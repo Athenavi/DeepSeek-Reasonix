@@ -407,6 +407,10 @@ async function runSafetyFixture(page) {
         const element = document.querySelector(".transcript"), viewport = element.getBoundingClientRect();
         const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
         for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          // Toolbar labels are visible text, but native dragging does not
+          // select them. Exercise the same selectable surface as the product.
+          if (!node.parentElement.closest("[data-transcript-selectable]")
+            || node.parentElement.closest("button, input, textarea, [role=button]")) continue;
           if (node.textContent.trim().length < 8) continue;
           const range = document.createRange(); range.setStart(node, 0); range.setEnd(node, 8);
           const rect = range.getBoundingClientRect();
@@ -417,6 +421,9 @@ async function runSafetyFixture(page) {
       await page.mouse.move(point.x, point.y); await page.mouse.down();
       await page.mouse.move(point.end, point.y, { steps: 4 });
       await settleFrames(page, 2);
+      assert(await page.evaluate(() => Boolean(document.getSelection()?.toString())
+        && document.querySelector(".transcript")?.dataset.scrollMode === "selection"),
+      "safety fixture establishes a real text selection before fault injection");
     }
     const started = await page.evaluate((cycle) => {
       const element = document.querySelector(".transcript");
