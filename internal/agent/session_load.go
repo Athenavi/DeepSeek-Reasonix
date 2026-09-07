@@ -24,6 +24,7 @@ type sessionLoadResult struct {
 	dag        bool
 	head       HeadRef
 	headCount  int
+	state      *sessionDAGState
 }
 
 // loadSessionMessages returns the session transcript, preferring the event log
@@ -71,6 +72,7 @@ func loadSessionTranscript(ctx context.Context, sessionPath string, limits sessi
 			msgs: msgs, times: times, fromEvents: true, damaged: st.damaged, dag: true,
 			head:      HeadRef{HeadID: headID, LeafID: st.heads[headID].leaf, LogGeneration: st.generation, LogOffset: st.lastGoodEnd},
 			headCount: len(st.heads),
+			state:     st,
 		}, nil
 	}
 	if probe.native && probe.size > 0 {

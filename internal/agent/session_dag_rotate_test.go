@@ -82,6 +82,7 @@ func TestDAGIncrementalReplayFromKnownTail(t *testing.T) {
 }
 
 func TestDAGUpgradeFromSchemaOneKeepsIDsAndTranscript(t *testing.T) {
+	useSchemaOneLog(t)
 	path := dagTestSession(t)
 	v1 := &Session{Messages: []provider.Message{
 		{Role: provider.RoleSystem, Content: "sys"},

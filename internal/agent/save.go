@@ -314,19 +314,12 @@ func (s *Session) saveLocked(path string, mode sessionSaveMode) error {
 	if err != nil {
 		return err
 	}
-	probe, err := probeSessionEventLog(path)
+	probe, err := probeLogForSave(path)
 	if err != nil {
 		return err
 	}
-	if probe.futureSchema {
-		return fmt.Errorf("session event log for %s uses schema %d; this build supports up to %d", path, probe.schemaVersion, sessionEventSchemaVersion)
-	}
-	if probe.native && probe.size > 0 {
-		// Drop any torn tail a crashed or disk-full append left behind before
-		// it can be buried under new records where replay would stop forever.
-		if err := repairSessionEventLogTail(path); err != nil {
-			return fmt.Errorf("repair session event log: %w", err)
-		}
+	if route := s.dagSaveRoute(path, probe); route != dagRouteSchemaOne {
+		return s.saveDAGLocked(path, mode, route, msgs, version, rewriteVersion, digest)
 	}
 	repairLog := false
 	deferProjection := mode.defersProjection()
@@ -1384,7 +1377,7 @@ func loadSessionUnlocked(path string) (*Session, error) {
 		return nil, err
 	}
 	msgs := res.msgs
-	s := &Session{Messages: msgs, eventLogDamaged: res.damaged, head: sessionHeadState{ref: res.head, dag: res.dag, headCount: res.headCount}}
+	s := &Session{Messages: msgs, eventLogDamaged: res.damaged, head: sessionHeadState{ref: res.head, dag: res.dag, headCount: res.headCount, state: res.state}}
 	// Repair persisted-history-safe issues before anything reads the session.
 	// Old sessions (pre adde2d3e) and interrupted turns can carry empty tool-call
 	// names, dangling tool_calls, or half-streamed argument JSON that DeepSeek

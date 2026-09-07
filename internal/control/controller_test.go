@@ -910,7 +910,7 @@ func TestSnapshotAdoptsNewerDiskForPureStalePrefix(t *testing.T) {
 }
 
 func TestSnapshotRecoversDivergedControllerTranscript(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	path := filepath.Join(dir, "session.jsonl")
 
 	staleSess := agent.NewSession("sys")
@@ -959,7 +959,7 @@ func TestSnapshotRecoversDivergedControllerTranscript(t *testing.T) {
 // makes the next open of that branch strip messages from a turn that in fact
 // kept running (and completed) on the recovery branch.
 func TestSnapshotConflictRecoveryTransplantsInFlightTurnMarker(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	path := filepath.Join(dir, "session.jsonl")
 
 	staleSess := agent.NewSession("sys")
@@ -1264,7 +1264,7 @@ func TestResumePreservesNewerWALAfterStaleMarker(t *testing.T) {
 }
 
 func TestSnapshotRewriteRecoversStaleControllerTranscript(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	path := filepath.Join(dir, "session.jsonl")
 
 	staleSess := agent.NewSession("sys")
@@ -1415,7 +1415,7 @@ func TestEditedPromptMetadataAfterMidTurnSnapshotStaysOnOwnedSession(t *testing.
 }
 
 func TestRecoveryBranchPersistsLaterOwnedCompactionRewrite(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	path := filepath.Join(dir, "session.jsonl")
 
 	currentSess := agent.NewSession("sys")
@@ -1484,7 +1484,7 @@ func TestRecoveryBranchPersistsLaterOwnedCompactionRewrite(t *testing.T) {
 }
 
 func TestConcurrentSnapshotsShareSingleRecoveryHandoff(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	path := filepath.Join(dir, "session.jsonl")
 
 	currentSess := agent.NewSession("sys")
@@ -1651,7 +1651,7 @@ type blockedRecoveryHandoff struct {
 
 func startBlockedRecoveryHandoff(t *testing.T) *blockedRecoveryHandoff {
 	t.Helper()
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	path := filepath.Join(dir, "session.jsonl")
 
 	currentSess := agent.NewSession("sys")
@@ -2269,7 +2269,7 @@ func (s *noticeSink) lastNotice() (event.Event, bool) {
 }
 
 func TestSnapshotConflictAtRecoveryDepthCapIsolatesCurrentBranch(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	path := filepath.Join(dir, "session.jsonl")
 	disk := agent.NewSession("sys")
 	disk.Add(provider.Message{Role: provider.RoleUser, Content: "first"})
@@ -2392,7 +2392,7 @@ func TestNewSessionRefusesWhileTurnRunning(t *testing.T) {
 // (running was false at the entry check), and must be refused so the executor
 // session is not swapped out from under a live run loop.
 func TestNewSessionRefusesTurnStartedDuringSnapshot(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	path := filepath.Join(dir, "session.jsonl")
 
 	// A diverged on-disk transcript makes Snapshot enter the recovery callback,

@@ -428,9 +428,8 @@ func (st *sessionDAGState) materialize(headID string) ([]provider.Message, []tim
 			sys.ID = msgs[0].ID
 			msgs[0] = sys
 		} else {
-			if sys.ID == "" {
-				sys.ID = NewMessageID()
-			}
+			// The writer stamps the prepended system message's id on the marker
+			// so every reader materializes the same id.
 			msgs = append([]provider.Message{sys}, msgs...)
 			times = append([]time.Time{h.createdAt}, times...)
 		}
