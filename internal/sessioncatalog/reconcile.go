@@ -229,9 +229,11 @@ func recordFromOrder(target DirectoryTarget, info agent.SessionOrderInfo) Sessio
 	if info.TopicID == "" {
 		scope, root = target.Scope, target.WorkspaceRoot
 	}
+	// A stale projection is never certified, but its last-known preview and
+	// count stay as display hints so the row does not vanish during repair.
 	turnsState := TurnsValid
 	if !info.ListingProjectionFresh() {
-		turnsState, info.Preview, info.Turns = TurnsUnknown, "", 0
+		turnsState = TurnsUnknown
 	}
 	contentFingerprint := sessionContentFingerprint(info.Path)
 	metaFingerprint := fileFingerprint(agent.BranchMetaPath(info.Path))
