@@ -3259,6 +3259,7 @@ export const zh: Record<DictKey, string> = {
   "notice.guardianModelMissing": "Guardian 已停用：未找到对应模型。",
   "notice.guardianStartFailed": "Guardian 启动失败，已停用。",
   "notice.contextEditingFallback": "改用本地维护。",
+  "notice.turnStalled": "已经有一段时间没有任何进展。回合仍在运行；如果看起来卡住了，请点击停止。",
   "questionNav.label": "问题导航",
   "questionNav.progress": "问题 {current} / {total}",
   "questionNav.jump": "跳转到问题 {n}",

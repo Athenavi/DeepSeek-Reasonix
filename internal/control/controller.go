@@ -324,6 +324,7 @@ type Controller struct {
 	// turn counts model turns this session, passed to hooks in their payload.
 	turn       int
 	turnEvents turnEventState
+	liveness   turnLiveness
 
 	displayRecorder func(content, display string)
 
@@ -1014,6 +1015,7 @@ func (c *Controller) rebindCheckpoints(sessionPath string) {
 func (c *Controller) spawnGuardedTurn(ctx context.Context, cancel context.CancelFunc, body func(ctx context.Context) error) {
 	body = c.prepareTurnAdmission(body)
 	ctx, completion := withGuardedTurnCompletion(ctx)
+	c.liveness.reset(time.Now())
 	c.autosaveWG.Go(func() {
 		c.autosaveWhileRunning(ctx)
 	})
@@ -3803,31 +3805,6 @@ func (c *Controller) SnapshotRewrite() error {
 func (c *Controller) snapshot(markActivity, forceRewrite, shutdownRecovery bool) error {
 	_, err := c.snapshotWithDurability(markActivity, forceRewrite, shutdownRecovery)
 	return err
-}
-
-// midTurnSnapshotInterval is atomic (nanoseconds) so a test shrinking it
-// cannot race a previous test's still-parking autosave goroutine.
-var midTurnSnapshotInterval atomic.Int64
-
-func init() { midTurnSnapshotInterval.Store(int64(30 * time.Second)) }
-
-// autosaveWhileRunning snapshots the session periodically while a turn runs,
-// so an abrupt kill (SSH drop, force-quit) loses at most one interval of a
-// long turn instead of all of it (#3772). Session.Save copies under the lock
-// and replaces the file atomically, so racing the turn's appends is safe.
-func (c *Controller) autosaveWhileRunning(ctx context.Context) {
-	t := time.NewTicker(time.Duration(midTurnSnapshotInterval.Load()))
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-			if err := c.snapshot(false, false, false); err != nil {
-				slog.Warn("controller: mid-turn snapshot", "err", err)
-			}
-		}
-	}
 }
 
 // snapshotWithDurability reports whether the canonical transcript reached disk

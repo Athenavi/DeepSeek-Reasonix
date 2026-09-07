@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"reasonix/internal/agent"
 	"reasonix/internal/event"
@@ -57,11 +58,7 @@ func (s *turnEventSink) Emit(e event.Event) {
 	if s == nil {
 		return
 	}
-	if s.c != nil {
-		if ledger := s.c.turnEventLedger(); ledger != nil {
-			ledger.ObserveRawEvent(e)
-		}
-	}
+	s.observe(e)
 	if turnEventSynchronousBarrier(e.Kind) {
 		if err := event.EmitChecked(s.stream, e); err != nil {
 			s.fail(err)
@@ -69,6 +66,18 @@ func (s *turnEventSink) Emit(e event.Event) {
 		return
 	}
 	s.stream.Emit(e)
+}
+
+// observe feeds every raw event to the ledger's routing and to the liveness
+// tracker before ordering, so silence is measured from real emission time.
+func (s *turnEventSink) observe(e event.Event) {
+	if s.c == nil {
+		return
+	}
+	if ledger := s.c.turnEventLedger(); ledger != nil {
+		ledger.ObserveRawEvent(e)
+	}
+	s.c.liveness.observe(e, time.Now())
 }
 
 func turnEventSynchronousBarrier(kind event.Kind) bool {
@@ -86,11 +95,7 @@ func (s *turnEventSink) EmitChecked(e event.Event) error {
 	if s == nil {
 		return nil
 	}
-	if s.c != nil {
-		if ledger := s.c.turnEventLedger(); ledger != nil {
-			ledger.ObserveRawEvent(e)
-		}
-	}
+	s.observe(e)
 	var err error
 	if s.publish.Load() > 0 && e.Kind == event.PromptAnswered {
 		// A frontend may answer during prompt publication, so the coalescer cannot

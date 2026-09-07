@@ -206,7 +206,10 @@ console.log("\nbundle budgets");
 // explicit budget rather than failing on a rounded 467.0 KiB display value.
 // The latest main-v2 session-runtime fence and exact prompt protocol measure
 // 468.2 KiB here; retain a 0.1 KiB ceiling for platform zlib rounding.
-const initialJSBudgetKiB = 468.3;
+// The running-tool elapsed label and turn_stalled notice copy (#9889) move
+// the merged path from 468.307 to 468.424 KiB gzip (the base already sat
+// 7 bytes over the rounded gate on Node 26 zlib); retain the next decimal.
+const initialJSBudgetKiB = 468.5;
 assertBudget("initial JavaScript gzip", initialJSGzip, initialJSBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk gzip", largestInitialJS, 280 * 1024);
 // Render-blocking CSS is intentionally absent: styles.css loads deferred via
@@ -286,7 +289,9 @@ for (const path of localeChunks) {
   // 61.027/61.881 KiB; retain bounded cross-platform headroom.
   // Recovery retry copy reaches the rounded 61.1 KiB boundary on Node/zlib
   // toolchains; keep the next one-decimal ceiling for cross-platform CI.
-  const budget = name.startsWith("zh-TW-") ? 62.0 * 1024 : 61.2 * 1024;
+  // The turn_stalled notice adds one string per dialect: 61.144 -> 61.205 KiB
+  // zh and 61.998 -> 62.058 KiB zh-TW; retain the next one-decimal ceiling.
+  const budget = name.startsWith("zh-TW-") ? 62.1 * 1024 : 61.3 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -391,6 +396,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2496.4 KiB locally; retain the smallest bounded ceiling.
 // The context truncation-rescue notice and its three locale strings measure
 // 2496.6 KiB; retain the smallest bounded ceiling.
-const rawInitialBudgetKiB = 2_496.7;
+// The running-tool elapsed label, dispatch timestamp, and turn_stalled copy
+// measure 2497.027 KiB raw (base 2496.630); retain the next decimal ceiling.
+const rawInitialBudgetKiB = 2_497.1;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

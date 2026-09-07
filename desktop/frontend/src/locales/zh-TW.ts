@@ -2308,6 +2308,7 @@ export const zhTW: Record<DictKey, string> = {
   "notice.guardianModelMissing": "Guardian 已停用：未找到對應模型。",
   "notice.guardianStartFailed": "Guardian 啟動失敗，已停用。",
   "notice.contextEditingFallback": "改用本機維護。",
+  "notice.turnStalled": "已經有一段時間沒有任何進展。回合仍在執行；如果看起來卡住了，請點擊停止。",
   "questionNav.label": "問題導航",
   "questionNav.progress": "問題 {current} / {total}",
   "questionNav.jump": "跳轉到問題 {n}",

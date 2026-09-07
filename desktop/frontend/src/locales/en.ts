@@ -3256,6 +3256,7 @@ export const en = {
   "notice.guardianModelMissing": "Guardian was disabled because its model was not found.",
   "notice.guardianStartFailed": "Guardian was disabled because it could not start.",
   "notice.contextEditingFallback": "Using local context maintenance.",
+  "notice.turnStalled": "No progress for a while. The turn is still running; if it looks stuck, press Stop.",
   "questionNav.label": "Question navigation",
   "questionNav.progress": "Question {current} / {total}",
   "questionNav.jump": "Jump to question {n}",
