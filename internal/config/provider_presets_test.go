@@ -8,7 +8,7 @@ import (
 	"reasonix/internal/provider/openai"
 )
 
-func TestCurrentBuiltInAnthropicCompatibleProvidersRemainLocalByCapability(t *testing.T) {
+func TestAnthropicPresetsDoNotImplicitlyEnableServerTools(t *testing.T) {
 	var entries []ProviderEntry
 	entries = append(entries, Default().Providers...)
 	for _, preset := range CuratedProviderPresets() {
@@ -20,7 +20,9 @@ func TestCurrentBuiltInAnthropicCompatibleProvidersRemainLocalByCapability(t *te
 		}
 		root := strings.TrimSuffix(strings.TrimRight(entry.BaseURL, "/"), "/v1")
 		if strings.EqualFold(root, "https://api.anthropic.com") {
-			t.Fatalf("built-in provider %q unexpectedly targets official Anthropic; add an explicit native-capability UX before enabling it", entry.Name)
+			if entry.Name != "anthropic" || entry.WebSearch == nil || *entry.WebSearch || entry.AuthHeader {
+				t.Fatalf("official Anthropic preset must explicitly use API-key auth without native server tools: %q", entry.Name)
+			}
 		}
 	}
 }

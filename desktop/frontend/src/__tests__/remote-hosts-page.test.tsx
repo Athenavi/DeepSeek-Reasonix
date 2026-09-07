@@ -29,7 +29,7 @@ async function flush() {
 
 function button(label: string, root: ParentNode = document): HTMLButtonElement | undefined {
   return Array.from(root.querySelectorAll<HTMLButtonElement>("button"))
-    .find((candidate) => candidate.textContent?.trim() === label);
+    .find((candidate) => (candidate.getAttribute("aria-label") || candidate.textContent?.trim()) === label);
 }
 
 console.log("\nRemote SSH host settings");

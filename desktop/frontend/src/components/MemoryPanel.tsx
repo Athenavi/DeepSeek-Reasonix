@@ -1198,7 +1198,7 @@ export function MemorySettingsPage() {
 					<code>{view.storeDir}</code>
 				</div>
 			)}
-			<div className="memory-tabs-row" role="tablist" aria-label={t("settings.tab.memory")}>
+			<div className="memory-tabs-row settings-toolbar" role="tablist" aria-label={t("settings.tab.memory")}>
 				<div className="settings-subtabs memory-tabs-row__primary" role="presentation">
 					<button
 						className={"settings-subtab" + (tab === "saved" ? " settings-subtab--active" : "")}

@@ -127,7 +127,7 @@ export function SubagentsSettingsPage({ s, onUseInChat }: { s: SettingsView; onU
     <section className="mem-section">
       {err && <div className="banner banner--error">{err}</div>}
       {!formOpen && (
-        <div className="cap-search subagents-toolbar">
+        <div className="cap-search subagents-toolbar settings-toolbar">
           <input
             className="mem-input"
             type="search"

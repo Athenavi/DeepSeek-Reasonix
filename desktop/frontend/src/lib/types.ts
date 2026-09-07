@@ -1475,6 +1475,7 @@ export interface MCPMarketplaceView {
 }
 
 export interface ModelInfo {
+  displayName?: string;
   ref: string; // "provider/model" — pass to SetModel
   provider: string;
   model: string;
@@ -1484,8 +1485,9 @@ export interface ModelInfo {
 }
 
 export interface EffortInfo {
+  options?: { id: string; name: string; description?: string }[];
   supported: boolean;
-  current: string; // "auto" | "low" | "medium" | "high" | "xhigh" | "max"
+  current: string; // adapter-owned ID; "auto" inherits the configured default
   default: string;
   levels: string[];
 }
@@ -1622,7 +1624,7 @@ export interface MemoryView {
 }
 
 // SettingsTab is the top-level navigation item in the Settings Centre modal.
-export type SettingsTab = "general" | "models" | "providers" | "bots" | "mcp" | "remote" | "skills" | "subagents" | "plugins" | "memory" | "hooks" | "diagnostics" | "shortcuts" | "permissions" | "sandbox" | "network" | "appearance" | "storage" | "updates";
+export type SettingsTab = "general" | "models" | "model-stats" | "providers" | "bots" | "mcp" | "remote" | "skills" | "subagents" | "plugins" | "memory" | "hooks" | "diagnostics" | "shortcuts" | "permissions" | "sandbox" | "network" | "appearance" | "storage" | "updates";
 
 /** Extension runtime doctor report from App.RuntimeDoctor. */
 export interface RuntimeDoctorReport {
@@ -1739,6 +1741,7 @@ export interface CapabilityIssue {
 }
 // Settings panel payloads (desktop/settings_app.go).
 export interface ProviderView {
+  displayName?: string;
   name: string;
   builtIn: boolean;
   added: boolean;
@@ -1801,7 +1804,26 @@ export interface ProviderModelCapabilityUpdate {
   inputModalities: string[];
 }
 
+export interface ProviderProtocolEndpoint {
+  baseUrl: string;
+  source: string;
+  checkedOn: string;
+  authHeader?: boolean;
+  responsesMode?: string;
+}
+
+export interface ProviderCatalog {
+  protocols?: Record<string, ProviderProtocolEndpoint>;
+  brandId: string;
+  brandLabel: string;
+  region: string;
+  product: string;
+  format: string;
+  baseUrl: string;
+}
+
 export interface ProviderPresetView {
+  catalog?: ProviderCatalog;
   id: string;
   label: string;
   description: string;

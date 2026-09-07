@@ -291,10 +291,7 @@ export function AppearanceOverview({
 
   return (
     <div className="appearance-overview">
-      <header className="appearance-overview__header">
-        <h2 className="appearance-overview__title">{t("settings.appearance")}</h2>
-        <p className="appearance-overview__sub">{t("settings.appearanceMeta")}</p>
-      </header>
+
 
       <section className="appearance-overview__current" aria-labelledby="appearance-current-label">
         <h3 id="appearance-current-label" className="appearance-overview__section-label">

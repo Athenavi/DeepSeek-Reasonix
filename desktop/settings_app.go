@@ -42,6 +42,7 @@ import (
 // read
 
 type ProviderView struct {
+	DisplayName                 *string                       `json:"displayName,omitempty"`
 	Name                        string                        `json:"name"`
 	BuiltIn                     bool                          `json:"builtIn"`
 	Added                       bool                          `json:"added"`
@@ -107,29 +108,30 @@ type ProviderModelCapabilityUpdate struct {
 	InputModalities []string `json:"inputModalities"`
 }
 type ProviderPresetView struct {
-	ID                   string   `json:"id"`
-	Label                string   `json:"label"`
-	Description          string   `json:"description"`
-	KeyEnv               string   `json:"keyEnv"`
-	Recommended          bool     `json:"recommended,omitempty"`
-	BillingMode          string   `json:"billingMode,omitempty"`
-	DisplayGroup         string   `json:"displayGroup,omitempty"`
-	DisplaySection       string   `json:"displaySection,omitempty"`
-	DisplayTier          string   `json:"displayTier,omitempty"`
-	RouteKind            string   `json:"routeKind,omitempty"`
-	Optional             bool     `json:"optional,omitempty"`
-	DisplayOrder         int      `json:"displayOrder,omitempty"`
-	ProviderNames        []string `json:"providerNames"`
-	Models               []string `json:"models"`
-	Added                bool     `json:"added"`
-	Status               string   `json:"status"`
-	StatusProviderNames  []string `json:"statusProviderNames"`
-	MissingProviderNames []string `json:"missingProviderNames,omitempty"`
-	KeySet               bool     `json:"keySet"`
-	RequiresKey          bool     `json:"requiresKey"`
-	Configured           bool     `json:"configured"`
-	KeySource            string   `json:"keySource,omitempty"`
-	KeySourcePath        string   `json:"keySourcePath,omitempty"`
+	Catalog              config.ProviderCatalog `json:"catalog"`
+	ID                   string                 `json:"id"`
+	Label                string                 `json:"label"`
+	Description          string                 `json:"description"`
+	KeyEnv               string                 `json:"keyEnv"`
+	Recommended          bool                   `json:"recommended,omitempty"`
+	BillingMode          string                 `json:"billingMode,omitempty"`
+	DisplayGroup         string                 `json:"displayGroup,omitempty"`
+	DisplaySection       string                 `json:"displaySection,omitempty"`
+	DisplayTier          string                 `json:"displayTier,omitempty"`
+	RouteKind            string                 `json:"routeKind,omitempty"`
+	Optional             bool                   `json:"optional,omitempty"`
+	DisplayOrder         int                    `json:"displayOrder,omitempty"`
+	ProviderNames        []string               `json:"providerNames"`
+	Models               []string               `json:"models"`
+	Added                bool                   `json:"added"`
+	Status               string                 `json:"status"`
+	StatusProviderNames  []string               `json:"statusProviderNames"`
+	MissingProviderNames []string               `json:"missingProviderNames,omitempty"`
+	KeySet               bool                   `json:"keySet"`
+	RequiresKey          bool                   `json:"requiresKey"`
+	Configured           bool                   `json:"configured"`
+	KeySource            string                 `json:"keySource,omitempty"`
+	KeySourcePath        string                 `json:"keySourcePath,omitempty"`
 }
 
 const (
@@ -683,7 +685,7 @@ func providerViewFromEntryForRootWithResolverAndCredentials(p config.ProviderEnt
 	}
 	modelCapabilities := providerModelCapabilitiesForView(p, models)
 	return ProviderView{
-		Name: p.Name, BuiltIn: builtIn, Added: added, Kind: p.Kind, BaseURL: p.BaseURL, ChatURL: p.ChatURL, RequestURL: p.RequestURL,
+		DisplayName: &p.DisplayName, Name: p.Name, BuiltIn: builtIn, Added: added, Kind: p.Kind, BaseURL: p.BaseURL, ChatURL: p.ChatURL, RequestURL: p.RequestURL,
 		Models: nonNil(models), VisionModels: nonNil(providerVisionModels(models, visionModels)), VisionModelsSet: visionModelsSet, VisionCapability: visionCapability, ModelsURL: p.ModelsURL, Default: p.DefaultModel(),
 		APIKeyEnv:                   p.APIKeyEnv,
 		Headers:                     nonNilStringMap(p.Headers),
@@ -810,6 +812,7 @@ func providerPresetViewsForRootWithResolver(cfg *config.Config, root string, res
 		added := status == providerPresetStatusInstalled || status == providerPresetStatusInstalledModified || status == providerPresetStatusNameConflict
 		out = append(out, ProviderPresetView{
 			ID:                   preset.ID,
+			Catalog:              config.CatalogForProviderPreset(preset),
 			Label:                preset.Label,
 			Description:          preset.Description,
 			KeyEnv:               keyEnv,
@@ -2521,6 +2524,9 @@ func saveProviderConfig(c *config.Config, p ProviderView) error {
 	}
 	original := e
 	e.Name = p.Name
+	if p.DisplayName != nil {
+		e.DisplayName = strings.TrimSpace(*p.DisplayName)
+	}
 	e.Kind = p.Kind
 	e.BaseURL = p.BaseURL
 	e.ChatURL = strings.TrimSpace(p.ChatURL)
@@ -2574,6 +2580,25 @@ func saveProviderConfig(c *config.Config, p ProviderView) error {
 		return err
 	}
 	addProviderAccess(c, p.Name)
+	return nil
+}
+
+// RenameProviderConnections updates display metadata only; route identities and
+// other settings are read from the latest configuration under the edit lock.
+func (a *App) RenameProviderConnections(names []string, displayName string) error {
+	return a.applyConfigChange(func(c *config.Config) error { return renameProviderConnections(c, names, displayName) })
+}
+
+func renameProviderConnections(c *config.Config, names []string, displayName string) error {
+	for _, name := range names {
+		if _, ok := c.Provider(name); !ok {
+			return fmt.Errorf("provider %q not found", name)
+		}
+	}
+	for _, name := range names {
+		p, _ := c.Provider(name)
+		p.DisplayName = strings.TrimSpace(displayName)
+	}
 	return nil
 }
 
@@ -2902,6 +2927,9 @@ func (a *App) AddProviderPresetAccess(id, key string) (string, error) {
 		}
 		names := make([]string, 0, len(missing))
 		for _, e := range missing {
+			if e.DisplayName == "" {
+				e.DisplayName = preset.Label
+			}
 			if err := c.UpsertProvider(e); err != nil {
 				return err
 			}
@@ -3811,4 +3839,184 @@ func trimList(in []string) []string {
 		}
 	}
 	return out
+}
+
+// SetConnectionKey detaches a legacy shared credential before updating this connection.
+// Empty values disable authentication for this connection without deleting another key.
+func (a *App) SetConnectionKey(name, value string) (string, error) {
+	var secretID [16]byte
+	if _, err := rand.Read(secretID[:]); err != nil {
+		return "", err
+	}
+	warning := ""
+	result, err := a.applyConfigChangeWithWarning("provider key", func(c *config.Config) error {
+		for i := range c.Providers {
+			if c.Providers[i].Name != name {
+				continue
+			}
+			env := fmt.Sprintf("REASONIX_CONNECTION_%X_KEY", secretID)
+			var err error
+			warning, err = a.saveProviderCredential(env, value)
+			if err != nil {
+				return err
+			}
+			c.Providers[i].APIKeyEnv = env
+			return nil
+		}
+		for _, p := range config.Default().Providers {
+			if p.Name != name {
+				continue
+			}
+			p.APIKeyEnv = fmt.Sprintf("REASONIX_CONNECTION_%X_KEY", secretID)
+			var err error
+			warning, err = a.saveProviderCredential(p.APIKeyEnv, value)
+			if err != nil {
+				return err
+			}
+			return c.UpsertProvider(p)
+		}
+		return fmt.Errorf("unknown provider %q", name)
+	})
+	return appendSettingsWarning(warning, result), err
+}
+
+// AddProviderConnection copies a preset or existing connection without sharing its credential.
+func (a *App) AddProviderConnection(presetID, sourceName, key string) (string, error) {
+	return a.addProviderConnection(presetID, sourceName, key, "", "")
+}
+
+// AddProviderConnectionWithURL overrides only the new connection, never the preset.
+func (a *App) AddProviderConnectionWithURL(presetID, sourceName, key, baseURL string) (string, error) {
+	baseURL = strings.TrimSpace(baseURL)
+	u, err := url.Parse(baseURL)
+	if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") || u.User != nil {
+		return "", fmt.Errorf("invalid provider base URL")
+	}
+	return a.addProviderConnection(presetID, sourceName, key, baseURL, "")
+}
+
+// AddProviderConnectionWithOptions applies overrides to the new connection only.
+func (a *App) AddProviderConnectionWithOptions(presetID, sourceName, key, baseURL, kind string) (string, error) {
+	if kind != "" && kind != "openai" && kind != "responses" && kind != "anthropic" {
+		return "", fmt.Errorf("invalid provider protocol")
+	}
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL != "" {
+		u, err := url.Parse(baseURL)
+		if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") || u.User != nil {
+			return "", fmt.Errorf("invalid provider base URL")
+		}
+	}
+	return a.addProviderConnection(presetID, sourceName, key, baseURL, kind)
+}
+
+func (a *App) addProviderConnection(presetID, sourceName, key, baseURL, kind string) (string, error) {
+	var connectionID [16]byte
+	if _, err := rand.Read(connectionID[:]); err != nil {
+		return "", err
+	}
+	warning := ""
+	result, err := a.applyConfigChangeWithWarning("provider access", func(c *config.Config) error {
+		var entries []config.ProviderEntry
+		var catalog config.ProviderCatalog
+		if presetID != "" {
+			preset, ok := config.CuratedProviderPreset(presetID)
+			if !ok {
+				return fmt.Errorf("unknown preset %q", presetID)
+			}
+			catalog = config.CatalogForProviderPreset(preset)
+			entries = append(entries, preset.Entries...)
+			for i := range entries {
+				if entries[i].DisplayName == "" {
+					entries[i].DisplayName = preset.Label
+				}
+			}
+		} else {
+			for _, p := range c.Providers {
+				if p.Name == sourceName {
+					entries = append(entries, p)
+					break
+				}
+			}
+		}
+		if len(entries) == 0 && presetID == "" {
+			for _, p := range config.Default().Providers {
+				if p.Name == sourceName {
+					entries = append(entries, p)
+					break
+				}
+			}
+		}
+		if len(entries) == 0 {
+			return fmt.Errorf("connection template not found")
+		}
+		if presetID == "" {
+			// The built-in official connection is the DeepSeek catalog.
+			if sourceName == "deepseek-flash" || sourceName == "deepseek-pro" {
+				catalog = config.ProviderCatalog{BrandID: "deepseek", Region: "global", Product: "api"}
+			}
+		}
+		endpoints := config.ProtocolEndpointsForCatalog(catalog)
+		for _, entry := range entries {
+			if kind != "" && kind != entry.Kind {
+				entry.Kind = kind
+				entry.RequestURL = ""
+				entry.ChatURL = ""
+				entry.ModelsURL = ""
+				entry.ExtraBody = nil
+				entry.AuthHeader = false
+				entry.Thinking = ""
+				entry.Effort = ""
+				entry.ResponsesMode = ""
+				entry.ResponsesStateful = nil
+			}
+			if baseURL != "" {
+				entry.BaseURL = baseURL
+				entry.RequestURL = ""
+				entry.ChatURL = ""
+				entry.ModelsURL = ""
+			}
+			if endpoint, ok := endpoints[entry.Kind]; ok && strings.TrimRight(entry.BaseURL, "/") == strings.TrimRight(endpoint.BaseURL, "/") {
+				// Only set affirmative catalog options; don't erase preset defaults.
+				if endpoint.AuthHeader {
+					entry.AuthHeader = true
+				}
+				if endpoint.ResponsesMode != "" {
+					entry.ResponsesMode = endpoint.ResponsesMode
+				}
+			}
+			originalName := entry.Name
+			entry.Name = fmt.Sprintf("%s-%x", originalName, connectionID)
+			if entry.DisplayName == "" {
+				entry.DisplayName = originalName
+			}
+			count := 1
+			for _, existing := range c.Providers {
+				if existing.DisplayName == entry.DisplayName || strings.HasPrefix(existing.DisplayName, entry.DisplayName+" · ") {
+					count++
+				}
+				if existing.Name == entry.Name {
+					return fmt.Errorf("connection identifier collision")
+				}
+			}
+			if sourceName != "" || count > 1 {
+				entry.DisplayName = fmt.Sprintf("%s · %d", entry.DisplayName, count)
+			}
+			if sourceName != "" {
+				entry.Headers = nil
+			} // Custom headers may contain credentials.
+			entry.APIKeyEnv = fmt.Sprintf("REASONIX_CONNECTION_%X_%X_KEY", connectionID, []byte(originalName))
+			var err error
+			warning, err = a.saveProviderCredential(entry.APIKeyEnv, key)
+			if err != nil {
+				return err
+			}
+			if err := c.UpsertProvider(entry); err != nil {
+				return err
+			}
+			addProviderAccess(c, entry.Name)
+		}
+		return nil
+	})
+	return appendSettingsWarning(warning, result), err
 }

@@ -56,6 +56,7 @@ const (
 )
 
 func init() {
+	provider.RegisterReasoning("anthropic", ReasoningForConfig)
 	provider.Register("anthropic", New)
 }
 
@@ -107,7 +108,15 @@ func New(cfg provider.Config) (provider.Provider, error) {
 	thinking, _ := cfg.Extra["thinking"].(string)
 	thinking = strings.ToLower(strings.TrimSpace(thinking))
 	effort, _ := cfg.Extra["effort"].(string)
-	effort = strings.ToLower(strings.TrimSpace(effort))
+	if effort != "auto" && effort != "off" {
+		if err := ReasoningForConfig(cfg).Validate(cfg.Model, effort); err != nil {
+			return nil, err
+		}
+	}
+
+	if effort == "auto" || effort == "off" {
+		effort = ""
+	}
 	vision, _ := cfg.Extra["vision"].(bool)
 	modelInfo := provider.ModelInfo{ID: cfg.Model, InputModalities: []provider.ModelModality{provider.ModalityText}}
 	if cfg.ModelInfo != nil {
@@ -152,6 +161,7 @@ func New(cfg provider.Config) (provider.Provider, error) {
 	}
 	return &client{
 		identityHeaders:  provider.NewClientIdentityHeaders(),
+		reasoning:        ReasoningForConfig(cfg),
 		name:             name,
 		apiKey:           cfg.APIKey,
 		keyEnv:           keyEnv,
@@ -187,6 +197,7 @@ func newHTTPClient(cfg provider.Config) (*http.Client, error) {
 
 type client struct {
 	identityHeaders  http.Header
+	reasoning        provider.ReasoningCapability
 	name             string
 	apiKey           string
 	keyEnv           string // api_key_env name, surfaced in auth errors
@@ -223,20 +234,6 @@ func (c *client) ModelInfo() provider.ModelInfo {
 
 func (c *client) deepSeekThinkingEnabled() bool {
 	return c != nil && c.deepseek && c.thinking != "disabled" && c.effort != "disabled"
-}
-
-func normalizeDeepSeekAnthropicEffort(model, effort string) string {
-	_ = model
-	switch effort {
-	case "low":
-		return "low"
-	case "medium", "xhigh":
-		return "high"
-	case "high", "max":
-		return effort
-	default:
-		return ""
-	}
 }
 
 func (c *client) RequiresToolCallReasoning() bool {
@@ -327,6 +324,9 @@ var bufPool = sync.Pool{
 }
 
 func (c *client) Stream(ctx context.Context, req provider.Request) (<-chan provider.Chunk, error) {
+	if err := c.reasoning.Validate(c.model, req.EffortOverride); err != nil {
+		return nil, err
+	}
 	requestCtx := provider.WithRequestAttemptCounter(ctx)
 	buf := bufPool.Get().(*bytes.Buffer)
 	buf.Reset()
@@ -464,6 +464,10 @@ func (c *client) buildRequest(ctx context.Context, req provider.Request) anthReq
 		Tools:     tools,
 		Stream:    true,
 	}
+	effort := c.effort
+	if req.EffortOverride != "" {
+		effort = req.EffortOverride
+	}
 	// Extended thinking is provider-specific. DeepSeek defaults to enabled and
 	// accepts output_config.effort alongside its binary toggle. Anthropic proper
 	// uses type=adaptive plus display/output_config. LongCat-style compatible
@@ -471,16 +475,20 @@ func (c *client) buildRequest(ctx context.Context, req provider.Request) anthReq
 	if c.deepseek {
 		c.applyDeepSeekThinking(&r, req)
 	} else {
-		switch c.thinking {
+		thinking := c.thinking
+		if effort != "" && thinking == "" {
+			thinking = "adaptive"
+		}
+		switch thinking {
 		case "adaptive":
 			r.Thinking = &thinkingConfig{Type: "adaptive", Display: "summarized"}
-			if c.effort != "" {
-				r.OutputConfig = &outputConfig{Effort: c.effort}
+			if effort != "" {
+				r.OutputConfig = &outputConfig{Effort: effort}
 			}
 		case "enabled", "disabled":
 			t := c.thinking
-			if c.effort == "enabled" || c.effort == "disabled" {
-				t = c.effort
+			if effort == "enabled" || effort == "disabled" {
+				t = effort
 			}
 			r.Thinking = &thinkingConfig{Type: t}
 		}

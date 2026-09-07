@@ -74,8 +74,9 @@ ok(
   "startup preference sync avoids rebuilding the full Settings payload",
 );
 ok(
-  /onChooseProvider=\{\(\) => \{[\s\S]*?setSettingsFocus\(\{ target: "model-access" \}\);[\s\S]*?setSettingsTarget\("models"\);/.test(appSource),
-  "onboarding opens the model access flow instead of model usage",
+  appSource.includes('setSettingsFocus({ target: "model-access", onboarding: true })') &&
+    appSource.includes('shouldOpenOnboarding(needs)') && !appSource.includes('<OnboardingOverlay'),
+  "onboarding routes directly to model service setup without a separate key modal",
 );
 ok(
   /initialFocus\?\.target === "model-access"[\s\S]*?initialFocus\?\.target === "model-stats"[\s\S]*?"usage"/.test(settingsSource),
@@ -91,58 +92,13 @@ ok(
   "usage statistics commands derive a monotonic request id from the shared focus state",
 );
 ok(
-  /case "deepseek-responses":\s*return t\("settings\.addProvider\.preset\.deepseekResponsesDesc"\)/.test(settingsSource),
-  "DeepSeek Responses preset uses a localized description",
+  settingsSource.includes("ProviderCatalogPicker") && !settingsSource.includes("function providerPresetDescription"),
+  "provider setup uses the brand catalog instead of the former flat preset cards",
 );
 ok(
-  !/case "deepseek-anthropic":\s*return t\("settings\.addProvider\.preset\.deepseekAnthropicDesc"\)/.test(settingsSource),
-  "redundant DeepSeek Anthropic preset is not separately localized in the provider list",
-);
-ok(
-  /case "token-rhythm":\s*return t\("settings\.addProvider\.preset\.tokenRhythmDesc"\)/.test(settingsSource) &&
-    /case "deepseek-responses":\s*return t\("settings\.addProvider\.preset\.deepseekResponsesLabel"\)/.test(settingsSource) &&
-    !/case "deepseek-anthropic":\s*return t\("settings\.addProvider\.preset\.deepseekAnthropicLabel"\)/.test(settingsSource) &&
-    /case "token-rhythm":\s*return t\("settings\.addProvider\.preset\.tokenRhythmLabel"\)/.test(settingsSource),
-  "visible official protocol presets and Token Rhythm localize their display names",
-);
-ok(
-  [enLocaleSource, zhLocaleSource, zhTWLocaleSource].every((source) =>
-    source.includes('"settings.addProvider.preset.deepseekResponsesDesc"') &&
-    source.includes('"settings.addProvider.preset.deepseekResponsesLabel"') &&
-    !source.includes('"settings.addProvider.preset.deepseekAnthropicDesc"') &&
-    !source.includes('"settings.addProvider.preset.deepseekAnthropicLabel"') &&
-    source.includes('"settings.addProvider.preset.tokenRhythmLabel"') &&
-    source.includes('"settings.addProvider.preset.tokenRhythmDesc"'),
-  ),
-  "provider preset localization is present in every supported locale",
-);
-ok(
-  [enLocaleSource, zhLocaleSource, zhTWLocaleSource].every((source) =>
-    source.includes('"settings.addProvider.preset.stepfunLabel"') &&
-    source.includes('"settings.addProvider.preset.stepfunAnthropicLabel"') &&
-    source.includes('"settings.addProvider.preset.stepfunResponsesLabel"') &&
-    source.includes('"settings.addProvider.preset.stepfunResponsesDesc"') &&
-    source.includes('"settings.addProvider.preset.stepfunApiLabel"') &&
-    source.includes('"settings.addProvider.preset.stepfunApiAnthropicLabel"'),
-  ),
-  "every StepFun preset localizes its display name and description",
-);
-ok(
-  enLocaleSource.includes('"settings.addProvider.preset.stepfunLabel": "StepFun Coding Plan"') &&
-    zhLocaleSource.includes('"settings.addProvider.preset.stepfunLabel": "阶跃星辰 Coding Plan"') &&
-    zhTWLocaleSource.includes('"settings.addProvider.preset.stepfunLabel": "階躍星辰 Coding Plan"'),
-  "StepFun preset names the subscription channel in every locale",
-);
-ok(
-  /case "stepfun-responses":\s*return t\("settings\.addProvider\.preset\.stepfunResponsesDesc"\)/.test(settingsSource) &&
-    /case "stepfun-responses":\s*return t\("settings\.addProvider\.preset\.stepfunResponsesLabel"\)/.test(settingsSource),
-  "StepFun Responses preset localizes through the settings panel",
-);
-ok(
-  enLocaleSource.includes('"settings.addProvider.preset.tokenRhythmLabel": "Token Rhythm"') &&
-    zhLocaleSource.includes('"settings.addProvider.preset.tokenRhythmLabel": "基元律动"') &&
-    zhTWLocaleSource.includes('"settings.addProvider.preset.tokenRhythmLabel": "基元律动"'),
-  "Token Rhythm preset uses the official English and Chinese brand names",
+  [enLocaleSource, zhLocaleSource, zhTWLocaleSource].every(source =>
+    ["settings.catalog.region", "settings.catalog.product", "settings.catalog.productCoding", "settings.providerProtocol"].every(key => source.includes(`"${key}"`))),
+  "account platform, plan and API format labels exist in every locale",
 );
 ok(
   [enLocaleSource, zhLocaleSource, zhTWLocaleSource].every((source) =>
@@ -243,8 +199,8 @@ ok(
 );
 ok(
   settingsSource.includes("officialProviders={s.officialProviders}") &&
-    settingsSource.includes("added: Boolean(state?.added)") &&
-    settingsSource.includes("keySet: Boolean(state?.keySet)"),
+    settingsSource.includes("const added = Boolean(provider?.added)") &&
+    settingsSource.includes("keySet: Boolean(provider?.keySet)"),
   "official provider templates honor the backend installed state",
 );
 ok(

@@ -3700,7 +3700,9 @@ export function Composer({
     mode: t(taskModeShortKey),
     summary: t(taskModeTooltipSummaryKey),
   });
-  const effortLevels = asArray(effort?.levels);
+  const effortOptions = asArray(effort?.options);
+  const effortLabel = (id: string) => effortOptions.find((option) => option.id === id)?.name || id;
+  const effortLevels = effort?.options ? ["auto", ...effortOptions.map((option) => option.id)] : asArray(effort?.levels);
   const currentEffort = effort?.current || "auto";
   const compactEffortTitle = currentEffort === "auto"
     ? t("status.effortAutoTitle", { def: effort?.default || "auto" })
@@ -4096,7 +4098,7 @@ export function Composer({
                   disabled={running}
                 >
                   <Gauge size={14} />
-                  <span>{level}</span>
+                  <span>{effortLabel(level)}</span>
                   {level === currentEffort && <Check size={13} />}
                 </button>
               ))}
@@ -4787,7 +4789,7 @@ export function Composer({
                     title={moreMenuOpen || moreMenuClosing ? undefined : compactEffortTitle}
                   >
                     <Gauge size={14} />
-                    <span>{currentEffort}</span>
+                    <span>{effortLabel(currentEffort)}</span>
                     <ChevronsUpDown size={11} />
                   </button>
                 </Tooltip>

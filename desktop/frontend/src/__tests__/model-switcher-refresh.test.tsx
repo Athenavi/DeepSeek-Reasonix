@@ -340,5 +340,22 @@ if (nullSafeOptions.length !== 2) {
   throw new Error(`null model metadata prevented catalog rendering: ${nullSafeOptions.length}`);
 }
 
+// Connection order and duplicate model IDs must survive selection and renaming.
+currentCatalog = [
+  { ref: "z/shared", provider: "z", displayName: "First connection", model: "shared", current: false },
+  { ref: "a/shared", provider: "a", displayName: "Second connection", model: "shared", current: true },
+];
+await act(async () => {
+  window.dispatchEvent(new Event("reasonix:model-catalog-changed"));
+  await new Promise(resolve => setTimeout(resolve, 0));
+});
+const connectionLabels = Array.from(document.querySelectorAll(".modelsw__group-label"), el => el.textContent);
+if (connectionLabels.join("|") !== "First connection|Second connection") {
+  throw new Error(`connection order differs from catalog: ${connectionLabels}`);
+}
+if (document.querySelectorAll("[role='option']").length !== 2) {
+  throw new Error("same model ID in separate connections was merged");
+}
+
 await act(async () => root.unmount());
 console.log("model switcher refresh: PASS");

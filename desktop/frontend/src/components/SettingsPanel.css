@@ -172,7 +172,7 @@
 
 .settings-center__navitem:hover .settings-center__navitem-main > svg,
 .settings-center__navitem--active .settings-center__navitem-main > svg {
-  color: var(--accent);
+  color: var(--fg);
 }
 
 .settings-center__navitem-main > span {
@@ -567,3 +567,218 @@
 }
 
 .settings-page-content { min-height: 100%; }
+/* Neutral, stable-height selection for the settings navigation in every theme. */
+:root .settings-center .settings-center__navitem {
+  border-radius: 16px;
+  align-content: center;
+}
+
+:root .settings-center .settings-center__navitem--active,
+:root .settings-center .settings-center__navitem--active:hover {
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+  color: var(--fg);
+  box-shadow: none;
+}
+
+:root .settings-center .settings-center__navitem--active::before {
+  display: none;
+}
+
+:root .settings-center .settings-center__navitem:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Shared settings density: preserve functional groups, remove page chrome. */
+:root .settings-center > .settings-center__content {
+  padding: 20px 24px;
+}
+:root .settings-center .settings-page {
+  margin: 0;
+  gap: 24px;
+}
+:root .settings-center .settings-page--form {
+  max-width: 880px;
+}
+:root .settings-center .settings-page--manager {
+  max-width: none;
+}
+:root .settings-center .settings-page > .settings-section {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+:root .settings-center .settings-page > .settings-section > .settings-section__head {
+  padding: 0 0 12px;
+}
+:root .settings-center .settings-page > .settings-section > .settings-section__body {
+  padding: 0;
+}
+:root .settings-center > .settings-center__content:has(.model-access-page:not([hidden])) {
+  padding: 0;
+}
+@media (max-width: 760px) {
+  :root .settings-center > .settings-center__content { padding: 16px; }
+}
+
+.settings-model-picker__group .settings-model-picker__option { min-height: 38px; padding: 8px 10px; }
+.settings-model-picker__option--pinned { position: sticky; top: 0; z-index: var(--z-local-raised); background: var(--bg-elev); }
+.settings-model-picker__group-title { padding: 10px 10px 5px; }
+.settings-model-picker__option:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.settings-subagent-advanced > summary { cursor: pointer; color: var(--fg-dim); padding: 12px 0; }
+
+/* Settings templates: geometry is shared; only task layout varies. */
+:root .settings-center .settings-page[data-layout] {
+  --settings-space: 24px;
+  --settings-control-height: 40px;
+  container: settings-page / inline-size;
+  max-width: none;
+  color: var(--fg);
+}
+:root .settings-center .settings-page[data-layout="form"] { max-width: 960px; }
+:root .settings-center .settings-page[data-layout="tool"] { max-width: 1200px; }
+:root .settings-center .settings-page[data-layout] > :is(.settings-section, .mem-section, .cap-mcp-settings, .appearance-overview, .remote-hosts, .diag-page) {
+  margin: 0 0 var(--settings-space);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+:root .settings-center .settings-page[data-layout] .settings-section__head {
+  align-items: center;
+  gap: 16px;
+  margin: 0;
+  padding: 0 0 16px;
+}
+:root .settings-center .settings-page[data-layout] :is(.settings-section__title, .settings-toolbar > h2, .settings-toolbar > strong, .cap-skills-head__title, .cap-server-section__title, .appearance-overview__section-label) {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+:root .settings-center .settings-page[data-layout] .settings-field {
+  grid-template-columns: minmax(160px, .8fr) minmax(0, 1.2fr);
+  gap: 24px;
+  padding: 16px 0;
+  align-items: center;
+}
+:root .settings-center .settings-page[data-layout] .settings-field--wide-copy { grid-template-columns: minmax(0, 1fr) auto; }
+:root .settings-center .settings-page[data-layout] :is(.settings-field__copy, .settings-field__control) { min-width: 0; }
+:root .settings-center .settings-page[data-layout] .settings-field__hint-line {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  display: block;
+  -webkit-line-clamp: unset;
+}
+:root .settings-center .settings-page[data-layout] :is(input.mem-input, select.mem-select, .provider-connection-fields input, .provider-connection-fields select) {
+  box-sizing: border-box;
+  min-height: var(--settings-control-height);
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  background-color: var(--bg);
+  font: inherit;
+  padding: 9px 12px;
+}
+:root .settings-center .settings-page[data-layout] select {
+  appearance: none;
+  background-image: none;
+  padding-inline-end: 28px;
+}
+:root .settings-center .settings-page[data-layout] select.mem-select {
+  /* Native popup retained; border and height match adjacent fields. */
+  appearance: auto;
+  background-color: var(--bg);
+}
+:root .settings-center .settings-page[data-layout] :is(input, select, textarea, button, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+:root .settings-center .settings-page[data-layout] .settings-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: 44px;
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+:root .settings-center .settings-page[data-layout] .settings-toolbar input[type="search"] { flex: 1 1 200px; min-width: 0; }
+:root .settings-center .settings-page[data-layout] .settings-toolbar :is(.btn, .chip) { flex-shrink: 0; }
+:root .settings-center .settings-page[data-layout] .settings-icon-button { width: 36px; height: 36px; padding: 0; display: inline-flex; justify-content: center; align-items: center; }
+:root .settings-center .settings-page[data-layout] .settings-save-bar {
+  position: sticky;
+  bottom: -20px;
+  z-index: var(--z-local-raised);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 0;
+  margin-top: 16px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+:root .settings-center .settings-page[data-layout] [hidden] { display: none !important; }
+:root .settings-center .settings-page--bots :is(.bot-channel-manager-card, .bot-channel-setup-card, .bot-detail-card) { padding: 0; border: 0; background: transparent; box-shadow: none; }
+:root .settings-center .settings-page--bots .bot-channel-manager { grid-template-columns: 240px minmax(0, 1fr); gap: 24px; }
+:root .settings-center .settings-page--bots .bot-channel-tabs { padding-right: 20px; border-right: 1px solid var(--border); }
+:root .settings-center .settings-page--bots .bot-channel-tab { border-color: transparent; min-height: 64px; box-shadow: none; background: transparent; }
+:root .settings-center .settings-page--bots .bot-channel-tab--active { background: color-mix(in srgb, var(--fg) 8%, transparent); border-color: transparent; box-shadow: none; color: var(--fg); }
+:root .settings-center .settings-page--bots .bot-simple-advanced { margin-top: 24px; box-shadow: none; background: transparent; border-inline: 0; border-radius: 0; }
+:root .settings-center .settings-page--plugins .cap-plugin-section { margin-top: 0; }
+:root .settings-center .settings-page--plugins .cap-plugin-section .cap-server-section__title { display: none; }
+:root .settings-center .settings-page--appearance .appearance-overview__current { margin-top: 0; }
+:root .settings-center .settings-page--remote .remote-host-row { box-shadow: none; }
+:root .settings-center .settings-page--hooks .hooks-json-panel { border: 1px solid var(--border); box-shadow: none; }
+:root .settings-center .settings-page--hooks .hooks-json-panel__textarea { min-height: 320px; resize: vertical; }
+:root .settings-center .settings-page--storage .settings-field__control input[readonly] { background: transparent; border-color: transparent; font-family: var(--font-mono, monospace); }
+:root .settings-center .settings-center__navitem:not(.settings-center__navitem--active):hover { background: color-mix(in srgb, var(--fg) 3%, transparent); }
+@container settings-page (max-width: 680px) {
+  :root .settings-center .settings-page[data-layout] .settings-field { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  :root .settings-center .settings-page--bots .bot-channel-manager { grid-template-columns: minmax(0, 1fr); }
+  :root .settings-center .settings-page--bots .bot-channel-tabs { border: 0; padding: 0; display: flex; overflow-x: auto; }
+  :root .settings-center .settings-page--bots .bot-channel-tab { flex: 0 0 160px; }
+}
+:root .settings-center .settings-page[data-layout] .settings-toolbar__actions { display: flex; align-items: center; gap: 8px; }
+:root .settings-center .settings-page--subagents .subagents-profile-group { padding: 0; border: 0; box-shadow: none; background: transparent; margin-bottom: 24px; }
+:root .settings-center .settings-page--bots .bot-channel-tab small { white-space: normal; overflow: visible; text-overflow: clip; }
+:root .settings-center .settings-page[data-layout] .settings-save-bar > [role="status"] { margin-right: auto; align-self: center; color: var(--fg-dim); font-size: var(--font-caption); }
+:root .settings-center .settings-page[data-layout] .settings-path-value { display: flex; align-items: center; gap: 8px; min-width: 0; }
+:root .settings-center .settings-page[data-layout] .settings-path-value input { flex: 1; min-width: 0; }
+
+/* Model preferences: one assignment matrix, then compact runtime controls. */
+.model-preferences { width: 100%; max-width: 1120px; margin: 0 auto; }
+.model-preferences .settings-section { background: transparent; border: 0; box-shadow: none; padding: 0; margin: 0; border-radius: 0; }
+.model-preferences .settings-section + .settings-section { margin-top: 20px; }
+.model-preferences .settings-section__head { padding: 0 0 16px; margin: 0; }
+.model-preferences .settings-section__title { font-size: 16px; }
+.model-preferences .settings-section__body { padding: 0; }
+.model-preferences .settings-field { padding: 16px 0; min-height: 0; gap: 24px; }
+.model-assignment-head, .model-preferences .model-assignment-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(220px, 1.5fr) minmax(140px, .8fr); gap: 24px; align-items: center; border-bottom: 1px solid var(--border); }
+.model-assignment-head { padding: 12px 0; font-size: 13px; color: var(--fg-dim); }
+.model-preferences .model-assignment-row .settings-field__control { display: contents; }
+.model-assignment-row .settings-model-picker { min-width: 0; width: 100%; }
+.model-assignment-row .settings-model-picker__selected small { display: none; }
+.model-preferences .settings-model-picker__trigger { min-height: 44px; padding: 10px 14px; }
+.model-assignment-connection { font-size: 13px; overflow-wrap: anywhere; color: var(--fg-dim); }
+.model-preferences .mem-select { appearance: none; min-height: 44px; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; background: var(--bg-elev); color: var(--text); }
+.model-preferences .settings-subagent-advanced { margin: 12px 0 24px; }
+.model-preferences .settings-subagent-advanced summary { cursor: pointer; padding: 8px 0; }
+.model-preferences .settings-section:last-child { border-top: 1px solid var(--border); padding-top: 24px; }
+.model-preferences .compact-ratio-controls { gap: 8px; }
+.model-preferences .compact-ratio-preset__caption, .model-preferences .compact-ratio-current { display: none; }
+.model-preferences .compact-ratio-presets .set-seg__btn { min-height: 40px; padding: 8px 16px; }
+.model-preferences .compact-ratio-summary { justify-content: flex-end; }
+@media (max-width: 900px) {
+ .model-assignment-head { display: none; }
+ .model-preferences .model-assignment-row { grid-template-columns: minmax(120px, .7fr) minmax(160px, 1fr); gap: 8px 16px; }
+ .model-assignment-connection { grid-column: 2; }
+}

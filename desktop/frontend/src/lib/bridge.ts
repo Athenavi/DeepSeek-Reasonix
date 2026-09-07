@@ -561,6 +561,7 @@ export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganiza
   SetDefaultToolApprovalMode(mode: string): Promise<void>;
   SetDefaultAutoRecoveryCheckpoint(enabled: boolean): Promise<void>;
 
+  RenameProviderConnections: typeof GeneratedApp.RenameProviderConnections;
   SaveProvider(p: ProviderView): Promise<void>;
   SetProviderWebSearch(names: string[], enabled: boolean): Promise<void>;
   SaveProviderModelCatalogs(updates: ProviderModelCatalogUpdate[]): Promise<string[]>;
@@ -579,6 +580,10 @@ export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganiza
   RemoveProviderAccess(name: string): Promise<void>;
   RemoveProviderAccesses(names: string[]): Promise<void>;
   SaveProviderKey(apiKeyEnv: string, value: string): Promise<string>;
+  SetConnectionKey(name: string, value: string): Promise<string>;
+  AddProviderConnectionWithOptions(presetID: string, sourceName: string, key: string, baseURL: string, kind: string): Promise<string>;
+  AddProviderConnectionWithURL(presetID: string, sourceName: string, key: string, baseURL: string): Promise<string>;
+  AddProviderConnection(presetID: string, sourceName: string, key: string): Promise<string>;
   SetProviderKey(apiKeyEnv: string, value: string): Promise<string>;
   ClearProviderKey(apiKeyEnv: string): Promise<void>;
   SetPermissionMode(mode: string): Promise<void>;
@@ -1118,7 +1123,7 @@ function bridgeBreadcrumb(method: string): string {
     return `model ${method}`;
   if (/^(SetDesktop|SetCloseBehavior|SetDisplayMode|SetStatusBar|SetReasoningDisplayMode|SetExpandThinking|SetAutoPlan|SetDefaultToolApprovalMode|SetCompactRatio|SetReasoningLanguage)/.test(method))
     return `settings ${method}`;
-  if (/^(SaveProvider|SetProviderWebSearch|SaveProviderModelCatalogs|AddOfficialProviderAccess|UpgradeDeepSeekProviderAccess|AddProviderPresetAccess|ResetProviderPresetAccess|RemoveProviderAccess|RemoveProviderAccesses|DeleteProvider|SaveProviderKey|SetProviderKey|ClearProviderKey|TestProviderModel|FetchProviderModelCatalog|FetchAllProviderModelCatalogs|FetchProviderModels|FetchAllProviderModels|ConnectKey)/.test(method))
+  if (/^(SetConnectionKey|AddProviderConnection|RenameProviderConnections|SaveProvider|SetProviderWebSearch|SaveProviderModelCatalogs|AddOfficialProviderAccess|UpgradeDeepSeekProviderAccess|AddProviderPresetAccess|ResetProviderPresetAccess|RemoveProviderAccess|RemoveProviderAccesses|DeleteProvider|SaveProviderKey|SetProviderKey|ClearProviderKey|TestProviderModel|FetchProviderModelCatalog|FetchAllProviderModelCatalogs|FetchProviderModels|FetchAllProviderModels|ConnectKey)/.test(method))
     return `provider ${method}`;
   if (/^(CheckUpdate|ApplyUpdateRequest|OpenDownloadPage|OpenUserConfigPath|ReloadUserConfig)/.test(method)) return `update ${method}`;
   if (/^(AddMCPServer|InstallMCPServer|UpdateMCPServer|RemoveMCPServer|AuthorizeAndConnectMCPServer|AuthenticateMCPServer|ReconnectMCPServer|ClearMCPServerAuthentication|SetMCPServer)/.test(method))
@@ -1395,8 +1400,22 @@ const mockProviderPresetTemplates: MockProviderPresetTemplate[] = [
   mockPreset("scnet-anthropic", "SCNet Anthropic", "SCNet (National Supercomputing Internet) Anthropic-compatible token-plan endpoint with Bearer auth.", "SCNET_API_KEY", mockProviderTemplate({ name: "scnet-anthropic", kind: "anthropic", baseUrl: "https://api.scnet.cn/api/llm/anthropic", models: ["GLM-5.2", "GLM-5", "GLM-5.1", "Kimi-K3", "Kimi-K2.7-Code", "Kimi-K2.6", "Kimi-K2.5", "DeepSeek-V4-Flash", "DeepSeek-V3.2", "MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.5", "MiMo-V2.5-Pro"], visionModels: ["Kimi-K2.6", "Kimi-K2.5"], default: "MiniMax-M2.5", apiKeyEnv: "SCNET_API_KEY", authHeader: true })),
 ];
 
+let mockCatalogLoad: Promise<void> | undefined;
+let mockCatalogs: Record<string, NonNullable<ProviderPresetView["catalog"]>> = {};
+function loadMockProviderCatalog(): Promise<void> {
+  return mockCatalogLoad ??= import("./providerCatalog.generated.json").then(({default: data}) => {
+    mockCatalogs = data.catalogs;
+    for (const template of data.templates) {
+      if (!mockProviderPresetTemplates.some(p => p.id === template.id)) {
+        mockProviderPresetTemplates.push(mockPreset(template.id, template.label, template.description, template.keyEnv, mockProviderTemplate(template.provider)));
+      }
+    }
+  });
+}
+
 function mockProviderPresetViews(): ProviderPresetView[] {
   return [...mockProviderPresetTemplates].sort((a, b) => mockProviderPresetDisplayRank(a.id) - mockProviderPresetDisplayRank(b.id)).map((template) => ({
+    catalog: mockCatalogs[template.id],
     id: template.id,
     label: template.label,
     description: template.description,
@@ -4529,7 +4548,15 @@ function makeMockApp(): AppBindings {
         conversationWidth,
       })) as DesktopStartupSettingsView;
     },
-    async Settings() { return JSON.parse(JSON.stringify(settings)) as SettingsView; },
+    async Settings() {
+      await loadMockProviderCatalog();
+      for (const preset of mockProviderPresetViews()) {
+        const existing = settings.providerPresets.find(p => p.id === preset.id);
+        if (existing) existing.catalog = preset.catalog;
+        else settings.providerPresets.push(preset);
+      }
+      return JSON.parse(JSON.stringify(settings)) as SettingsView;
+    },
     async StorageSettings() { return { defaultWorkspace: cwd, statePath: `${cwd}/.reasonix`, cachePath: `${cwd}/.reasonix/cache`, extensionsPath: `${cwd}/.reasonix/plugins` }; },
     async HooksSettings(scope: string) {
       const key = scope === "project" ? "project" : "global";
@@ -4587,10 +4614,39 @@ function makeMockApp(): AppBindings {
     async SetDefaultAutoRecoveryCheckpoint(_enabled: boolean) {
       // Legacy no-op; Auto Guard is always built into Auto.
     },
+    async SetConnectionKey(name: string, value: string) {
+      const p = settings.providers.find(p => p.name === name);
+      if (!p) throw new Error("Connection not found");
+      p.apiKeyEnv = `REASONIX_CONNECTION_${crypto.randomUUID().replaceAll("-", "")}_KEY`;
+      p.keySet = Boolean(value.trim());
+      return "";
+    },
+    async AddProviderConnectionWithOptions(_presetID: string, sourceName: string, key: string, baseURL: string, kind: string) {
+      const source = settings.providers.find(p => p.name === sourceName);
+      if (!source) throw new Error("Connection template unavailable in preview");
+      settings.providers.push({...source, kind:kind || source.kind, baseUrl:baseURL || source.baseUrl, requestUrl:"", chatUrl:"", modelsUrl:"", name:`${source.name}-${crypto.randomUUID()}`, builtIn:false, added:true, apiKeyEnv:`REASONIX_CONNECTION_${crypto.randomUUID().replaceAll("-", "")}_KEY`, keySet:Boolean(key.trim())});
+      return "";
+    },
+    async AddProviderConnectionWithURL(_presetID: string, sourceName: string, key: string, baseURL: string) {
+      const source = settings.providers.find(p => p.name === sourceName);
+      if (!source) throw new Error("Connection template unavailable in preview");
+      settings.providers.push({...source, baseUrl:baseURL, requestUrl:"", chatUrl:"", modelsUrl:"", name:`${source.name}-${crypto.randomUUID()}`, builtIn:false, added:true, apiKeyEnv:`REASONIX_CONNECTION_${crypto.randomUUID().replaceAll("-", "")}_KEY`, keySet:Boolean(key.trim())});
+      return "";
+    },
+    async AddProviderConnection(_presetID: string, sourceName: string, key: string) {
+      const source = settings.providers.find(p => p.name === sourceName);
+      if (!source) throw new Error("Connection template unavailable in preview");
+      settings.providers.push({...source, name:`${source.name}-${crypto.randomUUID()}`, builtIn:false, added:true, apiKeyEnv:`REASONIX_CONNECTION_${crypto.randomUUID().replaceAll("-", "")}_KEY`, keySet:Boolean(key.trim())});
+      return "";
+    },
+    async RenameProviderConnections(names: string[], displayName: string) {
+      for (const name of names) if (!settings.providers.some(p => p.name === name)) throw new Error(`Provider ${name} not found`);
+      settings.providers = settings.providers.map(p => names.includes(p.name) ? {...p, displayName: displayName.trim()} : p);
+    },
     async SaveProvider(p: ProviderView) {
       p.added = true;
       const i = settings.providers.findIndex((x) => x.name === p.name);
-      if (i >= 0) settings.providers[i] = p;
+      if (i >= 0) settings.providers[i] = { ...settings.providers[i], ...p };
       else settings.providers.push(p);
     },
     async SetProviderWebSearch(names: string[], enabled: boolean) {

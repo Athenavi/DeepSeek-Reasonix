@@ -495,7 +495,9 @@ func TestStreamOpenGenericErrorPassesThrough(t *testing.T) {
 }
 
 func TestStreamOpenCarriesRequestEffortAndSeqBase(t *testing.T) {
-	fc := newFakeClient("demo", demoDescriptor())
+	descriptor := demoDescriptor()
+	descriptor.Efforts = []string{"low", "high"}
+	fc := newFakeClient("demo", descriptor)
 	r := testResolver(t, baseCatalog(), nil, fc)
 
 	effort := "high"
@@ -780,5 +782,31 @@ func TestStreamPendingWindowOverflowInterrupts(t *testing.T) {
 	last := chunks[len(chunks)-1]
 	if last.Type != provider.ChunkError || !provider.IsStreamInterrupted(last.Err) {
 		t.Fatalf("terminal chunk = %+v, want interrupted error", last)
+	}
+}
+
+func TestReasoningSelectionRejectsUndeclaredBeforeSidecarIO(t *testing.T) {
+	descriptor := demoDescriptor()
+	descriptor.Efforts = []string{"low", "high"}
+	fc := newFakeClient("demo", descriptor)
+	r := testResolver(t, baseCatalog(), nil, fc)
+	bad := "medium"
+	_, err := r.Resolve(provider.Selection{Ref: "plugin/demo/fake/x", Effort: &bad})
+	var unsupported *provider.UnsupportedReasoningEffort
+	if !errors.As(err, &unsupported) {
+		t.Fatalf("selection error=%v", err)
+	}
+	p, err := r.Resolve(provider.Selection{Ref: "plugin/demo/fake/x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = p.Stream(context.Background(), provider.Request{EffortOverride: bad})
+	if !errors.As(err, &unsupported) {
+		t.Fatalf("override error=%v", err)
+	}
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
+	if len(fc.opened) != 0 {
+		t.Fatal("invalid effort reached sidecar")
 	}
 }
