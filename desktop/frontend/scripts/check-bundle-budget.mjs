@@ -389,6 +389,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // The shared harness decision surface adds a bounded startup stylesheet
 // payload. The current base plus exact prompt identity and stale-card recovery
 // measure 2496.4 KiB locally; retain the smallest bounded ceiling.
-const rawInitialBudgetKiB = 2_496.5;
+// The context truncation-rescue notice and its three locale strings measure
+// 2496.6 KiB; retain the smallest bounded ceiling.
+const rawInitialBudgetKiB = 2_496.7;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

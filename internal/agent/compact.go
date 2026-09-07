@@ -78,19 +78,20 @@ Rules: be terse — bullet points and fragments, not prose. Preserve identifiers
 // at send time and must never make compaction happen earlier than the user's
 // configured compact_ratio.
 func (a *Agent) compact(ctx context.Context, trigger, instructions string, force bool) error {
-	allowChunked := trigger == CompactionTriggerManual
-	_, err := a.compactToProjectionWithChunked(ctx, trigger, instructions, force, false, allowChunked)
+	_, err := a.compactToProjectionWithChunked(ctx, trigger, instructions, foldRequest{
+		force: force, allowChunked: trigger == CompactionTriggerManual,
+	})
 	return err
 }
 
 func (a *Agent) compactToProjection(ctx context.Context, trigger, instructions string, force, mustFree bool) (CompactionOutcome, error) {
-	return a.compactToProjectionWithChunked(ctx, trigger, instructions, force, mustFree, false)
+	return a.compactToProjectionWithChunked(ctx, trigger, instructions, foldRequest{force: force, mustFree: mustFree})
 }
 
-func (a *Agent) compactToProjectionWithChunked(ctx context.Context, trigger, instructions string, force, mustFree, allowChunked bool) (CompactionOutcome, error) {
+func (a *Agent) compactToProjectionWithChunked(ctx context.Context, trigger, instructions string, req foldRequest) (CompactionOutcome, error) {
 	a.sess.compactionRunMu.Lock()
 	defer a.sess.compactionRunMu.Unlock()
-	return a.compactToProjectionLocked(ctx, trigger, instructions, force, mustFree, allowChunked)
+	return a.compactToProjectionLocked(ctx, trigger, instructions, req)
 }
 
 func (a *Agent) compactTrigger() int {
@@ -408,8 +409,16 @@ func (a *Agent) summaryRequest(region []provider.Message, instructions string) p
 
 // summarize asks the executor's own provider to distill a replayed prefix into
 // a briefing. instructions is optional /compact focus + PreCompact text.
+func (a *Agent) summarize(ctx context.Context, region []provider.Message, instructions string) (string, *provider.Usage, error) {
+	req := a.summaryRequest(region, instructions)
+	summary, usage, err := a.runSummaryRequest(ctx, req)
+	a.observeSummaryOutcome(req, usage, err)
+	return summary, usage, err
+}
+
+// runSummaryRequest admits, sends, and drains one summary request.
 // Named returns so defer can attach RequestCount and still return usage.
-func (a *Agent) summarize(ctx context.Context, region []provider.Message, instructions string) (summary string, usage *provider.Usage, err error) {
+func (a *Agent) runSummaryRequest(ctx context.Context, req provider.Request) (summary string, usage *provider.Usage, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	ctx = provider.WithRequestAttemptCounter(ctx)
@@ -420,7 +429,6 @@ func (a *Agent) summarize(ctx context.Context, region []provider.Message, instru
 		}
 	}()
 	defer trackPublishedHostStream(ctx, cancel)()
-	req := a.summaryRequest(region, instructions)
 	if err := a.applySummaryAdmissionToRequest(&req); err != nil {
 		return "", usage, err
 	}
@@ -487,7 +495,9 @@ func (a *Agent) summarizeOnce(ctx context.Context, fold []provider.Message, inst
 	return a.summarize(ctx, fold, instructions)
 }
 
-// renderTranscript flattens messages into a readable transcript for summarization.
+// renderTranscript flattens messages into a bounded transcript for the
+// transcript-form summary request. Tool bodies are the provider-visible
+// Content cut to slimToolResultRunes; RawContent never enters a summary.
 func renderTranscript(msgs []provider.Message) string {
 	var b strings.Builder
 	for _, m := range msgs {
@@ -506,11 +516,7 @@ func renderTranscript(msgs []provider.Message) string {
 			}
 			b.WriteString("\n")
 		case provider.RoleTool:
-			body := m.Content
-			if m.RawContent != "" {
-				body = m.RawContent
-			}
-			fmt.Fprintf(&b, "[tool %s result]\n%s\n\n", m.Name, body)
+			fmt.Fprintf(&b, "[tool %s result]\n%s\n\n", m.Name, slimToolResult(m.Content))
 		case provider.RoleSystem:
 			fmt.Fprintf(&b, "[system]\n%s\n\n", m.Content)
 		}
