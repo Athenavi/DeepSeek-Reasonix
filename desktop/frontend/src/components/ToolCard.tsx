@@ -81,6 +81,11 @@ function formatElapsedSeconds(ms: number): string {
   return String(Math.max(0, Math.round(ms / 1000)));
 }
 
+function formatRunningElapsed(ms: number): string {
+  const seconds = Number(formatElapsedSeconds(ms));
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m${seconds % 60}s`;
+}
+
 /** Lines shown by default in a shell output block before the "show all" button. */
 const SHELL_PREVIEW_LINES = 10;
 const ERROR_SUMMARY_MAX_CHARS = 140;
@@ -231,17 +236,17 @@ export const ToolCard = memo(function ToolCard({ item, subcalls, tabId, displayN
       ? [item.profile.model, item.profile.effort ? `effort ${item.profile.effort}` : ""].filter(Boolean).join(" · ")
       : "";
 
-  // Sub-agent progress chip: phase + running elapsed + recent activity. The
-  // 1s ticker only runs while a progress card is live; terminal cards show
-  // the final duration instead.
+  // One 1s ticker per live card feeds both the sub-agent chip and the plain
+  // running-elapsed label; terminal cards show the final duration instead.
   const sp = item.subagentProgress;
+  const ticking = sp ? !isTerminalSubagentPhase(sp.phase) : item.status === "running" && item.startedAt !== undefined;
   const [nowTick, setNowTick] = useState(() => Date.now());
   useEffect(() => {
-    if (!sp || isTerminalSubagentPhase(sp.phase)) return;
+    if (!ticking) return;
     const id = window.setInterval(() => setNowTick(Date.now()), 1000);
     return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sp]);
+  }, [ticking]);
+  const liveElapsed = ticking && !sp && item.startedAt !== undefined ? formatRunningElapsed(nowTick - item.startedAt) : "";
   const subagentChip = sp
     ? (() => {
         const label = subagentPhaseLabel(t, sp.phase);
@@ -389,7 +394,7 @@ export const ToolCard = memo(function ToolCard({ item, subcalls, tabId, displayN
   const quiet =
     item.readOnly && item.name !== "web_search" && !hasNested && item.status !== "error" && item.status !== "stopped";
 
-  const duration = item.status === "running" ? "" : (shellSummary || formatToolDuration(item.durationMs));
+  const duration = item.status === "running" ? liveElapsed : (shellSummary || formatToolDuration(item.durationMs));
   // While the model is still streaming this call's arguments (partial
   // dispatch), show the received volume as the live subject so a long
   // write_file body reads as progress instead of a silent stall.
