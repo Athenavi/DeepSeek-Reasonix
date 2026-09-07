@@ -107,15 +107,9 @@ func New(cfg provider.Config) (provider.Provider, error) {
 	keySource, _ := cfg.Extra["api_key_source"].(string)
 	thinking, _ := cfg.Extra["thinking"].(string)
 	thinking = strings.ToLower(strings.TrimSpace(thinking))
-	effort, _ := cfg.Extra["effort"].(string)
-	if effort != "auto" && effort != "off" {
-		if err := ReasoningForConfig(cfg).Validate(cfg.Model, effort); err != nil {
-			return nil, err
-		}
-	}
-
-	if effort == "auto" || effort == "off" {
-		effort = ""
+	effort, err := configuredEffort(cfg)
+	if err != nil {
+		return nil, err
 	}
 	vision, _ := cfg.Extra["vision"].(bool)
 	modelInfo := provider.ModelInfo{ID: cfg.Model, InputModalities: []provider.ModelModality{provider.ModalityText}}
@@ -234,10 +228,6 @@ func (c *client) ModelInfo() provider.ModelInfo {
 
 func (c *client) deepSeekThinkingEnabled() bool {
 	return c != nil && c.deepseek && c.thinking != "disabled" && c.effort != "disabled"
-}
-
-func (c *client) RequiresToolCallReasoning() bool {
-	return c.deepSeekThinkingEnabled()
 }
 
 func (c *client) RequiresAssistantReasoningReplay(m provider.Message) bool {

@@ -3760,33 +3760,7 @@ func (a *App) addProviderConnection(presetID, sourceName, key, baseURL, kind str
 		}
 		endpoints := config.ProtocolEndpointsForCatalog(catalog)
 		for _, entry := range entries {
-			if kind != "" && kind != entry.Kind {
-				entry.Kind = kind
-				entry.RequestURL = ""
-				entry.ChatURL = ""
-				entry.ModelsURL = ""
-				entry.ExtraBody = nil
-				entry.AuthHeader = false
-				entry.Thinking = ""
-				entry.Effort = ""
-				entry.ResponsesMode = ""
-				entry.ResponsesStateful = nil
-			}
-			if baseURL != "" {
-				entry.BaseURL = baseURL
-				entry.RequestURL = ""
-				entry.ChatURL = ""
-				entry.ModelsURL = ""
-			}
-			if endpoint, ok := endpoints[entry.Kind]; ok && strings.TrimRight(entry.BaseURL, "/") == strings.TrimRight(endpoint.BaseURL, "/") {
-				// Only set affirmative catalog options; don't erase preset defaults.
-				if endpoint.AuthHeader {
-					entry.AuthHeader = true
-				}
-				if endpoint.ResponsesMode != "" {
-					entry.ResponsesMode = endpoint.ResponsesMode
-				}
-			}
+			applyConnectionOverrides(&entry, kind, baseURL, endpoints)
 			originalName := entry.Name
 			entry.Name = fmt.Sprintf("%s-%x", originalName, connectionID)
 			if entry.DisplayName == "" {
@@ -3821,4 +3795,34 @@ func (a *App) addProviderConnection(presetID, sourceName, key, baseURL, kind str
 		return nil
 	})
 	return appendSettingsWarning(warning, result), err
+}
+
+func applyConnectionOverrides(entry *config.ProviderEntry, kind, baseURL string, endpoints map[string]config.ProviderProtocolEndpoint) {
+	if kind != "" && kind != entry.Kind {
+		entry.Kind = kind
+		entry.RequestURL = ""
+		entry.ChatURL = ""
+		entry.ModelsURL = ""
+		entry.ExtraBody = nil
+		entry.AuthHeader = false
+		entry.Thinking = ""
+		entry.Effort = ""
+		entry.ResponsesMode = ""
+		entry.ResponsesStateful = nil
+	}
+	if baseURL != "" {
+		entry.BaseURL = baseURL
+		entry.RequestURL = ""
+		entry.ChatURL = ""
+		entry.ModelsURL = ""
+	}
+	if endpoint, ok := endpoints[entry.Kind]; ok && strings.TrimRight(entry.BaseURL, "/") == strings.TrimRight(endpoint.BaseURL, "/") {
+		// Only set affirmative catalog options; don't erase preset defaults.
+		if endpoint.AuthHeader {
+			entry.AuthHeader = true
+		}
+		if endpoint.ResponsesMode != "" {
+			entry.ResponsesMode = endpoint.ResponsesMode
+		}
+	}
 }

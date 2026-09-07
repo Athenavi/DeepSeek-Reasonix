@@ -2,13 +2,14 @@ import { useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { LockKeyhole, RotateCcw } from "lucide-react";
 import { useT } from "../lib/i18n";
+import { imageInputHardBlocked, imageInputState } from "../lib/providerImageInput";
 import { ModalCloseButton } from "./ModalCloseButton";
 import type { ProviderModelCapabilityView } from "../lib/types";
 
 export interface ModelDetailsDraft { model: string; contextWindow: string; maxOutputTokens: number; vision: boolean | null; }
-export default function ProviderModelDialog({ initial, candidates, contextDefault, capability, busy, onClose, onApply }: {
+export default function ProviderModelDialog({ initial, candidates, contextDefault, capability, baseURL, busy, onClose, onApply }: {
   initial?: ModelDetailsDraft; candidates: string[]; contextDefault?: number;
-  capability?: ProviderModelCapabilityView; busy: boolean; onClose: () => void; onApply: (draft: ModelDetailsDraft) => void;
+  capability?: ProviderModelCapabilityView; baseURL?: string; busy: boolean; onClose: () => void; onApply: (draft: ModelDetailsDraft) => void;
 }) {
   const t = useT(), titleId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -25,10 +26,11 @@ export default function ProviderModelDialog({ initial, candidates, contextDefaul
   }, []);
   const validNumber = (value: string, omit = false) => !value.trim() || (Number.isSafeInteger(Number(value)) && (Number(value) > 0 || (omit && Number(value) === -1)));
   const valid = Boolean(model.trim()) && !/[\s,，]/.test(model.trim()) && (Boolean(initial) || !candidates.some(id => id.toLowerCase() === model.trim().toLowerCase())) && validNumber(context) && validNumber(output, true);
-  const imageState = vision === "auto" ? capability?.state ?? "unknown" : vision === "true" ? "supported" : "unsupported";
+  const imageBlocked = imageInputHardBlocked(baseURL, model, capability);
+  const imageState = imageBlocked ? "unsupported" : imageInputState(vision === "auto" ? "auto" : vision === "true" ? "on" : "off", capability);
   return createPortal(<dialog ref={dialog} className="provider-model-dialog" aria-labelledby={titleId}
     onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
-    <form onSubmit={event => { event.preventDefault(); if (!valid) { setError(true); return; } onApply({ model:model.trim(), contextWindow:context.trim(), maxOutputTokens:Number(output) || 0, vision:vision === "auto" ? null : vision === "true" }); }}>
+    <form onSubmit={event => { event.preventDefault(); if (!valid) { setError(true); return; } onApply({ model:model.trim(), contextWindow:context.trim(), maxOutputTokens:Number(output) || 0, vision:vision === "auto" ? null : !imageBlocked && vision === "true" }); }}>
       <header><h2 id={titleId}>{t(initial ? "settings.modelDialog.edit" : "settings.models.add")}</h2><ModalCloseButton label={t("common.close")} disabled={busy} onClick={onClose}/></header>
       <label className="provider-model-dialog__id">{t("settings.modelDialog.id")}
         {initial ? <span><LockKeyhole size={16}/>{model}</span> : <input autoFocus className="mem-input" value={model} disabled={busy} onChange={e=>setModel(e.target.value)} placeholder="deepseek-v4-flash"/>}
@@ -48,7 +50,7 @@ export default function ProviderModelDialog({ initial, candidates, contextDefaul
           <div className="provider-model-dialog__capability-title">{t("settings.modelDialog.input")}</div>
           <div className="provider-model-dialog__chips">
             <label><input type="checkbox" checked disabled/>{t("settings.textInput")}<LockKeyhole size={14}/></label>
-            <label><input type="checkbox" checked={imageState === "supported"} disabled={busy} onChange={event=>setVision(String(event.target.checked))}/>{t("settings.modelDialog.image")}</label>
+            <label><input type="checkbox" checked={imageState === "supported"} disabled={busy || imageBlocked} onChange={event=>setVision(String(event.target.checked))}/>{t("settings.modelDialog.image")}</label>
             <label title={t("settings.modelDialog.unavailable")}><input type="checkbox" checked={false} disabled/>{t("settings.modelDialog.video")}</label>
             <label title={t("settings.modelDialog.unavailable")}><input type="checkbox" checked={false} disabled/>PDF</label>
           </div>

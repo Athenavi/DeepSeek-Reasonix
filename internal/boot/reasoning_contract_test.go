@@ -20,13 +20,24 @@ func TestReasoningCatalogUsesResolvedModelOverride(t *testing.T) {
 }
 func TestConfiguredEffortRejectsBeforeCredentialsOrIO(t *testing.T) {
 	for _, e := range []config.ProviderEntry{
-		{Kind: "openai", Model: "deepseek-v4-flash", BaseURL: "https://api.deepseek.com", Effort: "medium"},
+		{Kind: "openai", Model: "deepseek-v4-flash", BaseURL: "https://api.deepseek.com", Effort: "ultra"},
 		{Kind: "openai", Model: "m", BaseURL: "https://example.invalid", SupportedEfforts: []string{"high"}, DefaultEffort: "max"},
 	} {
 		_, err := NewProvider(&e)
 		var unsupported *provider.UnsupportedReasoningEffort
 		if !errors.As(err, &unsupported) {
 			t.Fatalf("expected exact-effort rejection, got %v", err)
+		}
+	}
+}
+
+func TestStoredDeepSeekEffortCompatibility(t *testing.T) {
+	for _, kind := range []string{"openai", "anthropic"} {
+		for _, effort := range []string{"medium", "xhigh"} {
+			entry := config.ProviderEntry{Name: "legacy", Kind: kind, Model: "deepseek-v4-flash", BaseURL: "https://api.deepseek.com", Effort: effort}
+			if _, err := NewProvider(&entry); err != nil {
+				t.Fatalf("%s/%s: %v", kind, effort, err)
+			}
 		}
 	}
 }

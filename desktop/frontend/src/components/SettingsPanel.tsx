@@ -6505,7 +6505,7 @@ export function ProviderEditor({
       {fetchStatus && <div role="status" className="provider-fetch-status provider-fetch-status--ok">{fetchStatus}</div>}
       {fetchFallback && <div role="alert" className="provider-fetch-status provider-fetch-status--warn">{fetchFallback}</div>}
       {modelDialog !== null && <Suspense fallback={null}><ProviderModelDialog
-        candidates={modelCandidateNames} contextDefault={Number(ctx) || undefined}
+        baseURL={effectiveRequestUrl} candidates={modelCandidateNames} contextDefault={Number(ctx) || undefined}
         initial={modelDialog ? {model:modelDialog, contextWindow:modelContextWindows[modelDialog] ?? "", maxOutputTokens:modelOverrides.find(item=>item.model === modelDialog)?.maxOutputTokens ?? 0, vision:modelOverrides.find(item=>item.model === modelDialog)?.vision ?? null} : undefined}
         capability={modelCapabilities.find(item=>item.model === modelDialog)} busy={busy}
         onClose={()=>setModelDialog(null)} onApply={applyModelDetails}/></Suspense>}

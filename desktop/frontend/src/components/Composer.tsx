@@ -3272,7 +3272,6 @@ export function Composer({
     setActive((prev) => (prev > maxIdx ? 0 : prev));
   }, [active, count, menuMode, slashSelectableIndices]);
 
-
   const removeAtToken = (value: string) => {
     return value.replace(/[\r\n]+$/u, "").replace(activeRefTokenRe, "").trimEnd();
   };

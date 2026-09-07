@@ -28,3 +28,16 @@ func ReasoningForConfig(cfg provider.Config) provider.ReasoningCapability {
 	return cap
 }
 func (c *client) ReasoningCapability() provider.ReasoningCapability { return c.reasoning.Clone() }
+
+// configuredEffort validates the adapter input after config compatibility normalization.
+func configuredEffort(cfg provider.Config) (string, error) {
+	effort, _ := cfg.Extra["effort"].(string)
+	if effort == "auto" || effort == "off" {
+		return "", nil
+	}
+	return effort, ReasoningForConfig(cfg).Validate(cfg.Model, effort)
+}
+
+func (c *client) RequiresToolCallReasoning() bool {
+	return c.deepSeekThinkingEnabled()
+}

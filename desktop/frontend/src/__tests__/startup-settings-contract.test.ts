@@ -184,9 +184,9 @@ ok(
 );
 ok(
   settingsSource.includes("officialProviders={s.officialProviders}") &&
-    settingsSource.includes("const added = Boolean(provider?.added)") &&
+    settingsSource.includes('canAdd: true, status: "available"') &&
     settingsSource.includes("keySet: Boolean(provider?.keySet)"),
-  "official provider templates honor the backend installed state",
+  "official templates allow separate connections while preserving credential status",
 );
 ok(
   /onUpgradeRecommended=\{\(name\) => \{[\s\S]*?cancelGroupFetch\(group\.id\);[\s\S]*?return apply\(\(\) => app\.UpgradeDeepSeekProviderAccess\(name\)\)/.test(settingsSource) &&
@@ -203,7 +203,7 @@ ok(
   "grouped DeepSeek profiles update server-side web search through one atomic backend call",
 );
 ok(
-  /<div className="provider-access-card__actions">[\s\S]*?<ProviderAccessMoreMenu[\s\S]*?<\/div>\s*<\/div>\s*\{group\.description && <div className="provider-access-card__desc">[\s\S]*?\{upgradeProvider && \(/.test(settingsSource) &&
+  /<div className="provider-access-card__actions">[\s\S]*?<ProviderAccessMoreMenu[\s\S]*?<\/div>\s*<\/div>\s*\{group\.description && !editingProvider && <div className="provider-access-card__desc">[\s\S]*?\{upgradeProvider && \(/.test(settingsSource) &&
     settingsSource.includes('className="provider-access-more__menu"') &&
     settingsSource.includes('buttonRole="menuitem"') &&
     stylesSource.includes(".provider-protocol-upgrade") &&

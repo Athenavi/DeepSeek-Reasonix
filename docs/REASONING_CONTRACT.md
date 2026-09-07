@@ -19,8 +19,11 @@ a depth scale merely by listing depth values in `supported_efforts`.
 adapter option and does not mean adaptive thinking. Request-level overrides use
 an empty string to inherit configuration, not the literal `auto`. Existing load
 normalization of retired stored `off` and letter case is retained. Existing valid
-IDs and TOML field names remain unchanged; unsupported old aliases now produce
-an actionable error rather than being silently remapped. Invalid configured
+IDs and TOML field names remain unchanged. Saved DeepSeek `medium` and `xhigh`
+values retain their historical `high` wire value when no explicit effort vocabulary
+is declared; configuration storage is not rewritten. New explicit selections and
+request overrides still reject undeclared aliases. Other unsupported aliases
+produce an actionable error. Invalid configured
 defaults remain visible for validation instead of falling back to another level.
 
 | Boundary | Compatibility |

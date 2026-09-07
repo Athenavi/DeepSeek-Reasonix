@@ -105,8 +105,7 @@ func EffectiveEffort(e *ProviderEntry) string {
 		return ""
 	}
 	if effort := normalizeStoredEffort(e.Effort); effort != "" {
-
-		return effort
+		return migrateStoredDeepSeekEffort(e, effort)
 	}
 	if explicitReasoningProtocol(e) == ReasoningProtocolKimiK3 {
 		return ""

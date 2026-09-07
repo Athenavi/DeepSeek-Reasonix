@@ -2,7 +2,7 @@ import {JSDOM} from 'jsdom';
 import React,{act} from 'react';
 import assert from 'node:assert/strict';
 const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
-Object.assign(globalThis,{window:dom.window,document:dom.window.document,localStorage:dom.window.localStorage,IS_REACT_ACT_ENVIRONMENT:true});
+Object.assign(globalThis,{window:dom.window,document:dom.window.document,localStorage:dom.window.localStorage,requestAnimationFrame:dom.window.requestAnimationFrame.bind(dom.window),cancelAnimationFrame:dom.window.cancelAnimationFrame.bind(dom.window),IS_REACT_ACT_ENVIRONMENT:true});
 const {createRoot}=await import('react-dom/client');
 const {ProviderEditor}=await import('../components/SettingsPanel');
 const {LocaleProvider}=await import('../lib/i18n');
@@ -11,11 +11,7 @@ const p={name:'custom',kind:'openai',baseUrl:'https://example.com/v1',models:['m
 const root=createRoot(document.getElementById('root')!);
 await act(async()=>root.render(<LocaleProvider><ProviderEditor initial={p as any} kinds={['openai']} busy={false} onCancel={()=>{}} onSave={()=>{}} onSaveKey={async()=>{}}/></LocaleProvider>));
 assert.equal(document.querySelectorAll('.provider-model-draft__context-field[open]').length,0);
-assert.equal(document.querySelector('input[type="password"]'),null);
-await act(async()=> (document.querySelector('.provider-key-compact__head > button') as HTMLButtonElement).click());
-assert.ok(document.querySelector('input[type="password"]'));
-await act(async()=> (document.querySelector('.provider-key-compact__head > button') as HTMLButtonElement).click());
-assert.equal(document.querySelector('input[type="password"]'),null);
+assert.ok(document.querySelector('input[type="password"]'), 'key entry is always visible and masked');
 assert.equal(document.querySelectorAll('.provider-model-toolbar .provider-model-draft__tools > button').length,2);
 
 await act(async()=>{(document.querySelector('.provider-model-toolbar button') as HTMLButtonElement).click();await new Promise(r=>setTimeout(r,20));});
@@ -26,4 +22,5 @@ assert.ok(manual);assert.ok(found);
 assert.equal(manual.querySelector('input')!.checked,true);
 assert.equal(found.querySelector('input')!.checked,false);
 await act(async()=>root.unmount());
+dom.window.close();
 console.log('PASS: discovery retains manual models and selection; new models are not auto-enabled; advanced fields start collapsed');

@@ -392,8 +392,8 @@ await act(async () => {
   );
   await flushPromises();
 });
-ok(rootEl.querySelector<HTMLButtonElement>(".provider-catalog__detail .btn--primary")?.disabled === true, "installed official providers cannot be added again");
-ok(rootEl.querySelector(".provider-catalog__detail")?.textContent?.includes("Added") === true, "installed official providers show their backend status");
+ok(rootEl.querySelector<HTMLButtonElement>(".provider-catalog__detail .btn--primary")?.disabled === false, "installed brands allow independent new connections");
+ok(rootEl.querySelector(".provider-catalog__detail")?.textContent?.includes("API Key") === true, "new connection has its own credential field");
 
 const openCodePreset = (
   id: string,
@@ -454,6 +454,7 @@ const brandButtons = rootEl.querySelectorAll(".provider-catalog__brand");
 ok(brandButtons.length === 2, "DeepSeek and all OpenCode products render as two brands");
 ok(Array.from(brandButtons).some(button => button.textContent?.includes("OpenCode")), "OpenCode has one selectable brand entry");
 ok(Array.from(brandButtons).every(button => !button.textContent?.includes("Anthropic")), "protocols never appear as top-level brands");
+await act(async () => { (Array.from(brandButtons).find(button => button.textContent?.includes("OpenCode")) as HTMLButtonElement).click(); });
 const products = rootEl.querySelector<HTMLSelectElement>('select[id$="-product"]');
 ok(Array.from(products?.options ?? []).map(option => option.value).join(",") === "go,zen", "Go and Zen remain distinct access plans within OpenCode");
 await act(async () => {
