@@ -395,7 +395,7 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // 2496.6 KiB; retain the smallest bounded ceiling.
 // Deferred presentation measured 2381.4 KiB before first-materialization
 // preloading. Mainline Stop brings the payload to 2381.8 KiB; retain
-// 0.2 KiB headroom for build identity.
-const rawInitialBudgetKiB = 2_382.0;
+// mainline recovery UI brings it to 2384.5 KiB. Retain 0.2 KiB headroom.
+const rawInitialBudgetKiB = 2_384.7;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

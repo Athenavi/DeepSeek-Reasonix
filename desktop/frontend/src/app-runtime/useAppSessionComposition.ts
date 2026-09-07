@@ -23,7 +23,7 @@ import { useSessionOperations } from "./useSessionOperations";
 import { useComposerInsertCommands } from "./useComposerInsertCommands";
 import { useSessionClearCommands } from "./useSessionClearCommands";
 import { useRuntimeStatus } from "./useRuntimeStatus";
-import { useAppDiagnostics, useSidebarConnectionValidity } from "./useAppEffectHosts";
+import { useAppDiagnostics, useRecoverableErrorToasts, useSidebarConnectionValidity } from "./useAppEffectHosts";
 import { useActiveTabUiReset, useDecisionSurfaceFocus } from "./useLocalUiLifecycles";
 import { useActiveTabMirrorCommit } from "./activeTabMirror";
 import { useInvocationMetadata } from "./useInvocationMetadata";
@@ -139,6 +139,7 @@ export type AppSessionCompositionInput = {
  */
 export function useAppSessionComposition(input: AppSessionCompositionInput) {
   const { t, showToast, shell, runtime } = input;
+  useRecoverableErrorToasts(showToast);
   const {
     state, liveStore, activeTabId, notice, activeTab, remoteSurfaceActive, remoteSession, remoteComposerReady,
     remoteSend, activeSessionIdentity, sessionSurfaceFence, sessionOperations,
