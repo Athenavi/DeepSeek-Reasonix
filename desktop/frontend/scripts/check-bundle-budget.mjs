@@ -286,7 +286,9 @@ for (const path of localeChunks) {
   // 61.027/61.881 KiB; retain bounded cross-platform headroom.
   // Recovery retry copy reaches the rounded 61.1 KiB boundary on Node/zlib
   // toolchains; keep the next one-decimal ceiling for cross-platform CI.
-  const budget = name.startsWith("zh-TW-") ? 62.0 * 1024 : 61.2 * 1024;
+  // The #9889/#9890 series adds recovery-wait, dialog-failure, and stall copy:
+  // zh-TW measures 63492 B (62.004 KiB) with the four PRs merged together.
+  const budget = name.startsWith("zh-TW-") ? 62.1 * 1024 : 61.2 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -393,8 +395,9 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // 2496.6 KiB; retain the smallest bounded ceiling.
 // The complete block renderer and input ownership gates measure 2371.7 KiB
 // on the settings + pure-kernel baseline. Keep the smallest bounded ceiling.
-// The running tool-card elapsed label and turn_stalled notice (#9889) measure
-// 2429046 B (2372.115 KiB) over a 2428639 B base; keep the smallest ceiling.
-const rawInitialBudgetKiB = 2_372.2;
+// The #9889/#9890 series (#9898, #9899, #9900, #9901) measures 2431847 B
+// (2374.851 KiB) merged together over a 2428639 B base; the four PRs share
+// this ceiling so they merge in any order. Re-measure once the series lands.
+const rawInitialBudgetKiB = 2_375.0;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
