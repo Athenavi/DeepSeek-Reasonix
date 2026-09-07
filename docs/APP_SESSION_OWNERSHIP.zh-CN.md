@@ -41,3 +41,9 @@ mixed 往返。汇总要求全部 2,688 次往返、完整检查点与堆快照�
 代际安装/退役、重连、主机挂起和显式关闭使用同一个 tab 发布顺序；不会在持全局 map 锁时等待发布锁，网络握手和 pump 等待仍在锁外。
 
 在 desktop 模块执行 `go test -race . -run 'TestRemoteResumeFailure|TestOpenRemoteProjectTabRejectedResumeRestoresPreviousIdentity|TestRemoteRejectedResume'`，覆盖错误可见时的完整身份、所有拒绝路径、旧请求失权，以及错误发布期间重连/退役/关闭的交错。
+
+## 远端启动锁交接
+
+远端服务持有者可能在竞争方排他 mkdir 失败与 Stat 之间释放目录。获取入口允许对这个缺失观测重新竞争一次，仍须通过排他 mkdir 才能成为持有者。只有 Exists 或结构化 SFTP v3 通用失败允许此路径；权限、传输与取消保持终止。连续第二次缺失会保守报错，因为协议不能区分重复竞争和永久通用失败；确实观察到存活锁后恢复原有受 context 控制的等待。此修复不改变独立的过期锁回收策略。
+
+根模块执行 `go test -race ./internal/remote/bootstrap`，覆盖释放交错、永久错误有限退出、取消及并发客户端只启动一次服务。
