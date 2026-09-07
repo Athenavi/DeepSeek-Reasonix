@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"reasonix/internal/event"
 	"reasonix/internal/provider"
@@ -104,6 +105,56 @@ func TestSummarizerCancellationAtOverflowPropagatesWithoutFallback(t *testing.T)
 	}
 	if after := projectionTokens(a); after != 0 {
 		t.Fatalf("cancellation installed projection tokens=%d (source=%d)", after, before)
+	}
+}
+
+// Thinking-mode providers (DeepSeek vision SKUs) may answer the summary
+// request with reasoning_content only and an empty content block. The
+// summarizer must surface the reasoning instead of failing with "summarizer
+// returned empty output" and retrying forever (observed on a 2M-token session:
+// chunked fallback reached fragment 2/14 and died on the same empty-output
+// check).
+func TestSummarizerReasoningOnlyIsSurfacedNotEmptied(t *testing.T) {
+	sess := foldableSessionOverForce(6)
+	a := agentOverForce(t, &fakeProvider{reasoningReply: "- kept: alpha constraint\n- kept: beta file path"}, sess)
+	before := estimateMessagesTokens(provider.ModelMessages(sess.Messages))
+
+	if err := prepareContext(context.Background(), a, CompactionTriggerOverflow); err != nil {
+		t.Fatalf("prepare with reasoning-only summary = %v, want applied fold", err)
+	}
+	if after := projectionTokens(a); after == 0 || after >= before {
+		t.Fatalf("reasoning-only summary installed projection tokens=%d (source=%d)", after, before)
+	}
+}
+
+// A reasoning-only reply that also opened a tool call is not a briefing: the
+// empty-output rejection must survive, and an opened call counts even when
+// the stream never completed it.
+func TestSummarizerReasoningWithToolCallStaysEmpty(t *testing.T) {
+	sess := foldableSessionOverForce(6)
+	a := agentOverForce(t, &fakeProvider{reasoningReply: "let me call a tool first", reasoningTool: true}, sess)
+
+	err := prepareContext(context.Background(), a, CompactionTriggerOverflow)
+	if !errors.Is(err, ErrCompactionRequired) || !strings.Contains(err.Error(), "summarizer returned empty output") {
+		t.Fatalf("prepare = %v, want the empty-output rejection under ErrCompactionRequired", err)
+	}
+	if after := projectionTokens(a); after != 0 {
+		t.Fatalf("reasoning with a tool call installed projection tokens=%d", after)
+	}
+}
+
+// The reasoning clamp cuts on rune boundaries so a CJK briefing stays valid
+// UTF-8 for the provider request that replays the digest.
+func TestSummarizerReasoningClampKeepsValidUTF8(t *testing.T) {
+	sess := foldableSessionOverForce(6)
+	a := agentOverForce(t, &fakeProvider{reasoningReply: strings.Repeat("上下文摘要要点。", 3000)}, sess)
+
+	summary, _, err := a.summarize(context.Background(), sess.Messages[1:], "")
+	if err != nil {
+		t.Fatalf("summarize = %v", err)
+	}
+	if len(summary) > summaryReasoningMaxBytes || !utf8.ValidString(summary) {
+		t.Fatalf("clamped reasoning is %d bytes valid=%v, want <= %d bytes of valid UTF-8", len(summary), utf8.ValidString(summary), summaryReasoningMaxBytes)
 	}
 }
 

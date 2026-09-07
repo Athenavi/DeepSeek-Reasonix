@@ -21,10 +21,15 @@ const (
 	defaultCompactRatio    = 0.80 // sole automatic maintenance trigger (new configs)
 	recentTailBudgetRatio  = 0.16 // recent verbatim tail as a fraction of the window
 	summaryOutputMaxTokens = 8192 // max digest output; further clipped by remaining candidate space
-	minRecentKeep          = 2    // never keep fewer recent messages than this
-	minCompactMessages     = 2    // skip compaction below this many compactable messages
-	fallbackTokPerChar     = 0.25 // ~4 chars/token, used before any usage is available to calibrate
-	protocolReserveTokens  = 256  // provider framing and control fields not represented by message estimates
+
+	// summaryReasoningMaxBytes clamps a surfaced reasoning-only summary
+	// (~8k tokens of bytes), matching the summaryOutputMaxTokens envelope.
+	summaryReasoningMaxBytes = 32768
+
+	minRecentKeep         = 2    // never keep fewer recent messages than this
+	minCompactMessages    = 2    // skip compaction below this many compactable messages
+	fallbackTokPerChar    = 0.25 // ~4 chars/token, used before any usage is available to calibrate
+	protocolReserveTokens = 256  // provider framing and control fields not represented by message estimates
 )
 
 var (
@@ -435,6 +440,8 @@ func (a *Agent) summarize(ctx context.Context, region []provider.Message, instru
 
 	// Unblock on timeout if the stream stalls while open.
 	var b strings.Builder
+	var reasoning strings.Builder
+	toolCalls := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -446,13 +453,24 @@ func (a *Agent) summarize(ctx context.Context, region []provider.Message, instru
 				}
 				s := strings.TrimSpace(b.String())
 				if s == "" {
-					return "", usage, fmt.Errorf("summarizer returned empty output")
+					// Thinking providers may answer with reasoning_content only. Surface
+					// it as the briefing unless the turn also reached for tools: that
+					// reasoning is private chain-of-thought, not digest material.
+					r := strings.TrimSpace(reasoning.String())
+					if r == "" || toolCalls > 0 {
+						return "", usage, fmt.Errorf("summarizer returned empty output")
+					}
+					return truncateUTF8Bytes(r, summaryReasoningMaxBytes), usage, nil
 				}
 				return s, usage, nil
 			}
 			switch chunk.Type {
 			case provider.ChunkText:
 				b.WriteString(chunk.Text)
+			case provider.ChunkReasoning:
+				reasoning.WriteString(chunk.Text)
+			case provider.ChunkToolCall, provider.ChunkToolCallStart:
+				toolCalls++
 			case provider.ChunkUsage:
 				usage = chunk.Usage
 			case provider.ChunkError:
