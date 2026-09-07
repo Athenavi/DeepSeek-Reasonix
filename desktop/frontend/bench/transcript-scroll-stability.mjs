@@ -123,9 +123,18 @@ async function expandGeometryProcesses(page) {
   // Standard with explicit process disclosure keeps reasoning collapsed.
   // Backend hydration intentionally supersedes the old localStorage preset.
   const viewport = page.locator(".transcript");
-  await viewport.evaluate(element => { element.scrollTop = 0; });
+  // A direct scrollTop assignment while tail-follow owns the viewport can be
+  // undone before the virtual list publishes its first range. A real upward
+  // gesture first transfers ownership to the reader on every platform.
+  await moveToOuterReaderGutter(page, viewport, false);
+  await page.mouse.wheel(0, -await viewport.evaluate(element => element.scrollHeight));
+  await page.waitForFunction(() => {
+    const element = document.querySelector(".transcript");
+    return element?.getAttribute("data-scroll-mode") === "manual" && element.scrollTop <= 1;
+  });
+  await waitForStableTranscriptGeometry(page);
   for (let step = 0; step < 500; step++) {
-    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await waitForStableTranscriptGeometry(page);
     const opened = await viewport.evaluate(element => {
       const buttons = [...element.querySelectorAll('.turn-collapse > button[aria-expanded="false"]')];
       for (const button of buttons) button.click();
