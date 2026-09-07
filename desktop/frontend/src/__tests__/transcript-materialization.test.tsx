@@ -101,6 +101,15 @@ async function verifyMaterialization(naturalHeight: number): Promise<number> {
     check(drift <= 0.5, `reverse materialization preserves every common visible position (${drift}px)`);
     check(overlap <= 0.5, `reverse materialization has no inter-block gap or overlap (${overlap}px)`);
     check(writes.length === 0, "materialization does not write native scroll during input");
+    const heldMidway = visible();
+    await act(async () => { kernel.endUserGesture(); root.render(<Fixture />); });
+    await harness.settle();
+    check(heldMidway.every(before => {
+      const after = visible().find(block => block.key === before.key);
+      return after != null && Math.abs(after.top - before.top) <= 0.5;
+    }), "mid-history origin release preserves the previously painted prefix anchor");
+    await act(async () => { kernel.beginUserGesture(snapshot()); root.render(<Fixture />); });
+
     // Reach the leading edge without releasing the input lease. Prefix-origin
     // calibration must be continuous, including the final one-pixel step.
     let maxEdgeExcess = 0;
@@ -136,6 +145,38 @@ async function verifyMaterialization(naturalHeight: number): Promise<number> {
     });
     const leading = scroller.querySelector<HTMLElement>('[data-transcript-block-key="fixed-0"]');
     check(!!leading && Math.abs(leading.getBoundingClientRect().top) <= 0.5, "native top exposes the complete first block");
+    // A previously invisible block can grow across the viewport boundary.
+    // Its new DOM height must not replace the reader's committed anchor.
+    await act(async () => {
+      scroller.scrollTop = 6_000;
+      kernel.observeNativeScroll(snapshot());
+      scroller.dispatchEvent(new Event("scroll"));
+    });
+    await act(async () => { kernel.endUserGesture(); root.render(<Fixture />); });
+    await harness.settle();
+    await act(async () => {
+      kernel.beginUserGesture(snapshot());
+      kernel.endUserGesture();
+      root.render(<Fixture />);
+    });
+    const beforeGrowth = visible()[0];
+    const predecessor = Array.from(scroller.querySelectorAll<HTMLElement>(".transcript__window-item"))
+      .filter(element => element.getBoundingClientRect().bottom <= 0).at(-1);
+    check(!!predecessor && !!beforeGrowth, "offscreen growth fixture owns a visible anchor and predecessor");
+    if (predecessor && beforeGrowth) {
+      await act(async () => {
+        for (let row = 0; row < 9; row++) {
+          const extra = document.createElement("div"); extra.className = "transcript__row"; predecessor.append(extra);
+        }
+        check(predecessor.getBoundingClientRect().bottom > 0, "natural growth enters viewport before its measured prefix commits");
+        harness.observers.filter(observer => observer.target === predecessor).forEach(observer => observer.notify());
+      });
+      await harness.settle();
+      const afterGrowth = visible().find(block => block.key === beforeGrowth.key);
+      check(afterGrowth != null && Math.abs(afterGrowth.top - beforeGrowth.top) <= 0.5,
+        "offscreen growth preserves the committed reader anchor instead of selecting the newly visible predecessor");
+    }
+
   } finally {
     await act(async () => root.unmount());
     host.remove();

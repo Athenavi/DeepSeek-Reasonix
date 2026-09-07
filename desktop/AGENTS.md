@@ -74,8 +74,8 @@ contracts when touching anything that can move the transcript viewport.
   while new preceding blocks are measured. Translate positions, extent, range
   lookup and publication-frontier checks together; consume the origin
   continuously toward the native leading edge, never reset it abruptly at zero.
-  Clear it under a current-DOM anchor restore in one prepaint commit after
-  input ends. Acknowledge geometry only after materialization finishes. For
+  Clear it using the committed prefix anchor in one prepaint commit after
+  input ends; ordinary growth retains the input-captured Kernel anchor. Acknowledge geometry only after materialization finishes. For
   subsequent size changes, while native input owns reader intent, the entire painted viewport is immutable: both the pre-measurement
   prefix range and mounted DOM must place a block after the viewport before it
   becomes a publish boundary. The logical Kernel anchor may only move that

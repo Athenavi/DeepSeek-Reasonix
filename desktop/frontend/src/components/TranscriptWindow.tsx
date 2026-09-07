@@ -280,9 +280,12 @@ export default function TranscriptWindow({
     // would let a native advance between those reads become an origin error.
     const commonTop = commonItem ? commonItem.start + origin
       : common && viewport ? common.getBoundingClientRect().top - viewport.top + (scrollElement?.scrollTop ?? observedTop) : undefined;
-    const firstVisible = visible[0];
-    const readerAnchor: LogicalAnchor | undefined = firstVisible && viewport
-      ? { kind: "block", blockKey: firstVisible.dataset.transcriptBlockKey!, offsetPx: viewport.top - firstVisible.getBoundingClientRect().top }
+    // Origin removal converts the already-painted coordinate system. Choose
+    // from its committed prefix, never from DOM heights that have just changed.
+    const committedVisible = measuredItems.find(item => item.start + origin + item.size > observedTop + 0.5
+      && item.start + origin < observedTop + clientHeight);
+    const originAnchor: LogicalAnchor | undefined = committedVisible
+      ? { kind: "block", blockKey: String(committedVisible.key), offsetPx: observedTop - (committedVisible.start + origin) }
       : undefined;
     if (container) {
       for (const item of measuredItems) {
@@ -316,7 +319,9 @@ export default function TranscriptWindow({
     if (published.length > 0 || releaseOrigin) {
       measurementNeedsRender.current = true;
       if (!kernel.userGestureActive) {
-        onGeometryWillChange(readerAnchor);
+        // Ordinary content growth belongs to the input-captured anchor;
+        // a newly enlarged preceding DOM block must not replace that owner.
+        onGeometryWillChange(releaseOrigin ? originAnchor : undefined);
         windowOrigin.current = 0;
       } else if (common && commonTop != null && published.some(change => firstMeasurements.has(change.key))) {
         const key = common.dataset.transcriptBlockKey!;
