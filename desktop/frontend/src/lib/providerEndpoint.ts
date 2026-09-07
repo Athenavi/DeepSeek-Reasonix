@@ -78,3 +78,21 @@ export function providerBaseURLForSave(
   }
   return providerBaseURLFromRequestURL(effectiveKind, requestUrl);
 }
+
+// Only rewrite a standard API suffix on an explicit protocol selection. Custom
+// paths, queries and fragments are user-owned and must stay byte-for-byte intact.
+export function providerRequestURLForFormatChange(previousKind: string, nextKind: string, requestUrl: string): string {
+  if (previousKind === nextKind || !requestUrl) return requestUrl;
+  try {
+    const url = new URL(requestUrl);
+    if (url.search || url.hash) return requestUrl;
+    const previousSuffix = previousKind === "anthropic" ? "/messages"
+      : previousKind === "responses" ? "/responses" : previousKind === "openai" ? "/chat/completions" : "";
+    if (!previousSuffix || !url.pathname.endsWith(previousSuffix)) return requestUrl;
+    const nextSuffix = nextKind === "anthropic" ? "/messages"
+      : nextKind === "responses" ? "/responses" : nextKind === "openai" ? "/chat/completions" : "";
+    if (!nextSuffix) return requestUrl;
+    url.pathname = url.pathname.slice(0, -previousSuffix.length) + nextSuffix;
+    return url.toString();
+  } catch { return requestUrl; }
+}

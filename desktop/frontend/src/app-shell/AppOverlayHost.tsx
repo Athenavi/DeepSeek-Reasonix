@@ -3,7 +3,6 @@ import { RemoteHostKeyDialog } from "../components/RemoteHostKeyDialog";
 import { RemoteSecretDialog } from "../components/RemoteSecretDialog";
 import { ShortcutsCheatsheet } from "../components/ShortcutsCheatsheet";
 import { StartupSplash } from "../components/StartupSplash";
-import { OnboardingOverlay } from "../components/OnboardingOverlay";
 import { ManagementSurface } from "../components/ManagementSurface";
 
 const HistoryPanel = lazy(() => import("../components/HistoryPanel").then((module) => ({ default: module.HistoryPanel })));
@@ -30,13 +29,12 @@ export type AppOverlayHostProps = {
   palette?: Region<ComponentProps<typeof CommandPalette>, "open" | "items" | "placeholder" | "emptyText">;
   shortcuts: Region<ComponentProps<typeof ShortcutsCheatsheet>, "open" | "platform" | "t">;
   startup?: Region<ComponentProps<typeof StartupSplash>, "hold">;
-  onboarding?: Region<ComponentProps<typeof OnboardingOverlay>, never>;
   selection: Region<ComponentProps<typeof TranscriptSelectionMenu>, "enabled" | "resetKey">;
   worktree?: Region<ComponentProps<typeof WorktreeMergeModal>, "tabId" | "isOpen">;
 };
 
 /** Presentation-only overlay region. Async ownership stays in feature owners. */
-export function AppOverlayHost({ history, recovery, settings, trash, automation, palette, shortcuts, startup, onboarding, selection, worktree }: AppOverlayHostProps) {
+export function AppOverlayHost({ history, recovery, settings, trash, automation, palette, shortcuts, startup, selection, worktree }: AppOverlayHostProps) {
   return (
     <>
       {history && <Suspense fallback={null}><HistoryPanel {...history.view} {...history.commands} /></Suspense>}
@@ -52,7 +50,6 @@ export function AppOverlayHost({ history, recovery, settings, trash, automation,
       {palette && <Suspense fallback={null}><CommandPalette {...palette.view} {...palette.commands} /></Suspense>}
       <ShortcutsCheatsheet {...shortcuts.view} {...shortcuts.commands} />
       {startup && <StartupSplash {...startup.view} {...startup.commands} />}
-      {onboarding && <OnboardingOverlay {...onboarding.commands} />}
       <Suspense fallback={null}><TranscriptSelectionMenu {...selection.view} {...selection.commands} /></Suspense>
       {worktree && <Suspense fallback={null}><WorktreeMergeModal {...worktree.view} {...worktree.commands} /></Suspense>}
     </>

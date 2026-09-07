@@ -12,8 +12,8 @@ export function useOnboardingCommands(providerConfigured: () => void) {
     const overlays = useOverlayStore.getState();
     overlays.setNeedsOnboarding(false);
     const navigation = useAppNavigationStore.getState();
-    navigation.setSettingsFocus({ target: "model-access" });
-    navigation.setSettingsTarget("models");
+    navigation.setSettingsFocus({ target: "model-access", onboarding: true });
+    navigation.setSettingsTarget("providers");
   });
   const skipOnboarding = useCommittedCommand(() => {
     dismissOnboarding();

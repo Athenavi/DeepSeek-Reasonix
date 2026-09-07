@@ -75,7 +75,7 @@ export function SessionStatusBanners(props: SessionStatusBannersProps) {
           </button>
         </div>
       )}
-      {props.providerSetupNeeded && !props.needsOnboarding && (
+      {props.providerSetupNeeded && (
         <div className="banner banner--warning banner--actionable">
           <span className="banner__msg">{t("onboarding.inlinePrompt")}</span>
           <span className="banner__spacer" />

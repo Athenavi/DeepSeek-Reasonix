@@ -122,9 +122,9 @@ func (c *Controller) summarizeImages(ctx context.Context, modelRef string, image
 		Temperature: provider.TemperaturePtr(0),
 		MaxTokens:   visionSummaryMaxTokens,
 		// Keep the bounded summary budget available for visible OCR and layout
-		// text. Providers that do not expose a low-effort vocabulary ignore this
-		// per-request hint and retain their configured default.
-		EffortOverride: "low",
+		// text. Select low only when the adapter declares it; otherwise
+		// leave the provider configuration unchanged.
+		EffortOverride: provider.PreferredReasoning(visionProvider, "low"),
 	})
 	if err != nil {
 		return nil, err

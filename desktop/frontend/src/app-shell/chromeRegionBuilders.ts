@@ -119,7 +119,6 @@ export function buildSessionStatusBannerProps(input: {
     providerSetupNeeded: shell.providerSetupNeeded,
     needsOnboarding: shell.needsOnboarding,
     onConfigureProvider: () => {
-      shell.setProviderSetupNeeded(false);
       onboarding.chooseOnboardingProvider();
     },
     updateChecksEnabled: input.updateChecksEnabled,

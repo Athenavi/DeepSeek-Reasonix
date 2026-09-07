@@ -1,3 +1,4 @@
+import { Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { useConfirmDialog } from "./ConfirmDialog";
@@ -114,7 +115,7 @@ export function RemoteHostsPage() {
   return (
     <>
       <div className="remote-hosts">
-        <div className="remote-hosts__toolbar">
+        <div className="remote-hosts__toolbar settings-toolbar">
           <h2>{t("remote.hosts.title")}</h2>
           <div className="remote-hosts__actions">
             <button className="btn" onClick={() => setScreen({ kind: "import" })}>
@@ -243,11 +244,11 @@ function RemoteHostRow(props: {
             {t("remote.connect")}
           </button>
         )}
-        <button className="btn" onClick={props.onEdit}>
-          {t("remote.host.edit")}
+        <button className="btn settings-icon-button" title={t("remote.host.edit")} aria-label={t("remote.host.edit")} onClick={props.onEdit}>
+          <Pencil size={16} aria-hidden="true" />
         </button>
-        <button className="btn btn--danger" onClick={props.onRemove}>
-          {t("remote.host.remove")}
+        <button className="btn settings-icon-button" title={t("remote.host.remove")} aria-label={t("remote.host.remove")} onClick={props.onRemove}>
+          <Trash2 size={16} aria-hidden="true" />
         </button>
       </div>
     </li>

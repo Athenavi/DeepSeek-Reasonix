@@ -237,7 +237,7 @@ async function runWindowedFixture(page) {
   const beforePrepend = await snapshot(page);
   await page.evaluate((anchor) => {
     window.__prependWrites = [];
-    window.__prependProbe = { anchor, blankFrames: 0, active: true };
+    window.__prependProbe = { anchor, blankFrames: 0, maxSettledDrift: 0, landed: false, active: true };
     window.__REASONIX_TRANSCRIPT_SCROLL_WRITE__ = (write) => {
       window.__prependWrites.push(write);
     };
@@ -251,6 +251,13 @@ async function runWindowedFixture(page) {
         return rect.height > 0 && rect.bottom > viewport.top && rect.top < viewport.bottom;
       });
       if (visible.length === 0) probe.blankFrames += 1;
+      const anchorBlock = [...element.querySelectorAll("[data-transcript-block-key]")]
+        .find(block => block.getAttribute("data-transcript-block-key") === probe.anchor.key);
+      if (anchorBlock) {
+        const drift = Math.abs(anchorBlock.getBoundingClientRect().top - viewport.top - probe.anchor.top);
+        if (drift <= 4 && window.__prependWrites.some(write => write.owner === "history-prepend" && write.outcome === "accepted")) probe.landed = true;
+        if (probe.landed) probe.maxSettledDrift = Math.max(probe.maxSettledDrift, drift);
+      }
       requestAnimationFrame(sample);
     };
     requestAnimationFrame(sample);
@@ -299,8 +306,10 @@ async function runWindowedFixture(page) {
   assert(prepend.blankFrames === 0, "history prepend produces zero blank viewport frames");
   const prependCorrections = prepend.writes.filter((write) => write.outcome === "accepted"
     && (write.owner === "history-prepend" || write.owner === "restore"));
-  assert(prependCorrections.length <= 2,
-    `history prepend uses at most one geometry retry (${JSON.stringify(prependCorrections.map(({ owner, transaction, geometryRevision, requestedOffset, acceptedOffset }) => ({ owner, transaction, geometryRevision, requestedOffset, acceptedOffset })))})`);
+  const revisionKeys = prependCorrections.map(write => `${write.generation}:${write.geometryRevision}`);
+  assert(new Set(revisionKeys).size === revisionKeys.length, "history prepend never corrects the same geometry revision twice");
+  assert(prepend.landed && prepend.maxSettledDrift <= 4,
+    `history prepend keeps every frame anchored after landing (${prepend.maxSettledDrift.toFixed(1)}px)`);
 
   await page.evaluate(() => {
     window.__questionWrites = [];

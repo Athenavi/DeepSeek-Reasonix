@@ -1,3 +1,4 @@
+import { mockProviderTemplate, mockPreset, mockBundlePreset, mockKimiAPIModels, mockLongCatModels, mockTokenRhythmModels, mockTokenRhythmModelOverrides, mockMiMoV25Models, mockMiniMaxModels, mockGLMAPIModels, mockGLMCodingModels, mockGLMAnthropicModels, mockQwenAPIModels, mockQwenPlanModels, mockQwenPlanVisionModels, mockStepFunModels, mockOpenCodeGoModels, mockNovitaModels, mockGMIModels, mockVercelModels, mockOllamaCloudModels } from "./mockProviderTemplates";
 // Wails and the browser mock share this React-to-Go contract.
 // @ts-ignore generated locally; fresh checkouts use the disabled drift check below.
 import type * as GeneratedApp from "../../wailsjs/go/main/App";
@@ -562,6 +563,7 @@ export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganiza
   SetDefaultToolApprovalMode(mode: string): Promise<void>;
   SetDefaultAutoRecoveryCheckpoint(enabled: boolean): Promise<void>;
 
+  RenameProviderConnections: typeof GeneratedApp.RenameProviderConnections;
   SaveProvider(p: ProviderView): Promise<void>;
   SetProviderWebSearch(names: string[], enabled: boolean): Promise<void>;
   SaveProviderModelCatalogs(updates: ProviderModelCatalogUpdate[]): Promise<string[]>;
@@ -580,6 +582,10 @@ export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganiza
   RemoveProviderAccess(name: string): Promise<void>;
   RemoveProviderAccesses(names: string[]): Promise<void>;
   SaveProviderKey(apiKeyEnv: string, value: string): Promise<string>;
+  SetConnectionKey(name: string, value: string): Promise<string>;
+  AddProviderConnectionWithOptions(presetID: string, sourceName: string, key: string, baseURL: string, kind: string): Promise<string>;
+  AddProviderConnectionWithURL(presetID: string, sourceName: string, key: string, baseURL: string): Promise<string>;
+  AddProviderConnection(presetID: string, sourceName: string, key: string): Promise<string>;
   SetProviderKey(apiKeyEnv: string, value: string): Promise<string>;
   ClearProviderKey(apiKeyEnv: string): Promise<void>;
   SetPermissionMode(mode: string): Promise<void>;
@@ -1120,7 +1126,7 @@ function bridgeBreadcrumb(method: string): string {
     return `model ${method}`;
   if (/^(SetDesktop|SetCloseBehavior|SetDisplayMode|SetStatusBar|SetReasoningDisplayMode|SetExpandThinking|SetAutoPlan|SetDefaultToolApprovalMode|SetCompactRatio|SetReasoningLanguage)/.test(method))
     return `settings ${method}`;
-  if (/^(SaveProvider|SetProviderWebSearch|SaveProviderModelCatalogs|AddOfficialProviderAccess|UpgradeDeepSeekProviderAccess|AddProviderPresetAccess|ResetProviderPresetAccess|RemoveProviderAccess|RemoveProviderAccesses|DeleteProvider|SaveProviderKey|SetProviderKey|ClearProviderKey|TestProviderModel|FetchProviderModelCatalog|FetchAllProviderModelCatalogs|FetchProviderModels|FetchAllProviderModels|ConnectKey)/.test(method))
+  if (/^(SetConnectionKey|AddProviderConnection|RenameProviderConnections|SaveProvider|SetProviderWebSearch|SaveProviderModelCatalogs|AddOfficialProviderAccess|UpgradeDeepSeekProviderAccess|AddProviderPresetAccess|ResetProviderPresetAccess|RemoveProviderAccess|RemoveProviderAccesses|DeleteProvider|SaveProviderKey|SetProviderKey|ClearProviderKey|TestProviderModel|FetchProviderModelCatalog|FetchAllProviderModelCatalogs|FetchProviderModels|FetchAllProviderModels|ConnectKey)/.test(method))
     return `provider ${method}`;
   if (/^(CheckUpdate|ApplyUpdateRequest|OpenDownloadPage|OpenUserConfigPath|ReloadUserConfig)/.test(method)) return `update ${method}`;
   if (/^(AddMCPServer|InstallMCPServer|UpdateMCPServer|RemoveMCPServer|AuthorizeAndConnectMCPServer|AuthenticateMCPServer|ReconnectMCPServer|ClearMCPServerAuthentication|SetMCPServer)/.test(method))
@@ -1274,68 +1280,6 @@ function mockScenario(): "demo" | "fresh" | "running" | "guidance" | "recovery" 
   return "demo";
 }
 
-function mockProviderTemplate(p: Pick<ProviderView, "name" | "kind" | "baseUrl" | "models" | "default" | "apiKeyEnv"> & Partial<ProviderView>): ProviderView {
-  return {
-    name: p.name,
-    builtIn: false,
-    added: true,
-    kind: p.kind,
-    baseUrl: p.baseUrl,
-    modelsUrl: p.modelsUrl ?? "",
-    models: p.models,
-    visionModels: p.visionModels ?? [],
-    visionModelsConfigured: Boolean(p.visionModelsConfigured ?? ((p.visionModels ?? []).length > 0)),
-    visionCapability: p.visionCapability,
-    default: p.default,
-    apiKeyEnv: p.apiKeyEnv,
-    headers: p.headers,
-    extraBody: p.extraBody,
-    authHeader: p.authHeader,
-    noProxy: p.noProxy,
-    keySet: Boolean(p.keySet),
-    balanceUrl: p.balanceUrl ?? "",
-    contextWindow: p.contextWindow ?? 0,
-    reasoningProtocol: p.reasoningProtocol ?? "",
-    thinking: p.thinking ?? "",
-    webSearch: Boolean(p.webSearch),
-    serverWebSearchCapability: Boolean(p.serverWebSearchCapability),
-    supportedEfforts: p.supportedEfforts ?? [],
-    defaultEffort: p.defaultEffort ?? "",
-    modelOverrides: p.modelOverrides,
-  };
-}
-
-function mockPreset(id: string, label: string, description: string, keyEnv: string, provider: ProviderView, metadata: Partial<Pick<MockProviderPresetTemplate, "recommended" | "billingMode" | "displayGroup" | "displaySection" | "displayTier" | "routeKind" | "optional" | "displayOrder">> = {}): MockProviderPresetTemplate {
-  return { id, label, description, keyEnv, provider, providers: [provider], ...metadata };
-}
-
-function mockBundlePreset(id: string, label: string, description: string, keyEnv: string, providers: ProviderView[], metadata: Partial<Pick<MockProviderPresetTemplate, "recommended" | "billingMode" | "displayGroup" | "displaySection" | "displayTier" | "routeKind" | "optional" | "displayOrder">> = {}): MockProviderPresetTemplate {
-  return { id, label, description, keyEnv, provider: providers[0], providers, ...metadata };
-}
-
-const mockKimiAPIModels = ["kimi-k3", "kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6", "kimi-k2.5"];
-const mockLongCatModels = ["LongCat-2.0"];
-const mockTokenRhythmModels = ["deepseek-v4-flash", "deepseek-v4-pro", "glm-5", "glm-5.1", "minimax-m2.7", "kimi-k2.5", "kimi-k2.6", "minimax-m2.5", "mimo-v2.5-pro", "qwen3.7-max", "kimi-k2.7-code", "glm-5.2", "qwen3.8-max", "deepseek-v4-flash-0731"];
-const mockTokenRhythmModelOverrides = mockTokenRhythmModels.flatMap((model) => {
-  if (model.startsWith("glm-")) return [{ model, reasoningProtocol: "glm", supportedEfforts: ["enabled", "disabled"], defaultEffort: "enabled" }];
-  if (model.startsWith("deepseek-")) return [{ model, reasoningProtocol: "deepseek", supportedEfforts: model === "deepseek-v4-pro" ? ["disabled", "high", "max"] : ["disabled", "low", "high", "max"], defaultEffort: "high" }];
-  return [];
-});
-const mockMiMoV25Models = ["mimo-v2.5-pro", "mimo-v2.5"];
-const mockMiniMaxModels = ["MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.7-highspeed"];
-const mockGLMAPIModels = ["glm-5.2", "glm-5.1", "glm-5", "glm-5-turbo", "glm-5v-turbo", "glm-4.7", "glm-4.7-flash", "glm-4.7-flashx", "glm-4.6", "glm-4.5", "glm-4.5-air", "glm-4.5-flash"];
-const mockGLMCodingModels = ["glm-5.2", "glm-5.1", "glm-5", "glm-4.7"];
-const mockGLMAnthropicModels = ["glm-5.2[1m]", "glm-5.2", "glm-5.1", "glm-5", "glm-4.7", "glm-4.5-air"];
-const mockQwenAPIModels = ["qwen3.7-plus", "qwen3.7-max", "qwen3.6-plus", "qwen3.5-plus", "qwen3-max-2026-01-23", "qwen3-coder-next", "qwen3-coder-plus", "MiniMax-M2.5", "glm-5", "glm-4.7", "kimi-k2.5"];
-const mockQwenPlanModels = ["qwen3.7-plus", "qwen3.6-plus", "kimi-k2.5", "glm-5", "MiniMax-M2.5", "qwen3.5-plus", "qwen3-max-2026-01-23", "qwen3-coder-next", "qwen3-coder-plus", "glm-4.7"];
-const mockQwenPlanVisionModels = ["qwen3.7-plus", "qwen3.6-plus", "qwen3.5-plus", "kimi-k2.5"];
-const mockStepFunModels = ["step-3.7-flash", "step-3.5-flash", "step-3.5-flash-2603"];
-const mockOpenCodeGoModels = ["glm-5.3", "glm-5.2", "glm-5.1", "kimi-k3", "kimi-k2.7-code", "kimi-k2.6", "deepseek-v4-pro", "deepseek-v4-flash", "mimo-v2.5-pro", "mimo-v2.5", "hy3"];
-const mockNovitaModels = ["zai-org/glm-5.2", "moonshotai/kimi-k2.7-code", "minimax/minimax-m3", "deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash", "qwen/qwen3.7-max", "qwen/qwen3.6-plus", "zai-org/glm-5v-turbo"];
-const mockGMIModels = ["zai-org/GLM-5.2-FP8", "deepseek-ai/DeepSeek-V4-Pro", "deepseek-ai/DeepSeek-V4-Flash", "moonshotai/Kimi-K2.7-Code", "anthropic/claude-sonnet-4.6", "openai/gpt-5.5"];
-const mockVercelModels = ["anthropic/claude-sonnet-4.6", "anthropic/claude-opus-4.8", "openai/gpt-5.4", "openai/gpt-5.4-pro", "moonshotai/kimi-k2.7-code", "zai/glm-5.2", "deepseek/deepseek-v4-pro"];
-const mockOllamaCloudModels = ["glm-5.2", "kimi-k2.7-code", "deepseek-v4-pro", "deepseek-v4-flash", "minimax-m3", "nemotron-3-nano:30b", "qwen3-coder-next"];
-
 const mockProviderPresetTemplates: MockProviderPresetTemplate[] = [
   mockBundlePreset(
     "opencode-go-recommended",
@@ -1403,8 +1347,22 @@ const mockProviderPresetTemplates: MockProviderPresetTemplate[] = [
   mockPreset("scnet-anthropic", "SCNet Anthropic", "SCNet (National Supercomputing Internet) Anthropic-compatible token-plan endpoint with Bearer auth.", "SCNET_API_KEY", mockProviderTemplate({ name: "scnet-anthropic", kind: "anthropic", baseUrl: "https://api.scnet.cn/api/llm/anthropic", models: ["GLM-5.2", "GLM-5", "GLM-5.1", "Kimi-K3", "Kimi-K2.7-Code", "Kimi-K2.6", "Kimi-K2.5", "DeepSeek-V4-Flash", "DeepSeek-V3.2", "MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2.5", "MiMo-V2.5-Pro"], visionModels: ["Kimi-K2.6", "Kimi-K2.5"], default: "MiniMax-M2.5", apiKeyEnv: "SCNET_API_KEY", authHeader: true })),
 ];
 
+let mockCatalogLoad: Promise<void> | undefined;
+let mockCatalogs: Record<string, NonNullable<ProviderPresetView["catalog"]>> = {};
+function loadMockProviderCatalog(): Promise<void> {
+  return mockCatalogLoad ??= import("./providerCatalog.generated.json").then(({default: data}) => {
+    mockCatalogs = data.catalogs;
+    for (const template of data.templates) {
+      if (!mockProviderPresetTemplates.some(p => p.id === template.id)) {
+        mockProviderPresetTemplates.push(mockPreset(template.id, template.label, template.description, template.keyEnv, mockProviderTemplate(template.provider)));
+      }
+    }
+  });
+}
+
 function mockProviderPresetViews(): ProviderPresetView[] {
   return [...mockProviderPresetTemplates].sort((a, b) => mockProviderPresetDisplayRank(a.id) - mockProviderPresetDisplayRank(b.id)).map((template) => ({
+    catalog: mockCatalogs[template.id],
     id: template.id,
     label: template.label,
     description: template.description,
@@ -4554,7 +4512,15 @@ function makeMockApp(): AppBindings {
         conversationWidth,
       })) as DesktopStartupSettingsView;
     },
-    async Settings() { return JSON.parse(JSON.stringify(settings)) as SettingsView; },
+    async Settings() {
+      await loadMockProviderCatalog();
+      for (const preset of mockProviderPresetViews()) {
+        const existing = settings.providerPresets.find(p => p.id === preset.id);
+        if (existing) existing.catalog = preset.catalog;
+        else settings.providerPresets.push(preset);
+      }
+      return JSON.parse(JSON.stringify(settings)) as SettingsView;
+    },
     async StorageSettings() { return { defaultWorkspace: cwd, statePath: `${cwd}/.reasonix`, cachePath: `${cwd}/.reasonix/cache`, extensionsPath: `${cwd}/.reasonix/plugins` }; },
     async HooksSettings(scope: string) {
       const key = scope === "project" ? "project" : "global";
@@ -4612,10 +4578,39 @@ function makeMockApp(): AppBindings {
     async SetDefaultAutoRecoveryCheckpoint(_enabled: boolean) {
       // Legacy no-op; Auto Guard is always built into Auto.
     },
+    async SetConnectionKey(name: string, value: string) {
+      const p = settings.providers.find(p => p.name === name);
+      if (!p) throw new Error("Connection not found");
+      p.apiKeyEnv = `REASONIX_CONNECTION_${crypto.randomUUID().replaceAll("-", "")}_KEY`;
+      p.keySet = Boolean(value.trim());
+      return "";
+    },
+    async AddProviderConnectionWithOptions(_presetID: string, sourceName: string, key: string, baseURL: string, kind: string) {
+      const source = settings.providers.find(p => p.name === sourceName);
+      if (!source) throw new Error("Connection template unavailable in preview");
+      settings.providers.push({...source, kind:kind || source.kind, baseUrl:baseURL || source.baseUrl, requestUrl:"", chatUrl:"", modelsUrl:"", name:`${source.name}-${crypto.randomUUID()}`, builtIn:false, added:true, apiKeyEnv:`REASONIX_CONNECTION_${crypto.randomUUID().replaceAll("-", "")}_KEY`, keySet:Boolean(key.trim())});
+      return "";
+    },
+    async AddProviderConnectionWithURL(_presetID: string, sourceName: string, key: string, baseURL: string) {
+      const source = settings.providers.find(p => p.name === sourceName);
+      if (!source) throw new Error("Connection template unavailable in preview");
+      settings.providers.push({...source, baseUrl:baseURL, requestUrl:"", chatUrl:"", modelsUrl:"", name:`${source.name}-${crypto.randomUUID()}`, builtIn:false, added:true, apiKeyEnv:`REASONIX_CONNECTION_${crypto.randomUUID().replaceAll("-", "")}_KEY`, keySet:Boolean(key.trim())});
+      return "";
+    },
+    async AddProviderConnection(_presetID: string, sourceName: string, key: string) {
+      const source = settings.providers.find(p => p.name === sourceName);
+      if (!source) throw new Error("Connection template unavailable in preview");
+      settings.providers.push({...source, name:`${source.name}-${crypto.randomUUID()}`, builtIn:false, added:true, apiKeyEnv:`REASONIX_CONNECTION_${crypto.randomUUID().replaceAll("-", "")}_KEY`, keySet:Boolean(key.trim())});
+      return "";
+    },
+    async RenameProviderConnections(names: string[], displayName: string) {
+      for (const name of names) if (!settings.providers.some(p => p.name === name)) throw new Error(`Provider ${name} not found`);
+      settings.providers = settings.providers.map(p => names.includes(p.name) ? {...p, displayName: displayName.trim()} : p);
+    },
     async SaveProvider(p: ProviderView) {
       p.added = true;
       const i = settings.providers.findIndex((x) => x.name === p.name);
-      if (i >= 0) settings.providers[i] = p;
+      if (i >= 0) settings.providers[i] = { ...settings.providers[i], ...p };
       else settings.providers.push(p);
     },
     async SetProviderWebSearch(names: string[], enabled: boolean) {

@@ -206,7 +206,8 @@ console.log("\nbundle budgets");
 // explicit budget rather than failing on a rounded 467.0 KiB display value.
 // The latest main-v2 session-runtime fence and exact prompt protocol measure
 // 468.2 KiB here; retain a 0.1 KiB ceiling for platform zlib rounding.
-const initialJSBudgetKiB = 468.3;
+// Mainline provider/settings integration measures 469.230 KiB gzip.
+const initialJSBudgetKiB = 469.3;
 assertBudget("initial JavaScript gzip", initialJSGzip, initialJSBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk gzip", largestInitialJS, 280 * 1024);
 // Render-blocking CSS is intentionally absent: styles.css loads deferred via
@@ -229,7 +230,8 @@ if (initialCSS.length > 0) {
 // shared title-safe shell, and the shared harness decision surface measure
 // 116.9 KiB gzip while reusing existing layout primitives. Retain a bounded
 // 0.1 KiB headroom ratchet.
-assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 117.0 * 1024);
+// Mainline provider/settings and recovery styles measure 119.435 KiB gzip.
+assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 119.5 * 1024);
 if (localeChunks.length !== 2) {
   throw new Error(`expected 2 on-demand Chinese locale chunks, found ${localeChunks.length}`);
 }
@@ -288,7 +290,8 @@ for (const path of localeChunks) {
   // toolchains; keep the next one-decimal ceiling for cross-platform CI.
   // The #9889/#9890 series adds recovery-wait, dialog-failure, and stall copy:
   // zh-TW measures 63492 B (62.004 KiB) with the four PRs merged together.
-  const budget = name.startsWith("zh-TW-") ? 62.1 * 1024 : 61.2 * 1024;
+  // Integrated settings and ownership copy measures 61.415 / 62.212 KiB.
+  const budget = name.startsWith("zh-TW-") ? 62.3 * 1024 : 61.5 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -397,6 +400,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // preloading. Mainline Stop brings the payload to 2381.8 KiB;
 // Mainline recovery UI brings it to 2384.5 KiB, and tool elapsed/liveness
 // UI to 2384.9 KiB. Retain 0.2 KiB headroom.
-const rawInitialBudgetKiB = 2_385.1;
+// Mainline provider/settings integration measures 2398.2 KiB in the
+// extracted shell. Retain the same bounded 0.2 KiB build headroom.
+const rawInitialBudgetKiB = 2_398.4;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
