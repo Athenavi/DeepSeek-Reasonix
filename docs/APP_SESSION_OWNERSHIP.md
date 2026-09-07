@@ -15,6 +15,16 @@ a newer subscriber. App composition wires these owners to the existing page
 tree; the runtime root and page tree still live together in App.tsx in this
 stage. Presentation-only extraction is a separate change.
 
+Remote resume rejection completes behind the tab's publication fence. Session
+identity, title, route, pending prompts and runtime state are restored before
+the error becomes observable. HTTP rejection, busy, listing failure, missing
+target and transport reconciliation share that completion owner. Generation,
+client, selection and route ownership are rechecked before restoration.
+
+Generation replacement, retirement, reconnect, host suspension and explicit
+close follow the same per-tab publication order. Network handshakes and pump
+waits remain outside the fence; map snapshots are revalidated after taking it.
+
 ## Verification
 
 `pnpm test:app-lifecycle` exercises source capture, committed publication,
@@ -23,6 +33,10 @@ unmount, subscription disposal, and negative memory-protocol fixtures.
 `pnpm test:app-browser` replays real local/remote navigation, send/Stop,
 three layouts, and Composer/Workspace DOM identity. `pnpm test:all` discovers
 the remaining frontend regression suites.
+
+`cd desktop && go test -race . -run 'TestRemoteResumeFailure|TestOpenRemoteProjectTabRejectedResumeRestoresPreviousIdentity|TestRemoteRejectedResume'`
+covers error-time identity, all rejection paths, lost ownership and publication
+interleavings with retirement, reconnect, host suspension and close.
 
 ## Independent memory screening
 
