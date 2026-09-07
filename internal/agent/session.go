@@ -76,6 +76,7 @@ type Session struct {
 	// first true conflict. It bounds repeated saves by this live controller to
 	// one recovery file without letting a replacement controller overwrite it.
 	recoveryLane string
+	head         sessionHeadState
 }
 
 // NewSession initializes a session with an optional system prompt.

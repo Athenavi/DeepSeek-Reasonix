@@ -1379,11 +1379,12 @@ func LoadSession(path string) (*Session, error) {
 
 func loadSessionUnlocked(path string) (*Session, error) {
 	hasher := newSessionTranscriptHasher()
-	msgs, _, damaged, err := loadSessionMessagesWithLimits(path, defaultSessionReplayLimits, hasher)
+	res, err := loadSessionTranscript(context.Background(), path, defaultSessionReplayLimits, hasher)
 	if err != nil {
 		return nil, err
 	}
-	s := &Session{Messages: msgs, eventLogDamaged: damaged}
+	msgs := res.msgs
+	s := &Session{Messages: msgs, eventLogDamaged: res.damaged, head: sessionHeadState{ref: res.head, dag: res.dag, headCount: res.headCount}}
 	// Repair persisted-history-safe issues before anything reads the session.
 	// Old sessions (pre adde2d3e) and interrupted turns can carry empty tool-call
 	// names, dangling tool_calls, or half-streamed argument JSON that DeepSeek
