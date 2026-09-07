@@ -17,7 +17,11 @@ ok(snapshot.prefix.items[50].start === 5000, "third-party cache mutation cannot 
 const invalid = commitTranscriptWindowGeometry({ ...geometryInput, previous: snapshot });
 ok(invalid.mode === "full" && invalid.prefix === snapshot.prefix,
   "invalid prefix enters covered full presentation using the immutable trusted geometry");
+const invalidBatch = commitTranscriptWindowGeometry({ ...geometryInput, previous: snapshot, measurementCommit: true });
+assert.equal(invalidBatch.measurementCommitted, false, "an invalid prefix cannot acknowledge a pending batch");
 backing[50].start = 5000;
+const recoveredBatch = commitTranscriptWindowGeometry({ ...geometryInput, previous: invalidBatch, measurementCommit: true });
+assert.equal(recoveredBatch.measurementCommitted, true, "a recovered valid prefix closes the pending batch");
 const previousRange = {
   structureRevision: "stable",
   scrollTop: 100,
@@ -137,3 +141,44 @@ ok(rangeElapsedMs < 1_000, `10,000-turn range reconstruction completes within 1s
 ok(largeRange.source === "reconstructed" && largeRange.items.length <= 40, "10,000-turn reconstruction keeps a bounded mounted range");
 ok(largeRange.items.some((item) => item.start <= 720_000 && item.end >= 720_096), "10,000-turn reconstruction covers the authoritative viewport");
 ok(largeRange.items.some((item) => item.index === 9_999), "10,000-turn reconstruction preserves protected block identity");
+
+// A safe future measurement must become painted geometry before native travel.
+// Retaining the old prefix defers +24px until block 38 is already visible.
+const baseline = Array.from({ length: 100 }, (_, index) => ({
+  key: `turn:${index}`, index, start: index * 191, end: (index + 1) * 191, size: 191,
+}));
+const revised = baseline.map(item => ({ ...item,
+  start: item.start + (item.index > 38 ? 24 : 0),
+  end: item.end + (item.index >= 38 ? 24 : 0),
+  size: item.size + (item.index === 38 ? 24 : 0),
+}));
+const futureInput = { ...geometryInput, measurements: baseline, candidate: baseline.slice(23, 61),
+  structureRevision: "future-growth", scrollTop: 31 * 191, clientHeight: 596, totalSize: 19100 };
+const beforePublication = commitTranscriptWindowGeometry(futureInput);
+for (const candidate of [revised.slice(23, 61), revised.slice(70, 90), baseline.slice(23, 61)]) {
+  const published = commitTranscriptWindowGeometry({ ...futureInput, previous: beforePublication,
+    measurements: revised, candidate,
+    totalSize: 19124, measurementCommit: true });
+  assert.equal(published.prefix.items[39].start, revised[39].start,
+    "approved post-viewport sizes enter the painted prefix in their publication transaction");
+  assert.equal(published.range.totalSize, published.prefix.extent);
+  for (const item of published.range.items) {
+    assert.equal(item.start, published.prefix.items[item.index].start,
+      "even a covering stale candidate takes placements from the published prefix");
+  }
+  assert.equal(published.mode, "windowed", "a stale candidate reconstructs from the published prefix");
+  for (const index of [31, 32, 33, 34]) {
+    assert.equal(published.prefix.items[index].start, baseline[index].start, "publication leaves visible reader coordinates unchanged");
+  }
+  let previous = published;
+  for (const scrollTop of [38 * 191 + 144, 59 * 191]) {
+    const advanced = commitTranscriptWindowGeometry({ ...futureInput, previous, scrollTop,
+      measurements: revised, candidate: revised.slice(Math.floor(scrollTop / 191) - 8, Math.floor(scrollTop / 191) + 30), totalSize: 19124 });
+    for (const item of advanced.range.items) {
+      assert.equal(item.start, published.prefix.items[item.index].start,
+        "native range advance cannot expose a deferred measurement shift");
+    }
+    previous = advanced;
+  }
+}
+console.log("PASS measurement publication paints the complete prefix before native range advancement");

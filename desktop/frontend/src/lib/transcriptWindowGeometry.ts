@@ -7,6 +7,7 @@ export type TranscriptWindowGeometry<T extends PrefixItem> = {
   prefix: { items: readonly T[]; extent: number; margin: number };
   covered: boolean;
   mode: "full" | "windowed";
+  measurementCommitted: boolean;
 };
 
 /** Own range, prefix, and extent together; third-party cache views are not snapshots. */
@@ -16,6 +17,7 @@ export function commitTranscriptWindowGeometry<T extends PrefixItem>(
     residentCount: number;
     forceFull: boolean;
     scrollHeight?: number;
+    measurementCommit?: boolean;
   },
 ): TranscriptWindowGeometry<T> {
   // TanStack's single-lane view is a lazy Proxy backed by a mutable typed
@@ -30,9 +32,18 @@ export function commitTranscriptWindowGeometry<T extends PrefixItem>(
   const previous = input.previous;
   let prefix = valid ? { items, extent: input.totalSize, margin: input.scrollMargin }
     : previous?.range.structureRevision === input.structureRevision ? previous.prefix : { items: [], extent: 0, margin: 0 };
-  const range = commitTranscriptWindowRange({ ...input, measurements: items, previous: previous?.range });
+  // An adapter-approved batch is a before-paint transaction. Retaining the
+  // older prefix would defer safe offscreen growth until native travel brings
+  // it into view. A stale candidate must instead reconstruct from this batch.
+  const candidate = input.measurementCommit && valid ? input.candidate.flatMap(item => {
+    const owned = items[item.index];
+    return owned?.key === item.key ? [owned] : [];
+  }) : input.candidate;
+  const range = commitTranscriptWindowRange({ ...input, candidate, measurements: items,
+    previous: input.measurementCommit && valid ? undefined : previous?.range });
   if (range.source === "retained" && previous) prefix = previous.prefix;
   const covered = valid && Number.isFinite(input.scrollHeight ?? 0) && range.covered
     && range.items.length + input.residentCount <= MAX_MOUNTED_COMPLETED_BLOCKS;
-  return { range, prefix, covered, mode: input.forceFull || !covered ? "full" : "windowed" };
+  return { range, prefix, covered, mode: input.forceFull || !covered ? "full" : "windowed",
+    measurementCommitted: Boolean(input.measurementCommit && valid) };
 }

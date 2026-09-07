@@ -53,8 +53,10 @@ contracts when touching anything that can move the transcript viewport.
   If no candidate, retained snapshot, or ledger reconstruction covers the
   viewport, fail closed through the shared full-DOM safety renderer before
   paint; never commit an uncovered range and detect the blank afterward.
-  Measurement-only notifications cannot replace the painted range while
-  native input owns an unchanged viewport. Native viewport geometry is an
+  Unsolicited measurement notifications cannot replace the painted range while
+  native input owns an unchanged viewport. An adapter-approved measurement batch
+  must instead commit its complete prefix and covering range before paint; it
+  cannot retain an older prefix and expose that growth during later native travel. Native viewport geometry is an
   external store: range renders must use its immutable snapshot so React
   cannot commit a range calculated before a newer compositor scroll offset.
   Window items use absolute layout `top`, not transforms that can put range
@@ -87,7 +89,9 @@ contracts when touching anything that can move the transcript viewport.
   without a bounded delta, and native thumb drag are unbounded: every cold
   measurement remains staged until ownership ends.
   Publish one immutable Reasonix snapshot, then transfer that exact published
-  batch into TanStack's keyed size cache in the same browser task. Never call
+  batch into TanStack's keyed size cache in the same browser task. Close the
+  batch with a layout-effect state update and acknowledge that publication in
+  the geometry commit; TanStack notification scheduling alone is insufficient. Never call
   TanStack `measure()` for a measurement publish: it clears the keyed cache and
   rebuilds the protected prefix. Never base correctness on an idle timeout,
   enable TanStack-owned ResizeObserver publication, or add platform-specific
