@@ -393,6 +393,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // 2496.6 KiB; retain the smallest bounded ceiling.
 // Source-bound owners plus input-release identity measure 2408.2 KiB.
 // Deferred presentation extraction in the next slice is budgeted separately.
-const rawInitialBudgetKiB = 2_408.3;
+// First-materialization presentation preloading adds 0.3 KiB raw; the
+// measured payload is 2408.5 KiB. Keep 0.2 KiB for build-identity drift.
+const rawInitialBudgetKiB = 2_408.7;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
