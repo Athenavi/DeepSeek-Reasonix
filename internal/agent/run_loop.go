@@ -327,7 +327,9 @@ func sleepStreamRetryBackoff(ctx context.Context, attempt int) bool {
 	return recoverySleep(ctx, time.Duration(1<<min(max(attempt-1, 0), 2))*2*time.Second)
 }
 
-var recoverySleep = func(ctx context.Context, delay time.Duration) bool {
+var recoverySleep = sleepRecovery
+
+func sleepRecovery(ctx context.Context, delay time.Duration) bool {
 	timer := time.NewTimer(delay)
 	defer timer.Stop()
 	select {

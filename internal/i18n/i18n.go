@@ -583,6 +583,7 @@ type Messages struct {
 	ProviderErrRateLimited         string // 429
 	ProviderErrServer              string // 500
 	ProviderErrServerBusy          string // 503
+	ProviderErrWaitExhaustedFmt    string // total time waited before giving up
 
 	// selection menus
 	SelectOneHint      string // "(↑/↓ · Enter · q to cancel)"
