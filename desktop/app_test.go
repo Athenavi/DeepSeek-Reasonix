@@ -3032,7 +3032,7 @@ func TestSetEffortForTabLeaseHeldKeepsOldControllerAlive(t *testing.T) {
 }
 
 func TestSetEffortForTabReanchorsDepthCapRecoveryBranch(t *testing.T) {
-	isolateDesktopUserDirs(t)
+	isolateDesktopUserDirsSchemaOne(t)
 	setDesktopTestCredential(t, "OLD_MODEL_KEY", "sk-test")
 
 	cfg := config.Default()
@@ -3694,7 +3694,7 @@ func TestRebuildSettingLockedRestoresSessionAuthorizations(t *testing.T) {
 }
 
 func TestSetModelForTabContinuesRecoveryPathAfterSnapshotConflict(t *testing.T) {
-	isolateDesktopUserDirs(t)
+	isolateDesktopUserDirsSchemaOne(t)
 	setDesktopTestCredential(t, "OLD_MODEL_KEY", "sk-test")
 	setDesktopTestCredential(t, "NEW_MODEL_KEY", "sk-test")
 

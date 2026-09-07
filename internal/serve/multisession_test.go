@@ -686,6 +686,7 @@ func TestBusyResumeDetachesAndReattachesRunningController(t *testing.T) {
 }
 
 func TestDetachedRecoveryKeepsServeRoutingWrapper(t *testing.T) {
+	t.Setenv(agent.SessionLogSchemaEnv, "v1")
 	dir := t.TempDir()
 	aPath := filepath.Join(dir, "a.jsonl")
 	bPath := filepath.Join(dir, "b.jsonl")

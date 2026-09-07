@@ -81,6 +81,12 @@ type BranchMeta struct {
 	ListingRevision      int64             `json:"listing_revision,omitempty"`
 	ListingContentDigest string            `json:"listing_content_digest,omitempty"`
 	InFlightTurn         *InFlightTurnMeta `json:"in_flight_turn,omitempty"`
+	// HeadID and its companions mirror the schema-2 log's selected head for
+	// listings that must not replay the log; they are absent for schema 1.
+	HeadID        string `json:"head_id,omitempty"`
+	HeadCount     int    `json:"head_count,omitempty"`
+	LogSchema     int    `json:"log_schema,omitempty"`
+	LogGeneration int64  `json:"log_generation,omitempty"`
 	// Closed completed todo shelves; desktop remounts hide the same fingerprint.
 	DismissedTodoBatches []string `json:"dismissed_todo_batches,omitempty"`
 }

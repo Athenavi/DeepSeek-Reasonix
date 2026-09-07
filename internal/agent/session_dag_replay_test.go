@@ -61,7 +61,7 @@ func dagContents(msgs []provider.Message) []string {
 // dagLinearLog writes log header + system + user + assistant + user on main.
 func dagLinearLog(t *testing.T, sessionPath string) (ids []string, base time.Time) {
 	t.Helper()
-	base = time.Date(2026, 9, 8, 10, 0, 0, 0, time.UTC)
+	base = time.Date(2026, 1, 8, 10, 0, 0, 0, time.UTC)
 	msgs := []provider.Message{
 		dagMsg(provider.RoleSystem, "sys", "S0"),
 		dagMsg(provider.RoleUser, "q1", "U1"),
@@ -323,19 +323,29 @@ func TestLoadSessionReadsSelectedHeadOfDAGLog(t *testing.T) {
 	if err != nil || len(users) != 2 || users[1].Message.Content != "from-other-writer" || !users[1].At.Equal(base.Add(31*time.Second)) {
 		t.Fatalf("user messages = %+v err=%v", users, err)
 	}
-	// The schema-1 save path must never write into a schema-2 log: a save
-	// through the old protocol stays checkpoint-only.
+	// A save extends the loaded head in place: the log grows by the new entry,
+	// the selected-head cache follows, and no transcript copy appears.
 	before, _ := os.ReadFile(store.SessionEventLog(path))
 	s.Add(dagMsg(provider.RoleAssistant, "reply", ""))
 	if err := s.Save(path); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
 	after, _ := os.ReadFile(store.SessionEventLog(path))
-	if string(before) != string(after) {
-		t.Fatal("schema-1 save path modified the schema-2 log")
+	if !strings.HasPrefix(string(after), string(before)) || len(after) == len(before) {
+		t.Fatal("save must append to the schema-2 log without rewriting it")
 	}
 	if b, err := os.ReadFile(path); err != nil || !strings.Contains(string(b), `"reply"`) {
 		t.Fatalf("checkpoint not written: %v", err)
+	}
+	reloaded, err := LoadSession(path)
+	if err != nil || reloaded.LeafID() != s.LeafID() || len(reloaded.Messages) != 5 {
+		t.Fatalf("reload after save: err=%v leaf %q vs %q len %d", err, reloaded.LeafID(), s.LeafID(), len(reloaded.Messages))
+	}
+	entries, _ := os.ReadDir(filepath.Dir(path))
+	for _, entry := range entries {
+		if store.IsSessionTranscriptName(entry.Name()) && entry.Name() != filepath.Base(path) {
+			t.Fatalf("save created a transcript copy: %s", entry.Name())
+		}
 	}
 }
 
@@ -365,4 +375,22 @@ func TestSchemaOneReaderRefusesDAGLogWithoutTruncating(t *testing.T) {
 func dagChain(st *sessionDAGState, head string) []string {
 	msgs, _ := st.materialize(head)
 	return dagContents(msgs)
+}
+
+// useSchemaOneLog pins a test to the schema-1 writer: it exercises mechanics
+// (replace records, revision CAS, recovery copies) that only that path has.
+func useSchemaOneLog(t *testing.T) {
+	t.Helper()
+	t.Setenv(SessionLogSchemaEnv, "v1")
+}
+
+func schemaOneTempDir(t *testing.T) string {
+	t.Helper()
+	useSchemaOneLog(t)
+	return t.TempDir()
+}
+
+func schemaOneSessionPath(t *testing.T, name string) string {
+	t.Helper()
+	return filepath.Join(schemaOneTempDir(t), name)
 }

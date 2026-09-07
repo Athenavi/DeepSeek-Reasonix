@@ -8,16 +8,33 @@ import (
 	"reasonix/internal/store"
 )
 
-// sessionHeadState is what a loaded Session knows about its schema-2 log
-// position; it stays zero for schema-1 sessions.
+// sessionHeadState is what a Session knows about its schema-2 log position;
+// it stays zero for schema-1 sessions. state caches the replayed graph so a
+// save only reads the bytes appended since the last observed tail.
 type sessionHeadState struct {
 	ref       HeadRef
 	dag       bool
 	headCount int
+	state     *sessionDAGState
+	events    []HeadEvent
 }
 
-// Head reports the head this session was loaded from. ok is false for
-// sessions that still live in a schema-1 log or a bare .jsonl.
+// HeadEvent reports a head-level fact a save discovered; the controller turns
+// it into a user-facing notice.
+type HeadEvent struct {
+	Kind        string
+	HeadID      string
+	OtherWriter string
+}
+
+const (
+	// HeadEventForkedConcurrent: this writer's head diverged from another
+	// writer's appends and continued on a fresh head.
+	HeadEventForkedConcurrent = "forked_concurrent"
+)
+
+// Head reports the head this session was loaded from or last saved to. ok is
+// false for sessions that still live in a schema-1 log or a bare .jsonl.
 func (s *Session) Head() (HeadRef, bool) {
 	if s == nil {
 		return HeadRef{}, false
@@ -25,6 +42,18 @@ func (s *Session) Head() (HeadRef, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.head.ref, s.head.dag
+}
+
+// DrainHeadEvents returns and clears the head events recorded by saves.
+func (s *Session) DrainHeadEvents() []HeadEvent {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	events := s.head.events
+	s.head.events = nil
+	return events
 }
 
 // selectedHead picks the head a plain open lands on: the last explicit select

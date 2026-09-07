@@ -60,6 +60,7 @@ func TestBranchAndSwitch(t *testing.T) {
 }
 
 func TestSnapshotExternalRemovalMovesOnceToStableRecovery(t *testing.T) {
+	t.Setenv(agent.SessionLogSchemaEnv, "v1")
 	dir := t.TempDir()
 	path := filepath.Join(dir, "root.jsonl")
 	session := agent.NewSession("sys")
