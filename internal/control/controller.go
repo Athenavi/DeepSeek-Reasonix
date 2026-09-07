@@ -2127,33 +2127,6 @@ func (c *Controller) RunSubagentProfile(ctx context.Context, name, task string, 
 	return tool.GuardSubagentHostDecisionText(answer), nil
 }
 
-// Cancel aborts the in-flight turn. A goroutine blocked awaiting approval
-// unblocks via the cancelled context.
-func (c *Controller) Cancel() {
-	c.promptResolveMu.Lock()
-	defer c.promptResolveMu.Unlock()
-	c.cancelLocked()
-}
-
-func (c *Controller) cancelLocked() {
-	c.mu.Lock()
-	cancel := c.cancel
-	if cancel != nil {
-		c.canceling = true
-	}
-	c.mu.Unlock()
-	if cancel != nil {
-		c.emitTurnStatus(event.TurnCancelling)
-		c.promptOwner.CancelAll()
-		c.approval.clearAll()
-		cancel()
-		return
-	}
-	if c.goals.active() {
-		c.stopGoal(GoalStatusStopped)
-	}
-}
-
 // beginRotation claims the session-rotation gate. It fails if a turn is running
 // or another rotation is already in progress, so the caller holds exclusive
 // rights to swap the executor session from the check here through endRotation.
