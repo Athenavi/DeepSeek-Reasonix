@@ -33,3 +33,11 @@ mixed 往返。汇总要求全部 2,688 次往返、完整检查点与堆快照�
 `SHARD_PASS` 只代表一个完整进程。汇总 `PASS` 代表自动筛查通过，不代表整个 App
 不存在内存泄漏；堆保留链分析及主分支对照仍是独立归因工作，报告持续保留待归因
 状态。PR head 的证据也不替代最新目标分支集成检查和原生平台验证。
+
+## 远端恢复失败的原子完成
+
+远端恢复被拒绝时，会话身份、标题、路由、待处理提示和运行态必须先恢复，错误才能对外可见。HTTP 拒绝、忙碌、列表失败、目标不存在及传输失败后回查旧会话，共用同一个失败完成入口，并复核 tab、client、代际、选择与路由权限。
+
+代际安装/退役、重连、主机挂起和显式关闭使用同一个 tab 发布顺序；不会在持全局 map 锁时等待发布锁，网络握手和 pump 等待仍在锁外。
+
+在 desktop 模块执行 `go test -race . -run 'TestRemoteResumeFailure|TestOpenRemoteProjectTabRejectedResumeRestoresPreviousIdentity|TestRemoteRejectedResume'`，覆盖错误可见时的完整身份、所有拒绝路径、旧请求失权，以及错误发布期间重连/退役/关闭的交错。
