@@ -1,3 +1,4 @@
+import { commitTranscriptWindowGeometry } from "../lib/transcriptWindowGeometry";
 import { TranscriptMeasurementLedger } from "../lib/transcriptMeasurementLedger";
 import { TranscriptKernel, type TranscriptKernelClock, type TranscriptKernelEvent } from "../lib/transcriptKernel";
 
@@ -157,6 +158,31 @@ const movedNativeIsNative = kernel.observeNativeScroll({
   visibleBlocks: [{ key: "turn:user-position", top: delayedWriterOffset - 90, bottom: delayedWriterOffset + 30 }],
 });
 ok(movedNativeIsNative, "a physical offset that diverges from the writer target belongs to the user");
+
+// The adapter closes a safe size batch while the kernel still owns native input.
+const nativeBatchWrites = writes.length;
+kernel.renewNativeGesture(snapshot, 320, () => {});
+const batchItems = Array.from({ length: 50 }, (_, index) => ({
+  index, key: `batch:${index}`, start: index * 100, end: (index + 1) * 100, size: 100,
+}));
+const batchInput = { candidate: batchItems.slice(0, 38), measurements: batchItems,
+  retainedIndexes: new Set<number>(), structureRevision: "batch", scrollTop: 200, clientHeight: 500,
+  scrollMargin: 0, totalSize: 5000, maxItems: 38, direction: "forward" as const,
+  gestureActive: kernel.userGestureActive, residentCount: 2, forceFull: false };
+const batchBefore = commitTranscriptWindowGeometry(batchInput);
+const measuredBatch = batchItems.map(item => ({ ...item, size: item.size + (item.index === 20 ? 24 : 0),
+  start: item.start + (item.index > 20 ? 24 : 0), end: item.end + (item.index >= 20 ? 24 : 0) }));
+const batchAfter = commitTranscriptWindowGeometry({ ...batchInput, candidate: measuredBatch.slice(0, 38),
+  measurements: measuredBatch, totalSize: 5024, previous: batchBefore, measurementCommit: true });
+kernel.advanceGeometry();
+clock.flushFrames();
+ok(batchAfter.prefix.items[21].start === 2124 && batchAfter.prefix.items[2].start === 200,
+  "a published future batch is painted without moving the kernel reader anchor");
+ok(kernel.userGestureActive && writes.length === nativeBatchWrites,
+  "before-paint measurement acknowledgement neither releases native ownership nor writes scroll");
+kernel.replaceSurface("batch-replaced");
+clock.advance(320);
+ok(writes.length === nativeBatchWrites, "batch completion cannot restore a replaced surface");
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);
