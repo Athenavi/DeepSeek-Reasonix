@@ -204,12 +204,9 @@ console.log("\nbundle budgets");
 // initial route. The session-runtime ordering fence adds 56 bytes and
 // cross-platform zlib rounding reaches the same startup path; retain the
 // explicit budget rather than failing on a rounded 467.0 KiB display value.
-// The latest main-v2 session-runtime fence and exact prompt protocol measure
-// 468.2 KiB here; retain a 0.1 KiB ceiling for platform zlib rounding.
 // Containing rejected backend calls (#9890) routes stackless unhandled
-// rejections to a toast instead of the crash overlay and adds the recovery
-// dialog's failure copy; the merged path measures 468.545 KiB. Retain
-// 0.055 KiB with the smallest one-decimal ratchet.
+// rejections to a toast and adds the recovery dialog's failure copy:
+// 479704 B (468.461 KiB) over a 479496 B main-v2 base; retain rounding headroom.
 const initialJSBudgetKiB = 468.6;
 assertBudget("initial JavaScript gzip", initialJSGzip, initialJSBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk gzip", largestInitialJS, 280 * 1024);
@@ -290,9 +287,7 @@ for (const path of localeChunks) {
   // 61.027/61.881 KiB; retain bounded cross-platform headroom.
   // Recovery retry copy reaches the rounded 61.1 KiB boundary on Node/zlib
   // toolchains; keep the next one-decimal ceiling for cross-platform CI.
-  // The recovery dialog's two failure strings measure 61.168 KiB zh and
-  // 62.021 KiB zh-TW; keep the next one-decimal ceiling for zh-TW only.
-  const budget = name.startsWith("zh-TW-") ? 62.1 * 1024 : 61.2 * 1024;
+  const budget = name.startsWith("zh-TW-") ? 62.0 * 1024 : 61.2 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -397,9 +392,10 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2496.4 KiB locally; retain the smallest bounded ceiling.
 // The context truncation-rescue notice and its three locale strings measure
 // 2496.6 KiB; retain the smallest bounded ceiling.
-// Rejection containment (#9890) and the recovery dialog's failure copy
-// measure 2497.511 KiB raw; retain 0.089 KiB with the smallest one-decimal
-// ratchet.
-const rawInitialBudgetKiB = 2_497.6;
+// The authoritative session experience UI and legacy-engine adapter measure
+// 2497.7 KiB. Re-measure when the legacy engine is removed in the next slice.
+// Rejection containment (#9890) and the recovery dialog's failure copy measure
+// 2558558 B (2498.592 KiB); retain the next bounded ceiling.
+const rawInitialBudgetKiB = 2_498.7;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

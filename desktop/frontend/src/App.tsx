@@ -86,6 +86,7 @@ import { applyTerminalThemePreference } from "./lib/terminalTheme";
 import { formatTerminalOutputForComposer } from "./lib/terminalOutput";
 import { useTerminalStore } from "./store/terminal";
 import { hydrateReasoningDisplayMode, setReasoningDisplayPending } from "./lib/reasoningDisplayPreference";
+import { hydrateSessionExperience } from "./lib/sessionExperience";
 import { parseTodos } from "./lib/tools";
 import {
   dismissedTodoKeyForScope,
@@ -182,7 +183,6 @@ import {
   useLayoutStore,
 } from "./store/layout";
 import { useOverlayStore } from "./store/overlays";
-import { hydrateDisplayMode } from "./lib/displayMode";
 import { recordFrontendDiagnostic } from "./lib/frontendDiagnosticBridge";
 import { DEFAULT_STATUS_BAR_ITEMS, normalizeStatusBarItems, type StatusBarItemId } from "./lib/statusBarItems";
 import { paletteSessionDisplayTitle, paletteSessionHint, paletteSessionKeywords, sessionActivityTime } from "./lib/session";
@@ -1417,7 +1417,7 @@ export default function App() {
   }, []);
 
   const applyDesktopPreferences = useCallback(
-    (settings: Pick<SettingsView, "desktopTheme" | "desktopThemeStyle" | "desktopTerminalTheme" | "desktopLayoutStyle" | "desktopLanguage" | "checkUpdates" | "statusBarStyle" | "statusBarItems" | "conversationWidth"> & { reasoningDisplayMode?: string; reasoningDisplayModeExplicit?: boolean }) => {
+    (settings: Pick<SettingsView, "desktopTheme" | "desktopThemeStyle" | "desktopTerminalTheme" | "desktopLayoutStyle" | "desktopLanguage" | "checkUpdates" | "statusBarStyle" | "statusBarItems" | "conversationWidth"> & { sessionExperience?: "standard" | "deep"; reasoningDisplayMode?: string; reasoningDisplayModeExplicit?: boolean }) => {
       const nextTheme = normalizeThemePreference(settings.desktopTheme);
       const nextStyle = normalizeThemeStyleForTheme(settings.desktopThemeStyle, nextTheme);
       applyConfiguredBaseAppearance(nextTheme, nextStyle);
@@ -1430,7 +1430,8 @@ export default function App() {
       setStartupUpdateChecksEnabled(settings.checkUpdates !== false);
       setStatusBarStyle(settings.statusBarStyle === "text" ? "text" : "icon");
       setStatusBarItems(normalizeStatusBarItems(settings.statusBarItems));
-      hydrateReasoningDisplayMode(settings.reasoningDisplayMode, settings.reasoningDisplayModeExplicit === true);
+      hydrateSessionExperience(settings.sessionExperience);
+      hydrateReasoningDisplayMode(settings.sessionExperience === "deep" ? "expanded" : "auto", settings.sessionExperience === "deep");
     },
     [setLocalePref],
   );
@@ -1453,7 +1454,9 @@ export default function App() {
       if (cancelled) return;
       applyDesktopPreferences(settings);
       applyConfigWarningSnapshot(settings.configWarnings, settings.configWarningsRevision);
-      hydrateDisplayMode(settings.displayMode);
+      // Session experience is the canonical user-facing preference. Legacy
+      // display mode is intentionally not hydrated, so an old compact value
+      // cannot override the two-state experience during startup.
       setSidebarImConnections(sidebarImConnectionsFromBot(settings.bot, t, runtimeStatus));
       setImTopicSources(sidebarImTopicSourcesFromBot(settings.bot, t));
       // Load unified theme experience after base appearance so pack tokens win.
@@ -1479,6 +1482,7 @@ export default function App() {
     void syncDesktopPreferences().catch((e) => {
       console.warn("desktop preferences sync failed", e);
       setStartupUpdateChecksEnabled(true);
+      hydrateSessionExperience("standard");
       hydrateReasoningDisplayMode("auto", false);
     });
     return () => {

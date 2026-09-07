@@ -110,7 +110,65 @@ async function waitForStableTranscriptGeometry(
   }), { timeout, frames, requireTail, maxTailDistance });
 }
 
+async function chooseSessionExperience(page, name) {
+  await page.getByRole("button", { name: "Command palette", exact: true }).waitFor();
+  await page.keyboard.press("ControlOrMeta+,");
+  await page.getByRole("radio", { name, exact: true }).click();
+  await page.waitForFunction((mode) => localStorage.getItem("reasonix-session-experience") === mode, name.toLowerCase());
+  await page.getByRole("button", { name: "Back to workspace", exact: true }).click();
+  await page.locator(".settings-page").waitFor({ state: "hidden" });
+}
+
+async function expandGeometryProcesses(page) {
+  // Prepare the legacy expanded-process/collapsed-reasoning fixture using
+  // real reader gestures and visible controls. Direct offsets or batched DOM
+  // clicks can race the old engine's layout-anchor and tail-follow owners.
+  const viewport = page.locator(".transcript");
+  await moveToOuterReaderGutter(page, viewport, false);
+  await page.mouse.wheel(0, -await viewport.evaluate(element => element.scrollHeight));
+  await page.waitForFunction(() => {
+    const element = document.querySelector(".transcript");
+    return element?.getAttribute("data-scroll-mode") === "manual" && element.scrollTop <= 1;
+  });
+  for (let step = 0; step < 500; step++) {
+    await waitForStableTranscriptGeometry(page);
+    const state = await viewport.evaluate(element => {
+      const viewport = element.getBoundingClientRect();
+      for (const button of element.querySelectorAll('.turn-collapse > button[aria-expanded="false"]')) {
+        const rect = button.getBoundingClientRect();
+        const top = Math.max(rect.top, viewport.top);
+        const bottom = Math.min(rect.bottom, viewport.bottom);
+        if (bottom - top < 4) continue;
+        const x = rect.left + rect.width / 2;
+        const y = top + (bottom - top) / 2;
+        if (button.contains(document.elementFromPoint(x, y))) return { button: { x, y } };
+      }
+      return { atEnd: element.scrollHeight - element.scrollTop - element.clientHeight <= 4,
+        step: element.clientHeight / 2 };
+    });
+    if (state.button) {
+      await page.mouse.click(state.button.x, state.button.y);
+      continue;
+    }
+    await moveToOuterReaderGutter(page, viewport, false);
+    if (state.atEnd) {
+      await page.mouse.wheel(0, -state.step * 2);
+      await page.waitForFunction(() => {
+        const element = document.querySelector(".transcript");
+        return element && element.scrollHeight - element.scrollTop - element.clientHeight > element.clientHeight / 2;
+      });
+      await waitForStableTranscriptGeometry(page);
+      await page.locator(".transcript__jump-bottom").click();
+      await waitForStableTranscriptGeometry(page, { timeout: 30_000, requireTail: true });
+      return;
+    }
+    await page.mouse.wheel(0, state.step);
+  }
+  throw new Error("geometry disclosure preparation did not reach the final row");
+}
+
 async function openGeometryContractFixture(page) {
+  await chooseSessionExperience(page, "Standard");
   await page.click('.project-tree__topic-main:has-text("bench:geometry-229")');
   await page.waitForFunction(
     () => document.querySelector(".transcript")?.textContent?.includes("Geometry contract fixture complete."),
@@ -118,6 +176,7 @@ async function openGeometryContractFixture(page) {
     { timeout: 30_000 },
   );
   await waitForStableTranscriptGeometry(page, { timeout: 30_000, requireTail: true });
+  await expandGeometryProcesses(page);
   return page.locator(".transcript");
 }
 
@@ -304,12 +363,10 @@ try {
     ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : {}),
   });
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  // Both 1.27.0 field reports keep completed working steps expanded. Apply the
-  // preference before the app mounts so every long-session, native-thumb, and
-  // measurement-churn assertion exercises the larger virtual row model.
-  await page.addInitScript(() => localStorage.setItem("reasonix-process-fold", "expanded"));
+  // Save Standard through the actual settings owner after startup hydration.
   await page.goto(url, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => !document.querySelector(".startup-splash"), undefined, { timeout: 30_000 });
+  await chooseSessionExperience(page, "Standard");
   await page.click('.project-tree__topic-main:has-text("bench:small-6t")');
   await page.waitForFunction(() => document.querySelectorAll(".transcript__row").length > 4, undefined, { timeout: 30_000 });
   await page.waitForFunction(() => document.querySelector(".transcript")?.textContent?.includes("Asynchronously hydrated verification appendix"), undefined, { timeout: 30_000 });
@@ -485,7 +542,7 @@ try {
   await waitForStableTranscriptGeometry(page, { timeout: 30_000, requireTail: true });
   assert(true, "rapid A→B→A switching leaves the reported long-turn session at its physical bottom");
   await openGeometryContractFixture(page);
-  await runGeometryContractTraversal(page, "DPR 1 first visit");
+  await runGeometryContractTraversal(page, "DPR 1 explicit process disclosure");
   await page.click('.project-tree__topic-main:has-text("bench:small-6t")');
   await page.waitForFunction(
     () => document.querySelector(".project-tree__topic--active .project-tree__topic-label")?.textContent?.includes("bench:small-6t"),
@@ -494,10 +551,12 @@ try {
   );
   await openGeometryContractFixture(page);
   await runGeometryContractTraversal(page, "DPR 1 A→B→A revisit");
+  await chooseSessionExperience(page, "Standard");
   await page.click('.project-tree__topic-main:has-text("bench:tools-38t")');
   await page.waitForFunction(() => document.querySelector(".project-tree__topic--active .project-tree__topic-label")?.textContent?.includes("bench:tools-38t"));
   await page.waitForFunction(() => document.querySelector(".transcript")?.textContent?.includes("pkg-41/mod.go"), undefined, { timeout: 30_000 });
   await page.waitForFunction(() => !document.querySelector(".transcript-navigation-overlay"), undefined, { timeout: 30_000 });
+  await waitForStableTranscriptGeometry(page, { timeout: 30_000, requireTail: true });
   const markdownVisibility = await page.evaluate(() => {
     const row = document.querySelector(".transcript__row");
     if (!(row instanceof HTMLElement)) return { inside: null, outside: null };
@@ -1708,9 +1767,9 @@ try {
   // tail writes in 11s). The tail writer must stay calm through churn and
   // still land on the physical bottom, with no OS setting involved.
   const reducedPage = await browser.newPage({ viewport: { width: 1280, height: 800 }, reducedMotion: "reduce" });
-  await reducedPage.addInitScript(() => localStorage.setItem("reasonix-process-fold", "expanded"));
   await reducedPage.goto(url, { waitUntil: "domcontentloaded" });
   await reducedPage.waitForFunction(() => !document.querySelector(".startup-splash"), undefined, { timeout: 30_000 });
+  await chooseSessionExperience(reducedPage, "Standard");
   assert(
     await reducedPage.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches),
     "reduced-motion emulation is active",
