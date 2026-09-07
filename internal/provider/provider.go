@@ -43,6 +43,9 @@ const (
 // Message is a single conversation message.
 type Message struct {
 	Role Role `json:"role"`
+	// ID is local transcript identity (stable across saves, reloads, and log
+	// branches). Adapters never copy it to the wire; older readers ignore it.
+	ID string `json:"id,omitempty"`
 	// Origin distinguishes real user input from host-generated user-role protocol
 	// messages. omitempty keeps legacy sessions readable by previous releases.
 	Origin MessageOrigin `json:"origin,omitempty"`
