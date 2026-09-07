@@ -120,39 +120,49 @@ async function chooseSessionExperience(page, name) {
 }
 
 async function expandGeometryProcesses(page) {
-  // Standard with explicit process disclosure keeps reasoning collapsed.
-  // Backend hydration intentionally supersedes the old localStorage preset.
+  // Prepare the legacy expanded-process/collapsed-reasoning fixture using
+  // real reader gestures and visible controls. Direct offsets or batched DOM
+  // clicks can race the old engine's layout-anchor and tail-follow owners.
   const viewport = page.locator(".transcript");
-  // A direct scrollTop assignment while tail-follow owns the viewport can be
-  // undone before the virtual list publishes its first range. A real upward
-  // gesture first transfers ownership to the reader on every platform.
   await moveToOuterReaderGutter(page, viewport, false);
   await page.mouse.wheel(0, -await viewport.evaluate(element => element.scrollHeight));
   await page.waitForFunction(() => {
     const element = document.querySelector(".transcript");
     return element?.getAttribute("data-scroll-mode") === "manual" && element.scrollTop <= 1;
   });
-  await waitForStableTranscriptGeometry(page);
   for (let step = 0; step < 500; step++) {
     await waitForStableTranscriptGeometry(page);
-    const opened = await viewport.evaluate(element => {
-      const buttons = [...element.querySelectorAll('.turn-collapse > button[aria-expanded="false"]')];
-      for (const button of buttons) button.click();
-      return buttons.length;
+    const state = await viewport.evaluate(element => {
+      const viewport = element.getBoundingClientRect();
+      for (const button of element.querySelectorAll('.turn-collapse > button[aria-expanded="false"]')) {
+        const rect = button.getBoundingClientRect();
+        const top = Math.max(rect.top, viewport.top);
+        const bottom = Math.min(rect.bottom, viewport.bottom);
+        if (bottom - top < 4) continue;
+        const x = rect.left + rect.width / 2;
+        const y = top + (bottom - top) / 2;
+        if (button.contains(document.elementFromPoint(x, y))) return { button: { x, y } };
+      }
+      return { atEnd: element.scrollHeight - element.scrollTop - element.clientHeight <= 4,
+        step: element.clientHeight / 2 };
     });
-    if (opened) continue;
-    const atEnd = await viewport.evaluate(element => {
-      if (element.scrollHeight - element.scrollTop - element.clientHeight <= 4) return true;
-      element.scrollTop += element.clientHeight / 2;
-      return false;
-    });
-    if (atEnd) {
-      // Finish preparation above the tail so the real return-to-bottom action
-      // explicitly reacquires tail ownership before the measured traversal.
-      await viewport.evaluate(element => { element.scrollTop -= element.clientHeight; });
-      await page.locator(".transcript__jump-bottom").waitFor();
+    if (state.button) {
+      await page.mouse.click(state.button.x, state.button.y);
+      continue;
+    }
+    await moveToOuterReaderGutter(page, viewport, false);
+    if (state.atEnd) {
+      await page.mouse.wheel(0, -state.step * 2);
+      await page.waitForFunction(() => {
+        const element = document.querySelector(".transcript");
+        return element && element.scrollHeight - element.scrollTop - element.clientHeight > element.clientHeight / 2;
+      });
+      await waitForStableTranscriptGeometry(page);
+      await page.locator(".transcript__jump-bottom").click();
+      await waitForStableTranscriptGeometry(page, { timeout: 30_000, requireTail: true });
       return;
     }
+    await page.mouse.wheel(0, state.step);
   }
   throw new Error("geometry disclosure preparation did not reach the final row");
 }
@@ -167,10 +177,6 @@ async function openGeometryContractFixture(page) {
   );
   await waitForStableTranscriptGeometry(page, { timeout: 30_000, requireTail: true });
   await expandGeometryProcesses(page);
-  await waitForStableTranscriptGeometry(page);
-  const jump = page.locator(".transcript__jump-bottom");
-  if (await jump.isVisible()) await jump.click();
-  await waitForStableTranscriptGeometry(page, { timeout: 30_000, requireTail: true });
   return page.locator(".transcript");
 }
 
