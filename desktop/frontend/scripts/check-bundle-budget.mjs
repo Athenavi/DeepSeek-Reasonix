@@ -391,8 +391,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2496.4 KiB locally; retain the smallest bounded ceiling.
 // The context truncation-rescue notice and its three locale strings measure
 // 2496.6 KiB; retain the smallest bounded ceiling.
-// Source-bound command owners and lifecycle composition measure 2408.0 KiB.
+// Source-bound owners plus input-release identity measure 2408.2 KiB.
 // Deferred presentation extraction in the next slice is budgeted separately.
-const rawInitialBudgetKiB = 2_408.1;
+const rawInitialBudgetKiB = 2_408.3;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

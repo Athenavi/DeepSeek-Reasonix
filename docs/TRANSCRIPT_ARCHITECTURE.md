@@ -107,3 +107,5 @@ boundaries, and the final-head CI requirement. This architecture does not assert
 that every frontend issue since 1.23.0 has been eliminated.
 
 An approved measurement batch also owns its next geometry commit. A layout-effect state update completes that commit before paint rather than relying on TanStack notification scheduling. The commit installs the complete published prefix and either its covering candidate or a range reconstructed from that same prefix. Retaining the older prefix would defer already-approved offscreen growth until native scrolling brings it into view. Unsolicited stale range notifications still retain the last covering snapshot.
+
+Input ownership also gates intent changes: an unowned scroll event may be a layout clamp or a delayed writer notification, so it cannot change the logical reading anchor or cancel tail follow. Structural transactions use the existing logical anchor. Touch momentum and native thumb release retain the same renewable native-input lease; a jump-bottom command explicitly ends the older lease. Lease renewal does not synthesize a scroll observation, and no-op writes do not erase pending writer provenance.
