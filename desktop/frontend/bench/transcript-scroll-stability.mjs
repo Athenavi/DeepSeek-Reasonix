@@ -123,6 +123,11 @@ async function runGeometryFixture(page) {
 async function runWindowedFixture(page) {
   const transcript = await loadFixture(page, "bench:windowed-1000t", "Windowed turn 1000");
   await jumpToTail(page);
+  // The production window adapter is lazy. Its covered full-DOM Suspense
+  // presentation can reach the tail before the adapter module has loaded.
+  // Wait for that lifecycle boundary instead of assuming a fixed frame count.
+  await page.waitForFunction(() => document.querySelector(".transcript__projection")?.getAttribute("data-transcript-render-mode") === "windowed",
+    undefined, { timeout: 1000 });
   let state = await snapshot(page);
   assert(state.completed > 100, `long fixture crosses the 100-turn boundary (${state.completed} completed blocks)`);
   assert(state.mode === "windowed", "long fixture uses the TanStack window adapter");

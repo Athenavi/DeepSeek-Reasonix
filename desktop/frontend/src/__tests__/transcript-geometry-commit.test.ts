@@ -64,5 +64,46 @@ try {
   await act(async () => root.unmount());
   stale.forEach(callback => callback(clock.time));
   assert.deepEqual(writes, [400], "queued geometry cannot write after its surface detaches");
+  const inputRoot = createRoot(document.getElementById("root")!);
+  scrollTop = 200; anchorTop = 180;
+  await act(async () => inputRoot.render(React.createElement(TranscriptKernelClockContext.Provider,
+    { value: clock }, React.createElement(Probe))));
+  await act(async () => { current.onPointerDownCapture({ clientX: 100, pointerType: "touch" }); current.onTouchStartCapture(); scrollTop = 260; anchorTop = 240; current.onScroll(); window.dispatchEvent(new window.MouseEvent("pointerup")); current.onTouchEndCapture(); clock.flushFrames(); });
+  assert.equal(current.kernel.userGestureActive, true, "touch release preserves ownership for momentum");
+  await act(async () => clock.advance(319));
+  await act(async () => { scrollTop = 320; anchorTop = 300; current.onScroll(); });
+  await act(async () => clock.advance(319));
+  assert.equal(current.kernel.userGestureActive, true, "momentum renews the existing input lease");
+  await act(async () => clock.advance(1));
+  assert.equal(current.kernel.userGestureActive, false, "ownership ends only after native progress becomes idle");
+  const ownedAnchor = current.kernel.anchor;
+  await act(async () => { scrollTop = 325; anchorTop = 600; current.onScroll(); });
+  assert.deepEqual(current.kernel.anchor, ownedAnchor, "an idle layout scroll cannot overwrite the observed reading anchor");
+  await act(async () => { current.onWheelCapture(); current.scrollToBottom(); });
+  assert.equal(current.kernel.intent, "tail", "explicit jump-bottom supersedes the older input lease");
+  assert.equal(current.kernel.userGestureActive, false);
+  await act(async () => {
+    scrollTop -= 54;
+    const transaction = current.beginStructural("display-change");
+    assert.equal(current.kernel.intent, "tail", "structural geometry cannot reinterpret a new bottom gap as reader intent");
+    assert.equal(transaction?.status, "active");
+  });
+  await act(async () => {
+    current.onPointerDownCapture({ clientX: 100, pointerType: "mouse" });
+    window.dispatchEvent(new window.MouseEvent("pointerup"));
+    current.onWheelCapture();
+    clock.flushFrames();
+  });
+  assert.equal(current.kernel.userGestureActive, true, "an older pointer-release frame cannot end a newer wheel lease");
+  await act(async () => {
+    current.endGesture();
+    current.onPointerDownCapture({ clientX: 799, pointerType: "mouse" });
+    window.dispatchEvent(new window.MouseEvent("pointerup"));
+    current.scrollToBottom();
+    clock.flushFrames();
+  });
+  assert.equal(current.kernel.intent, "tail", "a delayed thumb release cannot re-enter reader intent after jump-bottom");
+  assert.equal(current.kernel.userGestureActive, false);
+  await act(async () => inputRoot.unmount());
   console.log("geometry commit: atomic paint, queued-work revocation, native takeover and disposal passed");
 } finally { dom.window.close(); }

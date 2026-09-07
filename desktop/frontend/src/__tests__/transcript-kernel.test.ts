@@ -184,5 +184,32 @@ kernel.replaceSurface("batch-replaced");
 clock.advance(320);
 ok(writes.length === nativeBatchWrites, "batch completion cannot restore a replaced surface");
 
+// Browser geometry notifications are not new user input.
+kernel.scrollToTail();
+const noInputChangedIntent = kernel.observeNativeScroll({ ...snapshot, scrollTop: 905, scrollHeight: 1460 });
+ok(!noInputChangedIntent && kernel.intent === "tail", "a delayed layout scroll cannot revoke tail intent without an input owner");
+const renewalSnapshot = { ...snapshot, scrollTop: 600, visibleBlocks: [{ key: "renewal", top: 580, bottom: 900 }] };
+kernel.beginUserGesture(renewalSnapshot);
+kernel.renewNativeGesture({ ...renewalSnapshot, scrollTop: 640 }, 320, () => {});
+ok(kernel.anchor.kind === "block" && kernel.anchor.offsetPx === 20,
+  "renewing input ownership does not invent a native scroll observation");
+kernel.observeNativeScroll({ ...renewalSnapshot, scrollTop: 640 });
+ok(kernel.anchor.kind === "block" && kernel.anchor.offsetPx === 60,
+  "the subsequent native event records actual user movement");
+kernel.endUserGesture();
+
+let firstTailWrite = true;
+kernel.connectWriter(() => {
+  const changed = firstTailWrite; firstTailWrite = false;
+  return { accepted: true, offset: 900, changed };
+});
+kernel.scrollToTail();
+kernel.scrollToTail(); // Geometry may request an idempotent sync before scroll delivery.
+kernel.beginUserGesture({ ...snapshot, scrollTop: 900 });
+kernel.renewNativeGesture({ ...snapshot, scrollTop: 900 }, 320, () => {});
+ok(!kernel.observeNativeScroll({ ...snapshot, scrollTop: 900 }),
+  "no-op sync and lease renewal preserve the pending writer event provenance");
+kernel.endUserGesture();
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

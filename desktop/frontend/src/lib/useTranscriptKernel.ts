@@ -68,6 +68,7 @@ export function useTranscriptKernel({
   // state deduplicates PointerEvent + compatibility MouseEvent delivery.
   const pointerGestureRef = useRef(0);
   const observedTopRef = useRef(0);
+  const inputRevisionRef = useRef(0);
   const prependAwaitingGeometryRef = useRef(false);
   const geometryWork = useRef<{ generation: number; cancel: () => void } | null>(null);
   const coverageRef = useRef(true);
@@ -91,6 +92,7 @@ export function useTranscriptKernel({
 
   useLayoutEffect(() => {
     prependAwaitingGeometryRef.current = false;
+    inputRevisionRef.current += 1;
     coverageRef.current = true;
     pointerGestureRef.current = 0;
     writer.freeze(false);
@@ -159,26 +161,25 @@ export function useTranscriptKernel({
   }, [geometryRevision, settleGeometry]);
 
   const beginStructural = useCallback((kind: Exclude<ScrollTransactionKind, "jump" | "selection" | "tail-sync">) => {
-    const current = snapshot();
-    // Composer geometry is reported after React has already resized the
-    // viewport. Preserve the pre-resize logical intent instead of mistaking
-    // the newly exposed bottom gap for a user-owned reader position.
-    if (current && kind !== "composer-resize") kernel.observeNativeScroll(current, false);
-    const anchor = kind === "composer-resize" ? kernel.anchor : current ? kernel.capture(current) : kernel.anchor;
+    // Structural geometry preserves the input-owned logical anchor; a new
+    // bottom gap after layout cannot turn tail follow into reader intent.
+    const anchor = kernel.anchor;
     if (kind === "prepend") prependAwaitingGeometryRef.current = true;
     const transaction = kernel.begin(kind, anchor);
     refresh();
     return transaction;
-  }, [kernel, refresh, snapshot]);
+  }, [kernel, refresh]);
 
   const beginGesture = useCallback((owner: "selection" | "native" = "native") => {
     const current = snapshot();
     if (!current) return;
+    inputRevisionRef.current += 1;
     kernel.beginUserGesture(current, owner);
     refresh();
   }, [kernel, refresh, snapshot]);
 
   const finishGesture = useCallback((resumed: ReturnType<TranscriptKernel["endUserGesture"]>) => {
+    inputRevisionRef.current += 1;
     writer.freeze(false);
     pointerGestureRef.current = 0;
     if (resumed) kernel.afterCurrentGenerationPaint(settleGeometry);
@@ -196,6 +197,17 @@ export function useTranscriptKernel({
     refresh();
   }, [finishGesture, kernel, refresh, snapshot]);
 
+  const claimNativeInput = useCallback(() => {
+    inputRevisionRef.current += 1;
+    renewGestureLease();
+  }, [renewGestureLease]);
+
+  const releaseNativeInput = useCallback(() => {
+    writer.freeze(false);
+    pointerGestureRef.current = 0;
+    claimNativeInput();
+  }, [claimNativeInput, writer]);
+
   const onScroll = useCallback(() => {
     const current = snapshot();
     if (!current) return null;
@@ -211,7 +223,10 @@ export function useTranscriptKernel({
     return towardHistory && kernel.userGestureActive;
   }, [kernel, refresh, renewGestureLease, snapshot]);
 
-  const onPointerDownCapture = useCallback((event: { clientX: number }) => {
+  const onPointerDownCapture = useCallback((event: { clientX: number; pointerType?: string }) => {
+    // Touch has its own start/end stream. Its compatibility pointerup must
+    // not schedule a mouse release that later cancels touch momentum.
+    if (event.pointerType === "touch") return;
     if (pointerGestureRef.current) return;
     const element = scrollRef.current;
     if (!element) return;
@@ -220,25 +235,40 @@ export function useTranscriptKernel({
     pointerGestureRef.current = nativeThumb ? 2 : 1;
     writer.freeze(nativeThumb);
     beginGesture();
+    const inputRevision = inputRevisionRef.current;
     const terminalEvents = ["pointerup", "pointercancel", "mouseup"] as const;
     const generation = kernel.generation;
     const finish = () => {
       terminalEvents.forEach((type) => window.removeEventListener(type, finish, true));
-      if (generation === kernel.generation) kernel.afterCurrentGenerationPaint(endGesture);
+      if (generation === kernel.generation && inputRevision === inputRevisionRef.current) {
+        pointerGestureRef.current = 0;
+        writer.freeze(false);
+      }
+      if (generation === kernel.generation) kernel.afterCurrentGenerationPaint(() => {
+        if (inputRevision !== inputRevisionRef.current) return;
+        if (nativeThumb) {
+          releaseNativeInput();
+        } else {
+          const current = snapshot();
+          if (current && current.scrollTop !== observedTopRef.current) onScroll();
+          endGesture();
+        }
+      });
     };
     terminalEvents.forEach((type) => window.addEventListener(type, finish, true));
-  }, [beginGesture, endGesture, kernel, writer]);
+  }, [beginGesture, endGesture, kernel, onScroll, releaseNativeInput, snapshot, writer]);
 
   const onKeyDownCapture = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (SCROLL_KEYS.has(event.key)) renewGestureLease();
-  }, [renewGestureLease]);
+    if (SCROLL_KEYS.has(event.key)) claimNativeInput();
+  }, [claimNativeInput]);
 
 
   const scrollToBottom = useCallback(() => {
+    endGesture();
     kernel.cancelActive("jump-to-bottom");
     kernel.scrollToTail();
     refresh();
-  }, [kernel, refresh]);
+  }, [endGesture, kernel, refresh]);
 
   const jumpToBlock = useCallback((key: string) => {
     const element = scrollRef.current;
@@ -298,9 +328,9 @@ export function useTranscriptKernel({
     writeOffset,
     onScroll,
     onPointerDownCapture,
-    onWheelCapture: renewGestureLease,
+    onWheelCapture: claimNativeInput,
     onTouchStartCapture: beginGesture,
-    onTouchEndCapture: endGesture,
+    onTouchEndCapture: releaseNativeInput,
     onKeyDownCapture,
   };
 }
