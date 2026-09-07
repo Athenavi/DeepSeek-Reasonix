@@ -395,7 +395,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2496.4 KiB locally; retain the smallest bounded ceiling.
 // The context truncation-rescue notice and its three locale strings measure
 // 2496.6 KiB; retain the smallest bounded ceiling.
-// Provider/settings integration: measured 2510.194 KiB including shell CSS.
-const rawInitialBudgetKiB = 2_510.3;
+// The complete block renderer and input ownership gates measure 2371.7 KiB
+// on the settings + pure-kernel baseline. Keep the smallest bounded ceiling.
+const rawInitialBudgetKiB = 2_371.8;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

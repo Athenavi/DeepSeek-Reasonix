@@ -58,9 +58,8 @@ import {
   type FontFamily,
   type MonoFontFamily,
 } from "../lib/fontFamily";
-import { getDisplayMode, onDisplayModeChange, setDisplayMode as setLocalDisplayMode } from "../lib/displayMode";
-import { getProcessFoldPreference, onProcessFoldPreferenceChange, setProcessFoldPreference, type ProcessFoldPreference } from "../lib/processFoldPreference";
-import { applyReasoningDisplayMode, useReasoningDisplayMode, type ReasoningDisplayMode } from "../lib/reasoningDisplayPreference";
+import { SessionExperienceSettings } from "./SessionExperienceSettings";
+import { SettingsField, SettingsSection } from "./SettingsForm";
 import { normalizeStatusBarItems, type StatusBarItemId } from "../lib/statusBarItems";
 import { normalizeToolApprovalMode } from "../lib/types";
 import {
@@ -324,8 +323,8 @@ export function SettingsPanel({
     label: settingsTabLabel(id, t),
     meta: s ? settingsTabMeta(id, s, t) : "",
     searchTerms: id === "general" ? [
-      "settings.desktopLayoutStyle", "settings.language", "settings.currency", "settings.displayMode",
-      "settings.reasoningDisplay", "settings.processFold", "settings.closeBehavior",
+      "settings.desktopLayoutStyle", "settings.language", "settings.currency", "settings.sessionExperience",
+      "settings.closeBehavior",
       "settings.defaultToolApprovalMode", "settings.sound", "settings.statusBarStyle", "settings.statusBarItems",
     ].map((key) => t(key as DictKey)).join(" ") : "",
   })), [s, t]);
@@ -479,82 +478,6 @@ function settingsPageKind(tab: SettingsTab): "form" | "manager" {
   }
 }
 
-function SettingsSection({
-  title,
-  description,
-  actions,
-  children,
-}: {
-  title?: ReactNode;
-  description?: ReactNode;
-  actions?: ReactNode;
-  children: ReactNode;
-}) {
-  const hasHead = Boolean(title || description || actions);
-  return (
-    <section className="settings-section">
-      {hasHead && (
-        <div className="settings-section__head">
-          <div>
-            {title && <div className="settings-section__title">{title}</div>}
-            {description && (
-              <div className="settings-section__desc">
-                <SettingsHint hint={description} />
-              </div>
-            )}
-          </div>
-          {actions && <div className="settings-section__actions">{actions}</div>}
-        </div>
-      )}
-      <div className="settings-section__body">{children}</div>
-    </section>
-  );
-}
-
-function SettingsField({
-  label,
-  hint,
-  icon,
-  children,
-  className,
-  stacked = false,
-}: {
-  label: ReactNode;
-  hint?: ReactNode;
-  icon?: ReactNode;
-  children: ReactNode;
-  className?: string;
-  stacked?: boolean;
-}) {
-  return (
-    <div className={`settings-field${stacked ? " settings-field--stacked" : ""}${className ? ` ${className}` : ""}`}>
-      <div className={`settings-field__copy${icon ? " settings-field__copy--icon" : ""}`}>
-        {icon && <span className="settings-field__icon" aria-hidden="true">{icon}</span>}
-        <div className="settings-field__copy-body">
-          <div className="settings-field__label">{label}</div>
-          {hint && (
-            <div className="settings-field__hint">
-              <SettingsHint hint={hint} />
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="settings-field__control">{children}</div>
-    </div>
-  );
-}
-
-function SettingsHint({ hint }: { hint: ReactNode }) {
-  if (typeof hint === "string" || typeof hint === "number") {
-    const label = String(hint);
-    return (
-      <Tooltip label={label} fill block className="settings-field__hint-tooltip">
-        <span className="settings-field__hint-line">{label}</span>
-      </Tooltip>
-    );
-  }
-  return hint;
-}
 
 function settingsTabPageTitle(id: SettingsTab, t: ReturnType<typeof useT>): string {
   switch (id) {
@@ -629,7 +552,7 @@ function settingsTabMeta(id: SettingsTab, s: SettingsView, t: ReturnType<typeof 
     case "models":
       return settingsModelMeta(s, t);
     case "general":
-      return `${desktopLayoutStyleLabel(normalizeDesktopLayoutStyle(s.desktopLayoutStyle), t)} · ${closeBehaviorLabel(normalizeCloseBehavior(s.closeBehavior), t)}`;
+      return `${s.sessionExperience === "deep" ? t("settings.sessionExperience.deep") : t("settings.sessionExperience.standard")} · ${desktopLayoutStyleLabel(normalizeDesktopLayoutStyle(s.desktopLayoutStyle), t)}`;
     case "providers":
       return t("settings.providerCount", { n: s.providers.length });
     case "bots":
@@ -1509,7 +1432,8 @@ function normalizeSettingsView(view: SettingsView | null | undefined): SettingsV
     desktopThemeStyle: normalizeThemeStyleForTheme(view.desktopThemeStyle, normalizeThemePreference(view.desktopTheme)),
     desktopTerminalTheme: normalizeTerminalThemePreference(view.desktopTerminalTheme),
     closeBehavior: normalizeCloseBehavior(view.closeBehavior),
-    displayMode: normalizeDisplayMode(view.displayMode),
+    sessionExperience: view.sessionExperience === "deep" ? "deep" : "standard",
+    displayMode: "standard",
     statusBarStyle: normalizeStatusBarStyle(view.statusBarStyle),
     statusBarItems: normalizeStatusBarItems(view.statusBarItems),
     conversationWidth: normalizeConversationWidth(view.conversationWidth),
@@ -1528,12 +1452,6 @@ type CloseBehavior = "background" | "quit";
 
 function normalizeCloseBehavior(mode: string | undefined): CloseBehavior {
   return mode === "quit" ? "quit" : "background";
-}
-
-type DisplayMode = "standard" | "compact";
-
-function normalizeDisplayMode(mode: string | undefined): DisplayMode {
-  return mode === "standard" || mode === "compact" ? mode : "standard";
 }
 
 type DesktopLayoutStyle = "classic" | "workbench" | "creation";
@@ -1649,17 +1567,8 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
   const { setPref } = useI18n();
   const t = useT();
   const closeBehavior = normalizeCloseBehavior(s.closeBehavior);
-  const [displayMode, setDisplayMode] = useState<DisplayMode>(() => normalizeDisplayMode(getDisplayMode()));
-  const [processFold, setProcessFold] = useState<ProcessFoldPreference>(getProcessFoldPreference);
-  const reasoningDisplayMode = useReasoningDisplayMode();
   const soundPanelId = useId();
-  useEffect(() => onDisplayModeChange((mode) => setDisplayMode(mode)), []);
-  useEffect(() => onProcessFoldPreferenceChange((pref) => setProcessFold(pref)), []);
   const defaultToolApprovalMode = normalizeToolApprovalMode(s.defaultToolApprovalMode);
-  const saveReasoningDisplayMode = useCallback(async (mode: ReasoningDisplayMode) => {
-    const ok = await apply(() => app.SetReasoningDisplayMode(mode));
-    if (ok) applyReasoningDisplayMode(mode);
-  }, [apply]);
   const languagePref = normalizeLangPref(s.desktopLanguage);
   const desktopCurrency = normalizeDesktopCurrency(s.desktopCurrency);
   const desktopLayoutStyle = normalizeDesktopLayoutStyle(s.desktopLayoutStyle);
@@ -1738,59 +1647,7 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
       </SettingsField>
       </SettingsSection>
 
-      <SettingsSection title={t("settings.general.sectionConversation")} description={t("settings.sessionContentDisplayHint")}>
-        <SettingsField label={t("settings.displayMode")} hint={t("settings.displayModeHint")} icon={<SlidersHorizontal size={18} />}>
-          <div className="set-seg" role="radiogroup" aria-label={t("settings.displayMode")}>
-            {(["standard", "compact"] as const).map((mode) => (
-              <button key={mode} type="button"
-                className={`set-seg__btn${displayMode === mode ? " set-seg__btn--on" : ""}`}
-                aria-pressed={displayMode === mode}
-                disabled={busy}
-                onClick={() => {
-                  setLocalDisplayMode(mode);
-                  void apply(() => app.SetDisplayMode(mode));
-                }}
-              >
-                {t(`settings.displayMode.${mode}`)}
-              </button>
-            ))}
-          </div>
-        </SettingsField>
-        <SettingsField label={t("settings.reasoningDisplay")} hint={t("settings.reasoningDisplayHint")} icon={<BrainCircuit size={18} />}>
-          <div>
-            <div className="set-seg" role="radiogroup" aria-label={t("settings.reasoningDisplay")}>
-              {(["hidden", "summary", "auto", "expanded"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  className={`set-seg__btn${reasoningDisplayMode === mode ? " set-seg__btn--on" : ""}`}
-                  aria-pressed={reasoningDisplayMode === mode}
-                  disabled={busy}
-                  onClick={() => void saveReasoningDisplayMode(mode)}
-                >
-                  {t(`settings.reasoningDisplay.${mode}`)}
-                </button>
-              ))}
-            </div>
-            {reasoningDisplayMode === "legacy-collapsed" && <div className="settings-inline-hint" role="status">{t("settings.reasoningDisplay.legacy")}</div>}
-          </div>
-        </SettingsField>
-        <SettingsField label={t("settings.processFold")} hint={t("settings.processFoldHint")} icon={<ListChecks size={18} />}>
-          <div className="set-seg" role="radiogroup" aria-label={t("settings.processFold")}>
-            {(["auto", "expanded"] as const).map((pref) => (
-              <button
-                key={pref}
-                type="button"
-                className={`set-seg__btn${processFold === pref ? " set-seg__btn--on" : ""}`}
-                aria-pressed={processFold === pref}
-                onClick={() => setProcessFoldPreference(pref)}
-              >
-                {t(`settings.processFold.${pref}`)}
-              </button>
-            ))}
-          </div>
-        </SettingsField>
-      </SettingsSection>
+      <SessionExperienceSettings snapshot={s} busy={busy} apply={apply} />
 
       <SettingsSection title={t("settings.general.sectionSystem")} description={t("settings.general.sectionSystemHint")}>
       <SettingsField label={t("settings.closeBehavior")} hint={<DesktopCloseBehaviorHint backgroundSelected={closeBehavior === "background"} hint={t("settings.closeBehaviorHint")} unavailableHint={t("settings.closeBehaviorUnavailable")} />} icon={<Power size={18} />}>
