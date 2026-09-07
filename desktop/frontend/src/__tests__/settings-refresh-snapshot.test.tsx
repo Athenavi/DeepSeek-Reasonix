@@ -543,7 +543,7 @@ ok(!document.getElementById("bot-step-behavior"), "bots tab omits global default
 eq(document.querySelectorAll(".bot-step-chip").length, 0, "hero no longer shows the old two-step chips");
 
 eq(document.querySelectorAll(".bot-channel-tabs [role=\"tab\"]").length, 5, "bot manager uses five fixed channel tabs on the left");
-ok(document.querySelector(".bot-channel-setup-card")?.textContent?.includes("Configure QQ") === true, "unconfigured QQ tab shows key setup on the right");
+ok(document.querySelector(".bot-channel-setup-card")?.querySelector("input") !== null, "unconfigured QQ tab shows key setup on the right");
 ok(document.body.textContent?.includes("Back to entry") === false, "bot manager does not show a return-to-entry action");
 
 const feishuTab = Array.from(document.querySelectorAll(".bot-channel-tabs [role=\"tab\"]")).find((button) => button.textContent?.includes("Feishu")) as HTMLButtonElement | undefined;
@@ -750,8 +750,8 @@ await waitFor("provider background discovery", () => providerBatchCalls === 1);
 const providerRefreshStorageKeys = Array.from({ length: sessionStorage.length }, (_, index) => sessionStorage.key(index) ?? "");
 ok(providerRefreshStorageKeys.some((key) => key.includes("old-fingerprint")), "provider auto-refresh cooldown uses the opaque catalog fingerprint");
 ok(providerRefreshStorageKeys.every((key) => !key.includes("private-gateway-secret")), "provider auto-refresh cooldown does not persist header secrets");
-const accessModelsButton = Array.from(providerRaceRootEl.querySelectorAll(".settings-subtab")).find(
-  (button) => button.textContent?.trim() === "Access",
+const accessModelsButton = Array.from(providerRaceRootEl.querySelectorAll(".settings-center__navitem")).find(
+  (button) => button.textContent?.trim() === "Model services",
 ) as HTMLButtonElement | undefined;
 if (!accessModelsButton) throw new Error("provider Access subtab did not render");
 await act(async () => {
@@ -807,7 +807,7 @@ window.go = {
     App: {
       Settings: async () => providerRefreshCancelSettings,
       FetchAllProviderModelCatalogs: async () => ({}),
-      FetchProviderModelCatalogDraft: async () => ["deepseek-v4-flash", "deepseek-v4-pro"].map((model) => ({ model, inputModalities: ["text"], state: "unsupported", source: "adapter" })),
+      FetchProviderModelCatalog: async () => ["deepseek-v4-flash", "deepseek-v4-pro"].map((model) => ({ model, inputModalities: ["text"], state: "unsupported", source: "adapter" })),
     } as Partial<AppBindings> as AppBindings,
   },
 };
@@ -820,8 +820,8 @@ await act(async () => {
   );
   await flushPromises();
 });
-const providerRefreshCancelAccessButton = Array.from(providerRefreshCancelRootEl.querySelectorAll(".settings-subtab")).find(
-  (button) => button.textContent?.trim() === "Access",
+const providerRefreshCancelAccessButton = Array.from(providerRefreshCancelRootEl.querySelectorAll(".settings-center__navitem")).find(
+  (button) => button.textContent?.trim() === "Model services",
 ) as HTMLButtonElement | undefined;
 if (!providerRefreshCancelAccessButton) throw new Error("provider refresh cancel Access subtab did not render");
 await act(async () => {
@@ -829,18 +829,18 @@ await act(async () => {
   await flushPromises();
 });
 const providerRefreshCancelButton = Array.from(providerRefreshCancelRootEl.querySelectorAll("button")).find(
-  (button) => button.textContent?.trim() === "Refresh models",
+  (button) => button.getAttribute("aria-label") === "Refresh models",
 ) as HTMLButtonElement | undefined;
 if (!providerRefreshCancelButton) throw new Error("provider refresh action did not render");
 await act(async () => {
   providerRefreshCancelButton.click();
   await flushPromises();
 });
-await waitFor("provider model discovery", () => document.querySelector('[role="dialog"] .provider-discovery-list') !== null);
-const providerModelDraftCancelButton = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')).find((button) => button.textContent?.trim() === "Cancel");
-if (!providerModelDraftCancelButton) throw new Error("provider discovery cancel action did not render");
+await waitFor("provider model discovery", () => providerRefreshCancelRootEl.textContent?.includes("deepseek-v4-pro") === true);
+const providerModelDraftCancelButton = providerRefreshCancelRootEl.querySelector<HTMLButtonElement>('.provider-editor-footer button');
+if (!providerModelDraftCancelButton) throw new Error("provider draft cancel action did not render");
 await act(async () => { providerModelDraftCancelButton.click(); await flushPromises(); });
-ok(document.querySelector('[role="dialog"] .provider-discovery-list') === null, "cancelling model discovery closes the candidate dialog");
+ok(!providerRefreshCancelRootEl.textContent?.includes("deepseek-v4-pro"), "cancelling discovery discards fetched candidates");
 ok(providerRefreshCancelSettings.providers[0].models.length === 1, "cancelling discovery preserves configured models");
 await act(async () => {
   providerRefreshCancelRoot.unmount();
@@ -926,8 +926,8 @@ await act(async () => {
   );
   await flushPromises();
 });
-const upgradeFailureAccessButton = Array.from(upgradeFailureRootEl.querySelectorAll(".settings-subtab")).find(
-  (button) => button.textContent?.trim() === "Access",
+const upgradeFailureAccessButton = Array.from(upgradeFailureRootEl.querySelectorAll(".settings-center__navitem")).find(
+  (button) => button.textContent?.trim() === "Model services",
 ) as HTMLButtonElement | undefined;
 if (!upgradeFailureAccessButton) throw new Error("upgrade failure Access subtab did not render");
 await act(async () => {

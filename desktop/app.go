@@ -9265,13 +9265,15 @@ type ModelInfo struct {
 	Current       bool   `json:"current"`
 	ContextWindow int    `json:"contextWindow,omitempty"`
 	Vision        bool   `json:"vision,omitempty"`
+	DisplayName   string `json:"displayName,omitempty"`
 }
 
 type EffortInfo struct {
-	Supported bool     `json:"supported"`
-	Current   string   `json:"current"`
-	Default   string   `json:"default"`
-	Levels    []string `json:"levels"`
+	Options   []provider.ReasoningOption `json:"options,omitempty"`
+	Supported bool                       `json:"supported"`
+	Current   string                     `json:"current"`
+	Default   string                     `json:"default"`
+	Levels    []string                   `json:"levels"`
 }
 
 // Models flattens the configured providers into their (provider, model) pairs —
@@ -9835,7 +9837,7 @@ func (a *App) EffortForTab(tabID string) EffortInfo {
 	if levels == nil {
 		levels = []string{}
 	}
-	return EffortInfo{Supported: true, Current: config.EffortDisplay(entry), Default: cap.Default, Levels: levels}
+	return EffortInfo{Supported: true, Current: config.EffortDisplay(entry), Default: cap.Default, Levels: levels, Options: config.ReasoningCapabilityForEntry(entry).Options}
 }
 
 func (a *App) SetEffort(level string) error {

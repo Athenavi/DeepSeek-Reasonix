@@ -1,3 +1,4 @@
+import { dismissOnboarding, shouldOpenOnboarding } from "./lib/onboarding";
 import { ManagementSurface } from "./components/ManagementSurface";
 import { useManagementWorkspace } from "./lib/useManagementWorkspace";
 import { useAppNavigationStore } from "./store/appNavigation";
@@ -72,8 +73,6 @@ import { UpdateBanner } from "./components/UpdateBanner";
 import { UpdaterProvider } from "./lib/useUpdater";
 import { Tooltip } from "./components/Tooltip";
 import { StartupSplash } from "./components/StartupSplash";
-import { OnboardingOverlay } from "./components/OnboardingOverlay";
-import { dismissOnboarding, shouldOpenOnboarding } from "./lib/onboarding";
 import { AppChrome } from "./components/AppChrome";
 import { ShortcutsCheatsheet } from "./components/ShortcutsCheatsheet";
 import { WorktreeBadge } from "./components/WorktreeBadge";
@@ -1075,8 +1074,6 @@ export default function App() {
   const startupSplashVisible = useOverlayStore((s) => s.startupSplashVisible);
   const setStartupSplashVisible = useOverlayStore((s) => s.setStartupSplashVisible);
   // null until the mount probe resolves; true shows the first-run guide.
-  const needsOnboarding = useOverlayStore((s) => s.needsOnboarding);
-  const setNeedsOnboarding = useOverlayStore((s) => s.setNeedsOnboarding);
   const [providerSetupNeeded, setProviderSetupNeeded] = useState(false);
   const page = useAppNavigationStore((s) => s.page);
   const managementActive = page.kind !== "workspace";
@@ -2537,23 +2534,26 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    const navigationGeneration = useAppNavigationStore.getState().generation;
     (async () => {
       try {
         const needs = await app.NeedsOnboarding();
         if (!cancelled) {
           setProviderSetupNeeded(needs);
-          setNeedsOnboarding(shouldOpenOnboarding(needs));
+          if (shouldOpenOnboarding(needs) && useAppNavigationStore.getState().generation === navigationGeneration) {
+            dismissOnboarding();
+            setSettingsFocus({ target: "model-access", onboarding: true });
+            setSettingsTarget("providers");
+          }
         }
       } catch {
-        // Bridge unavailable (browser dev seam) — skip the gate; a real key
-        // failure still surfaces via the topbar startupError banner.
-        if (!cancelled) setNeedsOnboarding(false);
+        // Setup status is advisory; bridge failures must not block startup.
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [setNeedsOnboarding]);
+  }, []);
 
   useEffect(() => {
     const el = footerRef.current;
@@ -4817,13 +4817,13 @@ export default function App() {
               </button>
             </div>
           )}
-          {providerSetupNeeded && !needsOnboarding && (
+          {providerSetupNeeded && (
             <div className="banner banner--warning banner--actionable">
               <span className="banner__msg">{t("onboarding.inlinePrompt")}</span>
               <span className="banner__spacer" />
               <button type="button" className="btn btn--small" onClick={() => {
-                setSettingsFocus({ target: "model-access" });
-                setSettingsTarget("models");
+                setSettingsFocus({ target: "model-access", onboarding: true });
+                setSettingsTarget("providers");
               }}>
                 {t("onboarding.configureProvider")}
               </button>
@@ -5479,24 +5479,6 @@ export default function App() {
 
       {startupSplashVisible && (
         <StartupSplash hold={startupSplashHold} onDone={() => setStartupSplashVisible(false)} />
-      )}
-
-      {needsOnboarding && (
-        <OnboardingOverlay
-          onComplete={() => {
-            setProviderSetupNeeded(false);
-            setNeedsOnboarding(false);
-          }}
-          onChooseProvider={() => {
-            setNeedsOnboarding(false);
-            setSettingsFocus({ target: "model-access" });
-            setSettingsTarget("models");
-          }}
-          onSkip={() => {
-            dismissOnboarding();
-            setNeedsOnboarding(false);
-          }}
-        />
       )}
 
       <Suspense fallback={null}>

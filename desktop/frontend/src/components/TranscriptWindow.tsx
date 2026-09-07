@@ -1,52 +1,17 @@
+import { useNativeViewportSnapshot } from "../lib/useTranscriptNativeViewport";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { TranscriptKernel } from "../lib/transcriptKernel";
 import type { ProjectionViewProps } from "./TranscriptProjectionView";
 import { TranscriptMeasurementLedger } from "../lib/transcriptMeasurementLedger";
 import type { TimelineBlock, TimelineProjection } from "../lib/transcriptTimeline";
-import { extractTranscriptWindowIndexes, type TranscriptWindowDirection } from "../lib/transcriptWindowRange";
+import { extractTranscriptWindowIndexes } from "../lib/transcriptWindowRange";
 import { commitTranscriptWindowGeometry, findTranscriptMeasurementPublicationBoundary, MAX_MOUNTED_COMPLETED_BLOCKS, type TranscriptWindowGeometry } from "../lib/transcriptWindowGeometry";
 
 const ANCHOR_MEASUREMENT_RADIUS = 4;
 // Keep enough mounted runway for native engines whose scroll event can arrive
 // ahead of TanStack's next range calculation. The browser fixtures enforce the
 // corresponding 40-block upper bound.
-
-type NativeViewportSnapshot = {
-  scrollTop: number;
-  clientHeight: number;
-  scrollHeight: number;
-  direction: TranscriptWindowDirection;
-};
-
-function useNativeViewportSnapshot(element: HTMLElement | null, kernel: Pick<TranscriptKernel, "generation">): NativeViewportSnapshot {
-  const cachedRef = useRef<NativeViewportSnapshot>({ scrollTop: 0, clientHeight: 0, scrollHeight: 0, direction: null });
-  const getSnapshot = useCallback(() => {
-    const scrollTop = element?.scrollTop ?? 0;
-    const clientHeight = element?.clientHeight ?? 0;
-    const scrollHeight = element?.scrollHeight ?? 0;
-    const cached = cachedRef.current;
-    if (Object.is(cached.scrollTop, scrollTop) && Object.is(cached.clientHeight, clientHeight) && Object.is(cached.scrollHeight, scrollHeight)) return cached;
-    const direction = scrollTop > cached.scrollTop ? "forward" : scrollTop < cached.scrollTop ? "backward" : cached.direction;
-    cachedRef.current = { scrollTop, clientHeight, scrollHeight, direction };
-    return cachedRef.current;
-  }, [element]);
-  const subscribe = useCallback((notify: () => void) => {
-    if (!element) return () => {};
-    const generation = kernel.generation;
-    let active = true;
-    const handleChange = () => { if (active && generation === kernel.generation) notify(); };
-    element.addEventListener("scroll", handleChange, { passive: true });
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(handleChange);
-    observer?.observe(element);
-    return () => {
-      active = false;
-      element.removeEventListener("scroll", handleChange);
-      observer?.disconnect();
-    };
-  }, [element, kernel]);
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-}
 
 export default function TranscriptWindow({
   projection,
@@ -211,6 +176,7 @@ export default function TranscriptWindow({
     const rect = target.getBoundingClientRect();
     if (rect.bottom >= viewport.top && rect.top <= viewport.bottom) onPinnedJumpVisible();
   }, [onPinnedJumpVisible, pinnedJumpBlockKey, rangeRevision, scrollElement]);
+  const surfaceGeneration = kernel.generation;
   const [measurementRevision, setMeasurementRevision] = useState(0);
   useLayoutEffect(() => {
     const container = residentTailRef.current;
@@ -229,7 +195,7 @@ export default function TranscriptWindow({
     // mounted blocks so local folds and deferred Markdown invalidate geometry.
     container.querySelectorAll(".transcript__window-item").forEach(element => observer.observe(element));
     return () => { disposed = true; observer.disconnect(); cancelFrame?.(); };
-  }, [fullDOMFallback, kernel, rangeRevision]);
+  }, [fullDOMFallback, kernel, rangeRevision, surfaceGeneration]);
   const measuredItems = fullDOMFallback ? geometry.prefix.items : virtualItems;
   useLayoutEffect(() => {
     const container = residentTailRef.current;

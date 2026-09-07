@@ -3,16 +3,7 @@
 import { JSDOM } from "jsdom";
 import React from "react";
 import { act } from "react";
-import { createRoot } from "react-dom/client";
-import { LocaleProvider } from "../lib/i18n";
-import {
-  ProviderEditor,
-  ProviderEditorModelPicker,
-  providerSupportsServerWebSearch,
-  providerSupportsServerWebSearchForView,
-  providerVisionCapabilityForView,
-} from "../components/SettingsPanel";
-import type { ProviderModelCapabilityView, ProviderView } from "../lib/types";
+import type { ProviderView } from "../lib/types";
 
 let passed = 0;
 let failed = 0;
@@ -50,6 +41,14 @@ globalThis.sessionStorage = dom.window.sessionStorage;
 globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
 globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
 window.scrollTo = () => {};
+const { createRoot } = await import("react-dom/client");
+const { LocaleProvider } = await import("../lib/i18n");
+const { ProviderEditor, ProviderEditorModelPicker, providerSupportsServerWebSearch, providerSupportsServerWebSearchForView, providerVisionCapabilityForView } = await import("../components/SettingsPanel");
+function editDisplayName() {
+  const input = rootEl!.querySelector<HTMLInputElement>(".provider-name-input")!;
+  Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!.call(input, "Display label");
+  input.dispatchEvent(new window.Event("input", { bubbles: true }));
+}
 
 function renderPicker(
   candidates: string[],
@@ -72,9 +71,8 @@ function renderPicker(
         candidates={candidates}
         selectedModels={[]}
         visionModels={visionModels}
-        visionModelsConfigured={visionModelsConfigured}
-        visionCapability={visionCapability}
-        modelCapabilities={modelCapabilities}
+        visionModelsConfigured={visionCapability === "unsupported"}
+        modelCapabilities={candidates.map(model => ({ model, state: visionModels.includes(model) ? "supported" : "unsupported" }))}
         contextWindows={{}}
         disabled={false}
         onToggleModel={() => undefined}
@@ -121,7 +119,7 @@ await act(async () => {
   }));
   await flushPromises();
 });
-ok(rootEl.textContent?.includes("No image input") === true, "known text-only DeepSeek models show a read-only image capability");
+ok(rootEl.querySelectorAll(".provider-model-draft__capabilities span").length === 0, "known text-only models omit redundant capability badges");
 ok(rootEl.querySelectorAll('input[type="checkbox"]').length === 1, "text-only model card does not render a second image checkbox");
 await act(async () => {
   root.render(renderPicker(["deepseek-v4-flash-vision-exp"], {
@@ -154,11 +152,8 @@ await act(async () => {
   ));
   await flushPromises();
 });
-ok(rootEl.querySelectorAll('input[type="checkbox"]').length === 2, "model capability metadata does not expose image-input checkboxes");
-ok(
-  rootEl.textContent?.includes("Image input") === true && rootEl.textContent?.includes("No image input") === true,
-  "model capability metadata renders read-only supported and unsupported labels",
-);
+ok(rootEl.querySelectorAll('input[type="checkbox"]').length === 2, "model capabilities remain read-only rather than introducing image-input checkboxes");
+ok(rootEl.textContent?.includes("No image input") !== true, "configurable DeepSeek models do not use the read-only image-unsupported label");
 ok(providerSupportsServerWebSearch("responses", "https://api.deepseek.com"), "DeepSeek Responses exposes server-side web search");
 ok(providerSupportsServerWebSearch("anthropic", "https://api.deepseek.com/anthropic"), "DeepSeek Anthropic exposes server-side web search");
 ok(providerSupportsServerWebSearch("openai", "https://api.deepseek.com"), "DeepSeek Chat Completions exposes independent web search");
@@ -273,7 +268,7 @@ const backendUnsupportedCustomProvider: ProviderView = {
   baseUrl: "https://eu.deepseek.com/v1",
   models: ["deepseek-v4-pro"],
   default: "deepseek-v4-pro",
-  visionCapability: "unsupported",
+  modelCapabilities: [{model:"deepseek-v4-pro",state:"unsupported"}],
 };
 
 const legacyChatURLProvider: ProviderView = {
@@ -313,7 +308,7 @@ try {
 }
 
 ok(!editorThrew, "provider editor can switch from built-in to custom without changing hook order");
-ok(rootEl.textContent?.includes("OpenAI-compatible") === true, "provider editor renders the custom provider fields after the switch");
+ok(rootEl.textContent?.includes("Chat Completions (/chat/completions)") === true, "provider editor renders the custom provider fields after the switch");
 ok(rootEl.textContent?.includes("Kimi K3 reasoning (low / high / max)") === true, "custom provider editor exposes the explicit Kimi K3 reasoning protocol");
 const providerUrlInput = rootEl.querySelector<HTMLInputElement>(".provider-url-input");
 ok(rootEl.querySelectorAll('input[type="radio"]:not(.sr-only)').length === 0, "custom provider editor exposes only one API address input");
@@ -322,7 +317,7 @@ const providerUrlLabel = Array.from(rootEl.querySelectorAll<HTMLLabelElement>("l
   (label) => label.htmlFor === providerUrlInput?.id,
 );
 ok(Boolean(providerUrlLabel) && providerUrlInput?.getAttribute("aria-describedby") !== null, "provider URL input has a programmatic label and description");
-ok(rootEl.textContent?.includes("Request URL:") === true, "provider URL helper explains exact request behavior");
+ok(rootEl.textContent?.includes("uses it unchanged") === true, "provider URL helper explains exact request behavior");
 ok(rootEl.querySelector<HTMLInputElement>('input[placeholder="e.g. my-proxy"]')?.disabled !== true, "new custom provider name stays editable");
 ok(rootEl.querySelector<HTMLInputElement>('input[placeholder="e.g. my-proxy"]')?.nextElementSibling?.classList.contains("mem-hint") !== true, "new custom provider editor omits the rename hint");
 
@@ -337,11 +332,8 @@ await act(async () => {
 const webSearchSwitch = rootEl.querySelector<HTMLInputElement>('input[role="switch"]');
 ok(rootEl.textContent?.includes("Server-side web search") === true, "DeepSeek Responses editor separates service capabilities from model selection");
 ok(webSearchSwitch?.checked === true, "curated DeepSeek Responses capability is enabled in the editor");
-ok(rootEl.textContent?.includes("This official endpoint does not accept images for this model.") === true, "DeepSeek Responses editor renders model image capability read-only");
-ok(
-  rootEl.querySelectorAll('.provider-model-draft__capabilities input[type="checkbox"]').length === 0,
-  "DeepSeek Responses editor does not render an image-capability checkbox",
-);
+ok(rootEl.querySelectorAll('.provider-model-draft__option input[type="checkbox"]').length === 1, "DeepSeek Responses exposes one model-selection checkbox");
+ok(rootEl.textContent?.includes("No image input") !== true, "DeepSeek Responses editor does not use the read-only image-unsupported label");
 
 await act(async () => {
   root.render(renderProviderEditor(longCatAnthropicProvider));
@@ -355,16 +347,16 @@ await act(async () => {
   await flushPromises();
 });
 ok(
-  rootEl.textContent?.includes("This official endpoint does not accept images for this model.") === true,
-  "provider editor honors backend vision capability for endpoints outside the legacy frontend heuristic",
+  rootEl.querySelectorAll(".provider-model-draft__capabilities span").length === 0,
+  "backend text-only metadata omits image badges outside the legacy endpoint heuristic",
 );
 const displayedRequestURL = (input: HTMLInputElement | null) =>
-  document.getElementById(input?.getAttribute("aria-describedby") ?? "")?.querySelector("code")?.textContent;
+  input?.value;
 const customProviderUrlInput = rootEl.querySelector<HTMLInputElement>(".provider-url-input");
-ok(rootEl.querySelectorAll('input[type="radio"]:not(.sr-only)').length === 0, "existing custom providers no longer expose an address mode selector");
-ok(customProviderUrlInput?.value === backendUnsupportedCustomProvider.baseUrl && displayedRequestURL(customProviderUrlInput) === "https://eu.deepseek.com/v1/chat/completions", "legacy base-only providers display their previously effective request URL");
-ok(rootEl.querySelector<HTMLInputElement>('input[placeholder="e.g. my-proxy"]')?.disabled === true, "existing custom provider name is locked");
-ok(rootEl.querySelector<HTMLInputElement>('input[placeholder="e.g. my-proxy"]')?.nextElementSibling?.textContent === "Changing the provider name is not supported yet", "existing custom provider editor shows the rename hint");
+ok(rootEl.querySelectorAll('input[type="radio"]').length === 0, "existing custom providers no longer expose an address mode selector");
+ok(customProviderUrlInput?.value === "https://eu.deepseek.com/v1/chat/completions", "legacy base-only providers display their previously effective request URL");
+ok(rootEl.querySelector<HTMLInputElement>(".provider-name-input")?.disabled === false, "existing connection display name remains editable");
+ok(rootEl.querySelector("code")?.textContent === backendUnsupportedCustomProvider.name, "stable provider identity remains separate from display name");
 
 let migratedProvider: ProviderView | undefined;
 await act(async () => {
@@ -374,10 +366,11 @@ await act(async () => {
   await flushPromises();
 });
 const legacyProviderUrlInput = rootEl.querySelector<HTMLInputElement>(".provider-url-input");
-ok(legacyProviderUrlInput?.value === legacyChatURLProvider.baseUrl && displayedRequestURL(legacyProviderUrlInput) === "https://legacy.example.com/chat/completions", "legacy OpenAI chat URLs display their historically normalized effective endpoint");
+ok( displayedRequestURL(legacyProviderUrlInput) === "https://legacy.example.com/chat/completions", "legacy OpenAI chat URLs display their historically normalized effective endpoint");
 const saveButton = Array.from(rootEl.querySelectorAll<HTMLButtonElement>("button")).find(
-  (button) => button.textContent?.trim() === "Save",
+  (button) => button.textContent?.trim() === "Save changes",
 );
+await act(async () => editDisplayName());
 await act(async () => {
   saveButton?.click();
   await flushPromises();
@@ -397,8 +390,9 @@ await act(async () => {
   await flushPromises();
 });
 const exactSaveButton = Array.from(rootEl.querySelectorAll<HTMLButtonElement>("button")).find(
-  (button) => button.textContent?.trim() === "Save",
+  (button) => button.textContent?.trim() === "Save changes",
 );
+await act(async () => editDisplayName());
 await act(async () => {
   exactSaveButton?.click();
   await flushPromises();
@@ -410,10 +404,11 @@ await act(async () => {
   root.render(renderProviderEditor({ ...legacyChatURLProvider, name: "save-failure" }, () => { throw new Error("storage unavailable"); }));
   await flushPromises();
 });
-const failedSaveButton = Array.from(rootEl.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.trim() === "Save");
+const failedSaveButton = Array.from(rootEl.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.trim() === "Save changes");
+await act(async () => editDisplayName());
 await act(async () => { failedSaveButton?.click(); await flushPromises(); });
 ok(rootEl.textContent?.includes("storage unavailable") === true, "save errors remain visible in the provider form");
-ok(rootEl.querySelector<HTMLInputElement>(".provider-url-input")?.value === legacyChatURLProvider.baseUrl && rootEl.querySelector(".provider-model-row") !== null, "failed save retains connection and model drafts");
+ok(rootEl.querySelector<HTMLInputElement>(".provider-url-input")?.value === "https://legacy.example.com/chat/completions" && rootEl.querySelector(".provider-model-draft__option") !== null, "failed save retains connection and model drafts");
 
 await act(async () => {
   root.unmount();

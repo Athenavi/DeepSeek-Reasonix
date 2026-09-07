@@ -37,11 +37,11 @@ await act(async () => { document.dispatchEvent(new dom.window.KeyboardEvent("key
 assert.equal(closes, 0, "Escape must not leave a settings page");
 await act(async () => { page.dispatchEvent(new dom.window.MouseEvent("mousedown", { bubbles: true })); });
 assert.equal(closes, 0, "clicking the page background must not exit");
-const models = Array.from(page.querySelectorAll<HTMLButtonElement>("nav button")).find((button) => button.textContent?.trim() === "Models")!;
+const models = Array.from(page.querySelectorAll<HTMLButtonElement>("nav button")).find((button) => button.textContent?.trim() === "Model preferences")!;
 assert.ok(models);
 await act(async () => models.click());
 assert.deepEqual(routes, ["models"]);
-assert.ok(page.querySelector('[aria-current="page"]')?.textContent?.includes("Models"));
+assert.ok(page.querySelector('[aria-current="page"]')?.textContent?.includes("Model preferences"));
 const back = Array.from(page.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.trim() === "Back to workspace")!;
 await act(async () => back.click());
 assert.equal(closes, 1);

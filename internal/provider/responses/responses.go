@@ -30,35 +30,10 @@ const (
 )
 
 func init() {
+	provider.RegisterReasoning("responses", ReasoningForConfig)
+	provider.RegisterReasoning("dashscope-responses", ReasoningForConfig)
 	provider.Register("responses", newFromConfig)
 	provider.Register("dashscope-responses", newFromConfig)
-}
-
-func newFromConfig(cfg provider.Config) (provider.Provider, error) {
-	effort, _ := cfg.Extra["effort"].(string)
-	mode, _ := cfg.Extra["mode"].(string)
-	webSearch, _ := cfg.Extra["web_search"].(bool)
-	var stateful *bool
-	switch value := cfg.Extra["stateful"].(type) {
-	case bool:
-		stateful = &value
-	case *bool:
-		stateful = value
-	}
-	proxy, _ := cfg.Extra["proxy_spec"].(netclient.ProxySpec)
-	keyEnv, _ := cfg.Extra["api_key_env"].(string)
-	keySource, _ := cfg.Extra["api_key_source"].(string)
-	maxOutputTokens, _ := cfg.Extra["max_output_tokens"].(int)
-	requestURL, _ := cfg.Extra["request_url"].(string)
-	return New(Config{
-		Name: cfg.Name, APIKey: cfg.APIKey, BaseURL: cfg.BaseURL, Model: cfg.Model,
-		ModelInfo: cfg.ModelInfo,
-		Effort:    effort, Mode: mode, Stateful: stateful, WebSearch: webSearch, Proxy: proxy,
-		KeyEnv: keyEnv, KeySource: keySource, MaxOutputTokens: maxOutputTokens, RequestURL: requestURL,
-		// Extra 原样透传：vision 等能力开关由调用方（boot/CLI）写入
-		// cfg.Extra，factory 若丢弃则 New() 读不到（评审 #7234 第 3 点）。
-		Extra: cfg.Extra,
-	}), nil
 }
 
 // Config holds Responses API provider settings.
@@ -110,6 +85,7 @@ func (c Config) mode() string {
 
 type client struct {
 	identityHeaders                    http.Header
+	reasoning                          provider.ReasoningCapability
 	name, apiKey, keyEnv, keySource    string
 	baseURL, requestURL, model, effort string
 	vendor, mode                       string
@@ -185,7 +161,8 @@ func New(cfg Config) provider.Provider {
 	return &client{
 		identityHeaders: provider.NewClientIdentityHeaders(),
 		name:            cfg.Name, apiKey: cfg.APIKey, keyEnv: cfg.KeyEnv, keySource: cfg.KeySource,
-		baseURL: baseURL, requestURL: requestURL, model: cfg.Model, effort: cfg.Effort,
+		reasoning: ReasoningForConfig(provider.Config{BaseURL: cfg.BaseURL, Model: cfg.Model, Extra: cfg.Extra}),
+		baseURL:   baseURL, requestURL: requestURL, model: cfg.Model, effort: cfg.Effort,
 		vendor: vendor, caps: cap, mode: cfg.mode(), sessionCache: sessionCache, search: provider.SearchPolicy{NativeEnabled: cfg.WebSearch, ClientEnabled: clientWebSearch}, maxOutputTokens: maxOutputTokens,
 		vision:    vision,
 		modelInfo: modelInfo,
@@ -249,6 +226,14 @@ func (c *client) ResetContext() {
 }
 
 func (c *client) Stream(ctx context.Context, req provider.Request) (<-chan provider.Chunk, error) {
+	if c.effort != "auto" && c.effort != "off" {
+		if err := c.reasoning.Validate(c.model, c.effort); err != nil {
+			return nil, err
+		}
+	}
+	if err := c.reasoning.Validate(c.model, req.EffortOverride); err != nil {
+		return nil, err
+	}
 	requestCtx := provider.WithRequestAttemptCounter(ctx)
 	body, usedPrevious, wireMessages := c.buildRequestBody(req)
 	resp, err := c.send(requestCtx, body)
@@ -304,12 +289,11 @@ func (c *client) buildRequestBody(req provider.Request) (map[string]any, bool, [
 	messages := provider.SanitizeToolPairing(provider.ModelMessages(req.Messages))
 	body := map[string]any{"model": c.model, "stream": true}
 
-	effort := strings.ToLower(strings.TrimSpace(c.effort))
-	if c.vendor == "deepseek" && (strings.EqualFold(strings.TrimSpace(c.model), "deepseek-v4-flash") || strings.EqualFold(strings.TrimSpace(c.model), "deepseek-v4-pro")) {
-		if effort == "medium" || effort == "xhigh" {
-			effort = "high"
-		}
+	effort := c.effort
+	if req.EffortOverride != "" {
+		effort = req.EffortOverride
 	}
+
 	switch effort {
 	case "auto":
 		effort = ""

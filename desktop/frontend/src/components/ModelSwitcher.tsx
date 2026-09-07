@@ -83,37 +83,30 @@ export function ModelSwitcher({
   const keyword = query.trim().toLowerCase();
   const filtered = useMemo(
     () => keyword
-      ? models.filter((m) => m.model.toLowerCase().includes(keyword) || m.provider.toLowerCase().includes(keyword))
+      ? models.filter((m) => m.model.toLowerCase().includes(keyword) || m.provider.toLowerCase().includes(keyword) || (m.displayName ?? "").toLowerCase().includes(keyword))
       : models,
     [models, keyword],
   );
 
-  // Group by provider, with the current model's group first
+  // Preserve catalog/configuration order, including when the current model changes.
   const groups = useMemo(() => {
     const map = new Map<string, ModelInfo[]>();
-    let currentProvider = "";
     for (const m of filtered) {
-      if (m.current) currentProvider = m.provider;
       const list = map.get(m.provider);
       if (list) list.push(m);
       else map.set(m.provider, [m]);
     }
     return [...map.entries()]
-      .sort(([a], [b]) => {
-        if (a === currentProvider) return -1;
-        if (b === currentProvider) return 1;
-        return providerLabel(a, t).localeCompare(providerLabel(b, t));
-      })
       .map(([provider, items]) => ({
         provider,
-        label: providerLabel(provider, t),
+        label: items[0]?.displayName?.trim() || providerLabel(provider, t),
         items,
       }));
   }, [filtered, t]);
 
   const currentProvider = useMemo(() => {
     const cur = models.find((m) => m.current) ?? models.find((m) => m.model === label || m.ref === label);
-    return cur ? providerLabel(cur.provider, t) : null;
+    return cur ? (cur.displayName?.trim() || providerLabel(cur.provider, t)) : null;
   }, [label, models, t]);
   const triggerLabel = currentProvider ? `${label} · ${currentProvider}` : label;
 

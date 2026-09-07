@@ -206,7 +206,9 @@ console.log("\nbundle budgets");
 // explicit budget rather than failing on a rounded 467.0 KiB display value.
 // The latest main-v2 session-runtime fence and exact prompt protocol measure
 // 468.2 KiB here; retain a 0.1 KiB ceiling for platform zlib rounding.
-const initialJSBudgetKiB = 468.3;
+// Provider/settings integration: measured 469.230 KiB gzip locally.
+// Keep the next decimal ceiling; individual chunk limits remain unchanged.
+const initialJSBudgetKiB = 469.3;
 assertBudget("initial JavaScript gzip", initialJSGzip, initialJSBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk gzip", largestInitialJS, 280 * 1024);
 // Render-blocking CSS is intentionally absent: styles.css loads deferred via
@@ -229,7 +231,8 @@ if (initialCSS.length > 0) {
 // shared title-safe shell, and the shared harness decision surface measure
 // 116.9 KiB gzip while reusing existing layout primitives. Retain a bounded
 // 0.1 KiB headroom ratchet.
-assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 117.0 * 1024);
+// Settings plus main-v2 recovery-wait styles measure 119.435 KiB gzip.
+assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 119.5 * 1024);
 if (localeChunks.length !== 2) {
   throw new Error(`expected 2 on-demand Chinese locale chunks, found ${localeChunks.length}`);
 }
@@ -286,9 +289,8 @@ for (const path of localeChunks) {
   // 61.027/61.881 KiB; retain bounded cross-platform headroom.
   // Recovery retry copy reaches the rounded 61.1 KiB boundary on Node/zlib
   // toolchains; keep the next one-decimal ceiling for cross-platform CI.
-  // The #9889/#9890 series adds recovery-wait, dialog-failure, and stall copy:
-  // zh-TW measures 63492 B (62.004 KiB) with the four PRs merged together.
-  const budget = name.startsWith("zh-TW-") ? 62.1 * 1024 : 61.2 * 1024;
+  // Integrated settings copy measures 61.357 / 62.180 KiB (zh / zh-TW).
+  const budget = name.startsWith("zh-TW-") ? 62.2 * 1024 : 61.4 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -395,9 +397,10 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // 2496.6 KiB; retain the smallest bounded ceiling.
 // The complete block renderer and input ownership gates measure 2371.7 KiB
 // on the settings + pure-kernel baseline. Keep the smallest bounded ceiling.
-// The #9889/#9890 series (#9898, #9899, #9900, #9901) measures 2431847 B
-// (2374.851 KiB) merged together over a 2428639 B base; the four PRs share
-// this ceiling so they merge in any order. Re-measure once the series lands.
-const rawInitialBudgetKiB = 2_375.0;
+// Provider-settings integration (connection identity, first-run routing and
+// adapter-owned reasoning) measures 2384.8 KiB after unused locale removal.
+// Main-v2 recovery-wait and rejection containment bring the combined build
+// to 2387.797 KiB raw; retain the smallest one-decimal ceiling.
+const rawInitialBudgetKiB = 2_387.8;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
