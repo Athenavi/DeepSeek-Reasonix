@@ -135,6 +135,7 @@ export default function TranscriptWindow({
   const totalSize = virtualizer.getTotalSize();
   const candidateItems = virtualizer.getVirtualItems();
   const committedGeometryRef = useRef<TranscriptWindowGeometry<(typeof candidateItems)[number]> | undefined>(undefined);
+  const pendingMeasurementCommit = useRef(false);
   const structureRevision = `${split.cold.length}:${split.cold[0]?.key ?? ""}:${split.cold[split.cold.length - 1]?.key ?? ""}`;
   const geometry = commitTranscriptWindowGeometry({
     candidate: candidateItems,
@@ -152,6 +153,7 @@ export default function TranscriptWindow({
     maxItems: coldMountBudget,
     direction: nativeViewport.direction,
     gestureActive: kernel.userGestureActive,
+    measurementCommit: pendingMeasurementCommit.current,
   });
   const committedRange = geometry.range;
   const virtualItems = committedRange.items;
@@ -161,11 +163,10 @@ export default function TranscriptWindow({
     : undefined;
   const rangeRevision = `${committedRange.scrollMargin}:${committedRange.totalSize}|${virtualItems.map((item) => `${String(item.key)}:${item.start}:${item.size}`).join("|")}`;
 
-  const pendingMeasurementCommit = useRef(false);
   useLayoutEffect(() => {
     committedGeometryRef.current = geometry;
-    const beforePaint = pendingMeasurementCommit.current;
-    pendingMeasurementCommit.current = false;
+    const beforePaint = geometry.measurementCommitted;
+    if (beforePaint) pendingMeasurementCommit.current = false;
     onGeometryChange(geometry.covered, beforePaint);
   }, [geometry, onGeometryChange]);
   useLayoutEffect(() => {
@@ -315,6 +316,10 @@ export default function TranscriptWindow({
         const index = coldIndexByKey.get(change.key);
         if (index != null) virtualizer.resizeItem(index, change.size);
       }
+      // A layout-effect state update closes the batch before paint; do not
+      // depend on TanStack's asynchronous notification scheduling. Geometry
+      // acknowledges this same batch instead of retaining the older prefix.
+      setMeasurementRevision(revision => revision + 1);
       return;
     }
   }, [coldIndexByKey, fullDOMFallback, kernel.intent, kernel.userGestureActive, logicalAnchorIndex, measuredItems, measurementLedger, measurementRevision, nativeViewport.clientHeight, nativeViewport.scrollTop, onGeometryChange, onGeometryWillChange, projection.activeBlock?.measurementRevision, rangeRevision, scrollElement, split.resident, virtualItems, virtualizer]);

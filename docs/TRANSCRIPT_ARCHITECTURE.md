@@ -105,3 +105,5 @@ See [review closure and acceptance evidence](TRANSCRIPT_ACCEPTANCE_9777.md) for
 the measured paged safety costs, remaining qualification limits, related PR
 boundaries, and the final-head CI requirement. This architecture does not assert
 that every frontend issue since 1.23.0 has been eliminated.
+
+An approved measurement batch also owns its next geometry commit. A layout-effect state update completes that commit before paint rather than relying on TanStack notification scheduling. The commit installs the complete published prefix and either its covering candidate or a range reconstructed from that same prefix. Retaining the older prefix would defer already-approved offscreen growth until native scrolling brings it into view. Unsolicited stale range notifications still retain the last covering snapshot.
