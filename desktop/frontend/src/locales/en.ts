@@ -3396,11 +3396,6 @@ export const en = {
   "subagent.preview.text": "Response preview",
   "subagent.preview.notice": "Notices",
   "subagent.preview.truncated": "preview truncated",
-  "subagent.outcome.label": "subagent",
-  "subagent.outcome.completed": "completed",
-  "subagent.outcome.partial": "partially complete",
-  "subagent.outcome.failed": "failed",
-  "subagent.outcome.cancelled": "cancelled",
   "subagent.outcome.retryable": "retryable",
 
   // software update
