@@ -5020,7 +5020,7 @@ export function ProvidersSection({ s, busy, apply, onboarding, onOnboardingCompl
         </button>
       }
     >
-      {onboarding && <div className="banner banner--actionable" role="status">
+      {onboarding && <div id="provider-onboarding" className="banner banner--actionable" role="status">
         <span className="banner__msg">{t(readyConnection ? "onboarding.connectionReady" : existingConnection ? "onboarding.repairConnection" : "onboarding.addConnection")}</span>
         {readyConnection && <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void startUsing()}>{t("onboarding.startUsing")}</button>}
       </div>}

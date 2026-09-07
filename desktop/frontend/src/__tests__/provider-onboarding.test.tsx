@@ -10,6 +10,8 @@ import { shouldOpenOnboarding, dismissOnboarding } from '../lib/onboarding';
 const provider = {name:'my-connection',displayName:'My connection',added:true,builtIn:false,kind:'openai',baseUrl:'https://example.test/v1',models:['model'],default:'model',keySet:false,apiKeyEnv:'TEST_KEY',visionModels:[],supportedEfforts:[],modelCapabilities:[]} as unknown as ProviderView;
 const render = (providers: ProviderView[], onboarding = true) => renderToStaticMarkup(<LocaleProvider><ProvidersSection s={{...baseSettings(),providers}} busy={false} apply={async()=>true} onboarding={onboarding}/></LocaleProvider>);
 assert.match(render([]), /class="provider-catalog"/);
+assert.match(render([]), /id="provider-onboarding"/);
+assert.doesNotMatch(render([],false), /id="provider-onboarding"/);
 assert.doesNotMatch(render([provider]), /class="provider-catalog"/);
 assert.match(render([provider]), /My connection/);
 assert.doesNotMatch(render([provider]), />Start using<|>开始使用</);
