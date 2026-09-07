@@ -17,7 +17,7 @@ function Probe() { commands = useOnboardingCommands(() => { completed++; }); ret
 await act(async () => root.render(<Probe />));
 commands.chooseOnboardingProvider();
 assert.deepEqual(useAppNavigationStore.getState().page, { kind: "settings", tab: "models" });
-assert.deepEqual(useAppNavigationStore.getState().settingsFocus, { target: "model-access" });
+assert.deepEqual(useAppNavigationStore.getState().settingsFocus, { target: "model-access", onboarding: true });
 assert.equal(useOverlayStore.getState().needsOnboarding, false);
 commands.completeOnboarding();
 assert.equal(completed, 1);

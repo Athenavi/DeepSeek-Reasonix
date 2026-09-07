@@ -1,3 +1,5 @@
+import type { ProviderPresetView } from "./providerCatalogTypes";
+export type { ProviderProtocolEndpoint, ProviderCatalog, ProviderPresetView } from "./providerCatalogTypes";
 import type { RecoveryEventFields } from "./recoveryStatus";
 // Wire contract — mirrors desktop/wire.go (itself mirroring internal/serve/wire.go).
 // One event channel carries every kind; `kind` discriminates the payload.
@@ -1475,6 +1477,7 @@ export interface MCPMarketplaceView {
 }
 
 export interface ModelInfo {
+  displayName?: string;
   ref: string; // "provider/model" — pass to SetModel
   provider: string;
   model: string;
@@ -1484,8 +1487,9 @@ export interface ModelInfo {
 }
 
 export interface EffortInfo {
+  options?: { id: string; name: string; description?: string }[];
   supported: boolean;
-  current: string; // "auto" | "low" | "medium" | "high" | "xhigh" | "max"
+  current: string; // adapter-owned ID; "auto" inherits the configured default
   default: string;
   levels: string[];
 }
@@ -1622,7 +1626,7 @@ export interface MemoryView {
 }
 
 // SettingsTab is the top-level navigation item in the Settings Centre modal.
-export type SettingsTab = "general" | "models" | "providers" | "bots" | "mcp" | "remote" | "skills" | "subagents" | "plugins" | "memory" | "hooks" | "diagnostics" | "shortcuts" | "permissions" | "sandbox" | "network" | "appearance" | "storage" | "updates";
+export type SettingsTab = "general" | "models" | "model-stats" | "providers" | "bots" | "mcp" | "remote" | "skills" | "subagents" | "plugins" | "memory" | "hooks" | "diagnostics" | "shortcuts" | "permissions" | "sandbox" | "network" | "appearance" | "storage" | "updates";
 
 /** Extension runtime doctor report from App.RuntimeDoctor. */
 export interface RuntimeDoctorReport {
@@ -1739,6 +1743,7 @@ export interface CapabilityIssue {
 }
 // Settings panel payloads (desktop/settings_app.go).
 export interface ProviderView {
+  displayName?: string;
   name: string;
   builtIn: boolean;
   added: boolean;
@@ -1801,31 +1806,7 @@ export interface ProviderModelCapabilityUpdate {
   inputModalities: string[];
 }
 
-export interface ProviderPresetView {
-  id: string;
-  label: string;
-  description: string;
-  keyEnv: string;
-  recommended?: boolean;
-  billingMode?: string;
-  displayGroup?: string;
-  displaySection?: string;
-  displayTier?: "primary" | "advanced" | "compatibility" | string;
-  routeKind?: string;
-  optional?: boolean;
-  displayOrder?: number;
-  providerNames: string[];
-  models: string[];
-  added: boolean;
-  status?: "available" | "installed" | "installed_modified" | "partial" | "name_conflict" | "similar_existing";
-  statusProviderNames?: string[];
-  missingProviderNames?: string[];
-  keySet: boolean;
-  requiresKey?: boolean;
-  configured?: boolean;
-  keySource?: string;
-  keySourcePath?: string;
-}
+
 
 export interface ProviderModelOverrideView {
   model: string;

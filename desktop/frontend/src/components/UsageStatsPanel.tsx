@@ -319,7 +319,7 @@ export function UsageStatsPanel() {
   return (
     <div className="usage-stats">
       {/* Section 1: range + source pickers, each in its own framed group */}
-      <div className="usage-stats__toolbar">
+      <div className="usage-stats__toolbar settings-toolbar">
         <div className="usage-stats__group" role="group" aria-label={t("settings.stats.range")}>
           {RANGE_PRESETS.map((r) => (
             <button

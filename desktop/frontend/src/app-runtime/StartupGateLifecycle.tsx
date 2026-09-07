@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { app } from "../lib/bridge";
-import { shouldOpenOnboarding } from "../lib/onboarding";
+import { dismissOnboarding, shouldOpenOnboarding } from "../lib/onboarding";
 import { useOverlayStore } from "../store/overlays";
+import { useAppNavigationStore } from "../store/appNavigation";
 
 export async function probeProviderSetupState(): Promise<boolean> {
   const needs = await app.NeedsOnboarding();
@@ -9,29 +10,27 @@ export async function probeProviderSetupState(): Promise<boolean> {
   return needs;
 }
 
-/**
- * Startup onboarding gate: probes whether a provider must be configured and
- * whether the first-run guide should open. Renders nothing; App composes it
- * once beside the other lifecycle components.
- */
+/** Probes setup once; a later navigation intent owns the current page. */
 export function StartupGateLifecycle() {
-  const setNeedsOnboarding = useOverlayStore((state) => state.setNeedsOnboarding);
   useEffect(() => {
     let cancelled = false;
+    const navigationGeneration = useAppNavigationStore.getState().generation;
     (async () => {
       try {
-        const needs = await probeProviderSetupState();
+        const needs = await app.NeedsOnboarding();
         if (cancelled) return;
-        setNeedsOnboarding(shouldOpenOnboarding(needs));
+        useOverlayStore.getState().setProviderSetupNeeded(needs);
+        const navigation = useAppNavigationStore.getState();
+        if (shouldOpenOnboarding(needs) && navigation.generation === navigationGeneration) {
+          dismissOnboarding();
+          navigation.setSettingsFocus({ target: "model-access", onboarding: true });
+          navigation.setSettingsTarget("providers");
+        }
       } catch {
-        // Bridge unavailable (browser dev seam) — skip the gate; a real key
-        // failure still surfaces via the topbar startupError banner.
-        if (!cancelled) setNeedsOnboarding(false);
+        // Setup status is advisory; bridge failures must not block startup.
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [setNeedsOnboarding]);
+    return () => { cancelled = true; };
+  }, []);
   return null;
 }

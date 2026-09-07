@@ -50,7 +50,7 @@ export function buildOverlayHostProps(input: {
   };
   setSettingsTarget: NonNullable<AppOverlayHostProps["settings"]>["commands"]["onNavigate"];
 }): AppOverlayHostProps {
-  const { t, history, navigation, chrome, onboarding, worktree, shell, sessionActions } = input;
+  const { t, history, navigation, chrome, worktree, shell, sessionActions } = input;
   const histView = input.histView;
   const settingsTarget = shell.settingsTarget;
   return {
@@ -88,9 +88,6 @@ export function buildOverlayHostProps(input: {
     },
     startup: shell.startupSplashVisible ? {
       view: { hold: input.startupSplashHold }, commands: { onDone: () => shell.setStartupSplashVisible(false) },
-    } : undefined,
-    onboarding: shell.needsOnboarding ? {
-      view: {}, commands: { onComplete: onboarding.completeOnboarding, onChooseProvider: onboarding.chooseOnboardingProvider, onSkip: onboarding.skipOnboarding },
     } : undefined,
     selection: {
       view: {

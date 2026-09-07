@@ -37,7 +37,7 @@ async function verifyMaterialization(naturalHeight: number): Promise<number> {
     return <div className="transcript" ref={setElement}>
       <Window projection={projection} scrollElement={element} kernel={kernel} protectedBlockKeys={new Set<string>()}
         forceFull={false} estimateBlock={() => 171} onPinnedJumpVisible={() => {}}
-        onGeometryWillChange={(anchor?: LogicalAnchor) => { if (!kernel.userGestureActive) kernel.begin("restore", anchor); }}
+        onGeometryWillChange={(anchor?: LogicalAnchor) => { if (!kernel.userGestureActive && !kernel.activeTransaction) kernel.begin("restore", anchor); }}
         onGeometryChange={() => {
           kernel.advanceGeometry();
           const transaction = kernel.activeTransaction;
@@ -102,8 +102,17 @@ async function verifyMaterialization(naturalHeight: number): Promise<number> {
     check(overlap <= 0.5, `reverse materialization has no inter-block gap or overlap (${overlap}px)`);
     check(writes.length === 0, "materialization does not write native scroll during input");
     const heldMidway = visible();
-    await act(async () => { kernel.endUserGesture(); root.render(<Fixture />); });
+    let prepend: ReturnType<TranscriptKernel["begin"]> = null;
+    await act(async () => {
+      kernel.endUserGesture();
+      // A history transaction can already own correction when the window
+      // consumes its temporary origin. Measurement must not replace it.
+      prepend = kernel.begin("prepend", kernel.anchor);
+      root.render(<Fixture />);
+    });
+    check(prepend != null && prepend.status !== "cancelled", "origin release preserves an existing prepend owner");
     await harness.settle();
+    check(prepend?.status === "committed", "prepend settles after origin and materialization geometry commit");
     check(heldMidway.every(before => {
       const after = visible().find(block => block.key === before.key);
       return after != null && Math.abs(after.top - before.top) <= 0.5;

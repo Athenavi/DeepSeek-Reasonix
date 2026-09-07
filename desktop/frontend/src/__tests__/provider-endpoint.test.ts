@@ -1,5 +1,6 @@
 import {
   providerBaseURLForSave,
+  providerRequestURLForFormatChange,
   providerBaseURLFromRequestURL,
   providerRequestURLFromConfig,
 } from "../lib/providerEndpoint";
@@ -27,5 +28,10 @@ eq(providerBaseURLForSave({ kind: "anthropic", baseUrl: "https://models.example/
 eq(providerBaseURLForSave({ kind: "openai", baseUrl: "https://models.example/v1", requestUrl: "https://gateway.example/old/chat/completions" }, "openai", "https://gateway.example/new/chat/completions"), "https://gateway.example/new", "changing the request URL derives a new base URL");
 eq(providerBaseURLForSave({ kind: "openai", baseUrl: "https://models.example/v1", requestUrl: "https://gateway.example/v1/chat/completions" }, "anthropic", "https://gateway.example/v1/chat/completions"), "https://gateway.example/v1/chat/completions", "changing protocol derives a new base URL under the new protocol");
 eq(providerBaseURLForSave(undefined, "responses", "https://gateway.example/v1/responses"), "https://gateway.example/v1", "new providers derive their base URL from the exact request URL");
+
+eq(providerRequestURLForFormatChange("openai", "responses", "https://gateway.example/v1/chat/completions"), "https://gateway.example/v1/responses", "explicit format switch changes a standard suffix");
+eq(providerRequestURLForFormatChange("anthropic", "openai", "https://gateway.example/v1/messages"), "https://gateway.example/v1/chat/completions", "Anthropic v1 is preserved when switching to chat");
+eq(providerRequestURLForFormatChange("openai", "responses", "https://gateway.example/custom?token=x"), "https://gateway.example/custom?token=x", "custom request paths and query values remain untouched");
+eq(providerRequestURLForFormatChange("openai", "responses", "https://gateway.example/v1/chat/completions?version=1"), "https://gateway.example/v1/chat/completions?version=1", "query-bearing exact overrides are never rewritten");
 
 if (failed > 0) process.exit(1);
