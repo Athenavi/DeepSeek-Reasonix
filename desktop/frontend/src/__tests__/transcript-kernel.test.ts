@@ -1,3 +1,4 @@
+import { commitTranscriptWindowGeometry } from "../lib/transcriptWindowGeometry";
 import { TranscriptMeasurementLedger } from "../lib/transcriptMeasurementLedger";
 import { TranscriptKernel, type TranscriptKernelClock, type TranscriptKernelEvent } from "../lib/transcriptKernel";
 
@@ -67,13 +68,11 @@ kernel.endUserGesture();
 const measured = new TranscriptMeasurementLedger();
 measured.commit([{ key: "before", size: 100 }, { key: "turn:4", size: 100 }]);
 kernel.beginUserGesture(snapshot);
-measured.beginUnboundedGesture();
 measured.stage([{ key: "before", size: 180 }, { key: "turn:4", size: 340 }]);
 const heldWrites = writes.length;
-measured.publishStaged(() => measured.publicationLead(kernel.userGestureActive) === 0);
+measured.publishStaged(() => !kernel.userGestureActive);
 ok(measured.sizeFor("turn:4", 0) === 100 && writes.length === heldWrites, "held growth remains staged with zero correction writes");
 kernel.endUserGesture();
-measured.endGesture();
 const reconciliation = kernel.begin("restore", kernel.anchor);
 measured.publishStaged();
 kernel.advanceGeometry();
@@ -157,6 +156,58 @@ const movedNativeIsNative = kernel.observeNativeScroll({
   visibleBlocks: [{ key: "turn:user-position", top: delayedWriterOffset - 90, bottom: delayedWriterOffset + 30 }],
 });
 ok(movedNativeIsNative, "a physical offset that diverges from the writer target belongs to the user");
+
+// The adapter closes a safe size batch while the kernel still owns native input.
+const nativeBatchWrites = writes.length;
+kernel.renewNativeGesture(snapshot, 320, () => {});
+const batchItems = Array.from({ length: 50 }, (_, index) => ({
+  index, key: `batch:${index}`, start: index * 100, end: (index + 1) * 100, size: 100,
+}));
+const batchInput = { candidate: batchItems.slice(0, 38), measurements: batchItems,
+  retainedIndexes: new Set<number>(), structureRevision: "batch", scrollTop: 200, clientHeight: 500,
+  scrollMargin: 0, totalSize: 5000, maxItems: 38, direction: "forward" as const,
+  gestureActive: kernel.userGestureActive, residentCount: 2, forceFull: false };
+const batchBefore = commitTranscriptWindowGeometry(batchInput);
+const measuredBatch = batchItems.map(item => ({ ...item, size: item.size + (item.index === 20 ? 24 : 0),
+  start: item.start + (item.index > 20 ? 24 : 0), end: item.end + (item.index >= 20 ? 24 : 0) }));
+const batchAfter = commitTranscriptWindowGeometry({ ...batchInput, candidate: measuredBatch.slice(0, 38),
+  measurements: measuredBatch, totalSize: 5024, previous: batchBefore, measurementCommit: true });
+kernel.advanceGeometry();
+clock.flushFrames();
+ok(batchAfter.prefix.items[21].start === 2124 && batchAfter.prefix.items[2].start === 200,
+  "a published future batch is painted without moving the kernel reader anchor");
+ok(kernel.userGestureActive && writes.length === nativeBatchWrites,
+  "before-paint measurement acknowledgement neither releases native ownership nor writes scroll");
+kernel.replaceSurface("batch-replaced");
+clock.advance(320);
+ok(writes.length === nativeBatchWrites, "batch completion cannot restore a replaced surface");
+
+// Browser geometry notifications are not new user input.
+kernel.scrollToTail();
+const noInputChangedIntent = kernel.observeNativeScroll({ ...snapshot, scrollTop: 905, scrollHeight: 1460 });
+ok(!noInputChangedIntent && kernel.intent === "tail", "a delayed layout scroll cannot revoke tail intent without an input owner");
+const renewalSnapshot = { ...snapshot, scrollTop: 600, visibleBlocks: [{ key: "renewal", top: 580, bottom: 900 }] };
+kernel.beginUserGesture(renewalSnapshot);
+kernel.renewNativeGesture({ ...renewalSnapshot, scrollTop: 640 }, 320, () => {});
+ok(kernel.anchor.kind === "block" && kernel.anchor.offsetPx === 20,
+  "renewing input ownership does not invent a native scroll observation");
+kernel.observeNativeScroll({ ...renewalSnapshot, scrollTop: 640 });
+ok(kernel.anchor.kind === "block" && kernel.anchor.offsetPx === 60,
+  "the subsequent native event records actual user movement");
+kernel.endUserGesture();
+
+let firstTailWrite = true;
+kernel.connectWriter(() => {
+  const changed = firstTailWrite; firstTailWrite = false;
+  return { accepted: true, offset: 900, changed };
+});
+kernel.scrollToTail();
+kernel.scrollToTail(); // Geometry may request an idempotent sync before scroll delivery.
+kernel.beginUserGesture({ ...snapshot, scrollTop: 900 });
+kernel.renewNativeGesture({ ...snapshot, scrollTop: 900 }, 320, () => {});
+ok(!kernel.observeNativeScroll({ ...snapshot, scrollTop: 900 }),
+  "no-op sync and lease renewal preserve the pending writer event provenance");
+kernel.endUserGesture();
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);
