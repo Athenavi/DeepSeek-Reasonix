@@ -105,24 +105,13 @@ ok(released.totalSize === 20_120, "gesture release commits range and extent atom
 const windowSource = await import("node:fs/promises").then((fs) => fs.readFile(new URL("../components/TranscriptWindow.tsx", import.meta.url), "utf8"));
 ok(windowSource.includes("useCachedMeasurements: true"), "TanStack cannot publish ResizeObserver sizes outside the viewport commit protocol");
 ok(windowSource.includes("measurementLedger.stage(changes)"), "DOM measurements enter the block-keyed staging ledger before publication");
-ok(
-  windowSource.includes("nativeViewport.clientHeight + publicationLeadPx")
-    && windowSource.includes("domSafeIndex")
-    && windowSource.includes("paintedSafeIndex == null || domSafeIndex == null")
-    && windowSource.includes('kernel.intent === "reader"')
-    && windowSource.includes("measurementLedger.publicationLead(kernel.userGestureActive)")
-    && windowSource.includes('addEventListener("wheel", observeWheel')
-    && windowSource.includes('["pointerdown", "mousedown"]')
-    && windowSource.includes("addEventListener(type, beginUnbounded")
-    && windowSource.includes('addEventListener("mouseup", endUnownedMouse')
-    && windowSource.includes('addEventListener("touchstart", beginUnbounded')
-    && windowSource.includes("measurementLedger.endGesture()")
-    && windowSource.indexOf("measurementLedger.publicationLead(kernel.userGestureActive)") > windowSource.indexOf("const container = coldContainerRef.current")
-    && windowSource.includes("[kernel.generation, kernel.userGestureActive, measurementLedger]")
-    && windowSource.includes("measurementLedger.publishStaged(")
-    && windowSource.includes("virtualizer.resizeItem(index, change.size);"),
-  "native-owned reader measurements retain the prefix-and-DOM compositor frontier",
-);
+ok(windowSource.includes("findTranscriptMeasurementPublicationBoundary({")
+  && windowSource.includes("scrollElement?.scrollTop ?? observedTop")
+  && windowSource.includes("measurementLedger.publishStaged(")
+  && windowSource.includes("virtualizer.resizeItem(index, change.size);"),
+  "measurement admission re-reads actual geometry before publishing the complete size batch");
+ok(!windowSource.includes("beginUnboundedGesture") && !windowSource.includes("publicationLead("),
+  "the window adapter cannot create a competing input lease or accumulate input distance");
 ok(!windowSource.includes("virtualizer.measure();"), "a safe suffix publish cannot invalidate and rebuild the protected prefix");
 ok(windowSource.includes("measurementLedger.commit(residentChanges)"), "resident blocks publish exact sizes before leaving ordinary DOM");
 const forwardIndexes = extractTranscriptWindowIndexes({ startIndex: 100, endIndex: 104, count: 1_000 }, new Set(), 36, "forward");

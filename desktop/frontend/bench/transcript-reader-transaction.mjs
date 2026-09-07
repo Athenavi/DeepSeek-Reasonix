@@ -366,10 +366,15 @@ async function runColdExpansion(page, transcript, label) {
   await page.mouse.click(rail.x + rail.width / 2, rail.y + rail.height * (949.5 / 1000));
   const block = page.locator("[data-transcript-block-key]").filter({ hasText: "windowed turn 950:" });
   await block.locator(".reasoning__head").click();
+  const toggle = block.locator(".turn-collapse__reasoning-head");
+  // Playwright may scroll an offscreen control before dispatching the click.
+  // Establish that input target first; measure expansion from the actual
+  // pre-click viewport rather than including actionability setup as drift.
+  await toggle.click({ trial: true });
   await waitForNativeViewportSettlement(page);
   const before = await block.evaluate(element => ({ key: element.dataset.transcriptBlockKey,
     top: element.getBoundingClientRect().top, height: element.getBoundingClientRect().height }));
-  await block.locator(".turn-collapse__reasoning-head").click();
+  await toggle.click();
   await page.waitForFunction(({ key, height }) => {
     const blocks = [...document.querySelectorAll("[data-transcript-block-key]")];
     const element = blocks.find(block => block.getAttribute("data-transcript-block-key") === key);
@@ -379,9 +384,9 @@ async function runColdExpansion(page, transcript, label) {
   }, before);
   const expanded = await block.evaluate(element => ({ top: element.getBoundingClientRect().top,
     height: element.getBoundingClientRect().height }));
-  assert(Math.abs(expanded.top - before.top) <= 4, `${label}: cold reasoning expansion preserves its reading anchor`);
+  assert(Math.abs(expanded.top - before.top) <= 4, `${label}: cold reasoning expansion preserves its reading anchor (${JSON.stringify({ before, expanded })})`);
   assert(expanded.height > before.height + 100, `${label}: real reasoning expansion repositions the next block without overlap`);
-  await block.locator(".turn-collapse__reasoning-head").click();
+  await toggle.click();
   await page.waitForFunction(({ key, height }) => {
     const element = [...document.querySelectorAll("[data-transcript-block-key]")]
       .find(block => block.getAttribute("data-transcript-block-key") === key);
