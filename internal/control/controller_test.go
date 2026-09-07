@@ -481,7 +481,7 @@ func TestFinishInFlightTurnKeepsMarkerUntilSnapshotSucceeds(t *testing.T) {
 }
 
 func TestResumePreservesTranscriptWhenCrashFollowsFinalSnapshot(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	path := filepath.Join(dir, "post-snapshot-crash.jsonl")
 	sess := agent.NewSession("sys")
 	if err := sess.Save(path); err != nil {

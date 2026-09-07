@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"time"
 
 	"reasonix/internal/store"
 )
@@ -17,6 +18,8 @@ type sessionHeadState struct {
 	headCount int
 	state     *sessionDAGState
 	events    []HeadEvent
+	pending   []sessionDAGEntry
+	openTurn  *sessionDAGTurn
 }
 
 // HeadEvent reports a head-level fact a save discovered; the controller turns
@@ -31,7 +34,34 @@ const (
 	// HeadEventForkedConcurrent: this writer's head diverged from another
 	// writer's appends and continued on a fresh head.
 	HeadEventForkedConcurrent = "forked_concurrent"
+	// HeadEventMultipleRecentHeads: the session opened on one of several heads
+	// that were active within recentHeadWindow; the others remain versions.
+	HeadEventMultipleRecentHeads = "multiple_recent_heads"
 )
+
+// recentHeadWindow bounds how old a competing head may be before opening a
+// conversation stops mentioning it.
+const recentHeadWindow = 24 * time.Hour
+
+// loadHeadEvents derives the events a fresh load should surface.
+func loadHeadEvents(st *sessionDAGState, selected string) []HeadEvent {
+	if st == nil {
+		return nil
+	}
+	h := st.heads[selected]
+	if h == nil {
+		return nil
+	}
+	for _, id := range st.liveHeads() {
+		if id == selected {
+			continue
+		}
+		if other := st.heads[id]; other != nil && h.lastActivity.Sub(other.lastActivity) < recentHeadWindow {
+			return []HeadEvent{{Kind: HeadEventMultipleRecentHeads, HeadID: selected, OtherWriter: other.writer}}
+		}
+	}
+	return nil
+}
 
 // Head reports the head this session was loaded from or last saved to. ok is
 // false for sessions that still live in a schema-1 log or a bare .jsonl.

@@ -155,6 +155,9 @@ type InFlightTurnMeta struct {
 	// this exact transcript on disk, the snapshot committed and only marker
 	// cleanup was interrupted; no message recovery is necessary.
 	CommitDigest string `json:"commit_digest,omitempty"`
+	// HeadID marks a schema-2 turn whose begin/end markers live in the log
+	// rather than in this sidecar; such markers are never persisted here.
+	HeadID string `json:"head_id,omitempty"`
 }
 
 func (m BranchMeta) DefaultScope() string {
