@@ -204,13 +204,10 @@ console.log("\nbundle budgets");
 // initial route. The session-runtime ordering fence adds 56 bytes and
 // cross-platform zlib rounding reaches the same startup path; retain the
 // explicit budget rather than failing on a rounded 467.0 KiB display value.
-// The latest main-v2 session-runtime fence and exact prompt protocol measure
-// 468.2 KiB here; retain a 0.1 KiB ceiling for platform zlib rounding.
 // The bounded provider-recovery wait (#9889/#9890) adds six locale strings and
-// a lazy banner mount to the startup path: the same-environment main-v2 base
-// measures 468.3 KiB and the merged path 468.902 KiB, while the banner itself
-// stays a 0.6 KiB lazy chunk. Retain the next decimal ceiling.
-const initialJSBudgetKiB = 469.0;
+// a lazy banner mount to the startup path: 480080 B (468.828 KiB) over a
+// 479496 B main-v2 base; the banner itself stays a lazy chunk.
+const initialJSBudgetKiB = 468.9;
 assertBudget("initial JavaScript gzip", initialJSGzip, initialJSBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk gzip", largestInitialJS, 280 * 1024);
 // Render-blocking CSS is intentionally absent: styles.css loads deferred via
@@ -233,10 +230,9 @@ if (initialCSS.length > 0) {
 // shared title-safe shell, and the shared harness decision surface measure
 // 116.9 KiB gzip while reusing existing layout primitives. Retain a bounded
 // 0.1 KiB headroom ratchet.
-// The provider-recovery wait banner (#9890) adds a measured 150 bytes gzip of
-// card, meta, and stop-button rules to a shell that sat 92 bytes under the
-// gate (116.910 -> 117.057 KiB). Retain the next decimal ceiling.
-assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 117.1 * 1024);
+// The provider-recovery wait banner (#9890) adds 150 B gzip of card, meta,
+// and stop-button rules: 116.910 -> 117.057 KiB. Retain rounding headroom.
+assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 117.2 * 1024);
 if (localeChunks.length !== 2) {
   throw new Error(`expected 2 on-demand Chinese locale chunks, found ${localeChunks.length}`);
 }
@@ -293,11 +289,7 @@ for (const path of localeChunks) {
   // 61.027/61.881 KiB; retain bounded cross-platform headroom.
   // Recovery retry copy reaches the rounded 61.1 KiB boundary on Node/zlib
   // toolchains; keep the next one-decimal ceiling for cross-platform CI.
-  // The bounded provider-recovery wait banner (#9890) adds six strings per
-  // dialect, measured at ~150 B gzip each: 61.284 KiB zh and 62.137 KiB zh-TW
-  // on bases within 60 B / 8 B of their gates. Keep the guidance copy intact
-  // and retain the next decimal ceiling with cross-platform zlib headroom.
-  const budget = name.startsWith("zh-TW-") ? 62.2 * 1024 : 61.4 * 1024;
+  const budget = name.startsWith("zh-TW-") ? 62.0 * 1024 : 61.2 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -402,9 +394,10 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2496.4 KiB locally; retain the smallest bounded ceiling.
 // The context truncation-rescue notice and its three locale strings measure
 // 2496.6 KiB; retain the smallest bounded ceiling.
-// The bounded provider-recovery wait (#9889/#9890) adds 0.9 KiB raw of banner
-// mount, status helpers, and English copy plus 0.8 KiB of banner CSS; the
-// merged path measures 2498.300 KiB. Retain the smallest bounded ceiling.
-const rawInitialBudgetKiB = 2_498.4;
+// The authoritative session experience UI and legacy-engine adapter measure
+// 2497.7 KiB. Re-measure when the legacy engine is removed in the next slice.
+// The bounded provider-recovery wait (#9889/#9890) adds banner mount, status
+// helpers, copy, and CSS: 2559365 B (2499.380 KiB). Retain the next ceiling.
+const rawInitialBudgetKiB = 2_499.5;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
