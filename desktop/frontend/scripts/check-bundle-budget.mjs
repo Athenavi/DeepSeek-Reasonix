@@ -401,6 +401,7 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // adapter-owned reasoning) measures 2384.8 KiB after unused locale removal.
 // Permit only this measured 13 KiB (0.55%) delta; retain every gzip, locale,
 // stylesheet and largest-chunk gate above/below unchanged.
-const rawInitialBudgetKiB = 2_384.9;
+// Prepend batch settlement adds 0.3 KiB raw; no other budget changes.
+const rawInitialBudgetKiB = 2_385.2;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
