@@ -8,7 +8,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const controller = readFileSync(join(root, "lib/useController.ts"), "utf8");
 const store = readFileSync(join(root, "lib/transcriptStore.ts"), "utf8");
 const chatPane = readFileSync(join(root, "app-shell/ChatPaneRegion.tsx"), "utf8");
-const appView = readFileSync(join(root, "App.tsx"), "utf8");
+const appView = readFileSync(join(root, "app-shell/AppRuntimeView.tsx"), "utf8");
 
 assert.match(controller, /deferResetUntilHistory \?\? true/, "history reset waits for successful load");
 assert.match(controller, /type: "hydrate_error"/, "history failure dispatches hydrate_error");

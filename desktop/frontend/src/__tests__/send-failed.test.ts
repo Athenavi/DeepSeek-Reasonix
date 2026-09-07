@@ -270,7 +270,7 @@ eq(
 );
 
 const here = dirname(fileURLToPath(import.meta.url));
-const appSource = readFileSync(resolve(here, "../App.tsx"), "utf8");
+const appSource = readFileSync(resolve(here, "../AppRuntime.tsx"), "utf8");
 const sessionCompositionSource = readFileSync(resolve(here, "../app-runtime/useAppSessionComposition.ts"), "utf8");
 const typesSource = readFileSync(resolve(here, "../lib/types.ts"), "utf8");
 const controllerSource = readFileSync(resolve(here, "../lib/useController.ts"), "utf8");

@@ -3,14 +3,14 @@ import { readFileSync } from "node:fs";
 import { JSDOM } from "jsdom";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
-const app = read("../App.tsx");
+const app = read("../AppRuntime.tsx");
 const isolation = read("../lib/useManagementWorkspace.ts");
 const shell = read("../components/ManagementPageShell.tsx");
 const css = read("../components/ManagementPageShell.css");
 const heartbeat = read("../custom/features/heartbeat/HeartbeatPanel.tsx");
 const warmth = read("../lib/useWarmTerminalPanel.ts");
 const sessionComposition = read("../app-runtime/useAppSessionComposition.ts");
-const appView = read("../App.tsx");
+const appView = read("../app-shell/AppRuntimeView.tsx");
 const chromeCommands = read("../app-runtime/useAppChromeCommands.ts");
 const palette = read("../app-runtime/usePaletteCommands.tsx");
 

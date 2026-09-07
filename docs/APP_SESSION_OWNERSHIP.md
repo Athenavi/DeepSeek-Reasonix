@@ -11,9 +11,9 @@ UI tab identifier. Missing or replaced targets produce a stale outcome.
 
 Subscription scopes revoke queued deliveries before releasing registrations.
 Terminal output uses reference-counted leases so an old cleanup cannot release
-a newer subscriber. App composition wires these owners to the existing page
-tree; the runtime root and page tree still live together in App.tsx in this
-stage. Presentation-only extraction is a separate change.
+a newer subscriber. AppRuntime wires these owners to AppRuntimeView. App.tsx is a small composition
+entry; the view receives committed commands and presentation data without
+creating a second session authority.
 
 Remote resume rejection completes behind the tab's publication fence. Session
 identity, title, route, pending prompts and runtime state are restored before

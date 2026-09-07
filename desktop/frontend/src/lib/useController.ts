@@ -55,7 +55,6 @@ import type { SearchSource } from "./searchSources";
 import { attachWebSearchOutput, historySearchAndAnswer } from "./searchTranscript";
 import { fileDiffFromWire, parseTodos, summarize, summarizeFileDiff, type ToolFileDiff } from "./tools";
 import { modeHasAutoApproveTools, normalizeMode, normalizeToolApprovalMode, type QualityFloor } from "./types";
-import { parseSubagentOutcomeText } from "./subagentOutcome";
 import type {
   BalanceInfo,
   CheckpointMeta,
@@ -286,7 +285,7 @@ export type Item =
       args: string;
       readOnly: boolean;
       resolvedName?: string;
-      capabilityId?: string; subagentRef?: string; subagentStatus?: string; subagentErrorCode?: string; subagentRetryable?: boolean;
+      capabilityId?: string; subagentOutcome?: import("./subagentOutcome").SubagentOutcome;
       status: ToolStatus;
       output?: string; searchSources?: SearchSource[]; searchSourcesStatus?: "available" | "not_provided"; searchSummary?: string; // display-only provider search results; replay data stays in output/serverSearch
       error?: string;
@@ -970,7 +969,7 @@ export function historyMessagesToItems(messages: HistoryMessage[], idPrefix: str
           summary: summarizeFileDiff(fileDiff) || tc.summary,
           fileDiff,
           isShell: tc.name === "bash" || (tc.id || "").startsWith("shell-"),
-          execution: result?.execution, ...parseSubagentOutcomeText(output),
+          execution: result?.execution,
         });
         seq++;
       }
@@ -991,7 +990,7 @@ export function historyMessagesToItems(messages: HistoryMessage[], idPrefix: str
         error,
         dataArchived: m.toolResultArchived || undefined,
         isShell: (m.toolName || "") === "bash" || (m.toolCallId || "").startsWith("shell-"),
-        execution: m.execution, ...parseSubagentOutcomeText(output),
+        execution: m.execution,
       });
       seq++;
       continue;
@@ -1684,7 +1683,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
           const args = t.args ? t.args : it.args;
           const fileDiff = fileDiffFromWire(t);
           const summary = summarizeFileDiff(fileDiff) || summarize(t.name, args) || (t.name === it.name && args === it.args ? it.summary : undefined);
-            next[idx] = { ...it, name: t.name, args, readOnly: t.readOnly, resolvedName: t.resolvedName ?? it.resolvedName, capabilityId: t.capabilityId ?? it.capabilityId, profile: t.profile ?? it.profile, subagentRef: t.subagentRef ?? it.subagentRef, subagentStatus: t.subagentStatus ?? it.subagentStatus, subagentErrorCode: t.subagentErrorCode ?? it.subagentErrorCode, subagentRetryable: t.subagentRetryable ?? it.subagentRetryable, summary, fileDiff, argChars: undefined, isShell: it.isShell || t.name === "bash" || id.startsWith("shell-"), execution: t.execution ?? it.execution, subagentProgress: it.subagentProgress ?? (SUBAGENT_PROGRESS_TOOLS.has(t.name) ? freshSubagentProgress() : undefined) };
+          next[idx] = { ...it, name: t.name, args, readOnly: t.readOnly, resolvedName: t.resolvedName ?? it.resolvedName, capabilityId: t.capabilityId ?? it.capabilityId, profile: t.profile ?? it.profile, summary, fileDiff, argChars: undefined, isShell: it.isShell || t.name === "bash" || id.startsWith("shell-"), execution: t.execution ?? it.execution, subagentProgress: it.subagentProgress ?? (SUBAGENT_PROGRESS_TOOLS.has(t.name) ? freshSubagentProgress() : undefined) };
         }
         if (t.parentId) touchSubagentParent(next, t.parentId);
         return { ...settled, items: next };
@@ -1752,7 +1751,10 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
             durationMs: t.durationMs,
             summary,
             isShell: existing.isShell || existing.name === "bash" || t.name === "bash",
-            execution: t.execution ?? existing.execution, subagentRef: t.subagentRef ?? existing.subagentRef, subagentStatus: t.subagentStatus ?? existing.subagentStatus, subagentErrorCode: t.subagentErrorCode ?? existing.subagentErrorCode, subagentRetryable: t.subagentRetryable ?? existing.subagentRetryable,
+            execution: t.execution ?? existing.execution,
+            subagentOutcome: t.subagentRef || t.subagentStatus
+              ? [t.subagentRef, t.subagentStatus, t.subagentErrorCode, t.subagentRetryable] as const
+              : existing.subagentOutcome,
           };
         }
       }
