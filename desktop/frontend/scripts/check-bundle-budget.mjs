@@ -397,7 +397,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // Deferred presentation extraction in the next slice is budgeted separately.
 // First-materialization presentation preloading adds 0.3 KiB raw; the
 // measured payload is 2408.5 KiB. Mainline session-level Stop raises this
-// to 2408.7 KiB; retain 0.2 KiB for build-identity drift.
-const rawInitialBudgetKiB = 2_408.9;
+// to 2408.7 KiB. Mainline recovery-wait/rejection containment then measures
+// 2411.3 KiB; retain 0.2 KiB for build-identity drift.
+const rawInitialBudgetKiB = 2_411.5;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

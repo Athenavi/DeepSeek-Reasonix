@@ -1,4 +1,7 @@
 import { useEffect } from "react";
+import { onRecoverableError, type RecoverableErrorDetail } from "../lib/globalCrashHandlers";
+import { useCommittedCommand } from "../lib/useCommittedCommand";
+import type { useToast } from "../lib/toast";
 import { recordFrontendDiagnostic } from "../lib/frontendDiagnosticBridge";
 
 export function useAppDiagnostics(input: {
@@ -29,4 +32,11 @@ export function useSidebarConnectionValidity<T extends { id: string }>(input: {
   useEffect(() => {
     setConnectionId((current) => !current || connections.some((connection) => connection.id === current) ? current : "");
   }, [connections, setConnectionId]);
+}
+
+export function useRecoverableErrorToasts(showToast: ReturnType<typeof useToast>["showToast"]) {
+  const report = useCommittedCommand(({ message }: RecoverableErrorDetail) => {
+    showToast(message, "warn", { durationMs: 6000 });
+  });
+  useEffect(() => onRecoverableError(report), [report]);
 }

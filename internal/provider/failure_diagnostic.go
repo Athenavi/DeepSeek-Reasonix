@@ -32,6 +32,8 @@ func DiagnoseFailure(err error) *FailureDiagnostic {
 	switch {
 	case errors.Is(err, context.Canceled):
 		d.Kind = "cancelled"
+	case AsRecoveryWaitExhausted(err) != nil:
+		d.Kind = "recovery_wait_exhausted"
 	case AsQuotaError(err) != nil:
 		d.Kind = "quota"
 		d.Status = AsQuotaError(err).Status

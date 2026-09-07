@@ -6918,6 +6918,55 @@ body > .mermaid-diagram--fullscreen {
 .composer-card--waiting {
   border-color: color-mix(in srgb, var(--warn) 30%, var(--border));
 }
+/* Provider-recovery wait: a card above the composer so a minute-scale wait is
+   never mistaken for model work (#9890). */
+.recovery-wait-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--warn) 10%, var(--bg-elev));
+  font: 12px var(--sans);
+}
+.recovery-wait-banner__body {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+.recovery-wait-banner__title {
+  font-weight: 600;
+  color: color-mix(in srgb, var(--warn) 74%, var(--fg));
+}
+.recovery-wait-banner__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.recovery-wait-banner__hint {
+  color: var(--fg-faint);
+}
+.recovery-wait-banner__stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.recovery-wait-banner__stop:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 .composer-resize-handle {
   --wails-draggable: no-drag;
   appearance: none;
