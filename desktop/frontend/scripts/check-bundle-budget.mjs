@@ -204,9 +204,9 @@ console.log("\nbundle budgets");
 // initial route. The session-runtime ordering fence adds 56 bytes and
 // cross-platform zlib rounding reaches the same startup path; retain the
 // explicit budget rather than failing on a rounded 467.0 KiB display value.
-// The session-level Stop fallback measures 479545 B (468.306 KiB) over a
-// 479496 B main-v2 base; retain a 0.1 KiB ceiling for platform zlib rounding.
-const initialJSBudgetKiB = 468.4;
+// The latest main-v2 session-runtime fence and exact prompt protocol measure
+// 468.2 KiB here; retain a 0.1 KiB ceiling for platform zlib rounding.
+const initialJSBudgetKiB = 468.3;
 assertBudget("initial JavaScript gzip", initialJSGzip, initialJSBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk gzip", largestInitialJS, 280 * 1024);
 // Render-blocking CSS is intentionally absent: styles.css loads deferred via
@@ -391,10 +391,10 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2496.4 KiB locally; retain the smallest bounded ceiling.
 // The context truncation-rescue notice and its three locale strings measure
 // 2496.6 KiB; retain the smallest bounded ceiling.
-// The authoritative session experience UI and legacy-engine adapter measure
-// 2497.7 KiB. Re-measure when the legacy engine is removed in the next slice.
-// The session-level Stop fallback measures 2557844 B (2497.895 KiB); retain
-// the next bounded ceiling.
-const rawInitialBudgetKiB = 2_498.0;
+// The complete block renderer and input ownership gates measure 2371.7 KiB
+// on the settings + pure-kernel baseline. Keep the smallest bounded ceiling.
+// The session-level Stop fallback measures 2428827 B (2371.901 KiB) over a
+// 2428639 B base; keep the smallest bounded ceiling.
+const rawInitialBudgetKiB = 2_372.0;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
