@@ -394,8 +394,9 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // The context truncation-rescue notice and its three locale strings measure
 // 2496.6 KiB; retain the smallest bounded ceiling.
 // Deferred presentation measured 2381.4 KiB before first-materialization
-// preloading. Mainline Stop brings the payload to 2381.8 KiB; retain
-// mainline recovery UI brings it to 2384.5 KiB. Retain 0.2 KiB headroom.
-const rawInitialBudgetKiB = 2_384.7;
+// preloading. Mainline Stop brings the payload to 2381.8 KiB;
+// Mainline recovery UI brings it to 2384.5 KiB, and tool elapsed/liveness
+// UI to 2384.9 KiB. Retain 0.2 KiB headroom.
+const rawInitialBudgetKiB = 2_385.1;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

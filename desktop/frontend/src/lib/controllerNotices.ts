@@ -25,6 +25,7 @@ const noticeCodeKeys: Record<string, DictKey> = {
   session_shutdown_recovery_forked: "recovery.noticeSavedCopy",
   decision_receipt: "notice.decisionReceiptTitle",
   context_editing_fallback: "notice.contextEditingFallback",
+  turn_stalled: "notice.turnStalled",
 };
 
 const streamInterruptReasonCodeKeys: Record<string, DictKey> = {
