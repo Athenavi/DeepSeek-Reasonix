@@ -104,6 +104,11 @@ func (s *Session) saveDAGLocked(path string, mode sessionSaveMode, route dagRout
 		return err
 	}
 	deferProjection := mode.defersProjection()
+	pending := s.takePendingMarkers()
+	for i := range pending {
+		pending[i].Head = plan.head
+	}
+	plan.entries = append(plan.entries, pending...)
 	if len(plan.entries) == 0 {
 		s.adoptDAGPosition(st, plan)
 		s.markCheckpointPersisted(path, digest, version, baseRevision, rewriteVersion, msgs, deferProjection)
@@ -118,6 +123,7 @@ func (s *Session) saveDAGLocked(path string, mode sessionSaveMode, route dagRout
 	}
 	tail := st.lastGoodEnd
 	if _, err := appendSessionDAGEntries(path, plan.entries, true); err != nil {
+		s.requeuePendingMarkers(pending)
 		return err
 	}
 	if err := st.replayFrom(ctx, tail, defaultSessionReplayLimits); err != nil {
