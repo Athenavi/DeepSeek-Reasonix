@@ -121,6 +121,11 @@ export function isInboxItemMissing(error: unknown): boolean {
   return raw === `${CODE_PREFIX}inbox_item_not_found` || raw === "inbox item not found";
 }
 
+// The idle-tab code is consumed by the Stop path, never displayed.
+export function isTurnNotRunning(error: unknown): boolean {
+  return errorText(error) === `${CODE_PREFIX}turn_not_running`;
+}
+
 export function formatInboxCancelError(error: unknown, locale: Locale): string {
   return ERROR_COPY[locale][CANCEL_FAILED_INDEX].replace("{error}", formatInboxError(error, locale));
 }

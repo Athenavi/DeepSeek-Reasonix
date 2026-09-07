@@ -26,6 +26,9 @@ of the previous index.
   and projects on case-sensitive volumes remain separate.
 - Missing legacy counts are represented as `unknown`. The session is visible
   immediately, then a single repair worker decodes it in the background.
+- A stale projection (a save interrupted before its listing stamp) is also
+  `unknown`, but it keeps its last-known preview and turn count as uncertified
+  hints so the row stays in the sidebar while repair recomputes it.
 - A missing file is marked degraded on the first scan. It is removed from the
   projection only after a second scan and the missing-file grace period.
 - Runtime state (`open`, `running`, and live status) comes only from in-memory
