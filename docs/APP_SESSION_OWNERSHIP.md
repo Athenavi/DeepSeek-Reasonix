@@ -25,6 +25,20 @@ Generation replacement, retirement, reconnect, host suspension and explicit
 close follow the same per-tab publication order. Network handshakes and pump
 waits remain outside the fence; map snapshots are revalidated after taking it.
 
+## Remote bootstrap lock handoff
+
+A remote server owner can release its directory between a competing exclusive
+mkdir and the contender's Stat. The acquisition owner retries this missing
+observation once, through exclusive mkdir again. Only Exists or structured
+SFTP v3 generic failure qualifies; permission, transport and cancellation
+errors remain terminal. A second consecutive missing observation fails closed,
+because the protocol cannot distinguish repeated contention from a permanent
+generic failure. Observing a live lock restores the normal context-bound wait.
+This does not change the separate stale-lock reclamation policy.
+
+`go test -race ./internal/remote/bootstrap` covers the release interleaving,
+bounded permanent failure, cancellation and one-launch concurrent clients.
+
 ## Verification
 
 `pnpm test:app-lifecycle` exercises source capture, committed publication,

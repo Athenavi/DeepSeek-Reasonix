@@ -157,7 +157,7 @@ ok(
 );
 ok(
   /existing\.selectionRevision\+\+/.test(remoteOpenSource) &&
-    /a\.goRemoteTabSafe\("remoteTabResume"[\s\S]*?restoreRejectedRemoteTabOpenSelection/.test(remotePendingSelectionSource),
+    /a\.goRemoteTabSafe\("remoteTabResume"[\s\S]*?resumeRemoteTabSessionPathForOpenSelection\(tabID, name, sessionPath, sessionTitle, revision, selection\)/.test(remotePendingSelectionSource),
   "session switches resume in the background behind a generation guard",
 );
 ok(
