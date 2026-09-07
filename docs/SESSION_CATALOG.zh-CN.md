@@ -19,6 +19,8 @@ Reasonix 始终以会话 transcript、event log、metadata sidecar 和
   卷上的不同文件和项目不会合并。
 - 缺少旧版计数时使用 `unknown` 状态。会话会立即可见，随后由单个 repair worker
   在后台解码修复。
+- 保存在写入列表戳记前被中断产生的过期投影同样是 `unknown`，但会保留最近一次
+  已知的预览和回合数作为未认证的提示，这样修复期间该行不会从侧栏消失。
 - 文件首次缺失时只标记为 degraded；只有连续第二次扫描仍缺失且超过宽限期后，
   才会从查询投影移除。
 - 运行时状态（`open`、`running` 和实时状态）只来自内存 controller，并覆盖
