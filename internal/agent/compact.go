@@ -21,10 +21,15 @@ const (
 	defaultCompactRatio    = 0.80 // sole automatic maintenance trigger (new configs)
 	recentTailBudgetRatio  = 0.16 // recent verbatim tail as a fraction of the window
 	summaryOutputMaxTokens = 8192 // max digest output; further clipped by remaining candidate space
-	minRecentKeep          = 2    // never keep fewer recent messages than this
-	minCompactMessages     = 2    // skip compaction below this many compactable messages
-	fallbackTokPerChar     = 0.25 // ~4 chars/token, used before any usage is available to calibrate
-	protocolReserveTokens  = 256  // provider framing and control fields not represented by message estimates
+
+	// summaryReasoningMaxBytes clamps a surfaced reasoning-only summary
+	// (~8k tokens of bytes), matching the summaryOutputMaxTokens envelope.
+	summaryReasoningMaxBytes = 32768
+
+	minRecentKeep         = 2    // never keep fewer recent messages than this
+	minCompactMessages    = 2    // skip compaction below this many compactable messages
+	fallbackTokPerChar    = 0.25 // ~4 chars/token, used before any usage is available to calibrate
+	protocolReserveTokens = 256  // provider framing and control fields not represented by message estimates
 )
 
 var (
@@ -435,6 +440,8 @@ func (a *Agent) summarize(ctx context.Context, region []provider.Message, instru
 
 	// Unblock on timeout if the stream stalls while open.
 	var b strings.Builder
+	var reasoning strings.Builder
+	toolCalls := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -446,13 +453,31 @@ func (a *Agent) summarize(ctx context.Context, region []provider.Message, instru
 				}
 				s := strings.TrimSpace(b.String())
 				if s == "" {
-					return "", usage, fmt.Errorf("summarizer returned empty output")
+					// Thinking-mode providers (e.g. DeepSeek vision SKUs) may put the
+					// whole answer in reasoning_content with an empty content block
+					// (#9679 follow-up: same shape boundedllm learned to surface).
+					// Surface a pure reasoning-only summary so the turn is not misread
+					// as "empty output" and retried forever. A turn that also tried to
+					// call tools did not produce a briefing; keep rejecting that shape
+					// (the reasoning is private chain-of-thought, not digest material).
+					r := strings.TrimSpace(reasoning.String())
+					if r == "" || toolCalls > 0 {
+						return "", usage, fmt.Errorf("summarizer returned empty output")
+					}
+					if len(r) > summaryReasoningMaxBytes {
+						r = r[:summaryReasoningMaxBytes]
+					}
+					return r, usage, nil
 				}
 				return s, usage, nil
 			}
 			switch chunk.Type {
 			case provider.ChunkText:
 				b.WriteString(chunk.Text)
+			case provider.ChunkReasoning:
+				reasoning.WriteString(chunk.Text)
+			case provider.ChunkToolCall:
+				toolCalls++
 			case provider.ChunkUsage:
 				usage = chunk.Usage
 			case provider.ChunkError:
