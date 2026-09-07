@@ -1034,10 +1034,11 @@ func digestSessionMessages(msgs []provider.Message) ([sha256.Size]byte, error) {
 }
 
 func messageForSessionIdentity(m provider.Message) provider.Message {
-	// CreatedAt is local display metadata. Keep it out of transcript identity
-	// so older builds that ignore the optional field can share the same event-
+	// CreatedAt and ID are local metadata. Keep them out of transcript identity
+	// so older builds that ignore the optional fields can share the same event-
 	// log revision and append without false conflicts.
 	m.CreatedAt = 0
+	m.ID = ""
 	return m
 }
 
@@ -1404,6 +1405,7 @@ func loadSessionUnlocked(path string) (*Session, error) {
 		s.rawMessages = msgs
 	}
 	s.Messages = normalized
+	assignLegacyMessageIDs(path, s.Messages)
 	// Decode already hashed the transcript; when the repairs above returned it
 	// unchanged (the common case) reuse that digest, else re-hash the repair.
 	digest, digestOK := hasher.sum()

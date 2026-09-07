@@ -82,7 +82,7 @@ type Session struct {
 func NewSession(system string) *Session {
 	s := &Session{}
 	if system != "" {
-		s.Messages = append(s.Messages, provider.Message{Role: provider.RoleSystem, Content: system})
+		s.Messages = append(s.Messages, provider.Message{Role: provider.RoleSystem, Content: system, ID: NewMessageID()})
 	}
 	return s
 }
@@ -91,6 +91,9 @@ func NewSession(system string) *Session {
 func (s *Session) Add(m provider.Message) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if m.ID == "" {
+		m.ID = NewMessageID()
+	}
 	s.expireProtocolRecoveryLocked([]provider.Message{m})
 	s.Messages = append(s.Messages, m)
 	s.version++
@@ -104,6 +107,7 @@ func (s *Session) AddBatch(messages ...provider.Message) {
 		return
 	}
 	s.mu.Lock()
+	mintMessageIDs(messages)
 	s.expireProtocolRecoveryLocked(messages)
 	s.Messages = append(s.Messages, messages...)
 	s.version++
@@ -131,7 +135,7 @@ func (s *Session) SetLeadingSystemPromptWithReason(prompt, reason string) bool {
 		}
 		s.Messages[0].Content = prompt
 	} else if prompt != "" {
-		s.Messages = append([]provider.Message{{Role: provider.RoleSystem, Content: prompt}}, s.Messages...)
+		s.Messages = append([]provider.Message{{Role: provider.RoleSystem, Content: prompt, ID: NewMessageID()}}, s.Messages...)
 	} else {
 		return false
 	}
@@ -295,6 +299,7 @@ func (s *Session) UpdateToolCallResolution(call provider.ToolCall) bool {
 func (s *Session) Replace(msgs []provider.Message) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	mintMessageIDs(msgs)
 	s.Messages = msgs
 	s.version++
 }
@@ -313,6 +318,7 @@ func (s *Session) Replace(msgs []provider.Message) {
 func (s *Session) Rewrite(msgs []provider.Message, reason string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	mintMessageIDs(msgs)
 	s.Messages = msgs
 	s.rewriteVersion++
 	s.version++
@@ -330,6 +336,7 @@ func (s *Session) Rewrite(msgs []provider.Message, reason string) {
 func (s *Session) ReplaceLocalMetadata(msgs []provider.Message) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	mintMessageIDs(msgs)
 	s.Messages = msgs
 	s.rewriteVersion++
 	s.version++

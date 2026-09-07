@@ -1997,7 +1997,7 @@ model = "x"
 
 	defaultReq := firstTokenProfileRequest(t, "")
 	balancedReq := firstTokenProfileRequest(t, "balanced")
-	if !reflect.DeepEqual(balancedReq.Messages, defaultReq.Messages) {
+	if !reflect.DeepEqual(withoutMessageIDs(balancedReq.Messages), withoutMessageIDs(defaultReq.Messages)) {
 		t.Fatal("balanced alias changed provider-visible messages")
 	}
 	if !reflect.DeepEqual(balancedReq.Tools, defaultReq.Tools) {
