@@ -137,9 +137,9 @@ func TestPreparePreservesLegacyNilContext(t *testing.T) {
 		a := agentOverForce(t, &fakeProvider{reply: "digest"}, foldableSessionOverForce(turns))
 		var err error
 		if manual {
-			err = a.CompactNow(nil, "")
+			err = a.CompactNow(nil, "") //nolint:staticcheck // Exercise the legacy nil-context compatibility boundary.
 		} else {
-			err = a.PrepareContext(nil)
+			err = a.PrepareContext(nil) //nolint:staticcheck // Exercise the legacy nil-context compatibility boundary.
 		}
 		if err != nil {
 			t.Fatalf("manual=%v: %v", manual, err)
