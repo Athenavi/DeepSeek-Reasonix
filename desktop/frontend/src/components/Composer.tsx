@@ -1,4 +1,4 @@
-import { recoveryStatusText } from "../lib/recoveryStatus";
+import { recoveryStatusText, type RecoveryRetry } from "../lib/recoveryStatus";
 import { useAppNavigationStore } from "../store/appNavigation";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -53,6 +53,7 @@ import { ANCHORED_POPOVER_CLOSE_MS, AnchoredPopover } from "./AnchoredPopover";
 import { EffortSwitcher } from "./EffortSwitcher";
 const ModelSwitcher = lazy(() => import("./ModelSwitcher").then((module) => ({ default: module.ModelSwitcher })));
 import { Tooltip } from "./Tooltip";
+const RecoveryWaitBanner = lazy(() => import("./RecoveryWaitBanner").then((module) => ({ default: module.RecoveryWaitBanner })));
 import { ComposerContextCard } from "./ComposerContextCard";
 import { Markdown } from "./Markdown";
 import { CodeViewer } from "./CodeViewer";
@@ -684,7 +685,7 @@ export function Composer({
   liveStore?: ControllerLiveStore;
   // Streaming argument characters provide estimated progress before usage arrives.
   turnArgChars?: number;
-  retry?: { attempt: number; max: number; recovery?: { phase?: string; next_attempt_at?: number; waiting?: boolean } };
+  retry?: RecoveryRetry;
   // True while a footer decision surface (approval / ask / clear context) owns
   // the UI. Pauses the model-work ticker without rendering a "waiting approval"
   // run strip (the decision card already conveys that state).
@@ -4418,6 +4419,7 @@ export function Composer({
           })}
         </div>
       )}
+      {retry?.recovery?.waiting && <Suspense fallback={null}><RecoveryWaitBanner retry={retry} now={now} onStop={() => void handleCancel()} stopDisabled={cancelSettlingDraftsRef.current.has(draftKey)} /></Suspense>}
       <div
         className={`composer-card${composerHeight !== null || composerResizing ? " composer-card--resized" : ""}${composerAutoExpanded ? " composer-card--autosized" : ""}${composerAutoOverflow ? " composer-card--auto-overflow" : ""}${composerResizing ? " composer-card--resizing" : ""}${running ? (waitingPrompt ? " composer-card--waiting" : " composer-card--running") : ""}`}
         ref={composerCardRef}
@@ -4450,9 +4452,7 @@ export function Composer({
                 )}
               </>
             ) : (
-              <span className="composer-run-strip__text">
-                {runStateText}
-              </span>
+              <span className="composer-run-strip__text">{runStateText}</span>
             )}
             <span className="sr-only" role="status">{runStateText}</span>
           </div>
