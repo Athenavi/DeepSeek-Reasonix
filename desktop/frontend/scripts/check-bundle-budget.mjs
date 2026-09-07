@@ -391,8 +391,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2496.4 KiB locally; retain the smallest bounded ceiling.
 // The context truncation-rescue notice and its three locale strings measure
 // 2496.6 KiB; retain the smallest bounded ceiling.
-// The complete block renderer replaces Virtuoso and measures 2371.5 KiB
-// on the settings + pure-kernel baseline. Keep the smallest bounded ceiling.
-const rawInitialBudgetKiB = 2_371.6;
+// Source-bound command owners and lifecycle composition measure 2408.0 KiB.
+// Deferred presentation extraction in the next slice is budgeted separately.
+const rawInitialBudgetKiB = 2_408.1;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

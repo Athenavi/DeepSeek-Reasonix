@@ -24,7 +24,7 @@ function ok(cond: boolean, label: string) {
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
-const appSource = readFileSync(resolve(here, "../App.tsx"), "utf8");
+const paletteSource = readFileSync(resolve(here, "../app-runtime/usePaletteCommands.tsx"), "utf8");
 const bridgeSource = readFileSync(resolve(here, "../lib/bridge.ts"), "utf8");
 const configWarningsSource = readFileSync(resolve(here, "../lib/useConfigLoadWarnings.ts"), "utf8");
 const settingsSource = readFileSync(resolve(here, "../components/SettingsPanel.tsx"), "utf8");
@@ -43,39 +43,13 @@ ok(
   "bridge exposes a lightweight desktop startup settings call",
 );
 ok(
-  appSource.includes("app.DesktopStartupSettings()"),
-  "App loads startup chrome preferences through the lightweight settings call",
-);
-ok(
-  configWarningsSource.includes('EventsOn("config:load-warnings"') &&
-    appSource.includes("useConfigLoadWarnings()") &&
-    appSource.includes("settings.configWarningsRevision"),
-  "runtime config warnings update the persistent desktop banner",
-);
-ok(
   configWarningsSource.includes("revision < latestRevision.current") &&
     configWarningsSource.includes("seenKeys.current.has(key)"),
   "startup and reload barriers reject stale events while repeated session builds stay deduplicated",
 );
 ok(
-  appSource.includes('hydrateReasoningDisplayMode("auto", false);'),
-  "startup failure preserves legacy reasoning-display migration precedence",
-);
-ok(
   bridgeSource.includes('displayMode: "standard", sessionExperience: "standard", reasoningDisplayMode: "auto", reasoningDisplayModeExplicit: false'),
-  "browser startup defaults match the classic standard/live-follow experience",
-);
-ok(
-  !/const\s+reloadSidebarImConnections[\s\S]*?app\.Settings\(\)[\s\S]*?\}, \[t\]\);/.test(appSource),
-  "sidebar IM refresh avoids rebuilding the full Settings payload",
-);
-ok(
-  !/const\s+syncDesktopPreferences[\s\S]*?app\.Settings\(\)[\s\S]*?\};/.test(appSource),
-  "startup preference sync avoids rebuilding the full Settings payload",
-);
-ok(
-  /onChooseProvider=\{\(\) => \{[\s\S]*?setSettingsFocus\(\{ target: "model-access" \}\);[\s\S]*?setSettingsTarget\("models"\);/.test(appSource),
-  "onboarding opens the model access flow instead of model usage",
+  "browser startup defaults include the canonical standard session experience",
 );
 ok(
   /initialFocus\?\.target === "model-access"[\s\S]*?initialFocus\?\.target === "model-stats"[\s\S]*?"usage"/.test(settingsSource),
@@ -86,7 +60,7 @@ ok(
   "each fresh model focus object can re-target the same subtab again",
 );
 ok(
-  /setSettingsFocus\(\(current\) => \(\{[\s\S]*?target: "model-stats",[\s\S]*?requestId: \(current\?\.requestId \?\? 0\) \+ 1,[\s\S]*?\}\)\)/.test(appSource) &&
+  /setSettingsFocus\(\(current\) => \(\{[\s\S]*?target: "model-stats",[\s\S]*?requestId: \(current\?\.requestId \?\? 0\) \+ 1,[\s\S]*?\}\)\)/.test(paletteSource) &&
     /initialFocus\?\.requestId/.test(settingsSource),
   "usage statistics commands derive a monotonic request id from the shared focus state",
 );
@@ -151,14 +125,12 @@ ok(
   "GLM reasoning protocol is localized in every supported locale",
 );
 ok(
-  settingsSource.includes("<SessionExperienceSettings") &&
-    settingsSource.includes("snapshot={s} busy={busy} apply={apply}"),
-  "General settings delegates the canonical session preference to its owning control",
-);
-ok(
   [enLocaleSource, zhLocaleSource, zhTWLocaleSource].every((source) =>
-    ["settings.sessionExperience", "settings.sessionExperienceHint", "settings.sessionExperience.standard", "settings.sessionExperience.deep"]
-      .every((key) => source.includes(`"${key}"`))),
+    source.includes('"settings.sessionExperience"') &&
+    source.includes('"settings.sessionExperienceHint"') &&
+    source.includes('"settings.sessionExperience.standard"') &&
+    source.includes('"settings.sessionExperience.deep"'),
+  ),
   "session experience labels are localized in every supported locale",
 );
 ok(

@@ -4,6 +4,7 @@
 import { runtimeStatusSnapshotIsStale } from "./runtimeStatusFreshness";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { asArray } from "./array";
+import { createControllerModelCommands } from "./controllerModelCommands";
 import { compactArchivedToolItems } from "./archivedToolItems";
 import { addBreadcrumb } from "./breadcrumbs";
 import { app, onEvent, onReady, onRuntimeRebuilt, onTabMeta, onTopicActivation } from "./bridge";
@@ -3932,23 +3933,30 @@ export function useController() {
     }
   }, [bumpCancelHydrateSeq, dispatchTo, scheduleCancelReconcile]);
 
-  const cancel = useCallback(async (inboxItemIDs: string[] = []): Promise<CancelOutcome> => {
-    const cur = stateRef.current, tabId = activeTabId;
+  const cancelForTab = useCallback(async (tabId: string, inboxItemIDs: string[] = []): Promise<CancelOutcome> => {
+    const cur = statesRef.current.get(tabId);
     let restoredText: string | undefined;
-    if (cur.running && cur.pendingUser !== undefined) {
+    if (cur?.running && cur.pendingUser !== undefined) {
       restoredText = cur.pendingUser;
-      if (tabId) dispatchTo(tabId, { type: "unsend" });
-    } else if (tabId) {
+      dispatchTo(tabId, { type: "unsend" });
+    } else {
       dispatchTo(tabId, { type: "cancel_requested" });
     }
-    if (!tabId) return { restoredText, discardedItemIds: [] };
     const result = await cancelTab(tabId, inboxItemIDs);
     return { restoredText, ...result };
-  }, [activeTabId, cancelTab, dispatchTo]);
+  }, [cancelTab, dispatchTo]);
 
-  const approve = useCallback((id: string, allow: boolean, session: boolean, persist: boolean) => {
-    if (!activeTabId) return;
+  const cancel = useCallback(async (inboxItemIDs: string[] = []): Promise<CancelOutcome> => {
     const tabId = activeTabId;
+    if (!tabId) return { discardedItemIds: [] };
+    return cancelForTab(tabId, inboxItemIDs);
+  }, [activeTabId, cancelForTab]);
+
+  const isPromptCurrentForTab = useCallback((tabId: string, kind: "approval" | "ask" | "mcpInteraction", id: string) => (
+    statesRef.current.get(tabId)?.[kind]?.id === id
+  ), []);
+  const approveForTab = useCallback((tabId: string, id: string, allow: boolean, session: boolean, persist: boolean) => {
+    if (!tabId) return;
     const promptState = statesRef.current.get(tabId);
     // Pin the failure callback to the prompt-id epoch the RPC was issued in:
     // if a controller rebuild lands while the call is in flight, a late
@@ -3957,29 +3965,38 @@ export function useController() {
     const epoch = statesRef.current.get(tabId)?.promptEpoch ?? 0;
     dispatchTo(tabId, { type: "clearApproval" });
     resolvePromptForTab(app, tabId, id, "approval", { allow, session, persist }, promptState?.approval?.turnId ?? promptState?.activeTurnId, promptState?.approval?.runtimeEpoch ?? runtimeEpochByTabRef.current.get(tabId)).catch((error) => handlePromptFailure(dispatchTo, tabId, id, epoch, error, "approval"));
-  }, [activeTabId, dispatchTo]);
+  }, [dispatchTo]);
 
-  const resolvePlanDecision = useCallback((id: string, action: "start_execution" | "revise_plan" | "exit_plan") => {
-    if (!activeTabId) return;
-    const tabId = activeTabId;
+  const approve = useCallback((id: string, allow: boolean, session: boolean, persist: boolean) => {
+    if (activeTabId) approveForTab(activeTabId, id, allow, session, persist);
+  }, [activeTabId, approveForTab]);
+
+  const resolvePlanDecisionForTab = useCallback((tabId: string, id: string, action: "start_execution" | "revise_plan" | "exit_plan") => {
+    if (!tabId) return;
     const promptState = statesRef.current.get(tabId);
     const epoch = statesRef.current.get(tabId)?.promptEpoch ?? 0;
     dispatchTo(tabId, { type: "clearApproval" });
     resolvePromptForTab(app, tabId, id, "plan", { action }, promptState?.approval?.turnId ?? promptState?.activeTurnId, promptState?.approval?.runtimeEpoch ?? runtimeEpochByTabRef.current.get(tabId)).catch((error) => handlePromptFailure(dispatchTo, tabId, id, epoch, error, "approval"));
-  }, [activeTabId, dispatchTo]);
+  }, [dispatchTo]);
 
-  const resolveRecovery = useCallback((id: string, action: "continue" | "continue_task" | "revise" | "stop", feedback = "") => {
-    if (!activeTabId) return;
-    const tabId = activeTabId;
+  const resolvePlanDecision = useCallback((id: string, action: "start_execution" | "revise_plan" | "exit_plan") => {
+    if (activeTabId) resolvePlanDecisionForTab(activeTabId, id, action);
+  }, [activeTabId, resolvePlanDecisionForTab]);
+
+  const resolveRecoveryForTab = useCallback((tabId: string, id: string, action: "continue" | "continue_task" | "revise" | "stop", feedback = "") => {
+    if (!tabId) return;
     const promptState = statesRef.current.get(tabId);
     const epoch = statesRef.current.get(tabId)?.promptEpoch ?? 0;
     dispatchTo(tabId, { type: "clearApproval" });
     resolvePromptForTab(app, tabId, id, "recovery", { action, feedback }, promptState?.approval?.turnId ?? promptState?.activeTurnId, promptState?.approval?.runtimeEpoch ?? runtimeEpochByTabRef.current.get(tabId)).catch((error) => handlePromptFailure(dispatchTo, tabId, id, epoch, error, "approval"));
-  }, [activeTabId, dispatchTo]);
+  }, [dispatchTo]);
 
-  const answerQuestion = useCallback((id: string, answers: QuestionAnswer[]): Promise<void> => {
-    if (!activeTabId) return Promise.reject(new Error("active tab is unavailable"));
-    const tabId = activeTabId;
+  const resolveRecovery = useCallback((id: string, action: "continue" | "continue_task" | "revise" | "stop", feedback = "") => {
+    if (activeTabId) resolveRecoveryForTab(activeTabId, id, action, feedback);
+  }, [activeTabId, resolveRecoveryForTab]);
+
+  const answerQuestionForTab = useCallback((tabId: string, id: string, answers: QuestionAnswer[]): Promise<void> => {
+    if (!tabId) return Promise.reject(new Error("source tab is unavailable"));
     const state = statesRef.current.get(tabId);
     const epoch = state?.promptEpoch ?? 0;
     return answerPromptForActiveTurn(app, tabId, id, answers, state?.ask?.turnId ?? state?.activeTurnId, state?.ask?.runtimeEpoch ?? runtimeEpochByTabRef.current.get(tabId)).then(
@@ -3991,23 +4008,33 @@ export function useController() {
         throw error;
       },
     );
-  }, [activeTabId, dispatchTo, reconcileRuntimeAfterRejectedMutation]);
+  }, [dispatchTo, reconcileRuntimeAfterRejectedMutation]);
 
-  const answerMCPInteraction = useCallback(
-    (id: string, action: "accept" | "decline" | "cancel", content?: Record<string, unknown>) => {
-      if (!activeTabId) return;
-      const tabId = activeTabId;
+  const answerQuestion = useCallback((id: string, answers: QuestionAnswer[]): Promise<void> => {
+    if (!activeTabId) return Promise.reject(new Error("active tab is unavailable"));
+    return answerQuestionForTab(activeTabId, id, answers);
+  }, [activeTabId, answerQuestionForTab]);
+
+  const answerMCPInteractionForTab = useCallback(
+    (tabId: string, id: string, action: "accept" | "decline" | "cancel", content?: Record<string, unknown>) => {
+      if (!tabId) return;
       const promptState = statesRef.current.get(tabId);
       const epoch = promptState?.promptEpoch ?? 0;
       dispatchTo(tabId, { type: "expire_prompt", id, epoch, kind: "mcp" });
       resolvePromptForTab(app, tabId, id, "mcp", { action, content: content ?? null }, promptState?.mcpInteraction?.turnId ?? promptState?.activeTurnId, promptState?.mcpInteraction?.runtimeEpoch ?? runtimeEpochByTabRef.current.get(tabId)).catch((error) => handlePromptFailure(dispatchTo, tabId, id, epoch, error, "mcp"));
     },
-    [activeTabId, dispatchTo],
+    [dispatchTo],
   );
 
-  const setControllerMode = useCallback((mode: Mode): Promise<void> => {
-    if (!activeTabId) return Promise.resolve();
-    const tabId = activeTabId;
+  const answerMCPInteraction = useCallback(
+    (id: string, action: "accept" | "decline" | "cancel", content?: Record<string, unknown>) => {
+      if (activeTabId) answerMCPInteractionForTab(activeTabId, id, action, content);
+    },
+    [activeTabId, answerMCPInteractionForTab],
+  );
+
+  const setControllerModeForTab = useCallback((tabId: string, mode: Mode): Promise<void> => {
+    if (!tabId) return Promise.resolve();
     const epoch = statesRef.current.get(tabId)?.promptEpoch ?? 0;
     return app.SetModeForTab(tabId, mode).then((drained) => {
       // Only dismiss the approvals the backend reports it actually
@@ -4016,7 +4043,12 @@ export function useController() {
       const ids = Array.isArray(drained) ? drained : [];
       if (ids.length) dispatchTo(tabId, { type: "approval_drained", ids, epoch });
     }).catch(() => {});
-  }, [activeTabId, dispatchTo]);
+  }, [dispatchTo]);
+
+  const setControllerMode = useCallback((mode: Mode): Promise<void> => {
+    if (!activeTabId) return Promise.resolve();
+    return setControllerModeForTab(activeTabId, mode);
+  }, [activeTabId, setControllerModeForTab]);
 
   const setCollaborationModeForTab = useCallback(async (tabId: string, mode: CollaborationMode): Promise<void> => {
     if (!tabId) return;
@@ -4428,67 +4460,12 @@ export function useController() {
     });
   }, []);
 
-  const setModel = useCallback(async (name: string) => {
-    if (!activeTabId) return false;
-    const tabId = activeTabId;
-    const switchSeq = (modelSwitchSeqByTab.current.get(tabId) ?? 0) + 1;
-    const successVersion = modelSwitchSuccessVersionByTab.current.get(tabId) ?? 0;
-    const existingQueue = modelSwitchQueueByTab.current.get(tabId);
-    // Every attempt in one queued burst shares the balance that was visible
-    // before the first switch cleared it. Otherwise a later queued failure
-    // captures the placeholder and cannot restore the outgoing provider.
-    const fallbackBalance = existingQueue
-      ? existingQueue.fallbackBalance
-      : statesRef.current.get(tabId)?.balance;
-    modelSwitchSeqByTab.current.set(tabId, switchSeq);
-    // Hide the outgoing provider's wallet as soon as the user starts a hot
-    // switch. If the rebuild fails, the catch path re-queries the still-active
-    // provider and restores its balance.
-    clearBalanceForTab(tabId);
-    try {
-      const result = await enqueueModelSwitch(tabId, name, fallbackBalance);
-      if (result === "superseded") return false;
-      modelSwitchSuccessVersionByTab.current.set(
-        tabId,
-        (modelSwitchSuccessVersionByTab.current.get(tabId) ?? 0) + 1,
-      );
-    } catch (err) {
-      if (modelSwitchSeqByTab.current.get(tabId) !== switchSeq) return false;
-      const { modelSwitchNoticeText } = await import("./controllerSwitchNotices");
-      if (modelSwitchSeqByTab.current.get(tabId) !== switchSeq) return false;
-      dispatchTo(tabId, { type: "local_notice", level: "warn", text: modelSwitchNoticeText(err) });
-      const olderSwitchSucceeded =
-        (modelSwitchSuccessVersionByTab.current.get(tabId) ?? 0) !== successVersion;
-      // Restore the known balance only when no older overlapping switch
-      // completed after this attempt began. Otherwise the backend now owns a
-      // different provider and the refresh below must establish its balance.
-      if (fallbackBalance && !olderSwitchSucceeded) {
-        dispatchTo(tabId, { type: "balance", balance: fallbackBalance });
-      }
-      void refreshBalanceForTab(tabId);
-      // A superseded success deliberately skips its own UI reconciliation.
-      // If this latest queued switch then fails, reconcile the model metadata
-      // to the provider that actually became active in the backend.
-      if (olderSwitchSucceeded) await refreshMetaForTab(tabId);
-      return false;
-    }
-    if (modelSwitchSeqByTab.current.get(tabId) !== switchSeq) return false;
-    void refreshBalanceForTab(tabId);
-    await refreshMetaForTab(tabId);
-    return modelSwitchSeqByTab.current.get(tabId) === switchSeq;
-  }, [activeTabId, clearBalanceForTab, dispatchTo, enqueueModelSwitch, refreshBalanceForTab, refreshMetaForTab]);
-
-  const setEffort = useCallback(async (level: string) => {
-    if (!activeTabId) return;
-    try {
-      await app.SetEffortForTab(activeTabId, level);
-    } catch (err) {
-      const { effortSwitchNoticeText } = await import("./controllerSwitchNotices");
-      dispatchTo(activeTabId, { type: "local_notice", level: "warn", text: effortSwitchNoticeText(err) });
-      return;
-    }
-    await refreshMetaForTab(activeTabId);
-  }, [activeTabId, dispatchTo, refreshMetaForTab]);
+  const { setModelForTab, setEffortForTab } = useMemo(() => createControllerModelCommands({
+    statesRef, modelSwitchSeqByTab, modelSwitchSuccessVersionByTab, modelSwitchQueueByTab,
+    enqueueModelSwitch, clearBalanceForTab, dispatchTo, refreshBalanceForTab, refreshMetaForTab,
+  }), [enqueueModelSwitch, clearBalanceForTab, dispatchTo, refreshBalanceForTab, refreshMetaForTab]);
+  const setModel = useCallback((name: string) => activeTabId ? setModelForTab(activeTabId, name) : Promise.resolve(false), [activeTabId, setModelForTab]);
+  const setEffort = useCallback((level: string) => activeTabId ? setEffortForTab(activeTabId, level) : Promise.resolve(), [activeTabId, setEffortForTab]);
 
   const cancelJob = useCallback(async (jobID: string): Promise<boolean> => {
     const tabId = activeTabId;
@@ -5039,13 +5016,16 @@ export function useController() {
     state: activeState,
     liveStore,
     activeTabId,
-    send, sendToTab, recoverDeliveryToTab, runShell, runShellForTab, steer, steerForTab, notice, cancel, approve, resolvePlanDecision, resolveRecovery, answerQuestion, answerMCPInteraction, setControllerMode,
+    send, sendToTab, recoverDeliveryToTab, runShell, runShellForTab, steer, steerForTab, notice,
+    cancel, cancelForTab, approve, approveForTab, isPromptCurrentForTab, resolvePlanDecision, resolvePlanDecisionForTab,
+    resolveRecovery, resolveRecoveryForTab, answerQuestion, answerQuestionForTab,
+    answerMCPInteraction, answerMCPInteractionForTab, setControllerMode, setControllerModeForTab,
     dismissExtensionForm, drainExtensionNotifications,
     setCollaborationMode, setCollaborationModeForTab, setToolApprovalMode, setToolApprovalModeForTab, setQualityFloor, setComposerProfileForTab, setGoal, setGoalForTab, clearGoal, clearGoalForTab, resumeGoal, resumeGoalForTab, pauseGoal, pauseGoalForTab,
     newSession, clearSession, listSessions, listTrashedSessions, retrySessionHistory, resumeSession, openChannelSession, previewSession, deleteSession, restoreSession, purgeTrashedSession, renameSession,
     loadOlderHistory,
     requestHistoryFullContent,
-    refreshMeta, pickWorkspace, switchWorkspace, compact, rewind, rewindForTab, rewindForTabDetailed, undoRewindForTab, setModel, setEffort, cancelJob,
+    refreshMeta, pickWorkspace, switchWorkspace, compact, rewind, rewindForTab, rewindForTabDetailed, undoRewindForTab, setModel, setModelForTab, setEffort, setEffortForTab, cancelJob,
     fetchMemory, remember, forget, saveDoc,
     switchTab, switchRemoteTab, openProjectTab, openGlobalTab, openTopicSession, ensureBlankTab, activateTopic, ensureBlankSurface, createIsolatedWorktree, commitSingleSurfaceNavigation, closeTab, reorderTabs,
     // Invalidate in-flight navigation completions (activateTopic's stale
