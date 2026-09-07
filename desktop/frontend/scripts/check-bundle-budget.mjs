@@ -204,11 +204,8 @@ console.log("\nbundle budgets");
 // initial route. The session-runtime ordering fence adds 56 bytes and
 // cross-platform zlib rounding reaches the same startup path; retain the
 // explicit budget rather than failing on a rounded 467.0 KiB display value.
-// The latest main-v2 session-runtime fence and exact prompt protocol measure
-// 468.2 KiB here; retain a 0.1 KiB ceiling for platform zlib rounding.
-// The running-tool elapsed label and turn_stalled notice copy (#9889) move
-// the merged path from 468.307 to 468.424 KiB gzip (the base already sat
-// 7 bytes over the rounded gate on Node 26 zlib); retain the next decimal.
+// The running tool-card elapsed label and turn_stalled notice (#9889) measure
+// 479621 B (468.380 KiB) over a 479496 B main-v2 base; retain rounding headroom.
 const initialJSBudgetKiB = 468.5;
 assertBudget("initial JavaScript gzip", initialJSGzip, initialJSBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk gzip", largestInitialJS, 280 * 1024);
@@ -289,9 +286,7 @@ for (const path of localeChunks) {
   // 61.027/61.881 KiB; retain bounded cross-platform headroom.
   // Recovery retry copy reaches the rounded 61.1 KiB boundary on Node/zlib
   // toolchains; keep the next one-decimal ceiling for cross-platform CI.
-  // The turn_stalled notice adds one string per dialect: 61.144 -> 61.205 KiB
-  // zh and 61.998 -> 62.058 KiB zh-TW; retain the next one-decimal ceiling.
-  const budget = name.startsWith("zh-TW-") ? 62.1 * 1024 : 61.3 * 1024;
+  const budget = name.startsWith("zh-TW-") ? 62.0 * 1024 : 61.2 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -396,8 +391,10 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2496.4 KiB locally; retain the smallest bounded ceiling.
 // The context truncation-rescue notice and its three locale strings measure
 // 2496.6 KiB; retain the smallest bounded ceiling.
-// The running-tool elapsed label, dispatch timestamp, and turn_stalled copy
-// measure 2497.027 KiB raw (base 2496.630); retain the next decimal ceiling.
-const rawInitialBudgetKiB = 2_497.1;
+// The authoritative session experience UI and legacy-engine adapter measure
+// 2497.7 KiB. Re-measure when the legacy engine is removed in the next slice.
+// The running tool-card elapsed label and turn_stalled notice (#9889) measure
+// 2558063 B (2498.108 KiB); retain the next bounded ceiling.
+const rawInitialBudgetKiB = 2_498.2;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
