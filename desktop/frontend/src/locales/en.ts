@@ -3468,6 +3468,7 @@ export const en = {
   "context.maintenanceAppliedSummary": "Built a short context view · history summarized",
   "context.maintenanceBlockedSummary": "Context summary could not form a safe short view · auto-retry stopped",
   "context.maintenanceFailedSummary": "Context summary failed · auto-retry stopped",
+  "context.maintenanceTruncatedSummary": "Trimmed the context view · oldest tool results and turns removed to fit the window",
   "context.maintenanceActionSnip": "Tool result snip",
   "context.maintenanceActionPrune": "Tool result prune",
   "context.maintenanceActionNative": "Native tool clearing",
