@@ -214,21 +214,21 @@ export class TranscriptKernel {
     return { kind: "block", blockKey: first.key, offsetPx: snapshot.scrollTop - first.top };
   }
 
-  observeNativeScroll(
-    snapshot: TranscriptViewportSnapshot,
-    nativeEvent = true,
-  ): boolean {
-    if (nativeEvent) {
-      const writerTop = this.writeTop;
+  observeNativeScroll(snapshot: TranscriptViewportSnapshot): boolean {
+    const writerTop = this.writeTop;
+    if (writerTop !== null && Math.abs(snapshot.scrollTop - writerTop) <= BOTTOM_THRESHOLD_PX) {
       this.writeTop = null;
-      if (writerTop !== null && Math.abs(snapshot.scrollTop - writerTop) <= BOTTOM_THRESHOLD_PX) return false;
+      return false;
     }
-    if (nativeEvent && !this.userGesture && this.active) return false;
+    // Scroll also fires for layout/clamping and delayed writer delivery. Only
+    // an input owner can turn that geometry observation into a new intent.
+    if (!this.userGesture) return false;
+    this.writeTop = null;
     const atBottom = snapshot.scrollHeight - snapshot.clientHeight - snapshot.scrollTop <= BOTTOM_THRESHOLD_PX;
     this.intentValue = atBottom ? "tail" : "reader";
     this.anchorValue = this.intentValue === "tail" ? { kind: "tail" } : this.capture(snapshot);
     this.anchors.set(this.session, this.anchorValue);
-    return nativeEvent;
+    return true;
   }
 
   beginUserGesture(snapshot: TranscriptViewportSnapshot, owner: "selection" | "native" = "native"): void {
@@ -259,8 +259,7 @@ export class TranscriptKernel {
     onEnd: (resumed: ScrollTransaction | null) => void,
   ): void {
     this.clearNativeGestureLease();
-    if (this.userGesture) this.observeNativeScroll(snapshot);
-    else this.beginUserGesture(snapshot, "native");
+    if (!this.userGesture) this.beginUserGesture(snapshot, "native");
     const generation = this.generationValue;
     const timer = this.clock.setTimeout(() => {
       if (generation !== this.generationValue || this.nativeGestureTimer !== timer) return;
@@ -416,7 +415,7 @@ export class TranscriptKernel {
     });
     this.emitEvent(transaction, owner, offset, result.offset, result.accepted ? "accepted" : result.reason ?? "rejected");
     if (result.accepted) {
-      this.writeTop = result.changed ? result.offset : null;
+      if (result.changed) this.writeTop = result.offset;
       this.finish(transaction.id, "committed", "committed");
     }
     return result.accepted;
@@ -455,7 +454,7 @@ export class TranscriptKernel {
     });
     this.emitEvent(active.transaction, owner, requested, result.offset, result.accepted ? "accepted" : result.reason ?? "rejected");
     if (result.accepted) {
-      this.writeTop = result.changed ? result.offset : null;
+      if (result.changed) this.writeTop = result.offset;
       this.finish(active.transaction.id, "committed", "committed");
     }
     return result.accepted;

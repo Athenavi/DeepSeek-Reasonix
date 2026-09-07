@@ -4,7 +4,7 @@
     "commented-code": 0,
     "complexity": 1961,
     "essay": 1966,
-    "file-size": 108992,
+    "file-size": 108685,
     "function-size": 8448,
     "layering": 1,
     "marker": 0,
@@ -134,9 +134,6 @@
     "desktop/frontend/src/components/ThemeLibrary.tsx": {
       "file-size": 158
     },
-    "desktop/frontend/src/components/Transcript.tsx": {
-      "file-size": 272
-    },
     "desktop/frontend/src/components/UsageStatsPanel.tsx": {
       "file-size": 276
     },
@@ -160,9 +157,6 @@
     },
     "desktop/frontend/src/lib/useController.ts": {
       "file-size": 4263
-    },
-    "desktop/frontend/src/lib/useTranscriptScrollArbiter.ts": {
-      "file-size": 35
     },
     "desktop/heartbeat.go": {
       "essay": 7

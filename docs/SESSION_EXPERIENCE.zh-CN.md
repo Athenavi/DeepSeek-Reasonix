@@ -23,3 +23,5 @@ session_experience = "standard"
 旧入口保留一个完整发布周期：`SetReasoningDisplayMode("expanded")` 映射为深度模式，其余推理值、`SetDisplayMode(*)` 和 `SetExpandThinking(*)` 映射为标准模式。旧过程折叠值 `expanded`、`auto` 分别映射为深度、标准模式。
 
 写入新配置时同步维护旧字段 `display=standard` 和 `reasoning=auto|expanded`，支持旧版本读取。旧版本写入配置可能丢弃其不认识的新字段，因此不保证新旧版本同时写入时无损保留新设置。兼容字段、入口、事件和本地存储镜像应在下一完整版本发布且不再要求降级兼容后再移除。
+
+手动展开状态以会话和稳定过程段标识为键，保存在有界内存缓存中，可跨渲染和窗口回收保留，但不会跨应用重启持久化。

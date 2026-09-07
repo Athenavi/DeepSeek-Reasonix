@@ -12,6 +12,7 @@ The desktop Settings page uses one **Session experience** preference to control 
 This preference applies to reasoning, tool calls, sub-task progress, work-process cards, approvals, validation, and the active turn. It changes presentation only. It does not change the selected model, reasoning strength, provider request, cost, context window, or saved transcript data.
 
 Manual expand/collapse is a message-level reading action and is retained for the message row. It does not create another global setting.
+Overrides are keyed by session and stable process-segment identity in a bounded in-memory cache. They survive React re-renders and transcript window recycling, but intentionally do not persist across application restarts.
 
 Warnings, approvals, delivery states, extension cards, and other items that require user action remain outside the completed work-process fold, so Standard mode never makes an action unreachable.
 
