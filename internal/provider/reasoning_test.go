@@ -26,7 +26,7 @@ func TestAdapterReasoningExactSelectionBeforeIO(t *testing.T) {
 					t.Error(err)
 				}
 				// A terminal response exercises egress without invoking any external model.
-				w.WriteHeader(400)
+				w.WriteHeader(http.StatusBadRequest)
 				_, _ = w.Write([]byte(`{"error":{"message":"contract fixture"}}`))
 			}))
 			defer server.Close()

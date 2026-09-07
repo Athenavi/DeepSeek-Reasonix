@@ -3,6 +3,7 @@ package config
 import (
 	_ "embed"
 	"encoding/json"
+	"maps"
 )
 
 // ProviderProtocolEndpoint is a documented SDK base URL, not a complete request URL.
@@ -29,8 +30,6 @@ var documentedProtocolEndpoints = func() map[string]map[string]ProviderProtocolE
 func ProtocolEndpointsForCatalog(c ProviderCatalog) map[string]ProviderProtocolEndpoint {
 	source := documentedProtocolEndpoints[c.BrandID+"|"+c.Region+"|"+c.Product]
 	result := make(map[string]ProviderProtocolEndpoint, len(source))
-	for kind, endpoint := range source {
-		result[kind] = endpoint
-	}
+	maps.Copy(result, source)
 	return result
 }
