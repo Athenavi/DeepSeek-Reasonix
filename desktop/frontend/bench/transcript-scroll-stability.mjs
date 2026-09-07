@@ -110,13 +110,57 @@ async function waitForStableTranscriptGeometry(
   }), { timeout, frames, requireTail, maxTailDistance });
 }
 
+async function chooseSessionExperience(page, name) {
+  await page.getByRole("button", { name: "Command palette", exact: true }).waitFor();
+  await page.keyboard.press("ControlOrMeta+,");
+  await page.getByRole("radio", { name, exact: true }).click();
+  await page.waitForFunction((mode) => localStorage.getItem("reasonix-session-experience") === mode, name.toLowerCase());
+  await page.getByRole("button", { name: "Back to workspace", exact: true }).click();
+  await page.locator(".settings-page").waitFor({ state: "hidden" });
+}
+
+async function expandGeometryProcesses(page) {
+  // Standard with explicit process disclosure keeps reasoning collapsed.
+  // Backend hydration intentionally supersedes the old localStorage preset.
+  const viewport = page.locator(".transcript");
+  await viewport.evaluate(element => { element.scrollTop = 0; });
+  for (let step = 0; step < 500; step++) {
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const opened = await viewport.evaluate(element => {
+      const buttons = [...element.querySelectorAll('.turn-collapse > button[aria-expanded="false"]')];
+      for (const button of buttons) button.click();
+      return buttons.length;
+    });
+    if (opened) continue;
+    const atEnd = await viewport.evaluate(element => {
+      if (element.scrollHeight - element.scrollTop - element.clientHeight <= 4) return true;
+      element.scrollTop += element.clientHeight / 2;
+      return false;
+    });
+    if (atEnd) {
+      // Finish preparation above the tail so the real return-to-bottom action
+      // explicitly reacquires tail ownership before the measured traversal.
+      await viewport.evaluate(element => { element.scrollTop -= element.clientHeight; });
+      await page.locator(".transcript__jump-bottom").waitFor();
+      return;
+    }
+  }
+  throw new Error("geometry disclosure preparation did not reach the final row");
+}
+
 async function openGeometryContractFixture(page) {
+  await chooseSessionExperience(page, "Standard");
   await page.click('.project-tree__topic-main:has-text("bench:geometry-229")');
   await page.waitForFunction(
     () => document.querySelector(".transcript")?.textContent?.includes("Geometry contract fixture complete."),
     undefined,
     { timeout: 30_000 },
   );
+  await waitForStableTranscriptGeometry(page, { timeout: 30_000, requireTail: true });
+  await expandGeometryProcesses(page);
+  await waitForStableTranscriptGeometry(page);
+  const jump = page.locator(".transcript__jump-bottom");
+  if (await jump.isVisible()) await jump.click();
   await waitForStableTranscriptGeometry(page, { timeout: 30_000, requireTail: true });
   return page.locator(".transcript");
 }
@@ -304,12 +348,10 @@ try {
     ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : {}),
   });
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  // Both 1.27.0 field reports keep completed working steps expanded. Apply the
-  // preference before the app mounts so every long-session, native-thumb, and
-  // measurement-churn assertion exercises the larger virtual row model.
-  await page.addInitScript(() => localStorage.setItem("reasonix-process-fold", "expanded"));
+  // Save Standard through the actual settings owner after startup hydration.
   await page.goto(url, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => !document.querySelector(".startup-splash"), undefined, { timeout: 30_000 });
+  await chooseSessionExperience(page, "Standard");
   await page.click('.project-tree__topic-main:has-text("bench:small-6t")');
   await page.waitForFunction(() => document.querySelectorAll(".transcript__row").length > 4, undefined, { timeout: 30_000 });
   await page.waitForFunction(() => document.querySelector(".transcript")?.textContent?.includes("Asynchronously hydrated verification appendix"), undefined, { timeout: 30_000 });
@@ -485,7 +527,7 @@ try {
   await waitForStableTranscriptGeometry(page, { timeout: 30_000, requireTail: true });
   assert(true, "rapid A→B→A switching leaves the reported long-turn session at its physical bottom");
   await openGeometryContractFixture(page);
-  await runGeometryContractTraversal(page, "DPR 1 first visit");
+  await runGeometryContractTraversal(page, "DPR 1 explicit process disclosure");
   await page.click('.project-tree__topic-main:has-text("bench:small-6t")');
   await page.waitForFunction(
     () => document.querySelector(".project-tree__topic--active .project-tree__topic-label")?.textContent?.includes("bench:small-6t"),
@@ -494,10 +536,12 @@ try {
   );
   await openGeometryContractFixture(page);
   await runGeometryContractTraversal(page, "DPR 1 A→B→A revisit");
+  await chooseSessionExperience(page, "Standard");
   await page.click('.project-tree__topic-main:has-text("bench:tools-38t")');
   await page.waitForFunction(() => document.querySelector(".project-tree__topic--active .project-tree__topic-label")?.textContent?.includes("bench:tools-38t"));
   await page.waitForFunction(() => document.querySelector(".transcript")?.textContent?.includes("pkg-41/mod.go"), undefined, { timeout: 30_000 });
   await page.waitForFunction(() => !document.querySelector(".transcript-navigation-overlay"), undefined, { timeout: 30_000 });
+  await waitForStableTranscriptGeometry(page, { timeout: 30_000, requireTail: true });
   const markdownVisibility = await page.evaluate(() => {
     const row = document.querySelector(".transcript__row");
     if (!(row instanceof HTMLElement)) return { inside: null, outside: null };
@@ -1708,9 +1752,9 @@ try {
   // tail writes in 11s). The tail writer must stay calm through churn and
   // still land on the physical bottom, with no OS setting involved.
   const reducedPage = await browser.newPage({ viewport: { width: 1280, height: 800 }, reducedMotion: "reduce" });
-  await reducedPage.addInitScript(() => localStorage.setItem("reasonix-process-fold", "expanded"));
   await reducedPage.goto(url, { waitUntil: "domcontentloaded" });
   await reducedPage.waitForFunction(() => !document.querySelector(".startup-splash"), undefined, { timeout: 30_000 });
+  await chooseSessionExperience(reducedPage, "Standard");
   assert(
     await reducedPage.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches),
     "reduced-motion emulation is active",
