@@ -127,3 +127,22 @@ func TestPrepareAllowsLiveBelowThresholdContext(t *testing.T) {
 		t.Fatal("live fast path changed")
 	}
 }
+
+func TestPreparePreservesLegacyNilContext(t *testing.T) {
+	for _, manual := range []bool{false, true} {
+		turns := 0
+		if manual {
+			turns = 6
+		}
+		a := agentOverForce(t, &fakeProvider{reply: "digest"}, foldableSessionOverForce(turns))
+		var err error
+		if manual {
+			err = a.CompactNow(nil, "")
+		} else {
+			err = a.PrepareContext(nil)
+		}
+		if err != nil {
+			t.Fatalf("manual=%v: %v", manual, err)
+		}
+	}
+}
