@@ -453,21 +453,14 @@ func (a *Agent) summarize(ctx context.Context, region []provider.Message, instru
 				}
 				s := strings.TrimSpace(b.String())
 				if s == "" {
-					// Thinking-mode providers (e.g. DeepSeek vision SKUs) may put the
-					// whole answer in reasoning_content with an empty content block
-					// (#9679 follow-up: same shape boundedllm learned to surface).
-					// Surface a pure reasoning-only summary so the turn is not misread
-					// as "empty output" and retried forever. A turn that also tried to
-					// call tools did not produce a briefing; keep rejecting that shape
-					// (the reasoning is private chain-of-thought, not digest material).
+					// Thinking providers may answer with reasoning_content only. Surface
+					// it as the briefing unless the turn also reached for tools: that
+					// reasoning is private chain-of-thought, not digest material.
 					r := strings.TrimSpace(reasoning.String())
 					if r == "" || toolCalls > 0 {
 						return "", usage, fmt.Errorf("summarizer returned empty output")
 					}
-					if len(r) > summaryReasoningMaxBytes {
-						r = r[:summaryReasoningMaxBytes]
-					}
-					return r, usage, nil
+					return truncateUTF8Bytes(r, summaryReasoningMaxBytes), usage, nil
 				}
 				return s, usage, nil
 			}
@@ -476,7 +469,7 @@ func (a *Agent) summarize(ctx context.Context, region []provider.Message, instru
 				b.WriteString(chunk.Text)
 			case provider.ChunkReasoning:
 				reasoning.WriteString(chunk.Text)
-			case provider.ChunkToolCall:
+			case provider.ChunkToolCall, provider.ChunkToolCallStart:
 				toolCalls++
 			case provider.ChunkUsage:
 				usage = chunk.Usage
