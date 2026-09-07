@@ -286,7 +286,9 @@ for (const path of localeChunks) {
   // 61.027/61.881 KiB; retain bounded cross-platform headroom.
   // Recovery retry copy reaches the rounded 61.1 KiB boundary on Node/zlib
   // toolchains; keep the next one-decimal ceiling for cross-platform CI.
-  const budget = name.startsWith("zh-TW-") ? 62.0 * 1024 : 61.2 * 1024;
+  // The #9889/#9890 series adds recovery-wait, dialog-failure, and stall copy:
+  // zh-TW measures 63492 B (62.004 KiB) with the four PRs merged together.
+  const budget = name.startsWith("zh-TW-") ? 62.1 * 1024 : 61.2 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -394,7 +396,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // Source-bound owners plus input-release identity measure 2408.2 KiB.
 // Deferred presentation extraction in the next slice is budgeted separately.
 // First-materialization presentation preloading adds 0.3 KiB raw; the
-// measured payload is 2408.5 KiB. Keep 0.2 KiB for build-identity drift.
-const rawInitialBudgetKiB = 2_408.7;
+// measured payload is 2408.5 KiB. Mainline session-level Stop raises this
+// to 2408.7 KiB; retain 0.2 KiB for build-identity drift.
+const rawInitialBudgetKiB = 2_408.9;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

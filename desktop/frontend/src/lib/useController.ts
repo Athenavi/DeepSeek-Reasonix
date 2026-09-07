@@ -13,7 +13,7 @@ import { formatInboxCancelError } from "./inboxError";
 import { settleForkConversationForTab } from "./forkWorktree";
 import type { MessageActionScope, MessageActionState } from "./messageActions";
 import { mergeRateBand, type AggregatedRateBand } from "./costRateBand";
-import { requestInboxCancel, type CancelOutcome } from "./inboxCancel";
+import { requestSessionCancel, type CancelOutcome } from "./inboxCancel";
 import { answerPromptForActiveTurn, normalizeTurnSubmit, resolveActiveTurnId, resolvePromptForTab } from "./inboxSubmit";
 import { findTabAfterSubmitFailure, reduceManagementConfirmation, reduceSubmitFailure } from "./turnSubmissionFailure";
 import { formatContextMaintenanceNotice, isNewMaintenanceOperation, rememberMaintenanceOperation } from "./contextMaintenanceTypes";
@@ -3922,14 +3922,14 @@ export function useController() {
       if (!turnId && exactAPIAvailable) {
         turnId = await resolveActiveTurnId(app, tabId);
       }
-      if (exactAPIAvailable && !turnId) throw new Error("active turn id is unavailable; refresh and try Stop again");
-      const result = await requestInboxCancel(app, tabId, inboxItemIDs, turnId);
-      scheduleCancelReconcile(tabId, 0);
+      const result = await requestSessionCancel(app, tabId, inboxItemIDs, turnId);
       if (result.warning) dispatchTo(tabId, { type: "local_notice", level: "warn", text: result.warning });
       return result;
     } catch (error) {
       dispatchTo(tabId, { type: "local_notice", level: "warn", text: formatInboxCancelError(error, getLocale()) });
       return { discardedItemIds: [] };
+    } finally {
+      scheduleCancelReconcile(tabId, 0);
     }
   }, [bumpCancelHydrateSeq, dispatchTo, scheduleCancelReconcile]);
 
