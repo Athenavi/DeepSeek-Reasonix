@@ -121,7 +121,8 @@ console.log("\nTranscriptKernel deterministic race matrix");
 
 {
   const { kernel, writes } = setup("prepend-selection");
-  kernel.observeNativeScroll(readerSnapshot());
+  kernel.beginUserGesture(readerSnapshot());
+  kernel.endUserGesture();
   const prepend = kernel.begin("prepend", kernel.anchor);
   kernel.beginUserGesture(readerSnapshot(), "selection");
   kernel.advanceGeometry();
@@ -146,7 +147,8 @@ console.log("\nTranscriptKernel deterministic race matrix");
 
 {
   const { kernel, writes } = setup("prepend-display");
-  kernel.observeNativeScroll(readerSnapshot("turn:stable"));
+  kernel.beginUserGesture(readerSnapshot("turn:stable"));
+  kernel.endUserGesture();
   const prepend = kernel.begin("prepend", kernel.anchor);
   const display = kernel.begin("display-change", kernel.anchor);
   kernel.advanceGeometry();
@@ -184,7 +186,8 @@ console.log("\nTranscriptKernel deterministic race matrix");
 
 {
   const { kernel, writes } = setup("lazy-measure");
-  kernel.observeNativeScroll(readerSnapshot("turn:markdown"));
+  kernel.beginUserGesture(readerSnapshot("turn:markdown"));
+  kernel.endUserGesture();
   const restore = kernel.begin("restore", kernel.anchor);
   kernel.advanceGeometry();
   ok(!kernel.correctAnchor(restore!, () => undefined), "lazy Markdown/image/table measurement defers when the anchor is unmeasured");
@@ -201,7 +204,8 @@ console.log("\nTranscriptKernel deterministic race matrix");
 
 {
   const { kernel } = setup("gesture-anchor-ownership");
-  kernel.observeNativeScroll(readerSnapshot("turn:reader", 500));
+  kernel.beginUserGesture(readerSnapshot("turn:reader", 500));
+  kernel.endUserGesture();
   kernel.beginUserGesture(readerSnapshot("turn:reader", 500));
   kernel.endUserGesture();
   ok(kernel.anchor.kind === "block" && kernel.anchor.blockKey === "turn:reader", "measurement-only gesture completion preserves the pre-measurement logical anchor");
