@@ -3354,11 +3354,6 @@ export const zh: Record<DictKey, string> = {
   "subagent.preview.text": "回答预览",
   "subagent.preview.notice": "提示",
   "subagent.preview.truncated": "预览已截断",
-  "subagent.outcome.label": "子代理",
-  "subagent.outcome.completed": "已完成",
-  "subagent.outcome.partial": "部分完成",
-  "subagent.outcome.failed": "失败",
-  "subagent.outcome.cancelled": "已取消",
   "subagent.outcome.retryable": "可重试",
 
   // 软件更新
