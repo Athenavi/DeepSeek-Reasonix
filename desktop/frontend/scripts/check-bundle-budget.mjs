@@ -231,8 +231,8 @@ if (initialCSS.length > 0) {
 // shared title-safe shell, and the shared harness decision surface measure
 // 116.9 KiB gzip while reusing existing layout primitives. Retain a bounded
 // 0.1 KiB headroom ratchet.
-// Integrated settings layout measures 119.231 KiB gzip; bounded ceiling.
-assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 119.3 * 1024);
+// Settings plus main-v2 recovery-wait styles measure 119.435 KiB gzip.
+assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 119.5 * 1024);
 if (localeChunks.length !== 2) {
   throw new Error(`expected 2 on-demand Chinese locale chunks, found ${localeChunks.length}`);
 }
@@ -399,9 +399,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // on the settings + pure-kernel baseline. Keep the smallest bounded ceiling.
 // Provider-settings integration (connection identity, first-run routing and
 // adapter-owned reasoning) measures 2384.8 KiB after unused locale removal.
-// Permit only this measured 13 KiB (0.55%) delta; retain every gzip, locale,
-// stylesheet and largest-chunk gate above/below unchanged.
-// Prepend batch settlement adds 0.3 KiB raw; no other budget changes.
-const rawInitialBudgetKiB = 2_385.2;
+// Main-v2 recovery-wait and rejection containment bring the combined build
+// to 2387.797 KiB raw; retain the smallest one-decimal ceiling.
+const rawInitialBudgetKiB = 2_387.8;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

@@ -31,6 +31,7 @@ import {
   TerminalSquare,
 } from "lucide-react";
 import { useToast } from "./lib/toast";
+import { onRecoverableError } from "./lib/globalCrashHandlers";
 import { useGoalActionHandler } from "./lib/goalAction";
 import { useWailsResizeFix } from "./lib/useWailsResizeFix";
 import { asArray } from "./lib/array";
@@ -1807,6 +1808,7 @@ export default function App() {
     }
     drainExtensionNotifications();
   }, [state.extensionNotifications, showToast, drainExtensionNotifications]);
+  useEffect(() => onRecoverableError(({ message }) => showToast(message, "warn", { durationMs: 6000 })), [showToast]);
   const extensionStatusList = useMemo(() => Object.values(state.extensionStatuses ?? {}), [state.extensionStatuses]);
   const patchActiveComposerProfile = useCallback(
     (patch: Partial<Omit<ComposerProfile, "pending">>, pendingFields: ComposerProfileField[]) => {

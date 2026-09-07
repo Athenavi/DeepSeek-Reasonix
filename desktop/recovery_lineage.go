@@ -437,12 +437,17 @@ func (a *App) ChooseRecoveryBranch(req RecoveryPreferenceRequest) error {
 	if chosen == "" {
 		return errors.New("selected branch is outside the recovery lineage")
 	}
-	defer a.lockRuntimeMutation("choose-recovery-branch")()
-	a.sessionRemovalMu.Lock()
-	defer a.sessionRemovalMu.Unlock()
-	if err := agent.SetRecoveryPreferred(paths, chosen); err != nil {
+	if err := func() error {
+		defer a.lockRuntimeMutation("choose-recovery-branch")()
+		a.sessionRemovalMu.Lock()
+		defer a.sessionRemovalMu.Unlock()
+		return agent.SetRecoveryPreferred(paths, chosen)
+	}(); err != nil {
 		return errors.New("could not save the recovery branch choice")
 	}
+	// The rescan reads session files and rewrites only the catalog projection,
+	// so it needs neither barrier; only the preference write above must stay
+	// atomic with respect to session removal.
 	if err := catalog.ReconcileDirectory(a.bootContext(), sessioncatalog.DirectoryTarget{Path: dir, Scope: req.Scope, WorkspaceRoot: req.WorkspaceRoot}); err != nil {
 		return errors.New("the branch choice was saved but the session catalog could not refresh")
 	}

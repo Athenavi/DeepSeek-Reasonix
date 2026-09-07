@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { GitBranch, Pencil, X } from "lucide-react";
 import { app } from "../lib/bridge";
+import { recordFrontendDiagnostic } from "../lib/frontendDiagnosticBridge";
 import type { ProjectTopicKey } from "../lib/sessionCatalogTypes";
 import type { RecoveryLineageMember, RecoveryLineageView } from "../lib/types";
 import { useT } from "../lib/i18n";
@@ -18,6 +19,10 @@ interface RecoveryLineageDialogProps {
 
 function versionActivityAt(member: RecoveryLineageMember): number {
   return member.lastActivityAt || member.createdAt || 0;
+}
+
+function failureText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOpenVersion }: RecoveryLineageDialogProps) {
@@ -44,6 +49,9 @@ export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOp
     try {
       await app.ChooseRecoveryBranch({ ...topic, path });
       await refresh();
+    } catch (error) {
+      recordFrontendDiagnostic("app", "session.recovery-choose-failed", { status: "error" });
+      showToast(t("recovery.chooseBranchFailed", { error: failureText(error) }), "error");
     } finally {
       setBusy(false);
     }
@@ -55,6 +63,9 @@ export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOp
     try {
       await onOpenVersion(member);
       onClose();
+    } catch (error) {
+      recordFrontendDiagnostic("app", "session.recovery-open-failed", { status: "error" });
+      showToast(t("recovery.openVersionFailed", { error: failureText(error) }), "error");
     } finally {
       setBusy(false);
     }
@@ -74,7 +85,7 @@ export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOp
       setEditingPath("");
       await refresh();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : String(error), "error");
+      showToast(failureText(error), "error");
     } finally {
       setBusy(false);
     }

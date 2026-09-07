@@ -156,6 +156,9 @@ func (s *turnEventSink) persistAndPublish(e event.Event) error {
 		s.publishInner(e)
 		return nil
 	}
+	if staleTurnStatus(e, ledger) {
+		return nil
+	}
 	// Outside-turn notices are not lifecycle records and must pass through after
 	// bootstrap or a terminal event.
 	if ledger.ActiveTurnID() == "" {
@@ -403,11 +406,19 @@ func (c *Controller) failTurnEventLedger(err error) {
 	}
 }
 
-func (c *Controller) emitTurnStatus(status event.TurnStatus) {
+// staleTurnStatus reports a status stamped for a turn that has since reached
+// its terminal event; cancelling is sticky, so it must not reach the next turn.
+func staleTurnStatus(e event.Event, ledger *turnevent.Ledger) bool {
+	return e.Kind == event.TurnStatusChanged && e.TurnID != "" && e.TurnID != ledger.ActiveTurnID()
+}
+
+// emitTurnStatus stamps the transition with the turn that requested it so the
+// ledger can drop it if that turn already reached its terminal event.
+func (c *Controller) emitTurnStatus(status event.TurnStatus, turnID string) {
 	if c == nil || status == "" {
 		return
 	}
-	c.sink.Emit(event.Event{Kind: event.TurnStatusChanged, Status: status})
+	c.sink.Emit(event.Event{Kind: event.TurnStatusChanged, Status: status, TurnID: turnID})
 }
 
 // emitTurnEventChecked reaches the lifecycle sink below the inbox observer so

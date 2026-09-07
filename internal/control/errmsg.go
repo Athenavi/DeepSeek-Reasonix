@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"reasonix/internal/i18n"
 	"reasonix/internal/provider"
@@ -25,6 +26,11 @@ func explainError(err error) error {
 	// is never reported as a model-stream disconnect.
 	if errors.Is(err, turnevent.ErrTurnLedgerUnavailable) {
 		return err
+	}
+	// The exhausted wait wraps its transport cause; explain the wait itself
+	// before the connect/status branches below explain that cause instead.
+	if wait := provider.AsRecoveryWaitExhausted(err); wait != nil {
+		return &explainedError{msg: explainRecoveryWait(wait), cause: err}
 	}
 	if provider.IsStreamInterrupted(err) {
 		return fmt.Errorf("model stream interrupted after recovery attempts: %s. The partial response was kept; retry or ask Reasonix to continue", err.Error())
@@ -101,6 +107,31 @@ func explainError(err error) error {
 		return errors.New(msg)
 	}
 	return err
+}
+
+// explainedError shows the localized message while keeping the typed cause
+// reachable, so DiagnoseFailure on the TurnDone error still classifies it.
+type explainedError struct {
+	msg   string
+	cause error
+}
+
+func (e *explainedError) Error() string { return e.msg }
+func (e *explainedError) Unwrap() error { return e.cause }
+
+func explainRecoveryWait(wait *provider.RecoveryWaitExhaustedError) string {
+	lines := []string{fmt.Sprintf(i18n.M.ProviderErrWaitExhaustedFmt, wait.Waited.Round(time.Second))}
+	var apiErr *provider.APIError
+	switch {
+	case errors.As(wait.Cause, &apiErr):
+		lines = append(lines, fmt.Sprintf("HTTP %d", apiErr.Status))
+		if reason := apiErrorReason(apiErr); reason != "" {
+			lines = append(lines, reason)
+		}
+	case wait.Cause != nil:
+		lines = append(lines, wait.Cause.Error())
+	}
+	return strings.Join(lines, "\n")
 }
 
 func modelFormatMismatchReason(reason string) bool {
