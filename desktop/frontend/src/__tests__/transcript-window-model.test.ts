@@ -1,5 +1,6 @@
+import { TranscriptMeasurementLedger } from "../lib/transcriptMeasurementLedger";
 import { commitTranscriptWindowRange } from "../lib/transcriptWindowRange";
-import { commitTranscriptWindowGeometry } from "../lib/transcriptWindowGeometry";
+import { commitTranscriptWindowGeometry, findTranscriptMeasurementPublicationBoundary } from "../lib/transcriptWindowGeometry";
 import assert from "node:assert/strict";
 function ok(condition: unknown, label: string) { assert.ok(condition, label); console.log(`PASS ${label}`); }
 const backing = Array.from({ length: 100 }, (_, index) => ({ key: `block:${index}`, index, start: index * 100, end: (index + 1) * 100, size: 100 }));
@@ -182,3 +183,57 @@ for (const candidate of [revised.slice(23, 61), revised.slice(70, 90), baseline.
   }
 }
 console.log("PASS measurement publication paints the complete prefix before native range advancement");
+
+// Recorded GTK ordering: input reaches 61,577px while native top is 50,313px.
+// Future DOM heights are available before native travel catches up.
+const stagedLedger = new TranscriptMeasurementLedger();
+const makePrefix = () => {
+  let top = 0;
+  return Array.from({ length: 650 }, (_, index) => {
+    const key = `gtk:${index}`, size = stagedLedger.sizeFor(key, 171);
+    const item = { key, index, start: top, end: top + size, size };
+    top += size;
+    return item;
+  });
+};
+const gtkInitial = makePrefix();
+const gtkMounted = gtkInitial.slice(282, 320);
+const gtkDOM = gtkMounted.map(item => ({ index: item.index, top: item.start - 50_313 }));
+const gtkBoundary = findTranscriptMeasurementPublicationBoundary({
+  paintedItems: gtkMounted, domItems: gtkDOM, scrollTop: 50_313, clientHeight: 596,
+});
+assert.equal(gtkBoundary, 302, "actual viewport retains a publishable future suffix despite delayed native travel");
+assert.equal(findTranscriptMeasurementPublicationBoundary({
+  paintedItems: gtkMounted, domItems: gtkDOM, scrollTop: 60_000, clientHeight: 596,
+}), undefined, "native progress after render rejects a stale mounted suffix");
+assert.equal(findTranscriptMeasurementPublicationBoundary({
+  paintedItems: gtkMounted, domItems: gtkDOM.map(item => ({ ...item, top: item.top - 600 })),
+  scrollTop: 50_313, clientHeight: 596,
+}), 305, "DOM movement advances the safe boundary beyond an older painted candidate");
+assert.equal(findTranscriptMeasurementPublicationBoundary({
+  paintedItems: gtkMounted, domItems: gtkDOM, scrollTop: 50_313, clientHeight: Number.NaN,
+}), undefined, "invalid viewport geometry cannot authorize a batch");
+stagedLedger.stage(gtkMounted.map(item => ({ key: item.key, size: 190 })));
+const gtkPublished = stagedLedger.publishStaged(key => Number(key.slice(4)) >= gtkBoundary!);
+assert.equal(gtkPublished.length, 18, "future measured rows publish while native ownership remains active");
+const gtkMeasured = makePrefix();
+for (const index of [294, 295, 296, 297]) {
+  assert.equal(gtkMeasured[index].start, gtkInitial[index].start, "publication cannot move any common visible block");
+}
+const gtkBase = { ...geometryInput, candidate: gtkMounted, measurements: gtkInitial,
+  totalSize: gtkInitial[gtkInitial.length - 1].end, structureRevision: "gtk-native-backlog", scrollTop: 50_313, clientHeight: 596 };
+const gtkBefore = commitTranscriptWindowGeometry(gtkBase);
+const gtkCommitted = commitTranscriptWindowGeometry({ ...gtkBase, previous: gtkBefore,
+  candidate: gtkMounted, measurements: gtkMeasured, totalSize: gtkMeasured[gtkMeasured.length - 1].end, measurementCommit: true });
+assert.equal(gtkCommitted.range.items.find(item => item.index === 303)?.size, 190,
+  "an old covering candidate paints the measured suffix before native catch-up");
+const catchupTop = gtkMeasured[302].start + 20;
+const commonBeforeRelease = [302, 303, 304, 305].map(index => gtkMeasured[index].start - catchupTop);
+// The sole anchor writer may reconcile measurements above the viewport after
+// release, but all visible rows must retain their individual screen positions.
+stagedLedger.publishStaged();
+const gtkReleased = makePrefix();
+const correctedTop = catchupTop + gtkReleased[302].start - gtkMeasured[302].start;
+assert.deepEqual([302, 303, 304, 305].map(index => gtkReleased[index].start - correctedTop), commonBeforeRelease,
+  "release after catch-up preserves all visible rows without the GTK 19/38px squeeze");
+console.log("PASS viewport-owned publication survives native backlog, stale render and multi-row release");

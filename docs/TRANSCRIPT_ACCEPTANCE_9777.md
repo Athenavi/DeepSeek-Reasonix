@@ -26,3 +26,10 @@ Renderer acceptance does not certify whole-App heap retention or the entire
 original integration PR. Live child PR checks are authoritative for delivery
 status; this document records the contract rather than a permanent green
 CI claim.
+
+Native finish is geometry-driven: after the sustained input phase, hosts send
+batches of eight native events until two observations confirm the physical tail.
+There is no fixed finishing-event count that assumes estimated height stayed
+constant. The original GTK 45-second total watchdog, WKWebView 225-second
+interaction watchdog, WebView2 60-second interaction budget, 4px displacement
+and tail limits, zero blank frames, and bounded mounts remain unchanged.

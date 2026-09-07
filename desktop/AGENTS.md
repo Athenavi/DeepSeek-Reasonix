@@ -83,15 +83,16 @@ contracts when touching anything that can move the transcript viewport.
   blocks to move with actual content growth; freezing every old top would
   overlap expanded content. Observe mounted absolute blocks as well as the
   projection root, since local folds do not change the root extent. Tail intent
-  does not refine invisible cold history; its exact geometry belongs to resident DOM. During
-  bounded wheel input, the lazy measurement ledger owns a publish boundary at
-  least the unconsumed pixel-mode native steps plus one viewport ahead
-  of the painted viewport in both prefix and DOM geometry. Retire travel only
-  after physical viewport progress is observed; counting already-consumed
-  travel indefinitely freezes future measurements and builds a release-time
-  geometry debt. Keep the one-viewport reserve throughout the gesture lease. Touch, selection, keyboard jumps, nested handoff
-  without a bounded delta, and native thumb drag are unbounded: every cold
-  measurement remains staged until ownership ends.
+  does not refine invisible cold history; its exact geometry belongs to resident DOM. The measurement ledger owns sizes only.
+  Input leases belong to the Kernel and must not be duplicated in the window
+  adapter. Re-read physical viewport geometry at measurement admission; both
+  painted prefix and measured DOM must place the publication boundary beyond
+  the viewport plus one viewport of runway. This reserve is not a bound on
+  compositor travel. Never integrate wheel intent into a pending-distance
+  barrier: a transient native backlog can exceed the mounted window and freeze
+  every future measurement until release. Apply the same geometry boundary to
+  wheel, touch, selection, keyboard and native-thumb ownership; the Kernel
+  still rejects programmatic reader writes throughout those leases.
   Publish one immutable Reasonix snapshot, then transfer that exact published
   batch into TanStack's keyed size cache in the same browser task. Close the
   batch with a layout-effect state update and acknowledge that publication in
