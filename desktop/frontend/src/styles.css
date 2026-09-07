@@ -31776,8 +31776,7 @@ body > .mermaid-diagram--fullscreen {
   display: none;
 }
 
-.app--creation .settings-field,
-:root[data-theme-style] .app--creation .settings-field {
+:where(.app--creation) .settings-field {
   grid-template-columns: minmax(150px, 200px) minmax(260px, 1fr);
   gap: 18px;
   padding: 10px 0;
@@ -31785,15 +31784,13 @@ body > .mermaid-diagram--fullscreen {
 }
 
 /* 机器人详情卡片内 settings-field 不受 Creation 全局覆盖 — 保持紧凑布局（仅复位溢出相关的 grid 属性） */
-.app--creation .bot-detail-card .settings-field,
-:root[data-theme-style] .app--creation .bot-detail-card .settings-field {
+:where(.app--creation) .bot-detail-card .settings-field {
   grid-template-columns: minmax(112px, 138px) minmax(0, 1fr);
   gap: 12px;
 }
 
 @media (max-width: 980px) {
-  .app--creation .bot-detail-card .settings-field,
-  :root[data-theme-style] .app--creation .bot-detail-card .settings-field {
+  :where(.app--creation) .bot-detail-card .settings-field {
     grid-template-columns: 1fr;
     gap: 8px;
   }
@@ -32016,8 +32013,7 @@ body > .mermaid-diagram--fullscreen {
     padding: 24px 22px;
   }
 
-  .app--creation .settings-field,
-  :root[data-theme-style] .app--creation .settings-field {
+  :where(.app--creation) .settings-field {
     grid-template-columns: 1fr;
     gap: 8px;
   }
