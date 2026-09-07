@@ -93,8 +93,7 @@ type sessionDAGEntry struct {
 	Digest string          `json:"digest,omitempty"`
 	Msgs   json.RawMessage `json:"msgs,omitempty"`
 
-	Target string          `json:"target,omitempty"`
-	Fields json.RawMessage `json:"fields,omitempty"`
+	Target string `json:"target,omitempty"`
 
 	NewHead string `json:"new_head,omitempty"`
 	From    string `json:"from,omitempty"`

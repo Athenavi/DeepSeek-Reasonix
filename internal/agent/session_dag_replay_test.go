@@ -161,8 +161,12 @@ func TestDAGPatchSystemAndRedactOverlays(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	patched, err := encodeSessionDAGMessage(provider.Message{Role: provider.RoleUser, Content: "q1", Edited: true, WorkDurationMs: 7})
+	if err != nil {
+		t.Fatal(err)
+	}
 	dagAppend(t, path,
-		sessionDAGEntry{Type: sessionDAGTypePatch, Head: SessionMainHead, Target: "U1", Fields: []byte(`{"edited":true,"workDurationMs":7}`), At: base.Add(20 * time.Second)},
+		sessionDAGEntry{Type: sessionDAGTypePatch, Head: SessionMainHead, Target: "U1", Msgs: patched, At: base.Add(20 * time.Second)},
 		sessionDAGEntry{Type: sessionDAGTypeSystem, Head: SessionMainHead, Msgs: sys, At: base.Add(21 * time.Second)},
 		sessionDAGEntry{Type: sessionDAGTypeRedact, Head: SessionMainHead, Targets: map[string]json.RawMessage{"A1": replacement}, Reason: "secret", At: base.Add(22 * time.Second)},
 	)

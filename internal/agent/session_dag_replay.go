@@ -68,7 +68,7 @@ type sessionDAGState struct {
 	nodes           map[string]*sessionDAGNode
 	heads           map[string]*sessionDAGHead
 	headOrder       []string
-	patches         map[string][]json.RawMessage
+	patches         map[string]provider.Message
 	redactions      map[string]provider.Message
 	writers         map[string]*sessionDAGWriter
 	selected        string
@@ -85,7 +85,7 @@ func newSessionDAGState(path string) *sessionDAGState {
 		path:       path,
 		nodes:      map[string]*sessionDAGNode{},
 		heads:      map[string]*sessionDAGHead{},
-		patches:    map[string][]json.RawMessage{},
+		patches:    map[string]provider.Message{},
 		redactions: map[string]provider.Message{},
 		writers:    map[string]*sessionDAGWriter{},
 	}
@@ -234,13 +234,20 @@ func (st *sessionDAGState) applyMessage(ctx context.Context, e sessionDAGEntry, 
 }
 
 // applyOverlay handles the entries that change how messages read without
-// moving any head: patches, system overrides, redactions, writer identity.
+// moving any head: patch replacements, system overrides, redactions, writer
+// identity.
 func (st *sessionDAGState) applyOverlay(ctx context.Context, e sessionDAGEntry, limits sessionReplayLimits) (bool, error) {
 	switch e.Type {
 	case sessionDAGTypePatch:
-		if _, known := st.nodes[e.Target]; known && len(e.Fields) > 0 {
-			st.patches[e.Target] = append(st.patches[e.Target], e.Fields)
+		if _, known := st.nodes[e.Target]; !known {
+			return true, nil
 		}
+		m, ok, err := st.decodeOne(ctx, e.Msgs, limits)
+		if err != nil || !ok {
+			return ok, err
+		}
+		m.ID = e.Target
+		st.patches[e.Target] = m
 	case sessionDAGTypeSystem:
 		m, ok, err := st.decodeOne(ctx, e.Msgs, limits)
 		if err != nil || !ok {
@@ -388,13 +395,13 @@ func (st *sessionDAGState) chainIDs(headID string) []string {
 	return ids
 }
 
-// appliedMessage is one node with its patches merged and any redaction
-// substituted; a patch only ever carries local fields, so the merge cannot
-// touch provider-visible bytes.
+// appliedMessage is one node with its latest patch and any redaction
+// substituted; a patch is provider-equivalent to the original by contract, so
+// the swap never touches provider-visible bytes.
 func (st *sessionDAGState) appliedMessage(n *sessionDAGNode) provider.Message {
 	m := n.msg
-	for _, raw := range st.patches[n.id] {
-		_ = json.Unmarshal(raw, &m)
+	if p, ok := st.patches[n.id]; ok {
+		m = p
 	}
 	if r, ok := st.redactions[n.id]; ok {
 		m = r

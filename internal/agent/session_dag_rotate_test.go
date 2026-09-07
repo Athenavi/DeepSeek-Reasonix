@@ -156,12 +156,16 @@ func TestDAGRotationDropsUnreachableAndAppliesRedactions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	patchedU2, err := encodeSessionDAGMessage(provider.Message{Role: provider.RoleUser, Content: "q2", Edited: true})
+	if err != nil {
+		t.Fatal(err)
+	}
 	dagAppend(t, path,
 		sessionDAGEntry{Type: sessionDAGTypeFork, Head: SessionMainHead, NewHead: "F", From: "U1", Kind: HeadKindFork, Name: "side", At: base.Add(time.Minute)},
 		dagMessageEntry(t, "F", "U1", "", dagMsg(provider.RoleAssistant, "side-answer-secret", "F1"), base.Add(2*time.Minute)),
 		sessionDAGEntry{Type: sessionDAGTypeRetire, Head: "F", At: base.Add(3 * time.Minute)},
 		sessionDAGEntry{Type: sessionDAGTypeRedact, Head: SessionMainHead, Targets: map[string]json.RawMessage{"A1": replacement}, At: base.Add(4 * time.Minute)},
-		sessionDAGEntry{Type: sessionDAGTypePatch, Head: SessionMainHead, Target: "U2", Fields: []byte(`{"edited":true}`), At: base.Add(5 * time.Minute)},
+		sessionDAGEntry{Type: sessionDAGTypePatch, Head: SessionMainHead, Target: "U2", Msgs: patchedU2, At: base.Add(5 * time.Minute)},
 		sessionDAGEntry{Type: sessionDAGTypeRename, Head: SessionMainHead, Name: "primary", At: base.Add(6 * time.Minute)},
 		sessionDAGEntry{Type: sessionDAGTypeCompaction, Head: SessionMainHead, CoveredLeaf: "A1", CoveredCount: 3, PrefixHash: "h", At: base.Add(7 * time.Minute)},
 		sessionDAGEntry{Type: sessionDAGTypeSelect, Head: SessionMainHead, At: base.Add(8 * time.Minute)},
