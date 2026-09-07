@@ -26,7 +26,11 @@ contracts when touching anything that can move the transcript viewport.
   `frontend/scripts/check-single-scroll-writer.mjs` must reject any bypass.
 - **Scroll provenance**: a physical writer offset remains pending until its
   matching native `scroll` event is consumed or a different offset proves
-  user movement. Starting a gesture must not relabel a delayed writer event as
+  input-owned user movement. No-op writes and input-lease renewal must not
+  consume pending writer provenance. Layout scrolls without an input owner
+  preserve logical intent, as do all structural geometry transactions. Touch
+  momentum and native thumb release retain the existing quiet-period lease
+  until their final native progress. Starting a gesture must not relabel a delayed writer event as
   native input, and top-edge pagination reacts only to native-owned upward
   movement, never a writer event or a reader moving away from the boundary.
 - **Explicit terminal state**: every transaction ends committed, cancelled, or

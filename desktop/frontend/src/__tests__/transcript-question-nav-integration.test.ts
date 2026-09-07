@@ -53,6 +53,8 @@ try {
 
   setAnchorPositions(5);
   await act(async () => {
+    transcript.dispatchEvent(new harness.dom.window.WheelEvent("wheel", { deltaY: -40, bubbles: true }));
+    transcript.scrollTop = Math.max(0, transcript.scrollTop - 40);
     transcript.dispatchEvent(new Event("scroll"));
     await new Promise((resolve) => setTimeout(resolve, 30));
   });

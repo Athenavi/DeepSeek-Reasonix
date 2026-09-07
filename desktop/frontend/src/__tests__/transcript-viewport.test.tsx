@@ -245,6 +245,7 @@ try {
   ok(Boolean(tailAction), "the jump-to-bottom action keeps a stable DOM host while hidden at the tail");
   const transcript = harness.scrollElement();
   await act(async () => {
+    transcript.dispatchEvent(new harness.dom.window.WheelEvent("wheel", { deltaY: -1000, bubbles: true }));
     transcript.scrollTop = 0;
     transcript.dispatchEvent(new Event("scroll"));
   });
