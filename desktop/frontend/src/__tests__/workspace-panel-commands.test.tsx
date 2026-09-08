@@ -61,6 +61,23 @@ try {
   assert.equal(restoredWidth, 640, "dock width restore clamps through the owner and writes the layout store port");
   await act(async () => useRemoteStore.getState().setHosts([]));
   assert.equal(useLayoutStore.getState().rightDockMode, "files");
+  await paint("A");
+  await act(async () => commands.openRightDockMode("changed"));
+  saveWorkspacePanelOpen(true, "B");
+  await act(async () => {
+    commands.toggleWorkspaceMaximized();
+    commands.prepareBlankWorkspace("B");
+  });
+  assert.equal(useLayoutStore.getState().workspacePanelOpen, false, "new-session intent collapses the dock immediately");
+  assert.equal(useLayoutStore.getState().workspacePanelMaximized, false);
+  assert.equal(loadWorkspacePanelOpen("A"), true, "another project's preference is untouched");
+  await paint("B");
+  assert.equal(useLayoutStore.getState().workspacePanelOpen, false, "destination restoration cannot reopen the blank-session dock");
+  await act(async () => commands.openRightDockMode("files"));
+  await paint("B");
+  assert.equal(useLayoutStore.getState().workspacePanelOpen, true, "manual open stays open on subsequent renders");
+  await paint("A");
+  assert.equal(useLayoutStore.getState().workspacePanelOpen, true, "ordinary project navigation retains restoration behavior");
   await act(async () => root.unmount());
   const before = { closes, widthClears, layout: useLayoutStore.getState() };
   first.openRightDockMode("changed"); first.toggleWorkspaceMaximized(); first.closeWorkspacePanel();

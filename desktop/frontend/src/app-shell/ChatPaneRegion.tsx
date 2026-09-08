@@ -27,6 +27,7 @@ export type ChatPaneTranscriptInput = {
   hydratePlaceholderActive: boolean;
   clearContextPending: boolean;
   creation: boolean;
+  emptyHero?: boolean;
   rewind: {
     stateActive: boolean;
     committing: boolean;
@@ -120,7 +121,7 @@ export function ChatPaneRegion(props: ChatPaneRegionProps) {
                 turnStartAt={state.turnStartAt}
                 contentRevision={state.historyLayoutRevision}
                 historyMutation={state.historyMutation}
-                welcomeVariant={transcript.creation ? "creation" : "default"}
+                welcomeVariant={transcript.creation || transcript.emptyHero ? "creation" : "default"}
                 creationMode={transcript.creation}
                 actionHoverMenus={transcript.creation && !transcript.hydratePlaceholderActive && !transitioning}
                 rewindSignal={rewind.signal}

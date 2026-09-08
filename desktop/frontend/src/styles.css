@@ -32008,14 +32008,14 @@ body > .mermaid-diagram--fullscreen {
   transition: padding 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Empty Creation: headline + composer share one footer stack, centered in chat. */
-.app--creation .chat-pane--creation-empty {
+/* Empty session: Creation and Workbench share a centered headline/composer stack. */
+:is(.app--creation, .app--workbench) .chat-pane--creation-empty {
   --creation-hero-col: min(100%, 720px);
   --creation-hero-inline: clamp(16px, 4vw, 56px);
   --creation-hero-stack-gap: clamp(14px, 2.2vh, 22px);
 }
 
-.app--creation .chat-pane--creation-empty > .main {
+:is(.app--creation, .app--workbench) .chat-pane--creation-empty > .main {
   flex: 0 0 0;
   height: 0;
   min-height: 0;
@@ -32023,7 +32023,7 @@ body > .mermaid-diagram--fullscreen {
   pointer-events: none;
 }
 
-.app--creation .chat-pane--creation-empty > .footer {
+:is(.app--creation, .app--workbench) .chat-pane--creation-empty > .footer {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -32035,7 +32035,7 @@ body > .mermaid-diagram--fullscreen {
   border-top: 0;
 }
 
-.app--creation .composer-decision-host--creation-hero {
+:is(.app--creation, .app--workbench) .composer-decision-host--creation-hero {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -32045,12 +32045,12 @@ body > .mermaid-diagram--fullscreen {
   margin-inline: auto;
 }
 
-.app--creation .composer-decision-host--creation-hero .welcome-creation__headline {
+:is(.app--creation, .app--workbench) .composer-decision-host--creation-hero .welcome-creation__headline {
   width: 100%;
   margin: 0;
 }
 
-.app--creation .composer-decision-host--creation-hero .composer-wrap {
+:is(.app--creation, .app--workbench) .composer-decision-host--creation-hero .composer-wrap {
   width: 100%;
   max-width: none;
   margin-inline: 0;
@@ -34553,7 +34553,7 @@ body > .mermaid-diagram--fullscreen {
   overflow: visible;
 }
 
-.app--creation .welcome-creation__headline {
+:is(.app--creation, .app--workbench) .welcome-creation__headline {
   display: block;
   margin: 0;
   width: 100%;
@@ -34579,14 +34579,81 @@ body > .mermaid-diagram--fullscreen {
 }
 
 @media (max-height: 640px) {
-  .app--creation .welcome-creation__headline {
+  :is(.app--creation, .app--workbench) .welcome-creation__headline {
     font-size: clamp(calc(24px * var(--font-scale)), 3.6vw, calc(36px * var(--font-scale)));
   }
 }
 
 @media (max-width: 760px) {
-  .app--creation .chat-pane--creation-empty {
+  :is(.app--creation, .app--workbench) .chat-pane--creation-empty {
     --creation-hero-col: min(100%, 520px);
+  }
+}
+
+/* Workbench welcome responds to the chat column, including open side docks. */
+.app--workbench .chat-pane--creation-empty {
+  container: workbench-welcome / inline-size;
+}
+
+.app--workbench .chat-pane--creation-empty > .footer {
+  padding: clamp(16px, 4vh, 32px) clamp(16px, 5cqw, 56px);
+  justify-content: flex-start;
+  overflow-y: auto;
+}
+
+.app--workbench .composer-decision-host--creation-hero {
+  flex: 0 0 auto;
+  width: min(100%, 720px);
+  max-width: 720px;
+  margin-block: auto;
+  gap: clamp(18px, 3cqw, 28px);
+}
+
+.app--workbench .composer-decision-host--creation-hero .welcome-creation__headline {
+  font-size: clamp(calc(24px * var(--font-scale)), 5cqw, calc(48px * var(--font-scale)));
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.app--workbench .chat-pane--creation-empty .composer-meta__params {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.app--workbench .chat-pane--creation-empty .composer-meta {
+  flex-shrink: 0;
+}
+
+@container (min-width: 340px) and (max-width: 700px) {
+  .app--workbench .chat-pane--creation-empty .composer-meta__params {
+    display: grid;
+    grid-template-columns: 34px max-content max-content minmax(0, 1fr);
+  }
+
+  .app--workbench .chat-pane--creation-empty .composer-meta__control--model {
+    grid-column: 1 / 4;
+    width: 100%;
+    max-width: none;
+  }
+
+  .app--workbench .chat-pane--creation-empty .composer-meta__control--more {
+    justify-self: end;
+  }
+
+  .app--workbench .chat-pane--creation-empty .composer-meta__divider {
+    display: none;
+  }
+}
+
+@container workbench-welcome (max-width: 560px) {
+  .app--workbench .composer-decision-host--creation-hero .composer-meta {
+    padding: 8px;
+  }
+
+  .app--workbench .chat-pane--creation-empty .composer-meta__control--model {
+    min-width: 100px;
   }
 }
 

@@ -266,7 +266,7 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
           },
         })} />
 
-        <section className={`chat-pane${session.transcript.creationEmptyHero ? " chat-pane--creation-empty" : ""}`}>
+        <section className={`chat-pane${session.transcript.emptyHero ? " chat-pane--creation-empty" : ""}`}>
           <TopicbarRegion view={buildTopicbarView({
             t, locale, activeTab, cwd: state.meta?.cwd, imDetail: sidebarImDetailConnection, imTopicSources: shell.preferences.imTopicSources,
             creation: sidebarCreation, chromeHidden: workbenchChromeHidden, automationReturn: shell.automationReturn,
@@ -338,6 +338,7 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
               hydratePlaceholderActive: session.hydratePlaceholderActive,
               clearContextPending: session.clearCommands.clearContextPending,
               creation: sidebarCreation,
+              emptyHero: session.transcript.emptyHero,
               rewind: { stateActive: session.sessionUndo.rewindState != null, committing: session.sessionUndo.rewindCommitting, signal: session.sessionUndo.rewindSignal },
             }}
             onRetryHistory={() => void runtime.sessionActions.retrySessionHistory(activeTabId)}
@@ -366,7 +367,7 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
               view: {
                 hidden: composerSurfaceHidden,
                 inert: runtimeTransitioning,
-                hero: session.transcript.creationEmptyHero,
+                hero: session.transcript.emptyHero,
                 headline: t("welcome.creation.title"),
                 remote: core.remoteSurfaceActive,
                 rewindCommitting: session.sessionUndo.rewindCommitting,

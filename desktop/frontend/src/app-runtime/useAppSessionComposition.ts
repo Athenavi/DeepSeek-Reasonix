@@ -626,7 +626,7 @@ export function useAppSessionComposition(input: AppSessionCompositionInput) {
   // running sessions can't run two switchTab() calls concurrently. Concurrent
   // switches race on the backend SetActiveTab/confirmBackendActiveTab ordering,
   const {
-    transcriptHydrating, creationEmptyHero,
+    transcriptHydrating, emptyHero,
     visibleTranscriptItems, visibleTranscriptTabId, visibleTranscriptGeometryKey,
     handleLoadOlderHistory, handleSurfacePaintReady, latestGuidanceConsumed, handleTranscriptPrompt,
   } = useTranscriptSurfaceProjection({
@@ -644,7 +644,7 @@ export function useAppSessionComposition(input: AppSessionCompositionInput) {
     preserved: preservedTranscriptSurface,
     singleSurface: singleSurfaceLayout,
     controllerReady,
-    creationLayout: desktopLayoutStyle === "creation",
+    heroLayout: desktopLayoutStyle === "creation" || desktopLayoutStyle === "workbench",
     imDetailActive: Boolean(sidebarImDetailConnection),
     sessionHasContent,
     commitRendered: commitRenderedTranscriptSurface,
@@ -709,7 +709,7 @@ export function useAppSessionComposition(input: AppSessionCompositionInput) {
     todoPanel: { showTodos, scopedTodoBatch, todos, dismissTodos, handleTodoContinue },
     delivery: { handleDeliveryContinue },
     transcript: {
-      transcriptHydrating, creationEmptyHero,
+      transcriptHydrating, emptyHero,
       visibleTranscriptItems, visibleTranscriptTabId, visibleTranscriptGeometryKey,
       handleLoadOlderHistory, handleSurfacePaintReady, latestGuidanceConsumed, handleTranscriptPrompt,
     },

@@ -326,7 +326,7 @@ export function buildComposerSurface(input: ComposerSurfaceInput): DecisionFoote
       guidanceConsumedText: input.guidance?.text,
       guidanceQueuePreviewItems: input.guidanceQueuePreviewItems,
       showContextWindowRing: view.showContextWindowRing,
-      heroMode: view.hero,
+      heroMode: view.hero && view.showContextWindowRing,
     },
   };
 }
