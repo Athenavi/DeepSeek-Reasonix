@@ -5005,6 +5005,55 @@
     },
     {
       "kind": "frontend-event",
+      "name": "InboxChanged",
+      "location": "desktop/frontend/src/lib/inboxEvents.ts:12",
+      "class": "keep-business",
+      "owner": "desktopHost().events.on, same payload"
+    },
+    {
+      "kind": "frontend-event",
+      "name": "app:open-settings",
+      "location": "desktop/frontend/src/app-runtime/useNativeSettingsEvent.ts:13",
+      "class": "keep-business",
+      "owner": "desktopHost().events.on, same payload"
+    },
+    {
+      "kind": "frontend-event",
+      "name": "config:load-warnings",
+      "location": "desktop/frontend/src/lib/useConfigLoadWarnings.ts:46",
+      "class": "keep-business",
+      "owner": "desktopHost().events.on, same payload"
+    },
+    {
+      "kind": "frontend-event",
+      "name": "desktop:shell-status",
+      "location": "desktop/frontend/src/components/DesktopCloseBehaviorHint.tsx:29",
+      "class": "keep-business",
+      "owner": "desktopHost().events.on, same payload"
+    },
+    {
+      "kind": "frontend-event",
+      "name": "history-index:changed-v1",
+      "location": "desktop/frontend/src/lib/useHistoryCatalog.ts:113",
+      "class": "keep-business",
+      "owner": "desktopHost().events.on, same payload"
+    },
+    {
+      "kind": "frontend-event",
+      "name": "project-tree:changed-v2",
+      "location": "desktop/frontend/src/lib/sessionCatalogBridge.ts:15",
+      "class": "keep-business",
+      "owner": "desktopHost().events.on, same payload"
+    },
+    {
+      "kind": "frontend-event",
+      "name": "project-tree:runtime-changed",
+      "location": "desktop/frontend/src/lib/projectTreeRuntime.ts:163",
+      "class": "keep-business",
+      "owner": "desktopHost().events.on, same payload"
+    },
+    {
+      "kind": "frontend-event",
       "name": "updater:progress",
       "location": "desktop/frontend/src/lib/bridge.ts:1077",
       "class": "keep-business",

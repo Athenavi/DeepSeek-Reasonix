@@ -10,13 +10,13 @@ Every entry carries one class: `keep-business` keeps its Go implementation and c
 | native-call | 0 | 24 | 0 | 24 |
 | event | 16 | 0 | 0 | 16 |
 | frontend-native | 0 | 14 | 0 | 14 |
-| frontend-event | 1 | 0 | 0 | 1 |
+| frontend-event | 8 | 0 | 0 | 8 |
 | css-marker | 0 | 8 | 0 | 8 |
 | persistence | 11 | 0 | 3 | 14 |
 | shell-file | 0 | 41 | 39 | 80 |
 | artifact | 5 | 0 | 0 | 5 |
 | ci-job | 13 | 8 | 1 | 22 |
-| **all** | | | | **759** |
+| **all** | | | | **766** |
 
 ## Desktop commands (Go `App` methods bound to the UI)
 
@@ -671,6 +671,13 @@ Every entry carries one class: `keep-business` keeps its Go implementation and c
 
 | Name | Detail | Location | Class | New owner |
 | --- | --- | --- | --- | --- |
+| `InboxChanged` |  | desktop/frontend/src/lib/inboxEvents.ts:12 | keep-business (保留业务实现) | `desktopHost().events.on, same payload` |
+| `app:open-settings` |  | desktop/frontend/src/app-runtime/useNativeSettingsEvent.ts:13 | keep-business (保留业务实现) | `desktopHost().events.on, same payload` |
+| `config:load-warnings` |  | desktop/frontend/src/lib/useConfigLoadWarnings.ts:46 | keep-business (保留业务实现) | `desktopHost().events.on, same payload` |
+| `desktop:shell-status` |  | desktop/frontend/src/components/DesktopCloseBehaviorHint.tsx:29 | keep-business (保留业务实现) | `desktopHost().events.on, same payload` |
+| `history-index:changed-v1` |  | desktop/frontend/src/lib/useHistoryCatalog.ts:113 | keep-business (保留业务实现) | `desktopHost().events.on, same payload` |
+| `project-tree:changed-v2` |  | desktop/frontend/src/lib/sessionCatalogBridge.ts:15 | keep-business (保留业务实现) | `desktopHost().events.on, same payload` |
+| `project-tree:runtime-changed` |  | desktop/frontend/src/lib/projectTreeRuntime.ts:163 | keep-business (保留业务实现) | `desktopHost().events.on, same payload` |
 | `updater:progress` |  | desktop/frontend/src/lib/bridge.ts:1077 | keep-business (保留业务实现) | `desktopHost().events.on, same payload` |
 
 ## Shell CSS markers

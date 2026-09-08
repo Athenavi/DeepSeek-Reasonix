@@ -12,7 +12,7 @@ import (
 var (
 	runtimeUseRe   = regexp.MustCompile(`\b(?:window\.runtime|runtime|rt)[!?]?\.(EventsOn|EventsOff|BrowserOpenURL|WindowSet[A-Za-z]+|WindowGet[A-Za-z]+|WindowIsMaximised|Clipboard[A-Za-z]+|OnFileDrop[A-Za-z]*)\b`)
 	goBindingRe    = regexp.MustCompile(`window\.go\??\.main\??\.App`)
-	eventsOnRe     = regexp.MustCompile(`EventsOn\(\s*("([^"]+)"|` + "`([^`]+)`" + `)`)
+	eventsOnRe     = regexp.MustCompile(`(?:EventsOn|events\.on)\(\s*("([^"]+)"|` + "`([^`]+)`" + `)`)
 	draggableRe    = regexp.MustCompile(`--wails-draggable`)
 	dropTargetRe   = regexp.MustCompile(`--wails-drop-target`)
 	frontendGlobRe = regexp.MustCompile(`\.(ts|tsx|css|html)$`)
