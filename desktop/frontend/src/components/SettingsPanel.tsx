@@ -1,6 +1,6 @@
 import { SettingsOptions } from "./SettingsOptions";
 import { SettingsSelect } from "./SettingsSelect";
-import { providerProtocolLabel, providerEndpointMismatch, providerProtocolChoices } from "../lib/providerProtocol";
+import { providerProtocolLabel, providerProtocolChoices } from "../lib/providerProtocol";
 import { providerSupportsServerWebSearch } from "../lib/providerSearch";
 export { providerSupportsServerWebSearch } from "../lib/providerSearch";
 import { ManagementPageShell } from "./ManagementPageShell";
@@ -21,7 +21,7 @@ import { app, COMPACT_RATIO_MAX_PERCENT, COMPACT_RATIO_MIN_PERCENT, openExternal
 import { normalizeLangPref, useI18n, type DictKey, type LangPref } from "../lib/i18n";
 import { createLatestRequestGate, mergedFetchedProviderModels, mergeProviderModelContextWindows, providerApiKeyEnvForSave, providerDefaultModel, providerIsConfigured, providerModelCandidates, providerModelContextWindowDrafts, providerRequiresKey } from "../lib/providerModels";
 import { cachedFetchProviderModelCatalog, cachedFetchProviderModels, invalidateProviderCacheByAPIKeyEnv, shouldSkipAutoRefresh } from "../lib/providerModelCache";
-import { providerBaseURLForSave, providerRequestURLForFormatChange, providerRequestURLFromConfig, trimmedBaseURL } from "../lib/providerEndpoint";
+import { providerBaseURLForSave, providerEndpointMismatchDetail, providerRequestURLForCatalogFormatChange, providerRequestURLFromConfig, trimmedBaseURL } from "../lib/providerEndpoint";
 import { providerModelVisionCapability, providerVisionModelsForView } from "../lib/providerVisionCapability";
 import { useUpdater } from "../lib/useUpdater";
 import {
@@ -6029,15 +6029,25 @@ export function ProviderEditor({
   const [savedSnapshot, setSavedSnapshot] = useState(draftSnapshot);
   const dirty = draftSnapshot !== savedSnapshot;
   const isNewCustomProvider = !initial;
-  const providerKindChoices = useMemo(() => {
+  const editorCatalog = useMemo(() => {
+    if (initial?.catalog) return initial.catalog;
+    if (initial?.presetId) {
+      const preset = providerPresets.find(item => item.id === initial.presetId);
+      if (preset) return catalogForPreset(preset);
+    }
     const catalogs = providerPresets.map(catalogForPreset);
-    const currentRoute = catalogs.find(c => c.format === kind && c.baseUrl && providerRequestURLFromConfig(kind, c.baseUrl, "") === requestUrl);
-    const registered = currentRoute ? catalogs.filter(c => c.brandId === currentRoute.brandId && c.region === currentRoute.region && c.product === currentRoute.product).map(c => c.format).filter(format => format !== "bundle") : kinds;
-    const choices = providerProtocolChoices(kind, initial?.kind, registered, Boolean(currentRoute));
+    return catalogs.find(catalog => Object.entries(catalog.protocols ?? {}).some(([routeKind, route]) =>
+      providerRequestURLFromConfig(routeKind, route.baseUrl, "") === requestUrl,
+    ));
+  }, [initial?.catalog, initial?.presetId, providerPresets, requestUrl]);
+  const providerKindChoices = useMemo(() => {
+    const registered = editorCatalog ? Object.keys(editorCatalog.protocols ?? {}) : kinds;
+    const choices = providerProtocolChoices(kind, initial?.kind, registered, Boolean(editorCatalog));
     return choices.length > 0 ? choices : ["openai"];
-  }, [kind, initial?.kind, kinds, providerPresets, requestUrl]);
+  }, [editorCatalog, kind, initial?.kind, kinds]);
   const effectiveKind = providerEditorEffectiveKind(isNewCustomProvider, kind, providerKindChoices);
   const effectiveRequestUrl = requestUrl.trim();
+  const endpointMismatch = providerEndpointMismatchDetail(effectiveKind, effectiveRequestUrl, editorCatalog);
   const effectiveBaseUrl = providerBaseURLForSave(initial, effectiveKind, effectiveRequestUrl);
   const effectiveLegacyChatUrl = effectiveKind.toLowerCase() === "openai" ? effectiveRequestUrl : initial?.chatUrl ?? "";
   const effectiveModelsUrl = modelsUrl.trim();
@@ -6149,6 +6159,8 @@ export function ProviderEditor({
     const provider: ProviderView = {
       name: name.trim(),
       ...(hideConnectionName ? {} : { displayName: displayName.trim() }),
+      ...(initial?.presetId ? { presetId: initial.presetId } : {}),
+      ...(initial?.catalog ? { catalog: initial.catalog } : {}),
       builtIn: initial?.builtIn ?? false,
       added: initial?.added ?? true,
       kind: effectiveKind,
@@ -6352,10 +6364,7 @@ export function ProviderEditor({
       <SettingsSelect className="mem-select" aria-label={t("settings.providerProtocol")} title={providerKindHint(effectiveKind, t)} value={kind} disabled={busy || fetchingModels} onValueChange={(value) => {
         const nextKind = value;
         setRequestUrl(current => {
-          const catalogs = providerPresets.map(catalogForPreset);
-          const currentRoute = catalogs.find(c => c.format === kind && c.baseUrl && providerRequestURLFromConfig(kind, c.baseUrl, "") === current);
-          const nextRoute = currentRoute && catalogs.find(c => c.brandId === currentRoute.brandId && c.region === currentRoute.region && c.product === currentRoute.product && c.format === nextKind);
-          return nextRoute?.baseUrl ? providerRequestURLFromConfig(nextKind, nextRoute.baseUrl, "") : providerRequestURLForFormatChange(kind, nextKind, current);
+          return providerRequestURLForCatalogFormatChange(kind, nextKind, current, editorCatalog);
         });
         setKind(nextKind);
       }}>
@@ -6365,7 +6374,10 @@ export function ProviderEditor({
           </option>
         ))}
       </SettingsSelect>
-      {providerEndpointMismatch(effectiveKind, effectiveRequestUrl) && <div role="alert" className="banner banner--warning">{t("settings.providerProtocolMismatch")}</div>}
+      {endpointMismatch.mismatch && <div role="alert" className="banner banner--warning">
+        <span>{t("settings.providerProtocolMismatch")}</span>
+        {endpointMismatch.recommendedUrl && <button type="button" className="btn btn--small" title={endpointMismatch.recommendedUrl} onClick={() => setRequestUrl(endpointMismatch.recommendedUrl)}>{t("settings.compactRatioApply")}</button>}
+      </div>}
       </div>
       <div className="provider-key-single">
         <label htmlFor={`provider-key-${initial?.name ?? "new"}`}>API Key</label>
@@ -6422,7 +6434,7 @@ export function ProviderEditor({
         <button className="btn btn--small" onClick={onCancel} disabled={busy}>
           {t("common.cancel")}
         </button>
-        <button className="btn btn--primary btn--small" onClick={() => void save()} disabled={busy || fetchingModels || (Boolean(initial) && !dirty) || !name.trim() || !effectiveBaseUrl || !models.trim() || extraBodyInvalid}>
+        <button className="btn btn--primary btn--small" onClick={() => void save()} disabled={busy || fetchingModels || (Boolean(initial) && !dirty) || !name.trim() || !effectiveBaseUrl || !models.trim() || extraBodyInvalid || endpointMismatch.mismatch}>
           {t("settings.models.saveChanges")}
         </button>
       </div>

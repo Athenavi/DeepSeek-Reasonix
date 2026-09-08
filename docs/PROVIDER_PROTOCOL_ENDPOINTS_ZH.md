@@ -12,7 +12,7 @@ Base URL excludes the request suffix: Chat = /chat/completions; Responses = /res
 | anthropic|global|api | — | — | [https://api.anthropic.com](https://platform.claude.com/docs/en/api/messages/create) |
 | baidu|cn|api | [https://qianfan.baidubce.com/v2](https://cloud.baidu.com/doc/qianfan/s/Smoghsq3g) | — | [https://qianfan.baidubce.com/anthropic](https://cloud.baidu.com/doc/qianfan/s/Smoghsq3g) |
 | cerebras|global|api | [https://api.cerebras.ai/v1](https://inference-docs.cerebras.ai/resources/openai) | — | — |
-| deepseek|global|api | [https://api.deepseek.com/v1](https://api-docs.deepseek.com/) | [https://api.deepseek.com](https://api-docs.deepseek.com/) | — |
+| deepseek|global|api | [https://api.deepseek.com/v1](https://api-docs.deepseek.com/) | [https://api.deepseek.com](https://api-docs.deepseek.com/) | [https://api.deepseek.com/anthropic](https://api-docs.deepseek.com/guides/anthropic_api) |
 | doubao|cn|api | [https://ark.cn-beijing.volces.com/api/v3](https://www.volcengine.com/docs/82379/1795150) | [https://ark.cn-beijing.volces.com/api/v3](https://www.volcengine.com/docs/82379/1795150) | — |
 | fireworks|global|api | [https://api.fireworks.ai/inference/v1](https://docs.fireworks.ai/getting-started/quickstart) | [https://api.fireworks.ai/inference/v1](https://docs.fireworks.ai/guides/response-api) | [https://api.fireworks.ai/inference](https://docs.fireworks.ai/getting-started/quickstart) |
 | gemini|global|api | [https://generativelanguage.googleapis.com/v1beta/openai](https://ai.google.dev/gemini-api/docs/openai) | — | — |

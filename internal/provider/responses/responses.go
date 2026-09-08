@@ -38,19 +38,21 @@ func init() {
 
 // Config holds Responses API provider settings.
 type Config struct {
-	Name       string
-	APIKey     string
-	BaseURL    string
-	Model      string
-	ModelInfo  *provider.ModelInfo
-	Effort     string
-	Mode       string // stateful | stateless; empty uses vendor detection.
-	Stateful   *bool  // legacy form of Mode; nil preserves vendor detection.
-	WebSearch  bool   // expose the provider-executed web_search tool.
-	Proxy      netclient.ProxySpec
-	KeyEnv     string
-	KeySource  string
-	RequestURL string // optional exact Responses request URL; empty derives from BaseURL
+	Name        string
+	DisplayName string
+	Protocol    string
+	APIKey      string
+	BaseURL     string
+	Model       string
+	ModelInfo   *provider.ModelInfo
+	Effort      string
+	Mode        string // stateful | stateless; empty uses vendor detection.
+	Stateful    *bool  // legacy form of Mode; nil preserves vendor detection.
+	WebSearch   bool   // expose the provider-executed web_search tool.
+	Proxy       netclient.ProxySpec
+	KeyEnv      string
+	KeySource   string
+	RequestURL  string // optional exact Responses request URL; empty derives from BaseURL
 	// MaxOutputTokens is the total provider output budget. Zero omits the field
 	// on official DeepSeek (server 384K ceiling) and unknown endpoints; MiMo
 	// still applies its 16K/32K ladder. Negative values omit it.
@@ -86,7 +88,9 @@ func (c Config) mode() string {
 type client struct {
 	identityHeaders                    http.Header
 	reasoning                          provider.ReasoningCapability
-	name, apiKey, keyEnv, keySource    string
+	name                               string
+	identity                           provider.RequestIdentity
+	apiKey, keyEnv, keySource          string
 	baseURL, requestURL, model, effort string
 	vendor, mode                       string
 	caps                               vendorCapabilities
@@ -160,7 +164,9 @@ func New(cfg Config) provider.Provider {
 	}
 	return &client{
 		identityHeaders: provider.NewClientIdentityHeaders(),
-		name:            cfg.Name, apiKey: cfg.APIKey, keyEnv: cfg.KeyEnv, keySource: cfg.KeySource,
+		name:            cfg.Name,
+		identity:        provider.RequestIdentity{Provider: cfg.Name, DisplayName: cfg.DisplayName, Protocol: cfg.Protocol},
+		apiKey:          cfg.APIKey, keyEnv: cfg.KeyEnv, keySource: cfg.KeySource,
 		reasoning: ReasoningForConfig(provider.Config{BaseURL: cfg.BaseURL, Model: cfg.Model, Extra: cfg.Extra}),
 		baseURL:   baseURL, requestURL: requestURL, model: cfg.Model, effort: cfg.Effort,
 		vendor: vendor, caps: cap, mode: cfg.mode(), sessionCache: sessionCache, search: provider.SearchPolicy{NativeEnabled: cfg.WebSearch, ClientEnabled: clientWebSearch}, maxOutputTokens: maxOutputTokens,
@@ -213,7 +219,7 @@ func nativeToolSearchModel(model string) bool {
 }
 
 func (c *client) sendOpts() provider.SendOptions {
-	return provider.SendOptions{Provider: c.name, KeyEnv: c.keyEnv, KeySource: c.keySource, KeyPresent: c.apiKey != "", RetryAuth: c.authed.Load()}
+	return provider.SendOptions{Provider: c.name, ProviderDisplayName: c.identity.DisplayName, Protocol: c.identity.Protocol, KeyEnv: c.keyEnv, KeySource: c.keySource, KeyPresent: c.apiKey != "", RetryAuth: c.authed.Load()}
 }
 
 // ResetContext drops stateful continuation metadata. Full-input stateless mode
@@ -732,7 +738,7 @@ func authErrorFromResponse(c *client, responseError *sseError) error {
 	if strings.Contains(value, "forbidden") || strings.Contains(value, "permission") {
 		status = http.StatusForbidden
 	}
-	return &provider.AuthError{Provider: c.name, KeyEnv: c.keyEnv, KeySource: c.keySource, Status: status, HasKey: c.apiKey != "", Body: responseError.Message}
+	return &provider.AuthError{Provider: c.name, ProviderDisplayName: c.identity.DisplayName, Protocol: c.identity.Protocol, KeyEnv: c.keyEnv, KeySource: c.keySource, Status: status, HasKey: c.apiKey != "", Body: responseError.Message}
 }
 
 type sseEvent struct {

@@ -157,6 +157,7 @@ func New(cfg provider.Config) (provider.Provider, error) {
 		identityHeaders:  provider.NewClientIdentityHeaders(),
 		reasoning:        ReasoningForConfig(cfg),
 		name:             name,
+		identity:         provider.RequestIdentity{Provider: name, DisplayName: cfg.DisplayName, Protocol: cfg.Protocol},
 		apiKey:           cfg.APIKey,
 		keyEnv:           keyEnv,
 		keySource:        keySource,
@@ -193,6 +194,7 @@ type client struct {
 	identityHeaders  http.Header
 	reasoning        provider.ReasoningCapability
 	name             string
+	identity         provider.RequestIdentity
 	apiKey           string
 	keyEnv           string // api_key_env name, surfaced in auth errors
 	keySource        string // source of keyEnv, surfaced in auth errors
@@ -266,11 +268,13 @@ func (c *client) MissingToolCallReasoningWarningIdentity() string {
 
 func (c *client) sendOpts() provider.SendOptions {
 	return provider.SendOptions{
-		Provider:   c.name,
-		KeyEnv:     c.keyEnv,
-		KeySource:  c.keySource,
-		KeyPresent: c.apiKey != "",
-		RetryAuth:  c.authed.Load(),
+		Provider:            c.name,
+		ProviderDisplayName: c.identity.DisplayName,
+		Protocol:            c.identity.Protocol,
+		KeyEnv:              c.keyEnv,
+		KeySource:           c.keySource,
+		KeyPresent:          c.apiKey != "",
+		RetryAuth:           c.authed.Load(),
 	}
 }
 
