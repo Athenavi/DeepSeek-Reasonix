@@ -24,7 +24,7 @@ export function imageInputModeForModel(modes: Record<string, ImageInputMode>, mo
 
 export function matchingModelKey(keys: string[], model: string): string | undefined {
   const exact = model.trim();
-  return keys.includes(exact) ? exact : [...keys].sort().find((key) => key.trim().toLowerCase() === exact.toLowerCase());
+  return keys.includes(exact) ? exact : undefined;
 }
 
 export function modelCapabilityForModel(capabilities: ProviderModelCapabilityView[] | null | undefined, model: string): ProviderModelCapabilityView | undefined {

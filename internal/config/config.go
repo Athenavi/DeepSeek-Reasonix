@@ -1579,16 +1579,6 @@ func (e *ProviderEntry) modelOverrideForModel(model string) (ProviderModelOverri
 	if ov, ok := e.ModelOverrides[model]; ok {
 		return ov, true
 	}
-	keys := make([]string, 0, len(e.ModelOverrides))
-	for k := range e.ModelOverrides {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	for _, k := range keys {
-		if strings.EqualFold(strings.TrimSpace(k), model) {
-			return e.ModelOverrides[k], true
-		}
-	}
 	return ProviderModelOverride{}, false
 }
 

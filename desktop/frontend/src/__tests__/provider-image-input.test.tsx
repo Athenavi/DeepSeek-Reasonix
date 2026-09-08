@@ -83,7 +83,7 @@ assert(imageInputHardBlocked("https://api.deepseek.com", "deepseek-v4-flash"));
 assert(!imageInputHardBlocked("https://eu.deepseek.com/anthropic", "future-vision"));
 assert(!imageInputHardBlocked("https://api.deepseek.com.relay.test", "deepseek-v4-flash"));
 assert(!imageInputHardBlocked("https://api.deepseek.com", "deepseek-v4-flash-vision-exp"));
-assert.equal(mergeImageInputModes(initial.modelOverrides, initial.models, { "RELAY-MODEL": "off" })[0].vision, false);
+assert.equal(mergeImageInputModes(initial.modelOverrides, initial.models, { "RELAY-MODEL": "off" })[0].vision, null);
 
 // The real dialog enforces a backend hard block as well as the primitive control.
 await render(<ProviderEditor key="blocked" initial={{...initial,modelCapabilities:[{...unknown,imageInputEnableAllowed:false,state:"unsupported"}]}} kinds={["openai"]} busy={false} onSave={()=>{}} onCancel={()=>{}}/>);

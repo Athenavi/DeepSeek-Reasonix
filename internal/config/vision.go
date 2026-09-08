@@ -175,7 +175,7 @@ func (e *ProviderEntry) HasVisionModel(model string) bool {
 		return false
 	}
 	for _, candidate := range e.VisionModels {
-		if strings.EqualFold(strings.TrimSpace(candidate), model) {
+		if strings.TrimSpace(candidate) == model {
 			return true
 		}
 	}
