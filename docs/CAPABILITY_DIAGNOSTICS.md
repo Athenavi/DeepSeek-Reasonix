@@ -67,6 +67,10 @@ as unverified. Neither result grants tool access or proves a server is broken.
 Static checks do not start MCP servers or call a model provider.
 When an existing runtime host or an explicit `--live` probe supplies MCP tools,
 capability diagnostics use that observed inventory to resolve portable aliases.
+Alias resolution follows runtime plugin ownership: a plugin skill can use aliases
+from its own package, while an ordinary local skill needs a concrete callable
+name or capability ID. Diagnostics preserve the adapter's original and visible
+names, including configured prefix stripping.
 
 ## Everyday workflows
 

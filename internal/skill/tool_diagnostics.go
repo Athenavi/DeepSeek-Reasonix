@@ -30,14 +30,23 @@ func CheckToolReferences(skills []Skill, opts ToolReferenceOptions) []ToolRefere
 	for _, entry := range opts.Registered {
 		names[entry.Name] = true
 	}
+	for _, binding := range opts.Bindings {
+		if binding.CallableName != "" {
+			names[binding.CallableName] = true
+		}
+		if binding.CapabilityID != "" {
+			names[binding.CapabilityID] = true
+		}
+	}
 	var out []ToolReferenceDiagnostic
 	for _, sk := range skills {
+		bindings := ToolBindingsForSkill(sk, opts.Bindings)
 		for _, ref := range sk.AllowedTools {
 			ref = strings.TrimSpace(ref)
 			if ref == "" {
 				continue
 			}
-			code, severity, reason := checkToolReference(ref, names, opts.Bindings)
+			code, severity, reason := checkToolReference(ref, names, bindings)
 			if code != "" {
 				out = append(out, ToolReferenceDiagnostic{sk.Name, ref, code, severity,
 					fmt.Sprintf("skill %q allowed-tools reference %q %s", sk.Name, ref, reason)})

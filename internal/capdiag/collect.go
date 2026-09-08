@@ -580,6 +580,7 @@ func mergeRuntimeHost(rep *MCPReport, host *plugin.Host, root, home, reasonixHom
 		byName[s.Name] = i
 	}
 	for _, s := range host.Servers() {
+		rep.bindings = append(rep.bindings, s.ToolBindings...)
 		tools := make([]MCPToolInfo, 0, len(s.ToolList))
 		for _, t := range s.ToolList {
 			tools = append(tools, MCPToolInfo{Name: t.Name, ReadOnlyHint: t.ReadOnlyHint, DestructiveHint: t.DestructiveHint})
@@ -796,13 +797,6 @@ func redactCommandDisplay(cmd, root, home, reasonixHome string) string {
 	}
 	return displayPath(fields[0], root, home, reasonixHome)
 }
-
-// ioDiscard avoids importing io in every call site for skill.Options.Stderr.
-func ioDiscard() *discardWriter { return &discardWriter{} }
-
-type discardWriter struct{}
-
-func (d *discardWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 // DefaultLiveTimeout is used when --live is set without --timeout.
 const DefaultLiveTimeout = 5 * time.Second

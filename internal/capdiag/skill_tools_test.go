@@ -34,7 +34,10 @@ func TestDoctorSkillReferenceParity(t *testing.T) {
 			t.Chdir(root)
 			custom, excluded := filepath.Join(root, "custom"), filepath.Join(root, "excluded")
 			var requests atomic.Int32
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { requests.Add(1); w.WriteHeader(500) }))
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+				w.WriteHeader(http.StatusInternalServerError)
+			}))
 			defer server.Close()
 			cfgText := fmt.Sprintf(`
 default_model = "diagnostic-test"

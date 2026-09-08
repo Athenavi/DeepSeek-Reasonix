@@ -7,6 +7,7 @@ import (
 
 	"reasonix/internal/config"
 	"reasonix/internal/skill"
+	"reasonix/internal/tool"
 )
 
 func TestSkillToolIssuesUseObservedMCPBindings(t *testing.T) {
@@ -15,7 +16,7 @@ func TestSkillToolIssuesUseObservedMCPBindings(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(file), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(file, []byte("---\nname: mcp-example\ndescription: Test\nauto-use: require\nrequires: [mcp-server:github]\nallowed-tools: [github/search]\n---\nTest\n"), 0600); err != nil {
+	if err := os.WriteFile(file, []byte("---\nname: mcp-example\ndescription: Test\nauto-use: require\nrequires: [mcp-server:github]\nallowed-tools: [mcp-tool:github/search]\n---\nTest\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	cfg := config.Default()
@@ -29,6 +30,9 @@ func TestSkillToolIssuesUseObservedMCPBindings(t *testing.T) {
 	} {
 		t.Run(tc.status, func(t *testing.T) {
 			mcp := MCPReport{Servers: []MCPServerInfo{{Name: "github", RuntimeStatus: tc.status, Error: "failed", Tools: []MCPToolInfo{{Name: "search"}}}}}
+			if tc.status == "connected" || tc.status == "probed" {
+				mcp.bindings = []tool.MCPBinding{{Server: "github", RawName: "search", CallableName: "mcp__github__search", CapabilityID: "mcp-tool:github/search"}}
+			}
 			issues := skillToolIssues(store, cfg, mcp, func(s string) string { return s })
 			if tc.code == "" {
 				if len(issues) != 0 {

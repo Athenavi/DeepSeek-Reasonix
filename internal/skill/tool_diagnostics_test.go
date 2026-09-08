@@ -9,7 +9,7 @@ import (
 )
 
 func TestToolReferenceDiagnostics(t *testing.T) {
-	binding := tool.MCPBinding{Server: "github", RawName: "search", VisibleName: "search", CallableName: "mcp__github__search", CapabilityID: "mcp-tool:github/search"}
+	binding := tool.MCPBinding{Package: "example-plugin", Server: "github", RawName: "search", VisibleName: "search", CallableName: "mcp__github__search", CapabilityID: "mcp-tool:github/search"}
 	other := binding
 	other.Server, other.CallableName, other.CapabilityID = "other", "mcp__other__search", "mcp-tool:other/search"
 	for _, tc := range []struct {
@@ -41,7 +41,7 @@ func TestToolReferenceDiagnostics(t *testing.T) {
 		{"mcp__*", "", []tool.MCPBinding{binding, other}},
 	} {
 		t.Run(tc.ref+tc.code, func(t *testing.T) {
-			d := CheckToolReferences([]Skill{{Name: "example", AllowedTools: []string{tc.ref}}}, ToolReferenceOptions{
+			d := CheckToolReferences([]Skill{{Name: "example", Plugin: "example-plugin", AllowedTools: []string{tc.ref}}}, ToolReferenceOptions{
 				Known: tool.KnownToolNames(), Registered: []tool.ContractEntry{{Name: "new_hidden_tool"}}, Bindings: tc.bindings,
 			})
 			if tc.code == "" {
