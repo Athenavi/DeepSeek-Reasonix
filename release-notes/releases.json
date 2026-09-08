@@ -11,49 +11,14 @@
         "zh": "Reasonix 1.38.2"
       },
       "summary": {
-        "en": "This release improves session reliability, provider configuration, and desktop performance. It introduces an append-only session log with version heads, independent web search model assignment, unified image understanding, and numerous fixes for navigation, cancellation, and CI stability.",
+        "en": "This release improves session reliability, model service configuration, and desktop performance. It introduces append-only session logs with version heads, independent web search model assignment, unified image understanding, and fixes for navigation, cancellation, and CI stability.",
         "zh": "此版本提升了会话可靠性、模型服务配置和桌面性能。引入了仅追加会话日志与版本 head、独立网页搜索模型分配、统一图片理解，并修复了导航、取消和 CI 稳定性等多项问题。"
       },
       "surfaces": [
         "desktop",
-        "cli",
-        "service"
+        "cli"
       ],
-      "guides": [
-        {
-          "title": {
-            "en": "Remote Sessions Guide",
-            "zh": "远程会话指南"
-          },
-          "body": {
-            "en": "Learn how to configure hosts, use the reasonix remote CLI, manage session lifecycle, and troubleshoot remote connections.",
-            "zh": "了解如何配置主机、使用 reasonix remote CLI、管理会话生命周期以及排查远程连接问题。"
-          },
-          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/e1833ca83ae8258d8941ac6fe7c34e3eb9932608/docs/REMOTE_SESSIONS.md"
-        },
-        {
-          "title": {
-            "en": "Web Search Model Assignment",
-            "zh": "网页搜索模型分配"
-          },
-          "body": {
-            "en": "Configure an independent model for web search queries and understand routing and usage ownership.",
-            "zh": "为网页搜索查询配置独立模型，并了解路由和使用量归属。"
-          },
-          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/e1833ca83ae8258d8941ac6fe7c34e3eb9932608/docs/WEB_SEARCH.md"
-        },
-        {
-          "title": {
-            "en": "Local Image Paths",
-            "zh": "本地图片路径"
-          },
-          "body": {
-            "en": "Use view_image(path) to provide local images to your agent and understand limits and validation.",
-            "zh": "使用 view_image(path) 向代理提供本地图片，并了解限制与验证。"
-          },
-          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/e1833ca83ae8258d8941ac6fe7c34e3eb9932608/docs/local-image-paths.md"
-        }
-      ],
+      "guides": [],
       "highlights": [
         {
           "kind": "new",
@@ -62,11 +27,11 @@
             "cli"
           ],
           "title": {
-            "en": "Append-only session log with version heads",
+            "en": "Append-only session logs with version heads",
             "zh": "仅追加会话日志与版本 head"
           },
           "body": {
-            "en": "Sessions now use an append-only DAG log (schema 2) that records every change as a version head. Fork, rewind, and version selection happen in place without creating separate files, improving reliability and enabling concurrent writers.",
+            "en": "Sessions now use an append-only DAG log (schema 2), recording every change as a version head. Forking, rewinding, and version selection happen within the same log instead of creating separate files, improving reliability and supporting concurrent writers.",
             "zh": "会话现在使用仅追加 DAG 日志（schema 2），将每次更改记录为版本 head。分叉、回退和版本选择均在同一日志内完成，不再创建单独文件，提高了可靠性并支持并发写入。"
           },
           "refs": [
@@ -115,8 +80,8 @@
             "zh": "独立网页搜索模型"
           },
           "body": {
-            "en": "You can now assign a dedicated connection and model for web search queries in Model preferences. Automatic remains the default, and explicit assignments respect the target connection's search switch.",
-            "zh": "现在可以在模型偏好中为网页搜索查询指定专用连接和模型。自动模式仍为默认，显式分配会遵循目标连接的搜索开关。"
+            "en": "You can now specify a dedicated connection and model for web search queries in Model preferences. Automatic remains the default and preserves existing selection behavior.",
+            "zh": "现在可以在模型偏好中为网页搜索查询指定专用连接和模型。自动模式仍为默认，并保留现有选择行为。"
           },
           "refs": [
             9945
@@ -133,93 +98,25 @@
             "zh": "统一本地图片与工具图片识别"
           },
           "body": {
-            "en": "Local image paths now have a built-in route to visual input via view_image(path), and images returned by tools share the existing image-summary service. Native vision remains the first choice.",
-            "zh": "本地图片路径现在通过 view_image(path) 内置支持视觉输入，工具返回的图片也共享现有的图片摘要服务。原生视觉仍为首选。"
+            "en": "Add view_image(path) and share the existing image-summary service between user attachments and all successful structured tool-image results, including MCP and on-demand MCP tools.",
+            "zh": "新增 view_image(path)，并在用户附件与所有成功的结构化工具图片结果（包括 MCP 和按需 MCP 工具）之间共享现有图片摘要服务。"
           },
           "refs": [
             9933
           ]
         },
         {
-          "kind": "improved",
-          "targets": [
-            "desktop"
-          ],
-          "title": {
-            "en": "Unified settings selection controls",
-            "zh": "统一设置选择组件"
-          },
-          "body": {
-            "en": "Settings pages now share compact SettingsSelect and SettingsOptions components, providing consistent sizing, focus states, and keyboard behavior. Model preferences are grouped with runtime preferences for a clearer layout.",
-            "zh": "设置页面现在共享紧凑的 SettingsSelect 和 SettingsOptions 组件，提供一致的尺寸、焦点状态和键盘行为。模型偏好与运行时偏好分组，布局更清晰。"
-          },
-          "refs": [
-            9938
-          ]
-        },
-        {
           "kind": "fixed",
           "targets": [
             "desktop"
           ],
           "title": {
-            "en": "Stop button now interrupts reliably",
-            "zh": "停止按钮现在可靠中断"
+            "en": "Model services navigation fixed",
+            "zh": "修复模型服务入口跳错页面"
           },
           "body": {
-            "en": "Stop is now a session-level unconditional interrupt. Stale turn IDs no longer block cancellation, and the UI retries fence rejections automatically.",
-            "zh": "停止现在是会话级无条件中断。过期的回合 ID 不再阻止取消，界面会自动重试被拒绝的请求。"
-          },
-          "refs": [
-            9898
-          ]
-        },
-        {
-          "kind": "fixed",
-          "targets": [
-            "desktop"
-          ],
-          "title": {
-            "en": "Provider recovery waiting is bounded",
-            "zh": "模型服务恢复等待有上限"
-          },
-          "body": {
-            "en": "Turns no longer wait indefinitely on flaky networks. A 10-minute recovery budget ends the turn with a clear, actionable error instead of spinning forever.",
-            "zh": "回合不再在网络不稳定时无限等待。10 分钟的恢复预算会以清晰、可操作的错误结束回合，而不是一直旋转。"
-          },
-          "refs": [
-            9899
-          ]
-        },
-        {
-          "kind": "fixed",
-          "targets": [
-            "desktop"
-          ],
-          "title": {
-            "en": "Sessions stay visible after crashes",
-            "zh": "崩溃后会话保持可见"
-          },
-          "body": {
-            "en": "After a hard kill mid-turn, conversations no longer disappear from the sidebar. Last-known preview and turn counts are preserved while repair runs.",
-            "zh": "回合中途强制终止后，对话不再从侧栏消失。修复期间保留最后已知的预览和回合计数。"
-          },
-          "refs": [
-            9902
-          ]
-        },
-        {
-          "kind": "fixed",
-          "targets": [
-            "desktop"
-          ],
-          "title": {
-            "en": "Model services navigation restored",
-            "zh": "模型服务导航已恢复"
-          },
-          "body": {
-            "en": "Clicking Model services no longer opens Model preferences. The navigation store now preserves the requested page correctly.",
-            "zh": "点击“模型服务”不再打开“模型偏好”。导航存储现在能正确保留请求的页面。"
+            "en": "Clicking Model services no longer opens Model preferences. The navigation store now preserves the requested page and remembered settings target.",
+            "zh": "点击“模型服务”不再进入“模型偏好”。导航 store 现在保留请求的页面和记忆的设置目标。"
           },
           "refs": [
             9951
@@ -231,15 +128,15 @@
             "desktop"
           ],
           "title": {
-            "en": "DeepSeek protocol migration and model identity fixes",
-            "zh": "DeepSeek 协议迁移与模型标识修复"
+            "en": "Stop is now a session-level interrupt",
+            "zh": "停止按钮改为会话级无条件中断"
           },
           "body": {
-            "en": "Custom model IDs are preserved exactly, and official DeepSeek connections now default to Chat Completions with a one-time migration for existing endpoints.",
-            "zh": "自定义模型 ID 被精确保留，官方 DeepSeek 连接现在默认使用 Chat Completions，并对现有端点执行一次性迁移。"
+            "en": "Stop now interrupts whatever is running in the session, even if the turn ID is stale. Only an idle tab is rejected with a stable error code.",
+            "zh": "停止现在会中断会话中正在运行的内容，即使回合 ID 已过期。只有空闲标签页才会以稳定错误代码被拒绝。"
           },
           "refs": [
-            9947
+            9898
           ]
         },
         {
@@ -248,15 +145,15 @@
             "desktop"
           ],
           "title": {
-            "en": "Provider protocol contracts enforced",
-            "zh": "模型服务协议契约强制执行"
+            "en": "Provider recovery waiting is bounded and surfaced",
+            "zh": "供应商恢复等待加上限并醒目提示"
           },
           "body": {
-            "en": "Changing a provider's API format no longer produces invalid routes. Conflicts are rejected with recommended endpoints, and failures show clear diagnostics.",
-            "zh": "更改模型服务的 API 格式不再产生无效路由。冲突会被拒绝并给出推荐端点，失败时显示清晰的诊断信息。"
+            "en": "A turn on a flaky network or overloaded provider no longer waits indefinitely. After a total waiting budget of 10 minutes, the turn ends with a clear, actionable error.",
+            "zh": "在网络不稳定或供应商过载时，回合不再无限等待。总等待预算为 10 分钟后，回合会以清晰、可操作的错误结束。"
           },
           "refs": [
-            9942
+            9899
           ]
         },
         {
@@ -265,46 +162,12 @@
             "desktop"
           ],
           "title": {
-            "en": "Compaction un-stuck for thinking models and unnumbered overflows",
-            "zh": "思考型模型与无数字超窗的分段压缩已修复"
-          },
-          "body": {
-            "en": "Summaries from thinking models are now recognized, and provider overflows without token numbers trigger the chunked fallback correctly.",
-            "zh": "思考型模型的摘要现在能被识别，无 token 数字的模型服务超窗也能正确触发分段回退。"
-          },
-          "refs": [
-            9882
-          ]
-        },
-        {
-          "kind": "fixed",
-          "targets": [
-            "desktop"
-          ],
-          "title": {
-            "en": "Summary-request overflow recovery",
-            "zh": "摘要请求超窗恢复"
-          },
-          "body": {
-            "en": "Sessions that exceed the context window can now recover through a ladder of fallbacks, including truncation rescue, instead of failing repeatedly.",
-            "zh": "超出上下文窗口的会话现在可以通过一系列回退（包括截断救援）恢复，而不是反复失败。"
-          },
-          "refs": [
-            9879
-          ]
-        },
-        {
-          "kind": "fixed",
-          "targets": [
-            "desktop"
-          ],
-          "title": {
-            "en": "Parallel tool cancellation bounded",
+            "en": "Parallel tool cancellation is bounded",
             "zh": "并行工具取消有界化"
           },
           "body": {
-            "en": "A tool that ignores cancellation no longer wedges the whole turn. After a 15-second grace period, the turn continues with an explicit interrupted result.",
-            "zh": "忽略取消的工具不再卡住整个回合。15 秒宽限期后，回合会以明确的中断结果继续。"
+            "en": "A tool that ignores cancellation no longer wedges the whole turn. After a bounded grace period, the turn abandons the straggler and reports an explicit interrupted result.",
+            "zh": "忽略取消的工具不再使整个回合卡住。在有界的宽限期后，回合会放弃掉队者并报告明确的已中断结果。"
           },
           "refs": [
             9901
@@ -316,12 +179,29 @@
             "desktop"
           ],
           "title": {
-            "en": "Rejected backend calls contained",
-            "zh": "后端调用失败被妥善处理"
+            "en": "Sessions stay listed after a crash",
+            "zh": "崩溃后会话不再从侧栏消失"
           },
           "body": {
-            "en": "Errors in the recovery-lineage dialog no longer trigger a full-screen crash overlay. They are toasted and logged as ordinary errors.",
-            "zh": "恢复谱系对话框中的错误不再触发全屏崩溃遮罩。它们会作为普通错误提示并记录。"
+            "en": "After a hard kill mid-turn, conversations no longer disappear from the sidebar. Last-known preview and turn count are kept as display hints while repair runs.",
+            "zh": "在回合中途强制终止后，会话不再从侧栏消失。在修复运行时，保留最后已知的预览和回合计数作为显示提示。"
+          },
+          "refs": [
+            9902
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Rejected backend calls no longer crash the UI",
+            "zh": "后端调用失败改为提示而非崩溃遮罩"
+          },
+          "body": {
+            "en": "Errors from backend calls in the recovery-lineage dialog are now contained as toasts instead of replacing the window with a crash overlay.",
+            "zh": "恢复谱系对话框中后端调用的错误现在以提示形式呈现，而不是用崩溃遮罩替换窗口。"
           },
           "refs": [
             9900
@@ -333,12 +213,131 @@
             "desktop"
           ],
           "title": {
-            "en": "Settings component layout ownership restored",
-            "zh": "设置组件布局所有权已恢复"
+            "en": "Compaction un-stuck on thinking-model summaries and unnumbered overflows",
+            "zh": "修复思考型模型摘要与无数字超窗导致的分段压缩死锁"
           },
           "body": {
-            "en": "The model assignment matrix no longer wraps incorrectly. Shared layout defaults have lower specificity so component layouts retain control.",
-            "zh": "模型分配矩阵不再错误换行。共享布局默认值降低了优先级，组件布局重新获得控制权。"
+            "en": "Compaction no longer fails on thinking-model summaries that put the briefing in reasoning_content, and provider overflows without token numbers now trigger the chunked fallback.",
+            "zh": "压缩不再因思考型模型将摘要放在 reasoning_content 中而失败，且无 token 数字的供应商超窗现在会触发分段回退。"
+          },
+          "refs": [
+            9882
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Summary-request overflow self-recovers and rescues over-ceiling context",
+            "zh": "摘要请求超窗自恢复与硬上限截断救援"
+          },
+          "body": {
+            "en": "When a summary request overflows, the system now recalibrates, re-plans a smaller prefix, and falls back to transcript form or truncation rescue instead of retrying the identical request.",
+            "zh": "当摘要请求超窗时，系统现在会重新校准、重新规划更小的前缀，并回退到转录形式或截断救援，而不是重试相同的请求。"
+          },
+          "refs": [
+            9879
+          ]
+        },
+        {
+          "kind": "improved",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Unified settings selection controls",
+            "zh": "统一设置选择组件与模型偏好布局"
+          },
+          "body": {
+            "en": "Settings pages now use shared compact SettingsSelect and SettingsOptions components, providing consistent sizing, focus states, and keyboard behavior. Model preferences are grouped with vertically stacked runtime preferences.",
+            "zh": "设置页面现在使用共享的紧凑 SettingsSelect 和 SettingsOptions 组件，提供一致的尺寸、焦点状态和键盘行为。模型偏好与垂直堆叠的运行时偏好分组。"
+          },
+          "refs": [
+            9938
+          ]
+        },
+        {
+          "kind": "improved",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Provider connection protocol contracts enforced",
+            "zh": "系统修复模型连接协议与错误恢复"
+          },
+          "body": {
+            "en": "Changing a saved provider connection's API format no longer creates invalid routes. Protocol conflicts are rejected with a recommended endpoint, and provider failures reload as their original error.",
+            "zh": "更改已保存的供应商连接的 API 格式不再产生无效路由。协议冲突会以推荐端点被拒绝，供应商失败会以其原始错误重新加载。"
+          },
+          "refs": [
+            9942
+          ]
+        },
+        {
+          "kind": "improved",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Model settings preserved and DeepSeek protocol migrated",
+            "zh": "完善模型配置与 DeepSeek 协议迁移"
+          },
+          "body": {
+            "en": "Custom model IDs are now preserved exactly, and existing official DeepSeek connections are migrated to Chat Completions as the default protocol.",
+            "zh": "自定义模型 ID 现在被精确保留，现有的官方 DeepSeek 连接迁移到 Chat Completions 作为默认协议。"
+          },
+          "refs": [
+            9947
+          ]
+        },
+        {
+          "kind": "improved",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Desktop checks shortened and signed release artifacts reused",
+            "zh": "缩短桌面检查并复用已签名发版产物"
+          },
+          "body": {
+            "en": "Desktop PR checks now share frontend build artifacts and run tests concurrently, and stable releases reuse the signed artifacts from preflight.",
+            "zh": "桌面 PR 检查现在共享前端构建产物并并发运行测试，稳定版发布复用预检的已签名产物。"
+          },
+          "refs": [
+            9943
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Memory screen baseline settled before judging drift",
+            "zh": "内存筛查先稳定基线再判定漂移"
+          },
+          "body": {
+            "en": "The app-memory screen now settles the baseline before comparing counters, preventing false drift reports from a noisy first sample.",
+            "zh": "应用内存筛查现在在比较计数器之前稳定基线，防止因嘈杂的第一个样本而产生错误的漂移报告。"
+          },
+          "refs": [
+            9950
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Settings component layout ownership preserved",
+            "zh": "修复设置组件布局所有权"
+          },
+          "body": {
+            "en": "The model assignment matrix in Settings no longer wraps the connection label below the purpose. Shared layout defaults have lower specificity so component layouts retain ownership.",
+            "zh": "设置中的模型分配矩阵不再将连接标签换行到用途下方。共享布局默认值具有较低的特异性，因此组件布局保留所有权。"
           },
           "refs": [
             9914
@@ -350,50 +349,49 @@
             "desktop"
           ],
           "title": {
-            "en": "Memory screening baseline stabilized",
-            "zh": "内存筛查基线已稳定"
+            "en": "Context admission cancellation preserved",
+            "zh": "修复上下文准备入口的取消语义"
           },
           "body": {
-            "en": "The app-memory benchmark now settles its baseline before judging drift, preventing false positives from noisy first samples.",
-            "zh": "应用内存基准测试现在在判定漂移前会稳定基线，防止因首个样本噪声而产生误报。"
+            "en": "A context preparation request cancelled before admission no longer returns success through a fast path. Cancellation is checked before and after acquiring the maintenance lock.",
+            "zh": "在准入前取消的上下文准备请求不再通过快速路径返回成功。在获取维护锁之前和之后都会检查取消。"
           },
           "refs": [
-            9950
+            9903
           ]
         },
         {
           "kind": "fixed",
           "targets": [
-            "service"
+            "desktop"
           ],
           "title": {
-            "en": "Windows CI queue no longer blocked",
-            "zh": "Windows CI 队列不再阻塞"
+            "en": "Windows WebView2 selection smoke bounded",
+            "zh": "为 Windows WebView2 选择测试加上限，避免阻塞 CI 队列"
           },
           "body": {
-            "en": "The desktop-windows job now has a 45-minute timeout and bounded WebView2 smoke step, preventing hung processes from holding the concurrency group.",
-            "zh": "desktop-windows 作业现在有 45 分钟超时和有界的 WebView2 冒烟步骤，防止挂起的进程占用并发组。"
+            "en": "The desktop-windows job now has a job-level timeout and the native selection smoke kills the whole process tree on timeout, preventing CI queue blockage.",
+            "zh": "desktop-windows 作业现在有作业级超时，原生选择测试在超时时会终止整个进程树，防止 CI 队列阻塞。"
           },
           "refs": [
             9948
           ]
         },
         {
-          "kind": "improved",
+          "kind": "fixed",
           "targets": [
-            "desktop",
-            "service"
+            "desktop"
           ],
           "title": {
-            "en": "Desktop CI checks shortened and release artifacts reused",
-            "zh": "桌面 CI 检查缩短并复用发版产物"
+            "en": "Race-suite tests deterministic and test job bounded",
+            "zh": "让两个 race 测试确定化并为 test job 加上限"
           },
           "body": {
-            "en": "Frontend bindings are built once and shared across jobs, and stable releases reuse signed artifacts from preflight, reducing CI time.",
-            "zh": "前端绑定只构建一次并在作业间共享，稳定版发版复用预检的签名产物，减少 CI 时间。"
+            "en": "Two timing-sensitive race tests are now deterministic, and the test job has a job-level timeout to prevent wedged Windows steps from holding the CI concurrency group.",
+            "zh": "两个对时序敏感的 race 测试现在具有确定性，test 作业有作业级超时，防止卡住的 Windows 步骤占用 CI 并发组。"
           },
           "refs": [
-            9943
+            9956
           ]
         },
         {
@@ -440,11 +438,11 @@
               "cli"
             ],
             "title": {
-              "en": "Append-only session log with version heads",
+              "en": "Append-only session logs with version heads",
               "zh": "仅追加会话日志与版本 head"
             },
             "body": {
-              "en": "Sessions now use an append-only DAG log (schema 2) that records every change as a version head. Fork, rewind, and version selection happen in place without creating separate files, improving reliability and enabling concurrent writers.",
+              "en": "Sessions now use an append-only DAG log (schema 2), recording every change as a version head. Forking, rewinding, and version selection happen within the same log instead of creating separate files, improving reliability and supporting concurrent writers.",
               "zh": "会话现在使用仅追加 DAG 日志（schema 2），将每次更改记录为版本 head。分叉、回退和版本选择均在同一日志内完成，不再创建单独文件，提高了可靠性并支持并发写入。"
             },
             "refs": [
@@ -472,8 +470,8 @@
               "zh": "独立网页搜索模型"
             },
             "body": {
-              "en": "You can now assign a dedicated connection and model for web search queries in Model preferences. Automatic remains the default, and explicit assignments respect the target connection's search switch.",
-              "zh": "现在可以在模型偏好中为网页搜索查询指定专用连接和模型。自动模式仍为默认，显式分配会遵循目标连接的搜索开关。"
+              "en": "You can now specify a dedicated connection and model for web search queries in Model preferences. Automatic remains the default and preserves existing selection behavior.",
+              "zh": "现在可以在模型偏好中为网页搜索查询指定专用连接和模型。自动模式仍为默认，并保留现有选择行为。"
             },
             "refs": [
               9945
@@ -489,8 +487,8 @@
               "zh": "统一本地图片与工具图片识别"
             },
             "body": {
-              "en": "Local image paths now have a built-in route to visual input via view_image(path), and images returned by tools share the existing image-summary service. Native vision remains the first choice.",
-              "zh": "本地图片路径现在通过 view_image(path) 内置支持视觉输入，工具返回的图片也共享现有的图片摘要服务。原生视觉仍为首选。"
+              "en": "Add view_image(path) and share the existing image-summary service between user attachments and all successful structured tool-image results, including MCP and on-demand MCP tools.",
+              "zh": "新增 view_image(path)，并在用户附件与所有成功的结构化工具图片结果（包括 MCP 和按需 MCP 工具）之间共享现有图片摘要服务。"
             },
             "refs": [
               9933
@@ -520,11 +518,11 @@
             ],
             "title": {
               "en": "Unified settings selection controls",
-              "zh": "统一设置选择组件"
+              "zh": "统一设置选择组件与模型偏好布局"
             },
             "body": {
-              "en": "Settings pages now share compact SettingsSelect and SettingsOptions components, providing consistent sizing, focus states, and keyboard behavior. Model preferences are grouped with runtime preferences for a clearer layout.",
-              "zh": "设置页面现在共享紧凑的 SettingsSelect 和 SettingsOptions 组件，提供一致的尺寸、焦点状态和键盘行为。模型偏好与运行时偏好分组，布局更清晰。"
+              "en": "Settings pages now use shared compact SettingsSelect and SettingsOptions components, providing consistent sizing, focus states, and keyboard behavior. Model preferences are grouped with vertically stacked runtime preferences.",
+              "zh": "设置页面现在使用共享的紧凑 SettingsSelect 和 SettingsOptions 组件，提供一致的尺寸、焦点状态和键盘行为。模型偏好与垂直堆叠的运行时偏好分组。"
             },
             "refs": [
               9938
@@ -532,16 +530,47 @@
           },
           {
             "targets": [
-              "desktop",
-              "service"
+              "desktop"
             ],
             "title": {
-              "en": "Desktop CI checks shortened and release artifacts reused",
-              "zh": "桌面 CI 检查缩短并复用发版产物"
+              "en": "Provider connection protocol contracts enforced",
+              "zh": "系统修复模型连接协议与错误恢复"
             },
             "body": {
-              "en": "Frontend bindings are built once and shared across jobs, and stable releases reuse signed artifacts from preflight, reducing CI time.",
-              "zh": "前端绑定只构建一次并在作业间共享，稳定版发版复用预检的签名产物，减少 CI 时间。"
+              "en": "Changing a saved provider connection's API format no longer creates invalid routes. Protocol conflicts are rejected with a recommended endpoint, and provider failures reload as their original error.",
+              "zh": "更改已保存的供应商连接的 API 格式不再产生无效路由。协议冲突会以推荐端点被拒绝，供应商失败会以其原始错误重新加载。"
+            },
+            "refs": [
+              9942
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Model settings preserved and DeepSeek protocol migrated",
+              "zh": "完善模型配置与 DeepSeek 协议迁移"
+            },
+            "body": {
+              "en": "Custom model IDs are now preserved exactly, and existing official DeepSeek connections are migrated to Chat Completions as the default protocol.",
+              "zh": "自定义模型 ID 现在被精确保留，现有的官方 DeepSeek 连接迁移到 Chat Completions 作为默认协议。"
+            },
+            "refs": [
+              9947
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Desktop checks shortened and signed release artifacts reused",
+              "zh": "缩短桌面检查并复用已签名发版产物"
+            },
+            "body": {
+              "en": "Desktop PR checks now share frontend build artifacts and run tests concurrently, and stable releases reuse the signed artifacts from preflight.",
+              "zh": "桌面 PR 检查现在共享前端构建产物并并发运行测试，稳定版发布复用预检的已签名产物。"
             },
             "refs": [
               9943
@@ -590,60 +619,12 @@
               "desktop"
             ],
             "title": {
-              "en": "Stop button now interrupts reliably",
-              "zh": "停止按钮现在可靠中断"
+              "en": "Model services navigation fixed",
+              "zh": "修复模型服务入口跳错页面"
             },
             "body": {
-              "en": "Stop is now a session-level unconditional interrupt. Stale turn IDs no longer block cancellation, and the UI retries fence rejections automatically.",
-              "zh": "停止现在是会话级无条件中断。过期的回合 ID 不再阻止取消，界面会自动重试被拒绝的请求。"
-            },
-            "refs": [
-              9898
-            ]
-          },
-          {
-            "targets": [
-              "desktop"
-            ],
-            "title": {
-              "en": "Provider recovery waiting is bounded",
-              "zh": "模型服务恢复等待有上限"
-            },
-            "body": {
-              "en": "Turns no longer wait indefinitely on flaky networks. A 10-minute recovery budget ends the turn with a clear, actionable error instead of spinning forever.",
-              "zh": "回合不再在网络不稳定时无限等待。10 分钟的恢复预算会以清晰、可操作的错误结束回合，而不是一直旋转。"
-            },
-            "refs": [
-              9899
-            ]
-          },
-          {
-            "targets": [
-              "desktop"
-            ],
-            "title": {
-              "en": "Sessions stay visible after crashes",
-              "zh": "崩溃后会话保持可见"
-            },
-            "body": {
-              "en": "After a hard kill mid-turn, conversations no longer disappear from the sidebar. Last-known preview and turn counts are preserved while repair runs.",
-              "zh": "回合中途强制终止后，对话不再从侧栏消失。修复期间保留最后已知的预览和回合计数。"
-            },
-            "refs": [
-              9902
-            ]
-          },
-          {
-            "targets": [
-              "desktop"
-            ],
-            "title": {
-              "en": "Model services navigation restored",
-              "zh": "模型服务导航已恢复"
-            },
-            "body": {
-              "en": "Clicking Model services no longer opens Model preferences. The navigation store now preserves the requested page correctly.",
-              "zh": "点击“模型服务”不再打开“模型偏好”。导航存储现在能正确保留请求的页面。"
+              "en": "Clicking Model services no longer opens Model preferences. The navigation store now preserves the requested page and remembered settings target.",
+              "zh": "点击“模型服务”不再进入“模型偏好”。导航 store 现在保留请求的页面和记忆的设置目标。"
             },
             "refs": [
               9951
@@ -654,15 +635,15 @@
               "desktop"
             ],
             "title": {
-              "en": "DeepSeek protocol migration and model identity fixes",
-              "zh": "DeepSeek 协议迁移与模型标识修复"
+              "en": "Stop is now a session-level interrupt",
+              "zh": "停止按钮改为会话级无条件中断"
             },
             "body": {
-              "en": "Custom model IDs are preserved exactly, and official DeepSeek connections now default to Chat Completions with a one-time migration for existing endpoints.",
-              "zh": "自定义模型 ID 被精确保留，官方 DeepSeek 连接现在默认使用 Chat Completions，并对现有端点执行一次性迁移。"
+              "en": "Stop now interrupts whatever is running in the session, even if the turn ID is stale. Only an idle tab is rejected with a stable error code.",
+              "zh": "停止现在会中断会话中正在运行的内容，即使回合 ID 已过期。只有空闲标签页才会以稳定错误代码被拒绝。"
             },
             "refs": [
-              9947
+              9898
             ]
           },
           {
@@ -670,15 +651,15 @@
               "desktop"
             ],
             "title": {
-              "en": "Provider protocol contracts enforced",
-              "zh": "模型服务协议契约强制执行"
+              "en": "Provider recovery waiting is bounded and surfaced",
+              "zh": "供应商恢复等待加上限并醒目提示"
             },
             "body": {
-              "en": "Changing a provider's API format no longer produces invalid routes. Conflicts are rejected with recommended endpoints, and failures show clear diagnostics.",
-              "zh": "更改模型服务的 API 格式不再产生无效路由。冲突会被拒绝并给出推荐端点，失败时显示清晰的诊断信息。"
+              "en": "A turn on a flaky network or overloaded provider no longer waits indefinitely. After a total waiting budget of 10 minutes, the turn ends with a clear, actionable error.",
+              "zh": "在网络不稳定或供应商过载时，回合不再无限等待。总等待预算为 10 分钟后，回合会以清晰、可操作的错误结束。"
             },
             "refs": [
-              9942
+              9899
             ]
           },
           {
@@ -686,44 +667,12 @@
               "desktop"
             ],
             "title": {
-              "en": "Compaction un-stuck for thinking models and unnumbered overflows",
-              "zh": "思考型模型与无数字超窗的分段压缩已修复"
-            },
-            "body": {
-              "en": "Summaries from thinking models are now recognized, and provider overflows without token numbers trigger the chunked fallback correctly.",
-              "zh": "思考型模型的摘要现在能被识别，无 token 数字的模型服务超窗也能正确触发分段回退。"
-            },
-            "refs": [
-              9882
-            ]
-          },
-          {
-            "targets": [
-              "desktop"
-            ],
-            "title": {
-              "en": "Summary-request overflow recovery",
-              "zh": "摘要请求超窗恢复"
-            },
-            "body": {
-              "en": "Sessions that exceed the context window can now recover through a ladder of fallbacks, including truncation rescue, instead of failing repeatedly.",
-              "zh": "超出上下文窗口的会话现在可以通过一系列回退（包括截断救援）恢复，而不是反复失败。"
-            },
-            "refs": [
-              9879
-            ]
-          },
-          {
-            "targets": [
-              "desktop"
-            ],
-            "title": {
-              "en": "Parallel tool cancellation bounded",
+              "en": "Parallel tool cancellation is bounded",
               "zh": "并行工具取消有界化"
             },
             "body": {
-              "en": "A tool that ignores cancellation no longer wedges the whole turn. After a 15-second grace period, the turn continues with an explicit interrupted result.",
-              "zh": "忽略取消的工具不再卡住整个回合。15 秒宽限期后，回合会以明确的中断结果继续。"
+              "en": "A tool that ignores cancellation no longer wedges the whole turn. After a bounded grace period, the turn abandons the straggler and reports an explicit interrupted result.",
+              "zh": "忽略取消的工具不再使整个回合卡住。在有界的宽限期后，回合会放弃掉队者并报告明确的已中断结果。"
             },
             "refs": [
               9901
@@ -734,12 +683,28 @@
               "desktop"
             ],
             "title": {
-              "en": "Rejected backend calls contained",
-              "zh": "后端调用失败被妥善处理"
+              "en": "Sessions stay listed after a crash",
+              "zh": "崩溃后会话不再从侧栏消失"
             },
             "body": {
-              "en": "Errors in the recovery-lineage dialog no longer trigger a full-screen crash overlay. They are toasted and logged as ordinary errors.",
-              "zh": "恢复谱系对话框中的错误不再触发全屏崩溃遮罩。它们会作为普通错误提示并记录。"
+              "en": "After a hard kill mid-turn, conversations no longer disappear from the sidebar. Last-known preview and turn count are kept as display hints while repair runs.",
+              "zh": "在回合中途强制终止后，会话不再从侧栏消失。在修复运行时，保留最后已知的预览和回合计数作为显示提示。"
+            },
+            "refs": [
+              9902
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Rejected backend calls no longer crash the UI",
+              "zh": "后端调用失败改为提示而非崩溃遮罩"
+            },
+            "body": {
+              "en": "Errors from backend calls in the recovery-lineage dialog are now contained as toasts instead of replacing the window with a crash overlay.",
+              "zh": "恢复谱系对话框中后端调用的错误现在以提示形式呈现，而不是用崩溃遮罩替换窗口。"
             },
             "refs": [
               9900
@@ -750,12 +715,60 @@
               "desktop"
             ],
             "title": {
-              "en": "Settings component layout ownership restored",
-              "zh": "设置组件布局所有权已恢复"
+              "en": "Compaction un-stuck on thinking-model summaries and unnumbered overflows",
+              "zh": "修复思考型模型摘要与无数字超窗导致的分段压缩死锁"
             },
             "body": {
-              "en": "The model assignment matrix no longer wraps incorrectly. Shared layout defaults have lower specificity so component layouts retain control.",
-              "zh": "模型分配矩阵不再错误换行。共享布局默认值降低了优先级，组件布局重新获得控制权。"
+              "en": "Compaction no longer fails on thinking-model summaries that put the briefing in reasoning_content, and provider overflows without token numbers now trigger the chunked fallback.",
+              "zh": "压缩不再因思考型模型将摘要放在 reasoning_content 中而失败，且无 token 数字的供应商超窗现在会触发分段回退。"
+            },
+            "refs": [
+              9882
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Summary-request overflow self-recovers and rescues over-ceiling context",
+              "zh": "摘要请求超窗自恢复与硬上限截断救援"
+            },
+            "body": {
+              "en": "When a summary request overflows, the system now recalibrates, re-plans a smaller prefix, and falls back to transcript form or truncation rescue instead of retrying the identical request.",
+              "zh": "当摘要请求超窗时，系统现在会重新校准、重新规划更小的前缀，并回退到转录形式或截断救援，而不是重试相同的请求。"
+            },
+            "refs": [
+              9879
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Memory screen baseline settled before judging drift",
+              "zh": "内存筛查先稳定基线再判定漂移"
+            },
+            "body": {
+              "en": "The app-memory screen now settles the baseline before comparing counters, preventing false drift reports from a noisy first sample.",
+              "zh": "应用内存筛查现在在比较计数器之前稳定基线，防止因嘈杂的第一个样本而产生错误的漂移报告。"
+            },
+            "refs": [
+              9950
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Settings component layout ownership preserved",
+              "zh": "修复设置组件布局所有权"
+            },
+            "body": {
+              "en": "The model assignment matrix in Settings no longer wraps the connection label below the purpose. Shared layout defaults have lower specificity so component layouts retain ownership.",
+              "zh": "设置中的模型分配矩阵不再将连接标签换行到用途下方。共享布局默认值具有较低的特异性，因此组件布局保留所有权。"
             },
             "refs": [
               9914
@@ -766,31 +779,47 @@
               "desktop"
             ],
             "title": {
-              "en": "Memory screening baseline stabilized",
-              "zh": "内存筛查基线已稳定"
+              "en": "Context admission cancellation preserved",
+              "zh": "修复上下文准备入口的取消语义"
             },
             "body": {
-              "en": "The app-memory benchmark now settles its baseline before judging drift, preventing false positives from noisy first samples.",
-              "zh": "应用内存基准测试现在在判定漂移前会稳定基线，防止因首个样本噪声而产生误报。"
+              "en": "A context preparation request cancelled before admission no longer returns success through a fast path. Cancellation is checked before and after acquiring the maintenance lock.",
+              "zh": "在准入前取消的上下文准备请求不再通过快速路径返回成功。在获取维护锁之前和之后都会检查取消。"
             },
             "refs": [
-              9950
+              9903
             ]
           },
           {
             "targets": [
-              "service"
+              "desktop"
             ],
             "title": {
-              "en": "Windows CI queue no longer blocked",
-              "zh": "Windows CI 队列不再阻塞"
+              "en": "Windows WebView2 selection smoke bounded",
+              "zh": "为 Windows WebView2 选择测试加上限，避免阻塞 CI 队列"
             },
             "body": {
-              "en": "The desktop-windows job now has a 45-minute timeout and bounded WebView2 smoke step, preventing hung processes from holding the concurrency group.",
-              "zh": "desktop-windows 作业现在有 45 分钟超时和有界的 WebView2 冒烟步骤，防止挂起的进程占用并发组。"
+              "en": "The desktop-windows job now has a job-level timeout and the native selection smoke kills the whole process tree on timeout, preventing CI queue blockage.",
+              "zh": "desktop-windows 作业现在有作业级超时，原生选择测试在超时时会终止整个进程树，防止 CI 队列阻塞。"
             },
             "refs": [
               9948
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Race-suite tests deterministic and test job bounded",
+              "zh": "让两个 race 测试确定化并为 test job 加上限"
+            },
+            "body": {
+              "en": "Two timing-sensitive race tests are now deterministic, and the test job has a job-level timeout to prevent wedged Windows steps from holding the CI concurrency group.",
+              "zh": "两个对时序敏感的 race 测试现在具有确定性，test 作业有作业级超时，防止卡住的 Windows 步骤占用 CI 并发组。"
+            },
+            "refs": [
+              9956
             ]
           }
         ]
@@ -799,6 +828,7 @@
       "risks": [],
       "contributors": [
         "SivanCola",
+        "github-actions[bot]",
         "XTLine",
         "Linearl"
       ],
