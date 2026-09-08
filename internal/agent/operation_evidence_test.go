@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"reasonix/internal/runtimepolicy"
+
 	"reasonix/internal/event"
 	"reasonix/internal/evidence"
 	"reasonix/internal/provider"
@@ -16,15 +18,19 @@ import (
 // evidenceWriter is a stand-in writer whose declared target is fixed, so the
 // tests exercise the host check rather than a built-in's own resolution.
 type evidenceWriter struct {
-	target tool.EvidenceTargetInfo
-	err    error
+	target     tool.EvidenceTargetInfo
+	err        error
+	executions *int
 }
 
 func (evidenceWriter) Name() string            { return "write_file" }
 func (evidenceWriter) Description() string     { return "fake writer" }
 func (evidenceWriter) Schema() json.RawMessage { return json.RawMessage(`{"type":"object"}`) }
 func (evidenceWriter) ReadOnly() bool          { return false }
-func (evidenceWriter) Execute(context.Context, json.RawMessage) (string, error) {
+func (w evidenceWriter) Execute(context.Context, json.RawMessage) (string, error) {
+	if w.executions != nil {
+		*w.executions++
+	}
 	return "", nil
 }
 
@@ -209,5 +215,54 @@ func TestEvidenceGateBlocksUnknownScopeWriterAfterABlock(t *testing.T) {
 	out, blocked := a.applyEvidenceGates(context.Background(), plan)
 	if !blocked || !strings.Contains(out.output, "cannot declare which files it changes") {
 		t.Fatalf("an unknown-scope writer must not route around the block: %+v (blocked=%v)", out, blocked)
+	}
+}
+
+// TestEvidenceGateHonorsAnExplicitRebuildInstruction pins the one waiver: the
+// user's own instruction names the file and asks for a full rewrite. The model
+// cannot grant it to itself, and it never covers a file the instruction does
+// not name.
+func TestEvidenceGateHonorsAnExplicitRebuildInstruction(t *testing.T) {
+	writer := evidenceWriter{target: tool.EvidenceTargetInfo{Path: "/w/notes.md", WholeFile: true}}
+	a, _ := newEvidenceAgent(t, writer, true)
+	a.turn.turnInput = "Please rewrite notes.md from scratch."
+	a.turn.constraints = runtimepolicy.ParseConstraints(a.turn.turnInput)
+	if out, blocked := runEvidenceGate(a, "/w/notes.md"); blocked {
+		t.Fatalf("an explicit rebuild instruction must waive the read: %+v", out)
+	}
+
+	other := evidenceWriter{target: tool.EvidenceTargetInfo{Path: "/w/other.md", WholeFile: true}}
+	b, _ := newEvidenceAgent(t, other, true)
+	b.turn.turnInput = a.turn.turnInput
+	b.turn.constraints = runtimepolicy.ParseConstraints(b.turn.turnInput)
+	if out, blocked := runEvidenceGate(b, "/w/other.md"); !blocked {
+		t.Fatalf("a file the instruction does not name must still require evidence: %+v", out)
+	}
+
+	c, _ := newEvidenceAgent(t, writer, true)
+	if out, blocked := runEvidenceGate(c, "/w/notes.md"); !blocked {
+		t.Fatalf("without a user instruction the requirement stands: %+v", out)
+	}
+}
+
+// TestEvidencePreflightBlocksBeforeTheBatchRuns pins the batch rule: a writer
+// whose evidence is missing is reported without ever starting.
+func TestEvidencePreflightBlocksBeforeTheBatchRuns(t *testing.T) {
+	executions := 0
+	writer := evidenceWriter{
+		target:     tool.EvidenceTargetInfo{Path: "/w/a.go", WholeFile: true, Hashes: hashesFor("alpha")},
+		executions: &executions,
+	}
+	reg := tool.NewRegistry()
+	reg.Add(writer)
+	a := New(&userInputCaptureProvider{}, reg, NewSession("system"), Options{}, event.Discard)
+	a.task.ledger = evidence.NewLedger()
+
+	batch := a.executeBatch(context.Background(), &a.turn, []provider.ToolCall{{ID: "c1", Name: "write_file", Arguments: `{"path":"/w/a.go"}`}})
+	if executions != 0 {
+		t.Fatalf("a blocked call must not start: executions=%d", executions)
+	}
+	if len(batch.results) != 1 || !strings.Contains(batch.results[0], "evidence required") {
+		t.Fatalf("batch results = %v, want a blocked evidence result", batch.results)
 	}
 }

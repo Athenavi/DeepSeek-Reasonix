@@ -107,8 +107,8 @@
 | 步骤 | 内容 | 状态 |
 | --- | --- | --- |
 | 1 | 来源身份、稳定读取 ID、游标及覆盖判定 | 已完成（19d91b570） |
-| 2 | 真实 writer 证据要求与统一预检 | 已完成（85334ef34、3568c26a3）；多目标批次预检待有工具声明多目标后生效 |
-| 3 | 预算、有界续读及旧回执兼容 | 已完成（72ddddfe2）；旧策略回执保留为兼容适配器，新流程不要求调用 |
+| 2 | 真实 writer 证据要求与统一预检 | 已完成：writer 声明、统一预检、批次级预检先于执行、未知写范围保守阻止、用户显式重建授权 |
+| 3 | 预算、有界续读及旧回执兼容 | 已完成：预算与阶梯、旧策略回执作为兼容适配器保留（仍按主机证据校验，5 个测试覆盖），新流程不要求调用 |
 | 4 | 结构化事件、单卡 UI、跨端与本地化 | 已完成：事件、桌面状态行、CLI 状态行与 en/zh/zh-TW 文案 |
 | 5 | 默认启用新协调器，移除冲突的旧执行路径 | 已完成：新行为即默认，Options.ReadPipeline 只保留主机内部回退开关 |
 | 6 | 方案文档、工具说明、兼容说明与验收记录 | 已完成：工具说明、方案、验收矩阵与固定任务集对比 |
@@ -144,6 +144,8 @@
 | 明确全文任务分页到 EOF | `TestExplicitFullReadContinuesSourcePagesToEOF` |
 | 覆盖/删除/精确编辑的证据规则 | `TestEvidenceGateBlocksAnUnreadOverwrite`、`TestEvidenceGateAllowsAfterTheModelSawTheContent`、`TestEvidenceGateRejectsStaleContent`、`TestWriteFileDeclaresWholeFileEvidenceOnlyForOverwrites` |
 | 未知写范围不绕过证据阻塞 | `TestEvidenceGateBlocksUnknownScopeWriterAfterABlock`、`TestEvidenceGateLeavesUndeclaredWritersAlone` |
+| 批次级预检先于执行 | `TestEvidencePreflightBlocksBeforeTheBatchRuns` |
+| 用户显式重建授权（模型不能自授） | `TestEvidenceGateHonorsAnExplicitRebuildInstruction`、`TestParseConstraintsRecognizesAnExplicitRebuild` |
 | 重复页与无进展有界退出 | `TestRepeatedPageIsNotProgress`、`TestStalledPagesPivotOnceThenPause` |
 | 预算耗尽与内容变化不重置 | `TestPageBudgetStopsContinuation`、`TestActiveTimeBudgetStopsContinuation`、`TestContentChangeDoesNotResetTheBudget` |
 | 未知上下文窗口不猜测 | `TestReadShadowNarrowsAnUnboundedFullRead` |
@@ -157,4 +159,6 @@
 | 乱序事件不回退 | `read-status-upsert.test.ts` |
 | 新回合清空上一回合状态 | `read-status-upsert.test.ts` |
 
-尚未由本仓库验证、需要真实环境执行：Windows WebView2 与 macOS WKWebView 的真实界面与滚动；Linux/Windows 的路径与换行行为；真实 provider 下的固定任务集对比（本仓库提供确定性对比harness，但成功率与 token 消耗需真实模型）。ACP 消费同一结构化事件，终端侧由 CLI 渲染。
+跨平台：`go test` 在 CI 的 ubuntu-latest、macos-latest、windows-latest 三平台矩阵上运行，因此路径、换行与文件替换的确定性用例由 CI 覆盖；本机只验证了 macOS。
+
+仍需真实环境执行：Windows 原生 WebView2 与 macOS WKWebView 的界面与滚动验收（需要真实桌面与交互）；真实 provider 下的任务集成功率与 token 对比（本仓库提供确定性 harness 覆盖轮数、读取次数、主机续读指令与放行写入数）。ACP 消费同一结构化事件，终端侧由 CLI 渲染。

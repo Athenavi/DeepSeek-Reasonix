@@ -57,6 +57,13 @@ func (a *Agent) checkOperationEvidence(ctx context.Context, call provider.ToolCa
 		return evidenceCheck{Satisfied: true, Supported: true}
 	}
 	check := evidenceCheck{Supported: true, Path: info.Path}
+	if info.WholeFile && a.rebuildAuthorized(info.Path) {
+		// The user explicitly asked to rebuild this file; the model cannot grant
+		// this to itself, and the instruction must name the file.
+		check.Satisfied = true
+		check.Reason = "user_authorized_rebuild"
+		return check
+	}
 	if info.WholeFile && len(info.Ranges) == 0 && len(info.Hashes) > 0 {
 		info.Ranges = []tool.ReadRange{{Start: 0, End: len(info.Hashes)}}
 	}
@@ -289,4 +296,44 @@ func (a *Agent) applyEvidenceGates(ctx context.Context, plan *toolCallPlan) (too
 	a.turn.evidenceBlocked.record(check.Path)
 	msg := describeEvidence(check, plan.call.Name)
 	return toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg)}, true
+}
+
+// rebuildAuthorized reports whether the user's own instruction explicitly asked
+// to rewrite this file. It is a host-side authorization, never a model claim.
+func (a *Agent) rebuildAuthorized(path string) bool {
+	if a == nil || !a.turn.constraints.AllowRebuild {
+		return false
+	}
+	text := strings.ToLower(a.turn.turnInput)
+	base := strings.ToLower(filepath.Base(path))
+	return text != "" && base != "" && strings.Contains(text, base)
+}
+
+// preflightEvidenceBatch evaluates every writer's declared evidence once for
+// the batch. A blocked call is reported without ever starting, so a batch that
+// mixes a read with a write cannot let the read pay for the write.
+func (a *Agent) preflightEvidenceBatch(ctx context.Context, calls []provider.ToolCall) map[int]toolOutcome {
+	blocked := map[int]toolOutcome{}
+	if a == nil || !a.reads.gates || a.task.ledger == nil || a.svc.tools == nil {
+		return blocked
+	}
+	boundary := observationBoundary(ctx, a.task.ledger.ObservationBoundary())
+	for i, call := range calls {
+		resolved, _, ambiguous := a.svc.tools.ResolveCall(call.Name)
+		if resolved == nil || len(ambiguous) > 0 || resolved.ReadOnly() {
+			continue
+		}
+		if _, anchored := resolved.(tool.AnchoredTextTarget); anchored {
+			// The anchor safety audit owns this writer.
+			continue
+		}
+		check := a.checkOperationEvidence(ctx, call, resolved, boundary)
+		if !check.Supported || check.Satisfied {
+			continue
+		}
+		a.turn.evidenceBlocked.record(check.Path)
+		msg := describeEvidence(check, call.Name)
+		blocked[i] = toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg)}
+	}
+	return blocked
 }

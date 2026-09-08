@@ -108,6 +108,10 @@ func (a *Agent) executeBatch(ctx context.Context, turn *turnRuntime, calls []pro
 	}
 
 	slots := newBatchSlots(calls)
+	// Evidence is evaluated once for the whole batch, before anything runs: a
+	// call whose writer cannot prove what it replaces never starts, and a read
+	// from this same batch can never satisfy it.
+	evidenceBlocked := a.preflightEvidenceBatch(ctx, calls)
 	results, outcomes, durations, startedAt := slots.results, slots.outcomes, slots.durations, slots.startedAt
 	ranParallel := make([]bool, len(calls))
 	batchStart := time.Now()
@@ -126,6 +130,11 @@ func (a *Agent) executeBatch(ctx context.Context, turn *turnRuntime, calls []pro
 	var batchErr error
 	var batchErrOnce sync.Once
 	run := func(s *batchSlots, i int) {
+		if pre, blocked := evidenceBlocked[i]; blocked {
+			s.outcomes[i] = pre
+			s.results[i] = pre.output
+			return
+		}
 		t, _, ambiguous := a.svc.tools.ResolveCall(s.calls[i].Name)
 		known := t != nil && len(ambiguous) == 0
 		writer := known && !t.ReadOnly()

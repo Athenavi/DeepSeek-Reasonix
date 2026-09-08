@@ -16,7 +16,11 @@ type Constraints struct {
 	AllowedChecks           []string
 	ForbidExternal          bool
 	RequireFullVerification bool
-	PlanModeReadOnly        bool
+	// AllowRebuild records that the user explicitly asked to rewrite a file
+	// completely. It only ever waives the read-before-overwrite requirement for
+	// a file the same instruction names; the model can never set it.
+	AllowRebuild     bool
+	PlanModeReadOnly bool
 	// PolicyFloor is the session quality floor, set from session state only —
 	// never parsed from user text. It stamps receipts at write time.
 	PolicyFloor taskcontract.PolicyFloor
@@ -46,6 +50,15 @@ func ParseConstraints(instruction string) Constraints {
 	}) {
 		c.RequireFullVerification = true
 		c.Notes = append(c.Notes, "user_require_full_verification")
+	}
+	if matchesAny(lower, []string{
+		"完全重写", "从头重写", "整个重写", "直接重写", "覆盖重写", "整个文件重写",
+		"from scratch", "rewrite it completely", "rewrite the file completely",
+		"overwrite it completely", "replace it entirely", "rebuild the file",
+		"rewrite this file", "rewrite the whole file",
+	}) {
+		c.AllowRebuild = true
+		c.Notes = append(c.Notes, "user_allow_rebuild")
 	}
 	if cmds := parseAllowedChecks(instruction); len(cmds) > 0 {
 		c.AllowedChecks = cmds
