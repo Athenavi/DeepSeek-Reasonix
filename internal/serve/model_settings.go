@@ -110,6 +110,11 @@ func (s *Server) applyModelSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid model settings snapshot", http.StatusBadRequest)
 		return
 	}
+	ref, ok := modelSettingsCatalogRef(request.Settings.Providers, request.Ref)
+	if !ok {
+		http.Error(w, "model is not included in the snapshot", http.StatusBadRequest)
+		return
+	}
 	s.bindMu.Lock()
 	defer s.bindMu.Unlock()
 	if !s.validateExpectedSessionLocked(w, r) {
@@ -119,22 +124,33 @@ func (s *Server) applyModelSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "cannot apply model settings while active work or background jobs are running", http.StatusConflict)
 		return
 	}
-	if view := s.modelSettingsStatusLocked(); view.Revision == request.Settings.Revision && view.Model == request.Ref {
+	if view := s.modelSettingsStatusLocked(); view.Revision == request.Settings.Revision && view.Model == ref {
 		writeJSON(w, view)
-		return
-	}
-	cfg := config.Default()
-	cfg.Providers = request.Settings.Providers
-	if _, ok := cfg.ResolveModel(request.Ref); !ok {
-		http.Error(w, "model is not included in the snapshot", http.StatusBadRequest)
 		return
 	}
 	previous := s.managedModels
 	s.managedModels = &request.Settings
-	if err := s.switchModelLocked(r.Context(), request.Ref); err != nil {
+	if err := s.switchModelLocked(r.Context(), ref); err != nil {
 		s.managedModels = previous
 		http.Error(w, fmt.Sprintf("apply saved model settings: %s", err), runtimeSwitchErrorStatus(err))
 		return
 	}
 	writeJSON(w, s.modelSettingsStatusLocked())
+}
+
+func modelSettingsCatalogRef(providers []config.ProviderEntry, requested string) (string, bool) {
+	requested = strings.TrimSpace(requested)
+	for _, entry := range providers {
+		models := entry.ChatModelList()
+		if len(models) == 0 {
+			models = entry.ModelList()
+		}
+		for _, model := range models {
+			ref := entry.Name + "/" + model
+			if requested == ref {
+				return ref, true
+			}
+		}
+	}
+	return "", false
 }

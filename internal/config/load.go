@@ -2486,7 +2486,7 @@ func mergeProviderModelOverride(dst *ProviderModelOverride, src ProviderModelOve
 
 func mergeModelLists(primary, extra []string) []string {
 	seen := map[string]bool{}
-	out := make([]string, 0, len(primary)+len(extra))
+	out := make([]string, 0, len(primary))
 	for _, list := range [][]string{primary, extra} {
 		for _, model := range list {
 			model = strings.TrimSpace(model)

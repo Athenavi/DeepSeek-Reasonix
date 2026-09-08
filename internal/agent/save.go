@@ -2215,5 +2215,5 @@ func NewSessionPath(dir, model string) string {
 	if safe == "" {
 		safe = "session"
 	}
-	return filepath.Join(dir, fmt.Sprintf("%s-%s.jsonl", time.Now().UTC().Format("20060102-150405.000000000"), safe))
+	return filepath.Join(dir, filepath.Base(fmt.Sprintf("%s-%s.jsonl", time.Now().UTC().Format("20060102-150405.000000000"), safe)))
 }

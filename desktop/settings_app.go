@@ -2050,7 +2050,7 @@ func (a *App) buildSettingReplacementController(tab *WorkspaceTab, snap tabRunti
 	if reload && oldCtrl != nil {
 		old, ok := oldCtrl.(*control.Controller)
 		if !ok {
-			return nil, normalizedTabRuntime{}, "", fmt.Errorf("reload runtime: controller is %T, want *control.Controller", oldCtrl)
+			return nil, normalizedTabRuntime{}, "", fmt.Errorf("reload runtime: controller does not support model snapshots")
 		}
 		res, err := rebuildTabRuntime(a, tab, old, opts)
 		if err != nil {
