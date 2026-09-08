@@ -188,11 +188,11 @@ eq(finalDeclaration(".provider-catalog__models", "overflow-wrap"), "anywhere", "
 eq(finalDeclaration(".provider-model-draft__list", "grid-auto-rows"), "min-content", "provider model rows grow with their content");
 eq(finalDeclaration(".provider-model-draft__option", "min-height"), undefined, "provider model cards do not force undersized rows");
 eq(finalDeclaration(".provider-model-draft__option", "overflow"), "hidden", "provider model cards contain overflowing controls");
-eq(finalDeclaration(".compact-ratio-presets", "width"), "100%", "compaction presets use the full settings control width");
-eq(finalDeclaration(".compact-ratio-presets .set-seg__btn", "flex"), "1 1 0", "three compaction presets share the available width equally");
-eq(finalDeclaration(".compact-ratio-presets .set-seg__btn", "flex-direction"), "column", "compaction presets place percentage and strategy on separate lines");
-eq(finalDeclaration(".compact-ratio-presets .set-seg__btn", "min-height"), "44px", "two-line compaction presets keep a stable target height");
-eq(finalDeclaration(".compact-ratio-presets .set-seg__btn", "white-space"), "normal", "compaction labels do not depend on ellipsis for their meaning");
+eq(finalDeclaration(".compact-ratio-choice-list", "width"), "100%", "compaction choices fit the settings control width");
+eq(finalDeclaration(".compact-ratio-choice__row", "display"), "grid", "compaction rows align radio, label, percentage and explanation");
+eq(finalDeclaration(".compact-ratio-choice__row", "min-height"), "40px", "compaction rows retain a stable click target");
+eq(finalDeclaration(".compact-ratio-choice__effect", "min-width"), "0", "compaction explanations can shrink and wrap");
+eq(finalDeclaration(".compact-ratio-choice__inline-input > span", "flex"), "0 0 auto", "percentage suffix remains visible beside the editable value");
 
 eq(finalDeclaration(".statusbar", "white-space"), "nowrap", "status bar keeps metrics on one row");
 eq(finalDeclaration(".statusbar", "overflow-y"), "hidden", "status bar hides vertical overflow");
