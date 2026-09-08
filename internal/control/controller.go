@@ -160,6 +160,7 @@ type Controller struct {
 	responseLanguage       string
 	reasoningLanguage      string
 	disableColdResumePrune bool // legacy; rewrite elision removed, still gates cold notice
+	headPolicy             sessionHeadPolicy
 	// testCacheColdAfter overrides cacheColdAfter() in tests. Zero uses the
 	// vendor-aware resolution from config.
 	testCacheColdAfter time.Duration
@@ -584,6 +585,10 @@ type Options struct {
 	// host user-turn snapshot rather than the cache-stable system prompt. Only
 	// Environment and Workspace are consumed; memory and skills stay live.
 	SessionContextStatic sessioncontext.Sections
+	// FileBranchesOnly keeps fork, branch, switch, and conversation rewind on
+	// separate session files even for schema-2 logs. The desktop sets it until
+	// its tabs bind to heads; every other frontend branches inside the log.
+	FileBranchesOnly bool
 	// DisableColdResumePrune suppresses the cold-resume cache-state notice.
 	// Resume never rewrites history regardless of this flag.
 	DisableColdResumePrune bool
@@ -711,6 +716,7 @@ func New(opts Options) *Controller {
 		responseLanguage:                  config.NormalizeLanguage(opts.ResponseLanguage),
 		reasoningLanguage:                 config.NormalizeReasoningLanguage(opts.ReasoningLanguage),
 		disableColdResumePrune:            opts.DisableColdResumePrune,
+		headPolicy:                        sessionHeadPolicy{fileBranchesOnly: opts.FileBranchesOnly},
 		shell:                             opts.Shell,
 		onRemember:                        opts.OnRemember,
 		onRememberPlanModeReadOnlyCommand: opts.OnRememberPlanModeReadOnlyCommand,

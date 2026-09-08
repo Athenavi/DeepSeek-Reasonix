@@ -137,3 +137,25 @@ func TestForkAtTurnCreatesRewindHeadInSameLog(t *testing.T) {
 		t.Fatalf("main head must keep its full chain, got %d messages", heads[0].MessageCount)
 	}
 }
+
+func TestFileBranchesOnlyKeepsFileBranchesForSchemaTwo(t *testing.T) {
+	dir := t.TempDir()
+	exec := agent.New(nil, nil, agent.NewSession("sys"), agent.Options{}, event.Discard)
+	exec.Session().Add(provider.Message{Role: provider.RoleUser, Content: "root prompt"})
+	c := New(Options{Executor: exec, SessionDir: dir, Label: "test", Sink: event.Discard, FileBranchesOnly: true})
+	path := filepath.Join(dir, "root.jsonl")
+	c.SetSessionPath(path)
+	if err := c.Snapshot(); err != nil {
+		t.Fatal(err)
+	}
+	branchPath, err := c.Branch("child")
+	if err != nil {
+		t.Fatalf("Branch: %v", err)
+	}
+	if branchPath == path || !strings.HasSuffix(branchPath, ".jsonl") || c.SessionPath() != branchPath {
+		t.Fatalf("FileBranchesOnly must keep file branches: returned %q, session path %q", branchPath, c.SessionPath())
+	}
+	if heads, _ := agent.ListSessionHeads(path); len(heads) != 1 {
+		t.Fatalf("file branch must not add heads to the source log: %+v", heads)
+	}
+}

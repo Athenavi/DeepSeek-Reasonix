@@ -56,7 +56,7 @@ func (c *Controller) forkNamedReady(turn int, name string, switchToFork bool, ki
 	if !hasBound {
 		return "", c.rewindFail(fmt.Errorf("fork unavailable for turn %d (resumed session)", turn))
 	}
-	if sess := c.loggedTurnSession(); sess != nil && switchToFork {
+	if sess := c.headBranchSession(); sess != nil && switchToFork {
 		return c.forkHeadReady(sess, turn, boundary, name, kind)
 	}
 
@@ -157,7 +157,7 @@ func (c *Controller) Branch(name string) (string, error) {
 	if err := c.Snapshot(); err != nil {
 		return "", c.rewindFail(err)
 	}
-	if sess := c.loggedTurnSession(); sess != nil {
+	if sess := c.headBranchSession(); sess != nil {
 		return c.forkHeadReady(sess, -1, sess.Len(), name, agent.HeadKindFork)
 	}
 	parentPath := c.SessionPath()
@@ -391,7 +391,7 @@ func (c *Controller) afterHeadSwitch(path string) {
 // the main head keeps the file's identity so the tree stays rooted at the
 // log, and every other head hangs under its parent head.
 func (c *Controller) withHeadBranches(branches []agent.BranchInfo) []agent.BranchInfo {
-	sess := c.loggedTurnSession()
+	sess := c.headBranchSession()
 	if sess == nil {
 		return branches
 	}
@@ -434,4 +434,19 @@ func (c *Controller) withHeadBranches(branches []agent.BranchInfo) []agent.Branc
 		out = append(out, info)
 	}
 	return out
+}
+
+// sessionHeadPolicy groups the frontend's choice between in-log heads and
+// separate session files for branch operations.
+type sessionHeadPolicy struct {
+	fileBranchesOnly bool
+}
+
+// headBranchSession returns the session when branch operations may create
+// heads inside its schema-2 log, nil when the frontend asked for files.
+func (c *Controller) headBranchSession() *agent.Session {
+	if c.headPolicy.fileBranchesOnly {
+		return nil
+	}
+	return c.loggedTurnSession()
 }
