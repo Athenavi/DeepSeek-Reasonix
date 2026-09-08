@@ -24,6 +24,7 @@
 | 迟到回执和旧连接不能撤销当前路由 | Serve 实例及递增序列、原子连接身份绑定和路由回收 | `TestRemoteOwnershipRejectsOvertakenReceipts`、`TestRemoteReplacedConnectionCannotPinOwnership`、`TestRemoteIncarnationReclaimsOldReservationsAndRejectsLateBuilders` |
 | 明确拒绝释放候选；结果未知时保留至确认 | 拒绝类型与正向所有权回读 | `TestRemoteInstallDistinguishesRejectionFromLostAcknowledgement`、`TestRemoteUnknownInstallRetainsOfferUntilOwned` |
 | 控制器关闭后不再创建 inbox 文件 | inbox 打开封锁和同步登记的发布通知 | `TestClosedControllerCannotOpenInboxFromLateDispatch`、`TestStaleRecoveryCannotOverwritePublishedForegroundRoute` |
+| 旧快照不能覆盖新选择的连接 | 列表投影提交期间保持当前租约代次，直到元数据写入完成 | `TestListingProjectionCannotOverwriteModelAfterAuthorityReplacement`、`TestListingAuthorityGuardRetainsGenerationThroughCommit`、`TestOwnedListingRejectsMissingAuthority`、`TestModelSettingsCredentialRefreshPersistsSelectedConnection` |
 | 保存后的 HTTP 重试保持已接受的凭据 | 传输重试复用不可变服务凭据 | `TestModelSettingsHTTPRetryKeepsAcceptedCredential` 返回真实 503，验证重试和下一运行 |
 
 ## 确定性验证

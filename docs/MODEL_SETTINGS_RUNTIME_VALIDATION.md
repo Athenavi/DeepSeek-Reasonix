@@ -24,6 +24,7 @@ This record distinguishes implemented behavior from release qualification. The c
 | Late ownership receipts and replaced connections cannot revoke current routes | Serve-wide incarnation/sequence, atomically pinned connection identity and route reconciliation | `TestRemoteOwnershipRejectsOvertakenReceipts`, `TestRemoteReplacedConnectionCannotPinOwnership`, `TestRemoteIncarnationReclaimsOldReservationsAndRejectsLateBuilders` |
 | Rejected installs release reservations; unknown installs retain them until confirmed | Typed rejection and positive ownership readback | `TestRemoteInstallDistinguishesRejectionFromLostAcknowledgement`, `TestRemoteUnknownInstallRetainsOfferUntilOwned` |
 | Controller shutdown prevents late inbox sidecar creation | Inbox open seal and synchronously registered publication kick | `TestClosedControllerCannotOpenInboxFromLateDispatch`, `TestStaleRecoveryCannotOverwritePublishedForegroundRoute` |
+| Retired snapshots cannot overwrite the selected connection | Listing publication holds the current lease generation through metadata commit | `TestListingProjectionCannotOverwriteModelAfterAuthorityReplacement`, `TestListingAuthorityGuardRetainsGenerationThroughCommit`, `TestOwnedListingRejectsMissingAuthority`, `TestModelSettingsCredentialRefreshPersistsSelectedConnection` |
 | HTTP retry retains accepted credentials after a save | Immutable provider credentials across transport retries | `TestModelSettingsHTTPRetryKeepsAcceptedCredential` returns an actual 503, then checks the retry and next runtime |
 
 ## Deterministic qualification

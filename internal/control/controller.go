@@ -3665,7 +3665,12 @@ func updateSessionListingProjection(s *agent.Session, path, modelRef, preview st
 	if !ok {
 		return fmt.Errorf("session persistence baseline missing after save")
 	}
-	_, err := agent.UpdateSessionListingProjectionIfCurrent(path, modelRef, preview, turns, markActivity, persisted)
+	var err error
+	if s.WriteAuthorityRequired() {
+		_, err = agent.UpdateOwnedSessionListingProjectionIfCurrent(path, modelRef, preview, turns, markActivity, persisted, s.WriteAuthority())
+	} else {
+		_, err = agent.UpdateSessionListingProjectionIfCurrent(path, modelRef, preview, turns, markActivity, persisted)
+	}
 	return err
 }
 
