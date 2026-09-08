@@ -1566,7 +1566,7 @@ func TestConcurrentSnapshotsShareSingleRecoveryHandoff(t *testing.T) {
 }
 
 func TestRecoverShutdownSnapshotPersistsAndReanchorsSession(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	path := filepath.Join(dir, "session.jsonl")
 	base := agent.NewSession("sys")
 	base.Add(provider.Message{Role: provider.RoleUser, Content: "persisted"})

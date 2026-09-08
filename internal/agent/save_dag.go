@@ -111,6 +111,8 @@ func (s *Session) saveDAGLocked(path string, mode sessionSaveMode, route dagRout
 	plan.entries = append(plan.entries, pending...)
 	if len(plan.entries) == 0 {
 		s.adoptDAGPosition(st, plan)
+		s.republishDAGDerivedIfPending(ctx, path, st, plan, msgs, digest, baseRevision)
+		s.maintainDAGLog(ctx, path, st, plan, mode, now)
 		s.markCheckpointPersisted(path, digest, version, baseRevision, rewriteVersion, msgs, deferProjection)
 		return nil
 	}
@@ -330,7 +332,7 @@ func (s *Session) publishDAGDerived(ctx context.Context, path string, st *sessio
 // redaction needs its bytes physically erased, but only under the
 // single-writer proof; otherwise the log simply keeps growing for now.
 func (s *Session) maintainDAGLog(ctx context.Context, path string, st *sessionDAGState, plan *dagWritePlan, mode sessionSaveMode, now time.Time) {
-	if mode != sessionSaveRewriteCompact && !sessionDAGLogOversized(st) {
+	if mode != sessionSaveRewriteCompact && st.holes == 0 && !sessionDAGLogOversized(st) {
 		return
 	}
 	if err := sessionDAGSingleWriterProof(path, st, now); err != nil {
