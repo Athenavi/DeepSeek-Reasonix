@@ -62,7 +62,6 @@ func (a *Agent) beginRunTurn(ctx context.Context, input string, pinned pinnedRev
 	a.turn = turnRuntime{}
 	a.turn.readShadow = newReadShadowState(a.readCoordinatorShadow)
 	a.turn.incompleteReads.legacyImplicitFullReads = a.legacyImplicitFullReads
-	a.turn.evidenceBlocked = map[string]struct{}{}
 	a.reads.runGen++
 	a.reads.tasks = newReadTasks(a.sess.path, a.reads.runGen)
 	a.resetStructuralRunGuards()

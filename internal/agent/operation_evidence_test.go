@@ -201,7 +201,6 @@ func TestEvidenceGateBlocksUnknownScopeWriterAfterABlock(t *testing.T) {
 	reg.Add(undeclaredWriter{name: "bash"})
 	a := New(&userInputCaptureProvider{}, reg, NewSession("system"), Options{}, event.Discard)
 	a.task.ledger = evidence.NewLedger()
-	a.turn.evidenceBlocked = map[string]struct{}{}
 
 	if out, blocked := runEvidenceGate(a, "/w/a.go"); !blocked {
 		t.Fatalf("the declarer must be blocked first: %+v", out)

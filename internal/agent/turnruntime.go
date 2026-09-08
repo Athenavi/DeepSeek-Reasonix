@@ -1,6 +1,9 @@
 package agent
 
 import (
+	"slices"
+	"sync"
+
 	"reasonix/internal/completion"
 	"reasonix/internal/provider"
 	"reasonix/internal/runtimepolicy"
@@ -110,14 +113,41 @@ type turnRuntime struct {
 
 	// evidenceBlocked records paths whose writer was blocked for missing
 	// evidence this turn. While it is non-empty an unknown-scope writer may not
-	// route around the block.
-	evidenceBlocked map[string]struct{}
+	// route around the block. Parallel tool calls write it, so it is guarded.
+	evidenceBlocked evidenceBlockState
 
 	phase phaseClock
 
 	// sessionContext is the content-free diagnostic for the snapshot selected
 	// before this real user turn. It is attached to Usage events only.
 	sessionContext turnContextDiagnostics
+}
+
+// evidenceBlockState is the mutex-guarded set of paths whose writer was blocked
+// for missing evidence in this turn.
+type evidenceBlockState struct {
+	mu    sync.Mutex
+	paths map[string]struct{}
+}
+
+func (s *evidenceBlockState) record(path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.paths == nil {
+		s.paths = map[string]struct{}{}
+	}
+	s.paths[path] = struct{}{}
+}
+
+func (s *evidenceBlockState) snapshot() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]string, 0, len(s.paths))
+	for path := range s.paths {
+		out = append(out, path)
+	}
+	slices.Sort(out)
+	return out
 }
 
 // terminalProtocolState groups the run's terminal-protocol bookkeeping: the
