@@ -427,6 +427,9 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // overlay-gate markers add 0.6 KiB raw over the 2408.2 KiB base; the panel,
 // its copy and its store stay in the lazy chunk. Measured 2408.766 KiB;
 // retain the next tenth.
-const rawInitialBudgetKiB = 2_408.8;
+// The phase D loopback browser broker adds 0.065 KiB of initial-path route
+// wiring over the 2408.766 KiB measurement (2408.831 KiB measured on the
+// darwin/arm64 packaging build); retain the next tenth.
+const rawInitialBudgetKiB = 2_408.9;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
