@@ -54,6 +54,7 @@ import { useNavigationIntentFence } from "./useNavigationIntentFence";
 import type { SearchSource } from "./searchSources";
 import { attachWebSearchOutput, historySearchAndAnswer } from "./searchTranscript";
 import { fileDiffFromWire, parseTodos, summarize, summarizeFileDiff, type ToolFileDiff } from "./tools";
+import { applyReadStatusFrame } from "./readStatus";
 import { modeHasAutoApproveTools, normalizeMode, normalizeToolApprovalMode, type QualityFloor } from "./types";
 import type {
   BalanceInfo,
@@ -80,6 +81,7 @@ import type {
   WireAsk,
   WireMCPInteraction,
   WireCompletionSummary,
+  WireReadStatus,
   WireDecisionReceipt,
   WireEvent,
   WireExtensionCard,
@@ -386,6 +388,8 @@ export interface State {
   cancellable: boolean;
   /** Host turn phase from turn_phase events (working|checking|verifying|reviewing). */
   turnPhase?: TurnPhaseName;
+  /** Live read progress keyed by read id: upserted, never appended per page. */
+  readStatuses?: Record<string, WireReadStatus>;
   /** Latest content-free turn quality summary, shown on demand in the change panel. */
   completionSummary?: WireCompletionSummary;
   approval?: WireApproval;
@@ -1507,6 +1511,9 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
         || (Boolean(e.turnId) && e.turnId !== s.activeTurnId);
       const fresh = {
         ...s,
+        // A new turn starts from no live read status: the previous turn's
+        // progress is history, not this turn's state.
+        readStatuses: undefined,
         activeTurnId: e.turnId ?? s.activeTurnId,
         assistantSegmentOrdinal: startsNewTurn ? 0 : s.assistantSegmentOrdinal,
         pendingSearchSources: undefined,
@@ -1819,6 +1826,8 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       // arguments, so drop the live estimate rather than double-count it.
       return { ...settled, usage, context: { ...settled.context, used, sessionTokens }, turnTokens, turnOutputTokens, turnOutputCharsAtUsage, turnOutputEstimated, turnTotalTokens, turnCost, turnRateBand, turnArgChars: updateContextGauge ? 0 : settled.turnArgChars, sessionTokens, sessionCost, sessionCurrency, usageSeq: settled.usageSeq + 1, lastRequestTps, pendingRequestModelMs: updateContextGauge ? undefined : settled.pendingRequestModelMs };
     }
+    case "read_status":
+      return applyReadStatusFrame(s, e.readStatus);
     case "notice": {
       const next = appendNoticeToState(s, e.level ?? "info", e.text ?? "", e.detail, e.code, e.decisionReceipt);
       return e.code?.startsWith("stream_interrupted_") ? { ...next, streamInterruptNoticeShown: true } : next;
