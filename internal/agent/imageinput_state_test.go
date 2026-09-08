@@ -3,11 +3,12 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"testing"
+
 	"reasonix/internal/event"
 	"reasonix/internal/imageinput"
 	"reasonix/internal/provider"
 	"reasonix/internal/tool"
-	"testing"
 )
 
 func TestImageCancellationPreservesRecoveryEvidence(t *testing.T) {
@@ -46,8 +47,8 @@ func TestImageCancellationPreservesRecoveryEvidence(t *testing.T) {
 			}
 		}
 	}
-	if !found || shot.calls != 1 {
-		t.Fatalf("found=%v calls=%d", found, shot.calls)
+	if !found || shot.calls.Load() != 1 {
+		t.Fatalf("found=%v calls=%d", found, shot.calls.Load())
 	}
 }
 

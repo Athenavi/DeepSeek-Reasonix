@@ -103,14 +103,14 @@ func TestToolImageFallbackPreservesOriginalResult(t *testing.T) {
 
 type detailedImageTool struct {
 	fakeImageTool
-	calls int
+	calls atomic.Int32
 }
 
 var _ tool.DetailedExecutor = (*detailedImageTool)(nil)
 
 func (*detailedImageTool) ExecutionDescriptor(json.RawMessage) *tool.ShellExecution { return nil }
 func (t *detailedImageTool) ExecuteDetailed(context.Context, json.RawMessage) (tool.DetailedResult, error) {
-	t.calls++
+	t.calls.Add(1)
 	return tool.DetailedResult{Output: t.text, Images: t.images}, nil
 }
 func TestDetailedImageFailureDoesNotRepeatTool(t *testing.T) {
@@ -124,8 +124,8 @@ func TestDetailedImageFailureDoesNotRepeatTool(t *testing.T) {
 	if err := a.Run(context.Background(), "inspect"); err != nil {
 		t.Fatal(err)
 	}
-	if imageTool.calls != 1 || vp.calls.Load() != 1 {
-		t.Fatalf("tool calls=%d vision calls=%d", imageTool.calls, vp.calls.Load())
+	if imageTool.calls.Load() != 1 || vp.calls.Load() != 1 {
+		t.Fatalf("tool calls=%d vision calls=%d", imageTool.calls.Load(), vp.calls.Load())
 	}
 	for _, m := range a.Session().Snapshot() {
 		if m.Role == provider.RoleTool && (!strings.Contains(m.Content, "operation completed") || !strings.Contains(m.Content, "already executed") || len(m.Images) != 1) {
@@ -144,8 +144,8 @@ func TestChildImageServiceIsSessionLocal(t *testing.T) {
 	first := NewReadOnlyAgent(p, tool.NewRegistry(), NewSession("one"), opts, event.Discard)
 	second := NewPlannerAgent(p, tool.NewRegistry(), NewSession("two"), opts, event.Discard)
 	for _, a := range []*Agent{first, second} {
-		_, s := a.processToolImages(context.Background(), "captured", []string{"data:image/png;base64,QUFB"})
-		if s == nil {
+		processed := a.processToolImages(context.Background(), "captured", []string{"data:image/png;base64,QUFB"})
+		if processed.summary == nil {
 			t.Fatal("child fallback missing")
 		}
 	}

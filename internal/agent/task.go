@@ -294,31 +294,6 @@ type TaskTool struct {
 	capabilityRuntime *MCPCapabilityRuntime
 }
 
-// TaskToolOptions holds the construction parameters for a TaskTool.
-// Prefer NewTaskToolWithOptions for new call sites; the positional NewTaskTool
-// remains as a compatibility wrapper for one full iteration cycle.
-type TaskToolOptions struct {
-	ImageInput                            *imageinput.Config
-	Provider                              provider.Provider
-	Pricing                               *provider.Pricing
-	QuoteContext                          *event.QuoteContext
-	ParentRegistry                        *tool.Registry
-	MaxSteps                              int
-	ContextWindow                         int
-	RecentKeep                            int
-	SoftCompactRatio                      float64
-	ToolResultSnipRatio                   float64
-	CompactRatio                          float64
-	CompactForceRatio                     float64
-	Temperature                           float64
-	ContextEditing, ArchiveDir, SysPrompt string
-	Gate                                  Gate
-	KeepPolicy                            KeepPolicy
-	SubagentModel                         string
-	SubagentEffort                        string
-	ResolveProvider                       func(string, string) (provider.Provider, *provider.Pricing, int, error)
-}
-
 // NewTaskToolWithOptions is the internal standard constructor for TaskTool.
 // An empty SysPrompt still resolves to DefaultTaskSystemPrompt. No extra
 // validation or default overrides are applied beyond the historical NewTaskTool

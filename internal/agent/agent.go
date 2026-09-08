@@ -282,8 +282,7 @@ type ToolHooks interface {
 // Agent drives a single task: a Provider, a tool Registry, and a Session wired
 // into the main loop.
 type Agent struct {
-	imageInput   *imageinput.Service
-	nativeImages bool
+	imageInput agentImageInput
 	agentConfig
 	// svc are the collaborators this agent talks to; see services.go.
 	svc agentServices
@@ -1088,8 +1087,7 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		reasoningByteLimit = defaultReasoningByteLimit
 	}
 	a := &Agent{
-		imageInput:   newImageInput(opts.ImageInput),
-		nativeImages: supportsNativeImages(prov),
+		imageInput: newImageInput(opts.ImageInput, prov),
 		svc: newAgentServices(prov, tools, sink, gate, planModeReadOnlyTrust,
 			sandboxEscapeApprover, configWriteApprover, hooks, opts),
 		agentConfig: agentConfig{

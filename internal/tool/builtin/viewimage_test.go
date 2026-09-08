@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"image"
 	"image/png"
 	"os"
@@ -63,7 +64,7 @@ func TestViewImageRejectsInvalidInputs(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, _, err := (viewImage{}).ExecuteWithImages(ctx, argsJSON(t, map[string]any{"path": "x"})); err != context.Canceled {
+	if _, _, err := (viewImage{}).ExecuteWithImages(ctx, argsJSON(t, map[string]any{"path": "x"})); !errors.Is(err, context.Canceled) {
 		t.Fatalf("error %v", err)
 	}
 }

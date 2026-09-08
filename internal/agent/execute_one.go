@@ -647,7 +647,8 @@ func (a *Agent) finishToolExecution(ctx context.Context, plan *toolCallPlan) too
 		rawErr := fmt.Sprintf("error: %v\n%s", err, detail)
 		body, truncMsg, original := a.boundProviderVisibleResult(rawErr, call.Name, call.ID)
 		out := toolOutcome{
-			output: body, errMsg: firstLine(err.Error()), truncated: truncMsg != "" || original != "", truncMsg: truncMsg,
+			runState: outcomeRunState(toolOutcome{executed: true, output: rawErr}),
+			output:   body, errMsg: firstLine(err.Error()), truncated: truncMsg != "" || original != "", truncMsg: truncMsg,
 			execution: execution, mcpApp: toProviderMCPApp(plan.mcpApp), recoveryGeneration: recoveryGen, subagentOutcome: subagentOutcomeFromError(err),
 		}
 		if original != "" {
@@ -668,7 +669,8 @@ func (a *Agent) finishToolExecution(ctx context.Context, plan *toolCallPlan) too
 	runState := outcomeRunState(toolOutcome{executed: true, output: result})
 	var visionSummary *provider.VisionSummary
 	if runState == provider.ToolRunCompleted {
-		result, visionSummary = a.processToolImages(cctx, result, images)
+		processed := a.processToolImages(cctx, result, images)
+		result, visionSummary = processed.text, processed.summary
 	}
 	body, truncMsg, original, readObserver := a.boundIncompleteReadAwareResult(plan, result)
 	out := toolOutcome{
