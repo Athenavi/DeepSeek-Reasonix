@@ -58,6 +58,15 @@ func TestLocalRangeDoesNotCaptureALargeWholeFile(t *testing.T) {
 	}
 }
 
+func TestReadPathIdentitySurvivesInvalidWindow(t *testing.T) {
+	dir := t.TempDir()
+	r := readFile{workDir: dir}
+	path, err := r.ResolveReadPath(json.RawMessage(`{"path":"a.txt","intent":"full","offset":5}`))
+	if err != nil || path != filepath.Join(dir, "a.txt") {
+		t.Fatalf("lost failed continuation identity: %q %v", path, err)
+	}
+}
+
 type changingReadOverlay struct{ calls int }
 
 func (o *changingReadOverlay) ReadTextFile(context.Context, string) (string, bool) {

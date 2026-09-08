@@ -108,6 +108,14 @@ func TestReadPipelineCursorRejectsTamperedBindings(t *testing.T) {
 	}
 }
 
+func TestReadCursorRejectsConflictingWindows(t *testing.T) {
+	for _, args := range []string{`{"path":"a","cursor":"token","offset":0}`, `{"path":"a","cursor":"token","limit":5}`} {
+		if _, err := withResolvedReadWindow(json.RawMessage(args), tool.ReadCursor{NextStart: 10}); err == nil {
+			t.Fatal("conflicting explicit window was silently discarded")
+		}
+	}
+}
+
 func TestReadPipelineRepeatedRejectedPagesReachBoundedPause(t *testing.T) {
 	path := makeShortPagedReadFixture(t, "repeat.txt", 2105, 2050, "tail")
 	var turns [][]provider.Chunk

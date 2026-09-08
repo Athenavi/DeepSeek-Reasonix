@@ -16,9 +16,16 @@ import (
 const maxReadSnapshotBytes = 64 << 20
 
 func (r readFile) ResolveReadPath(args json.RawMessage) (string, error) {
-	p, err := parseReadFileParams(args)
-	if err != nil {
+	// Path identity must remain available even when another argument is
+	// invalid, so a failed continuation still belongs to its bounded task.
+	var p struct {
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
 		return "", err
+	}
+	if strings.TrimSpace(p.Path) == "" {
+		return "", fmt.Errorf("path is required")
 	}
 	return resolveReadablePath(r.workDir, p.Path, r.paths).Path, nil
 }

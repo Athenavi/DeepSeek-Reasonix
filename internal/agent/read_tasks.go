@@ -161,6 +161,12 @@ func withResolvedReadWindow(args json.RawMessage, cursor tool.ReadCursor) (json.
 	if err := json.Unmarshal(args, &fields); err != nil {
 		return nil, fmt.Errorf("invalid args: %w", err)
 	}
+	if _, present := fields["offset"]; present {
+		return nil, fmt.Errorf("cursor cannot be combined with offset; pass the issued cursor unchanged")
+	}
+	if _, present := fields["limit"]; present {
+		return nil, fmt.Errorf("cursor cannot be combined with limit; pass the issued cursor unchanged")
+	}
 	delete(fields, "cursor")
 	delete(fields, "intent")
 	delete(fields, "offset")
