@@ -194,7 +194,15 @@ executable the thin launcher starts: without `--host-rpc` it bootstraps
 `--host-rpc` as the service. Launcher, `current.json`, single-instance
 identity and relaunch logic therefore keep their current shape. On macOS the
 bundle's main executable is Electron and the Go service lives in
-`Contents/MacOS/`; the `.app` swap path is unchanged.
+`Contents/MacOS/`; the `.app` swap path is unchanged. Implementation notes:
+`installlayout.Member` names are forward-slash paths under the version
+directory, either a whitelisted base name or `app/...` (no `..`, absolute
+paths, backslashes or symlinks); manifest readers accept schema 1 (flat list)
+and schema 2 (flat list plus `app/`); `REASONIX_DESKTOP_SHELL=wails` keeps the
+in-process shell for a binary that has `app/` beside it; under the shell the
+macOS hand-off waits for the Electron process (the service's parent, passed
+as `-owner-pid`) and reopens the swapped bundle with `open -n` while the shell
+only quits.
 
 ### F. Full-matrix acceptance and removal of the old shell
 

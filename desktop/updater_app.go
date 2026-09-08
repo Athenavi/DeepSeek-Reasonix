@@ -390,7 +390,7 @@ func (a *App) installPortableUpdate(requestID string, meta *cachedUpdate, data [
 	case "windows":
 		err = applyWindowsFile(meta.Path, meta.SHA256, meta.Version, preparedUpdate)
 	case "darwin":
-		err = applyMac(meta.Path, meta.Version)
+		err = applyMac(meta.Path, meta.Version, a.updateHandoffOwnerPID())
 	case "linux":
 		if versionedPortable {
 			err = applyLinuxVersioned(data, meta.Version)
@@ -436,7 +436,7 @@ func (a *App) installPortableUpdate(requestID string, meta *cachedUpdate, data [
 	// Persist the conversation and stop subprocesses before handing off (same as
 	// shutdown). On Linux the binary is now replaced, so relaunch it; on Windows and
 	// macOS the installer/helper we launched takes over once we exit.
-	a.relaunchDesktop(runtime.GOOS == "linux")
+	a.relaunchAfterPortableUpdate()
 	return nil
 }
 

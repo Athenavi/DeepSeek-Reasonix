@@ -146,7 +146,12 @@ Chromium sandbox 不使用 `--no-sandbox`；minisign 与摘要校验不变。
 可执行文件：不带 `--host-rpc` 时它引导 `app/Reasonix(.exe)` 后退出，Electron 再以
 `--host-rpc` 启动同一二进制作为服务。因此启动器、`current.json`、单实例身份与重启
 逻辑保持现状。macOS 上 bundle 的主可执行文件是 Electron，Go 服务位于
-`Contents/MacOS/`；`.app` 替换路径不变。
+`Contents/MacOS/`；`.app` 替换路径不变。实现说明：`installlayout.Member` 的名字是
+版本目录下的正斜杠路径，要么是白名单内的文件名，要么是 `app/...`（不允许 `..`、绝对
+路径、反斜杠与符号链接）；清单读取端同时接受 schema 1（扁平列表）和 schema 2（扁平
+列表加 `app/`）；`REASONIX_DESKTOP_SHELL=wails` 让旁边已有 `app/` 的二进制继续使用
+进程内 shell；在 shell 下，macOS 交接子进程等待的是 Electron 进程（服务的父进程，
+通过 `-owner-pid` 传入），替换后用 `open -n` 重新打开 bundle，shell 本身只退出。
 
 ### F. 全矩阵验收并删除旧实现
 

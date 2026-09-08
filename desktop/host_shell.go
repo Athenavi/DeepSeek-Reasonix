@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
+	"runtime"
 	"sync"
 
 	"reasonix/desktop/internal/hostrpc"
@@ -173,6 +174,13 @@ func (b *hostShellBridge) relaunch() error {
 	return b.server.Request(ctx, "host/app.relaunch", map[string][]string{"args": {}}, nil)
 }
 
+// quit asks the shell to shut the application down without restarting it.
+func (b *hostShellBridge) quit() error {
+	ctx, cancel := context.WithTimeout(context.Background(), rpcHostWindowTimeout)
+	defer cancel()
+	return b.server.Request(ctx, "host/app.quit", struct{}{}, nil)
+}
+
 // relaunchDesktop restarts Reasonix after an update. Under the shell the
 // restart is owned by Electron; the Wails build exits itself after handing
 // off to the thin launcher.
@@ -188,4 +196,27 @@ func (a *App) relaunchDesktop(relaunchBinary bool) {
 		_ = relaunchThroughLauncher()
 	}
 	os.Exit(0)
+}
+
+// relaunchAfterPortableUpdate restarts Reasonix once the platform installer
+// owns the swap. Under the shell on macOS the detached hand-off reopens the
+// swapped bundle itself, so the shell must only quit.
+func (a *App) relaunchAfterPortableUpdate() {
+	if runtime.GOOS == "darwin" && a.hostMode() {
+		if err := a.hostShell.quit(); err != nil {
+			slog.Warn("desktop host: quit request failed", "err", err)
+		}
+		return
+	}
+	a.relaunchDesktop(runtime.GOOS == "linux")
+}
+
+// updateHandoffOwnerPID is the process the platform update helper waits for
+// before it swaps the install: the Electron shell, which is the service's
+// parent and holds the bundle open, under the shell; this process under Wails.
+func (a *App) updateHandoffOwnerPID() int {
+	if a.hostMode() {
+		return os.Getppid()
+	}
+	return os.Getpid()
 }
