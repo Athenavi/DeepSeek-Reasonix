@@ -5998,7 +5998,7 @@ export function ProviderEditor({
   const [modelOverrides, setModelOverrides] = useState(initial?.modelOverrides ?? []);
   const [showKey, setShowKey] = useState(false);
   const [modelCandidates, setModelCandidates] = useState<string[]>(initial?.models ?? []);
-  const [legacyVisionModels] = useState(initial?.visionModels ?? []);
+  const [legacyVisionModels, setLegacyVisionModels] = useState(initial?.visionModels ?? []);
   const [modelCapabilities, setModelCapabilities] = useState<ProviderModelCapabilityView[]>(initial?.modelCapabilities ?? []);
   const visionModelsConfigured = Boolean(initial?.visionModelsConfigured ?? legacyVisionModels.length > 0);
   const [modelsUrl, setModelsUrl] = useState(initial?.modelsUrl ?? "");
@@ -6025,7 +6025,7 @@ export function ProviderEditor({
   const [fetchStatus, setFetchStatus] = useState<string | null>(null);
   const [fetchFallback, setFetchFallback] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const draftSnapshot = JSON.stringify([name, hideConnectionName ? "" : displayName, kind, requestUrl, models, modelsUrl, apiKeyEnv, headersDraft, extraBodyDraft, authHeader, noProxy, keyDraft, balanceUrl, ctx, modelContextWindows, modelOverrides, modelCapabilities, reasoningProtocol, thinking, webSearch]);
+  const draftSnapshot = JSON.stringify([name, hideConnectionName ? "" : displayName, kind, requestUrl, models, modelsUrl, apiKeyEnv, headersDraft, extraBodyDraft, authHeader, noProxy, keyDraft, balanceUrl, ctx, modelContextWindows, modelOverrides, modelCapabilities, legacyVisionModels, reasoningProtocol, thinking, webSearch]);
   const [savedSnapshot, setSavedSnapshot] = useState(draftSnapshot);
   const dirty = draftSnapshot !== savedSnapshot;
   const isNewCustomProvider = !initial;
@@ -6226,6 +6226,18 @@ export function ProviderEditor({
     setModelDialog(null);
   };
 
+  const deleteModel = () => {
+    if (!modelDialog || busy || fetchingModels) return;
+    const model = modelDialog;
+    setModels(current => parseProviderListInput(current).filter(item => item !== model).join(", "));
+    setModelCandidates(current => current.filter(item => item !== model));
+    setModelOverrides(current => current.filter(item => item.model !== model));
+    setModelCapabilities(current => current.filter(item => item.model !== model));
+    setLegacyVisionModels(current => current.filter(item => item !== model));
+    setModelContextWindows(current => Object.fromEntries(Object.entries(current).filter(([key]) => key !== model)));
+    setModelDialog(null);
+  };
+
   const selectAllEditorModels = () => {
     setModelsFromList(modelCandidateNames);
   };
@@ -6400,8 +6412,8 @@ export function ProviderEditor({
       {modelDialog !== null && <Suspense fallback={null}><ProviderModelDialog
         baseURL={effectiveRequestUrl} candidates={modelCandidateNames} contextDefault={Number(ctx) || undefined}
         initial={modelDialog ? {model:modelDialog, contextWindow:modelContextWindows[modelDialog] ?? "", maxOutputTokens:modelOverrides.find(item=>item.model === modelDialog)?.maxOutputTokens ?? 0, vision:modelOverrides.find(item=>item.model === modelDialog)?.vision ?? null} : undefined}
-        capability={modelCapabilities.find(item=>item.model === modelDialog)} busy={busy}
-        onClose={()=>setModelDialog(null)} onApply={applyModelDetails}/></Suspense>}
+        capability={modelCapabilities.find(item=>item.model === modelDialog)} busy={busy || fetchingModels}
+        onClose={()=>setModelDialog(null)} onApply={applyModelDetails} onDelete={deleteModel}/></Suspense>}
       <ProviderEditorModelPicker
         actions={<>
         <button type="button" className="btn provider-icon-action" title={t("settings.fetchModels")} aria-label={t(fetchingModels ? "settings.fetchingModels" : "settings.fetchModels")} disabled={busy || fetchingModels || !canFetch || extraBodyInvalid} onClick={() => void fetchModels()}>{fetchingModels ? <Loader2 size={17} /> : <RefreshCw size={17} />}</button>

@@ -8,9 +8,10 @@ import type { ProviderModelCapabilityView } from "../lib/types";
 import { modelDraftError } from "../lib/providerModelDraft";
 
 export interface ModelDetailsDraft { model: string; contextWindow: string; maxOutputTokens: number; vision: boolean | null; }
-export default function ProviderModelDialog({ initial, candidates, contextDefault, capability, baseURL, busy, onClose, onApply }: {
+export default function ProviderModelDialog({ initial, candidates, contextDefault, capability, baseURL, busy, onClose, onApply, onDelete }: {
   initial?: ModelDetailsDraft; candidates: string[]; contextDefault?: number;
   capability?: ProviderModelCapabilityView; baseURL?: string; busy: boolean; onClose: () => void; onApply: (draft: ModelDetailsDraft) => void;
+  onDelete?: () => void;
 }) {
   const t = useT(), titleId = useId();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -63,7 +64,7 @@ export default function ProviderModelDialog({ initial, candidates, contextDefaul
         </aside>
       </div>
       {error && validation && <p role="alert">{t(`providerUI.validation.${validation}`)}</p>}
-      <footer><small>{t("settings.modelDialog.draftHint")}</small><button type="button" className="btn" disabled={busy} onClick={onClose}>{t("common.cancel")}</button><button className="btn btn--primary" disabled={busy}>{t(initial ? "settings.modelDialog.apply" : "settings.modelDialog.add")}</button></footer>
+      <footer>{initial && onDelete && <button type="button" className="btn btn--danger" disabled={busy} onClick={onDelete}>{t("providerUI.deleteModel")}</button>}<small>{t("settings.modelDialog.draftHint")}</small><button type="button" className="btn" disabled={busy} onClick={onClose}>{t("common.cancel")}</button><button className="btn btn--primary" disabled={busy}>{t(initial ? "settings.modelDialog.apply" : "settings.modelDialog.add")}</button></footer>
     </form>
   </dialog>, document.body);
 }
