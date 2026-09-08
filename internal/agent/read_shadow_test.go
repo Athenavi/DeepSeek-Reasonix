@@ -107,6 +107,24 @@ func TestReadShadowNarrowsAnUnboundedFullRead(t *testing.T) {
 
 type recordingSink struct{ events []event.Event }
 
+func TestReadStatusEmitterPreservesZeroBasedRanges(t *testing.T) {
+	sink := &recordingSink{}
+	a := New(&userInputCaptureProvider{}, tool.NewRegistry(), NewSession("system"), Options{}, sink)
+	a.emitReadStatus(readcoord.Transition{
+		Key: "read", To: readcoord.StateNeedsMore,
+		Covered: []tool.ReadRange{{Start: 0, End: 10}, {Start: 100, End: 110}},
+		Missing: []tool.ReadRange{{Start: 10, End: 100}},
+	}, tool.ReadResultEnvelope{Intent: tool.ReadIntentFull})
+	frames := sink.readStatuses()
+	if len(frames) != 1 {
+		t.Fatalf("frames=%d", len(frames))
+	}
+	want := [][2]int{{0, 10}, {100, 110}}
+	if len(frames[0].Covered) != 2 || frames[0].Covered[0] != want[0] || frames[0].Covered[1] != want[1] || len(frames[0].Missing) != 1 || frames[0].Missing[0] != [2]int{10, 100} {
+		t.Fatalf("emitter shifted source coordinates: %+v", frames[0])
+	}
+}
+
 func (s *recordingSink) Emit(e event.Event) { s.events = append(s.events, e) }
 
 func (s *recordingSink) readStatuses() []*event.ReadStatusPayload {

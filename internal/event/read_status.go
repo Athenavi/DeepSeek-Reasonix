@@ -3,6 +3,8 @@ package event
 // ReadStatusPayload is the host-only delivery state of one logical read. It is
 // keyed by turn, read id, and generation, and holds ranges only: never source
 // text, never a whole-file digest presented as a percentage.
+// Covered and Missing use zero-based half-open source ranges, like read
+// envelopes and pause receipts. Consumers perform one-based display conversion.
 type ReadStatusPayload struct {
 	ReadID     string   `json:"read_id"`
 	Generation uint64   `json:"generation,omitempty"`

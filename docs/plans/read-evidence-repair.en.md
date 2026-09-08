@@ -87,3 +87,7 @@ telemetry. The same rendering regression covers the live/history notice shape.
 The paginated TranscriptStore uses that same conversion, including empty-body
 LocalOnly receipts; cold backend slices and repeated frontend page loads are
 tested independently from the legacy full-history converter.
+Read-status event ranges stay zero-based and half-open, matching envelopes and
+pause receipts; CLI and desktop perform the one-based conversion only when
+displaying them. The emitter regression prevents a double shift of the first
+visible line found during native pagination verification.

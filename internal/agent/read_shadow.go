@@ -125,8 +125,8 @@ func (a *Agent) emitReadStatus(tr readcoord.Transition, env tool.ReadResultEnvel
 	a.svc.sink.Emit(event.Event{Kind: event.ReadStatus, ReadStatus: payload})
 }
 
-// linePairs renders zero-based half-open ranges as 1-based inclusive line
-// pairs for display; an empty range set stays empty.
+// linePairs preserves zero-based half-open coordinates on the host wire.
+// CLI and desktop convert to one-based display exactly once.
 func linePairs(ranges []tool.ReadRange) [][2]int {
 	if len(ranges) == 0 {
 		return nil
@@ -136,7 +136,7 @@ func linePairs(ranges []tool.ReadRange) [][2]int {
 		if r.Empty() {
 			continue
 		}
-		out = append(out, [2]int{r.Start + 1, r.End})
+		out = append(out, [2]int{r.Start, r.End})
 	}
 	if len(out) == 0 {
 		return nil

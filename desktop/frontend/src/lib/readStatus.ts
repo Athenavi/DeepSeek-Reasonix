@@ -1,7 +1,7 @@
 // Read progress is host-owned, keyed by read id, and upserted: a hundred pages
 // of one logical read still render one status line, never a hundred notices.
 
-/** WireReadStatus is one logical read's delivery state; ranges only, no text. */
+/** WireReadStatus is one read's delivery state; zero-based half-open ranges, no text. */
 export interface WireReadStatus {
   readId: string;
   generation?: number;
