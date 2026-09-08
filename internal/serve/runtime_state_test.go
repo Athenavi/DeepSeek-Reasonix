@@ -154,7 +154,10 @@ func TestRuntimeStateHTTPStatusUsesRequestedDetachedController(t *testing.T) {
 		RuntimeState event.RuntimeStateSnapshot `json:"runtimeState"`
 	}
 	runtimeStateHTTPGet(t, httpServer.URL+"/status?runtime=1&session="+url.QueryEscape(detachedPath), &status)
-	if status.SessionPath != detachedPath || !status.Running || status.RuntimeState.Phase != "executing" || status.RuntimeState.RuntimeEpoch != detached.RuntimeStateSnapshot().RuntimeEpoch {
+	if status.SessionPath != detachedPath {
+		t.Fatalf("detached status path = %q, want canonical identity %q", status.SessionPath, detachedPath)
+	}
+	if !status.Running || status.RuntimeState.Phase != "executing" || status.RuntimeState.RuntimeEpoch != detached.RuntimeStateSnapshot().RuntimeEpoch {
 		t.Fatalf("detached status was borrowed from foreground: %+v", status)
 	}
 	if foreground.RuntimeStateSnapshot().Running {

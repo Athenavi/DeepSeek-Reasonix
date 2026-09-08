@@ -130,12 +130,13 @@ func (s *sessionTagSink) RuntimeStateChanged(snapshot event.RuntimeStateSnapshot
 
 // A per-session status query must resolve its own controller, not the foreground.
 func (s *Server) ownedRuntimeStatusView(path string) (map[string]any, bool) {
+	path = agent.CanonicalSessionPath(path)
 	s.bindMu.Lock()
 	defer s.bindMu.Unlock()
 	ctrl := s.ctl()
-	if ctrl == nil || agent.CanonicalSessionPath(ctrl.SessionPath()) != agent.CanonicalSessionPath(path) {
+	if ctrl == nil || agent.CanonicalSessionPath(ctrl.SessionPath()) != path {
 		s.detachedMu.Lock()
-		detached := s.detached[agent.CanonicalSessionPath(path)]
+		detached := s.detached[path]
 		ctrl = nil
 		if detached != nil {
 			ctrl = detached.ctrl
