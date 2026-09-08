@@ -168,12 +168,12 @@ jobs:
         timeout-minutes: 3
         run: go test -timeout=2m -run '^TestBashSharesSessionTempAcrossCalls$' ./internal/tool/builtin
 
-      # Serve is outside the general Windows PR smoke list. Keep its public
-      # runtime path identity contract covered before a mainline push.
-      - name: test (Windows runtime status)
+      # Serve and taskmonitor are outside the general Windows PR smoke list.
+      # Cover runtime identities and snapshot publication before mainline push.
+      - name: test (Windows runtime status and task snapshots)
         if: env.RUN_STEPS == 'true' && runner.os == 'Windows' && github.event_name == 'pull_request'
         timeout-minutes: 5
-        run: go test -timeout=2m -run '^TestRuntimeStateHTTP' ./internal/serve
+        run: go test -timeout=2m -run '^TestRuntimeStateHTTP|^TestFileStoreSaveTaskWaitsForTransientSnapshotReader$' ./internal/serve ./internal/taskmonitor
 
       # Shell execution contract: PowerShell identity, Chinese workspace paths,
       # UTF-8 output, and ExitCode retention must gate PRs on native Windows.
