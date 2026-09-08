@@ -65,6 +65,12 @@ export const OFFLINE_ATTRIBUTION_REASON = "heap-retainer-and-control-evidence-re
 // back to 512). Only a displaced final tail is persistent drift.
 export const TRANSIENT_EXCURSION_REASON = "transient-counter-excursion";
 
+// A single early baseline reading can sit above the resting value while layout
+// cleanup still owns listeners. Every later reading then looks displaced, which
+// the gate would misreport as persistent drift. An unsettled baseline is
+// reported as its own blocker instead of being judged as displacement.
+export const BASELINE_NOT_SETTLED_REASON = "baseline-not-settled";
+
 // Reasons the automated gate must block on. Observations (the offline
 // attribution duty, fully-recovered excursions) are recorded on every report
 // but are not screening failures.
@@ -77,11 +83,11 @@ export function screeningBlockers(reasons) {
 // kept as observations so they still get an offline explanation. When the
 // bench ends with an explicit "settled" resting-state sample, that sample is
 // the authoritative tail and every earlier checkpoint is intermediate.
-function counterDriftReason(values, phases) {
+function counterDriftReason(values, phases, baselineStable = true) {
   const baseline = values[0];
   const final = values.at(-1);
   const settledTail = phases.at(-1) === "settled";
-  if (final !== baseline) return "persistent";
+  if (baselineStable && final !== baseline) return "persistent";
   if (!settledTail) {
     const tail = values.slice(1).slice(-3);
     if (tail.some((value) => value !== final)) return "persistent";
@@ -96,12 +102,14 @@ export function attributeRetention(samples, cohorts = retainedCohorts(samples)) 
     [dom?.nodes, dom?.jsEventListeners].every(value => Number.isSafeInteger(value) && value >= 0));
   const released = samples.every((sample) => sample.lifecycle.activeOperations === 0);
   const phases = samples.map((sample) => sample.phase);
+  const baselineStable = samples[0]?.baselineStable !== false;
   const reasons = [];
   if (retained) reasons.push("persistent-render-cohort");
   if (!nativeCountersValid) reasons.push("invalid-native-counters");
+  if (!baselineStable) reasons.push(BASELINE_NOT_SETTLED_REASON);
   if (nativeCountersValid) {
-    const nodeDrift = counterDriftReason(samples.map((sample) => sample.dom.nodes), phases);
-    const listenerDrift = counterDriftReason(samples.map((sample) => sample.dom.jsEventListeners), phases);
+    const nodeDrift = counterDriftReason(samples.map((sample) => sample.dom.nodes), phases, baselineStable);
+    const listenerDrift = counterDriftReason(samples.map((sample) => sample.dom.jsEventListeners), phases, baselineStable);
     if (nodeDrift === "persistent" || listenerDrift === "persistent") reasons.push("post-gc-dom-or-listener-drift");
     else if (nodeDrift === "transient" || listenerDrift === "transient") reasons.push(TRANSIENT_EXCURSION_REASON);
   }
