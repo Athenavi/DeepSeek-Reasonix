@@ -4049,16 +4049,16 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 	buildCtx, registration := beginSharedHostMCPRegistration(buildCtx, sharedHost)
 	defer registration.rollback()
 	ctrl, err := a.buildTabControllerBootFenced(buildCtx, extensionGen, boot.Options{
-		Model:                    model,
-		RequireKey:               false,
-		StatsSource:              "desktop",
-		TaskStore:                a.taskStore(),
-		OnConfigLoadWarnings:     a.configLoadWarningsHandler(),
-		Sink:                     sink,
-		WorkspaceRoot:            root,
-		SessionDir:               sessionDir,
-		EffortOverride:           cloneStringPtr(buildEffort),
-		SharedHost:               sharedHost,
+		Model:                model,
+		RequireKey:           false,
+		StatsSource:          "desktop",
+		TaskStore:            a.taskStore(),
+		OnConfigLoadWarnings: a.configLoadWarningsHandler(),
+		Sink:                 sink,
+		WorkspaceRoot:        root,
+		SessionDir:           sessionDir,
+		EffortOverride:       cloneStringPtr(buildEffort),
+		SharedHost:           sharedHost, BrowserExecutor: a.browserExecutorForTab(tab),
 		CleanupPendingReconciler: reconcileDesktopCleanupPending,
 		SubagentParentLive:       a.subagentParentProbeForBuild(tab),
 		SessionRecoveryMeta:      a.tabSessionRecoveryMeta(tab),
@@ -5128,16 +5128,6 @@ func (a *App) orderedTabIDsSnapshotLocked() ([]string, bool) {
 	sort.Strings(missing)
 	ordered = append(ordered, missing...)
 	return ordered, len(ordered) != len(a.tabOrder) || len(missing) > 0
-}
-
-func (a *App) removeTabOrderLocked(tabID string) {
-	next := a.tabOrder[:0]
-	for _, id := range a.tabOrder {
-		if id != tabID {
-			next = append(next, id)
-		}
-	}
-	a.tabOrder = next
 }
 
 func loadTabsFile() desktopTabsFile {

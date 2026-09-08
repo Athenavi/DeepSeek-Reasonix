@@ -27,6 +27,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"reasonix/desktop/internal/browserops"
 	"reasonix/desktop/internal/instanceidentity"
 	"reasonix/internal/agent"
 	"reasonix/internal/billing"
@@ -419,6 +420,11 @@ type App struct {
 	webView2Recovery *webView2RecoveryCoordinator
 	// hostShell is non-nil only under the Electron shell (--host-rpc).
 	hostShell *hostShellBridge
+	// browserExecutors are per-tab browser grants over the shell; browserOps is
+	// the durable write ledger shared by all of them. Both lazily created.
+	browserExecMu    sync.Mutex
+	browserExecutors map[string]*hostBrowserExecutor
+	browserOps       *browserops.Ledger
 }
 
 type desktopShellRuntimeState struct {
@@ -2148,16 +2154,16 @@ func (a *App) clearActiveSessionRuntime(tab *WorkspaceTab, oldCtrl control.Sessi
 	newSink := &tabEventSink{tabID: tab.ID, app: a, ctx: a.ctx}
 	sharedHost := a.lookupSharedHost(snap.sharedHostKey)
 	newCtrl, err := boot.Build(a.bootContext(), boot.Options{
-		Model:                    snap.model,
-		RequireKey:               false,
-		StatsSource:              "desktop",
-		TaskStore:                a.taskStore(),
-		OnConfigLoadWarnings:     a.configLoadWarningsHandler(),
-		Sink:                     newSink,
-		WorkspaceRoot:            snap.workspaceRoot,
-		SessionDir:               sessionDirForSnapshot(snap),
-		EffortOverride:           cloneStringPtr(snap.effort),
-		SharedHost:               sharedHost,
+		Model:                snap.model,
+		RequireKey:           false,
+		StatsSource:          "desktop",
+		TaskStore:            a.taskStore(),
+		OnConfigLoadWarnings: a.configLoadWarningsHandler(),
+		Sink:                 newSink,
+		WorkspaceRoot:        snap.workspaceRoot,
+		SessionDir:           sessionDirForSnapshot(snap),
+		EffortOverride:       cloneStringPtr(snap.effort),
+		SharedHost:           sharedHost, BrowserExecutor: a.browserExecutorForTab(tab),
 		MCPHostProfile:           plugin.HostProfileDesktopApps,
 		CleanupPendingReconciler: reconcileDesktopCleanupPending,
 		SubagentParentLive:       a.subagentParentProbeForBuild(tab),
@@ -4109,16 +4115,16 @@ func (a *App) buildSessionRebindCandidate(
 		return nil, err
 	}
 	ctrl, err := boot.Build(a.bootContext(), boot.Options{
-		Model:                    model,
-		RequireKey:               false,
-		StatsSource:              "desktop",
-		TaskStore:                a.taskStore(),
-		OnConfigLoadWarnings:     a.configLoadWarningsHandler(),
-		Sink:                     a.desktopControllerSink(sink, cfg.Notifications),
-		WorkspaceRoot:            root,
-		SessionDir:               sessionDir,
-		EffortOverride:           cloneStringPtr(source.effort),
-		SharedHost:               sharedHost,
+		Model:                model,
+		RequireKey:           false,
+		StatsSource:          "desktop",
+		TaskStore:            a.taskStore(),
+		OnConfigLoadWarnings: a.configLoadWarningsHandler(),
+		Sink:                 a.desktopControllerSink(sink, cfg.Notifications),
+		WorkspaceRoot:        root,
+		SessionDir:           sessionDir,
+		EffortOverride:       cloneStringPtr(source.effort),
+		SharedHost:           sharedHost, BrowserExecutor: a.browserExecutorForTab(tab),
 		MCPHostProfile:           plugin.HostProfileDesktopApps,
 		CleanupPendingReconciler: reconcileDesktopCleanupPending,
 		SubagentParentLive:       a.subagentParentProbeForBuild(tab),
@@ -9650,16 +9656,16 @@ func (a *App) SetModelForTab(tabID, name string) (retErr error) {
 
 	stageStarted = time.Now()
 	newCtrl, err := boot.Build(a.bootContext(), boot.Options{
-		Model:                    name,
-		RequireKey:               false,
-		StatsSource:              "desktop",
-		TaskStore:                a.taskStore(),
-		OnConfigLoadWarnings:     a.configLoadWarningsHandler(),
-		Sink:                     snap.sink,
-		WorkspaceRoot:            snap.workspaceRoot,
-		SessionDir:               sessionDirForSnapshot(snap),
-		EffortOverride:           cloneStringPtr(effortOverride),
-		SharedHost:               sharedHost,
+		Model:                name,
+		RequireKey:           false,
+		StatsSource:          "desktop",
+		TaskStore:            a.taskStore(),
+		OnConfigLoadWarnings: a.configLoadWarningsHandler(),
+		Sink:                 snap.sink,
+		WorkspaceRoot:        snap.workspaceRoot,
+		SessionDir:           sessionDirForSnapshot(snap),
+		EffortOverride:       cloneStringPtr(effortOverride),
+		SharedHost:           sharedHost, BrowserExecutor: a.browserExecutorForTab(tab),
 		MCPHostProfile:           plugin.HostProfileDesktopApps,
 		CleanupPendingReconciler: reconcileDesktopCleanupPending,
 		SubagentParentLive:       a.subagentParentProbeForBuild(tab),
@@ -9839,16 +9845,16 @@ func (a *App) SetEffortForTab(tabID, level string) error {
 	}
 	sharedHost := a.lookupSharedHost(snap.sharedHostKey)
 	newCtrl, err := boot.Build(a.bootContext(), boot.Options{
-		Model:                    modelRef,
-		RequireKey:               false,
-		StatsSource:              "desktop",
-		TaskStore:                a.taskStore(),
-		OnConfigLoadWarnings:     a.configLoadWarningsHandler(),
-		Sink:                     snap.sink,
-		WorkspaceRoot:            snap.workspaceRoot,
-		SessionDir:               sessionDirForSnapshot(snap),
-		EffortOverride:           &effort,
-		SharedHost:               sharedHost,
+		Model:                modelRef,
+		RequireKey:           false,
+		StatsSource:          "desktop",
+		TaskStore:            a.taskStore(),
+		OnConfigLoadWarnings: a.configLoadWarningsHandler(),
+		Sink:                 snap.sink,
+		WorkspaceRoot:        snap.workspaceRoot,
+		SessionDir:           sessionDirForSnapshot(snap),
+		EffortOverride:       &effort,
+		SharedHost:           sharedHost, BrowserExecutor: a.browserExecutorForTab(tab),
 		MCPHostProfile:           plugin.HostProfileDesktopApps,
 		CleanupPendingReconciler: reconcileDesktopCleanupPending,
 		SubagentParentLive:       a.subagentParentProbeForBuild(tab),
