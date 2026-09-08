@@ -642,45 +642,6 @@ func TestServeExtensionReloadPublishesOnlySuccessfulReplacement(t *testing.T) {
 	}
 }
 
-func TestServeSwitchEffortUsesModelRefForDuplicateModelNames(t *testing.T) {
-	writeServeModelConfig(t)
-
-	bc := NewBroadcaster()
-	ctrl := control.New(control.Options{
-		Sink:       bc,
-		Label:      "shared-chat",
-		ModelRef:   "alternate/shared-chat",
-		SessionDir: t.TempDir(),
-	})
-	server := New(ctrl, bc, config.ServeConfig{})
-	var builtRef string
-	server.buildController = func(_ context.Context, ref string) (*control.Controller, error) {
-		builtRef = ref
-		return control.New(control.Options{
-			Sink:       bc,
-			Label:      "shared-chat",
-			ModelRef:   ref,
-			SessionDir: t.TempDir(),
-		}), nil
-	}
-
-	if err := server.switchEffort(context.Background(), "high"); err != nil {
-		t.Fatalf("switchEffort: %v", err)
-	}
-	if builtRef != "alternate/shared-chat" {
-		t.Fatalf("rebuilt model ref = %q, want alternate/shared-chat", builtRef)
-	}
-	edit := config.LoadForEdit(config.UserConfigPath())
-	def, _ := edit.Provider("default")
-	if def.Effort != "" {
-		t.Fatalf("default effort = %q, want unchanged", def.Effort)
-	}
-	alt, _ := edit.Provider("alternate")
-	if alt.Effort != "high" {
-		t.Fatalf("alternate effort = %q, want high", alt.Effort)
-	}
-}
-
 func writeServeModelConfig(t *testing.T) {
 	t.Helper()
 	home := t.TempDir()

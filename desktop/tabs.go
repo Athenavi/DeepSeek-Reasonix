@@ -84,6 +84,7 @@ type WorkspaceTab struct {
 	Ready               bool                     // true once boot.Build completes
 	StartupErr          string                   // build error, surfaced to the frontend
 	StartupErrLeaseHeld bool                     // true when StartupErr can be retried after a session lease releases
+	modelApplication    tabModelApplicationState // guarded by App.mu; never persisted
 	runtimeID           string                   // process-local SessionRuntime registry identity
 	sessionLease        *agent.SessionLease
 	sessionLeaseMu      sync.Mutex
@@ -600,6 +601,8 @@ func cloneDetachedRuntimeTab(tab *WorkspaceTab, key, path string) *WorkspaceTab 
 		Ready:                    tab.Ready,
 		StartupErr:               tab.StartupErr,
 		StartupErrLeaseHeld:      tab.StartupErrLeaseHeld,
+		modelApplication:         tab.modelApplication,
+		lastBuildResult:          tab.lastBuildResult,
 		runtimeID:                tab.runtimeID,
 		sink:                     tab.sink,
 		ActivityStatus:           tab.ActivityStatus,
@@ -707,6 +710,8 @@ func applyRuntimeTab(target, source *WorkspaceTab, path string, wailsCtx context
 	}
 
 	target.Ctrl = source.Ctrl
+	target.modelApplication.failure = source.modelApplication.failure
+	target.lastBuildResult = source.lastBuildResult
 	target.sink = source.sink
 	target.adoptSessionLease(source.takeSessionLease())
 	target.SessionPath = canonicalTabSessionPath(path)
@@ -1760,7 +1765,11 @@ func (a *App) notifyTabRuntimeRebuiltAtEpoch(tab *WorkspaceTab, epoch string) {
 	a.mu.RLock()
 	sink := tab.sink
 	tabID := tab.ID
+	ctrl, _ := tab.Ctrl.(*control.Controller)
 	a.mu.RUnlock()
+	if ctrl != nil {
+		go ctrl.NotifyInboxRuntimeReady()
+	}
 	if sink != nil && sink.context() != nil {
 		sink.emitRuntimeEvent("runtime:rebuilt", tabID, epoch)
 		return
@@ -3517,61 +3526,6 @@ func (a *App) desktopControllerSink(inner event.Sink, cfg config.NotificationsCo
 	return notify.NewSink(inner, sender, cfg)
 }
 
-func setTabStartupError(tab *WorkspaceTab, err error) bool {
-	if tab == nil {
-		return false
-	}
-	tab.StartupErr = userFacingSessionLeaseError("", err).Error()
-	tab.StartupErrLeaseHeld = errors.Is(err, agent.ErrSessionLeaseHeld)
-	return tab.StartupErrLeaseHeld
-}
-
-func clearTabStartupError(tab *WorkspaceTab) {
-	if tab == nil {
-		return
-	}
-	tab.StartupErr = ""
-	tab.StartupErrLeaseHeld = false
-}
-
-func (a *App) recordTabStartupFailure(tab *WorkspaceTab, buildGeneration uint64, wailsCtx context.Context, err error) {
-	a.mu.Lock()
-	if a.tabBuildSupersededLocked(tab, buildGeneration) {
-		a.mu.Unlock()
-		return
-	}
-	leaseHeld, save := a.markTabStartupFailureLocked(tab, err, keepStartupRestore)
-	tab.releaseSessionLease()
-	a.mu.Unlock()
-	a.writeTabsSaveRequest(save)
-	if leaseHeld {
-		a.scheduleDeferredStartupBuild(tab.ID)
-		tabID := tab.ID
-		// The deferred loop retries every 2s and re-enters this path. Only the
-		// first transition to lease_blocked needs the explicit meta push — a
-		// repeated push would re-fetch the same list and churn the frontend.
-		a.mu.RLock()
-		rt := a.runtimeForTabLocked(tab)
-		alreadyBlocked := rt != nil && rt.Phase == sessionRuntimeLeaseBlocked && rt.Issue != nil && rt.Issue.Code == "session_lease_held"
-		a.mu.RUnlock()
-		if alreadyBlocked {
-			a.emitReady(wailsCtx, tab.ID)
-			return
-		}
-		// A failed startup emits no agent events, so the frontend's tabMetas
-		// list would never refresh its runtime state and the takeover
-		// banner/button would have nothing to render. Push the authoritative
-		// tab meta (whose Runtime carries the lease_blocked view) explicitly.
-		a.goSafe("tab-meta-push-lease", func() {
-			if a.tabs[tabID] == nil {
-				return
-			}
-			a.emitRuntimeEvent(tabMetaRefreshEventChannel, TabMetaRefreshEvent{TabID: tabID, Meta: a.MetaForTab(tabID)})
-		})
-	}
-	a.emitReady(wailsCtx, tab.ID)
-}
-
 // closeTabBuildDone signals waiters (topic-activation completions) that the
 // build owning buildGeneration has terminated. Every build funnels through
 // buildTabControllerWithContextCore, whose deferred call guarantees
@@ -3794,6 +3748,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 		PinnedContextLoader:      pinnedContextLoader(root),
 		OnSessionRecovered:       a.handleTabSessionRecovered(tab),
 		OnSessionTransition:      a.handleTabSessionTransition(tab),
+		BeforeInboxDispatch:      a.beforeInboxDispatch,
 		OnSessionTitleChanged:    a.onSessionTitleChanged,
 	})
 	if a.handleTabControllerBootError(tab, registration, rootKey, buildGeneration, wailsCtx, err) {
@@ -3980,6 +3935,12 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 		return
 	}
 	defer releasePublication()
+	if a.rejectStaleStartupModelSettings(tab, ctrl, buildGeneration, wailsCtx, func() {
+		registration.rollback()
+		a.abandonSupersededBuild(tab, ctrl, rootKey, acquiredLeaseKey)
+	}) {
+		return
+	}
 	a.mu.Lock()
 	if a.tabBuildSupersededLocked(tab, buildGeneration) {
 		a.mu.Unlock()
@@ -4000,15 +3961,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 	a.advanceSessionRuntimeEpochLocked(tab)
 	keepBuildContext = true
 	a.mu.Unlock()
-	// A directly-opened session announces itself to a resident serve so the
-	// remote side can watch it read-only and reclaim it (see
-	// adoptSessionFromLocalServe). First-open path of the takeover flow.
-	if path := strings.TrimSpace(tab.currentSessionPath()); path != "" && !tab.ReadOnly {
-		a.attachTakeoverMirror(tab.ID, path)
-		go a.adoptSessionFromLocalServe(tab.ID, path)
-	}
-	recoverPendingTurnProjections(tab, ctrl)
-	a.emitReady(wailsCtx, tab.ID)
+	a.finishStartupPublication(tab, ctrl, wailsCtx)
 }
 
 type sessionBinding struct {

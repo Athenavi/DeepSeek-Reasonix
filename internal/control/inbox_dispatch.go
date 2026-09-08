@@ -1,6 +1,7 @@
 package control
 
 import (
+	"errors"
 	"log/slog"
 	"time"
 
@@ -8,6 +9,19 @@ import (
 )
 
 const maxInboxDispatchRetryAttempts = 3
+
+// ErrInboxRuntimeUnpublished means the host owns the next dispatch kick:
+// either this runtime is a candidate or it was replaced before admission.
+var ErrInboxRuntimeUnpublished = errors.New("inbox runtime is not published")
+
+// NotifyInboxRuntimeReady is called after a host publishes a complete runtime.
+func (c *Controller) NotifyInboxRuntimeReady() { c.maybeDispatchInbox() }
+
+func (c *Controller) SetBeforeInboxDispatch(before func(*Controller) (func(), error)) {
+	c.mu.Lock()
+	c.modelSettings.beforeInboxDispatch = before
+	c.mu.Unlock()
+}
 
 type inboxDispatchResult int
 
@@ -32,6 +46,10 @@ func (c *Controller) endRotation() {
 // rejection can never disappear in the handoff window.
 func (c *Controller) maybeDispatchInbox() {
 	c.inbox.mu.Lock()
+	if c.inbox.closed {
+		c.inbox.mu.Unlock()
+		return
+	}
 	c.inbox.dispatchPending = true
 	if c.inbox.dispatching {
 		c.inbox.mu.Unlock()
@@ -39,7 +57,19 @@ func (c *Controller) maybeDispatchInbox() {
 	}
 	c.inbox.dispatching = true
 	c.inbox.mu.Unlock()
+	c.mu.Lock()
+	hostAdmission := c.modelSettings.beforeInboxDispatch != nil
+	c.mu.Unlock()
+	if hostAdmission {
+		// Enqueue/resume can be called with the host's publication lock held.
+		// Never synchronously reenter that lock through its admission callback.
+		c.autosaveWG.Go(c.drainInboxDispatch)
+		return
+	}
+	c.drainInboxDispatch()
+}
 
+func (c *Controller) drainInboxDispatch() {
 	for {
 		c.inbox.mu.Lock()
 		if !c.inbox.dispatchPending {
@@ -102,6 +132,9 @@ func (c *Controller) dispatchInboxOnce() inboxDispatchResult {
 	}
 	receipt, err := c.TrySubmitInboxItem(meta.ID)
 	if err != nil {
+		if errors.Is(err, ErrInboxRuntimeUnpublished) || errors.Is(err, ErrTurnRunning) {
+			return inboxDispatchIdle
+		}
 		slog.Warn("controller: dispatch inbox item", "err", err, "id", meta.ID)
 		return inboxDispatchRetry
 	}

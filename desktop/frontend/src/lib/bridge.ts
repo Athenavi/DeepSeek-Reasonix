@@ -1,3 +1,4 @@
+import { makeMockModelSettingsBindings, type ModelSettingsBindings } from "./modelSettingsBridge";
 import { mockProviderTemplate, mockPreset, mockBundlePreset, mockKimiAPIModels, mockLongCatModels, mockTokenRhythmModels, mockTokenRhythmModelOverrides, mockMiMoV25Models, mockMiniMaxModels, mockGLMAPIModels, mockGLMCodingModels, mockGLMAnthropicModels, mockQwenAPIModels, mockQwenPlanModels, mockQwenPlanVisionModels, mockStepFunModels, mockOpenCodeGoModels, mockNovitaModels, mockGMIModels, mockVercelModels, mockOllamaCloudModels } from "./mockProviderTemplates";
 // Wails and the browser mock share this React-to-Go contract.
 // @ts-ignore generated locally; fresh checkouts use the disabled drift check below.
@@ -199,7 +200,7 @@ interface DesktopWindowState {
 }
 // AppBindings is the hand-written React-to-Go contract. _CheckGeneratedBindings
 // catches generated methods missing here; update this interface and typecheck.
-export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganizationBindings, HistoryCatalogBindings, TaskCatalogBindings, BlankProjectBindings, QualityFloorBindings, SessionTitleBindings, ScrollDiagnosticBindings, RemoteProjectBindings, MCPAppBindings, PinnedContextBindings, FollowupBindings {
+export interface AppBindings extends ModelSettingsBindings, SessionCatalogBindings, ProjectTreeOrganizationBindings, HistoryCatalogBindings, TaskCatalogBindings, BlankProjectBindings, QualityFloorBindings, SessionTitleBindings, ScrollDiagnosticBindings, RemoteProjectBindings, MCPAppBindings, PinnedContextBindings, FollowupBindings {
   Platform(): Promise<string>;
   MinimiseMainWindow(): Promise<void>;
   ToggleMaximiseMainWindow(): Promise<void>;
@@ -550,7 +551,6 @@ export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganiza
   SaveDoc(path: string, body: string): Promise<string>;
   SaveDocForTab(tabID: string, path: string, body: string): Promise<string>;
   DesktopStartupSettings(): Promise<DesktopStartupSettingsView>;
-  Settings(): Promise<SettingsView>;
   HooksSettings(scope: string): Promise<HooksSettingsView>;
   SaveHooksSettings(scope: string, hooks: HookConfigView[]): Promise<void>;
   SaveHooksSettingsForRoot(scope: string, projectRoot: string, hooks: HookConfigView[]): Promise<void>;
@@ -1706,6 +1706,7 @@ function makeMockApp(): AppBindings {
   }
   // Mutable settings so the Settings panel's edits are observable in browser dev.
   const settings: SettingsView = {
+    modelSettingsFingerprint: "mock-model-settings-0",
     defaultModel: "deepseek",
     plannerModel: "",
     visionModel: "",
@@ -4527,15 +4528,7 @@ function makeMockApp(): AppBindings {
         conversationWidth,
       })) as DesktopStartupSettingsView;
     },
-    async Settings() {
-      await loadMockProviderCatalog();
-      for (const preset of mockProviderPresetViews()) {
-        const existing = settings.providerPresets.find(p => p.id === preset.id);
-        if (existing) existing.catalog = preset.catalog;
-        else settings.providerPresets.push(preset);
-      }
-      return JSON.parse(JSON.stringify(settings)) as SettingsView;
-    },
+    ...makeMockModelSettingsBindings(settings, loadMockProviderCatalog, mockProviderPresetViews),
     async StorageSettings() { return { defaultWorkspace: cwd, statePath: `${cwd}/.reasonix`, cachePath: `${cwd}/.reasonix/cache`, extensionsPath: `${cwd}/.reasonix/plugins` }; },
     async HooksSettings(scope: string) {
       const key = scope === "project" ? "project" : "global";

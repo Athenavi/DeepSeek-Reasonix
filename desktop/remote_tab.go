@@ -695,6 +695,10 @@ func remoteSessionTakenOver(err error) bool {
 }
 
 func (a *App) SubmitRemoteTab(tabID, text string) error {
+	revision, err := a.ensureRemoteModelSettings(tabID)
+	if err != nil {
+		return err
+	}
 	client, base, expectedPath, err := a.remoteTabCommandTarget(tabID)
 	if err != nil {
 		return err
@@ -702,7 +706,7 @@ func (a *App) SubmitRemoteTab(tabID, text string) error {
 	ctx, cancel := commandContext(a)
 	defer cancel()
 	body, _ := json.Marshal(map[string]string{"input": text})
-	return servePostForSession(ctx, client, serveURL(base, "/submit"), body, expectedPath)
+	return servePostForSession(ctx, client, serveURL(base, "/submit"), body, expectedPath, revision)
 }
 
 func (a *App) CancelRemoteTab(tabID string) error {

@@ -135,6 +135,7 @@ type Controller struct {
 	modelCapabilityResolver func(*config.ProviderEntry) config.ResolvedModelCapability
 	frozenImageInput        *bool
 	imageCapabilityChanged  func() bool
+	modelSettings           controllerModelSettings
 	prompt                  controllerPromptState
 	pinnedContextLoader     PinnedContextLoader
 	sessionContextStatic    sessioncontext.Sections
@@ -508,9 +509,16 @@ type Options struct {
 	// the exact active model. Nil keeps the legacy config-only behavior.
 	ModelCapabilityResolver func(*config.ProviderEntry) config.ResolvedModelCapability
 	// FrozenImageInput belongs to the provider instance built for this runtime.
-	FrozenImageInput       *bool
-	ImageCapabilityChanged func() bool
-	SystemPrompt           string
+	FrozenImageInput            *bool
+	ImageCapabilityChanged      func() bool
+	ModelSettingsRevision       string
+	ModelSettingsSourceRevision string
+	ModelSettingsCurrent        func() (string, error)
+	// BeforeInboxDispatch lets the owner reserve runtime admission before a
+	// queued message becomes a new turn. The returned release runs after claim
+	// and synchronous turn admission, outside every controller lock.
+	BeforeInboxDispatch func(*Controller) (func(), error)
+	SystemPrompt        string
 	// PinnedContextLoader snapshots the current session sidecar at turn
 	// admission. The Agent persists changes as append-only user-role revisions.
 	PinnedContextLoader PinnedContextLoader
@@ -700,6 +708,7 @@ func New(opts Options) *Controller {
 		modelCapabilityResolver:           opts.ModelCapabilityResolver,
 		frozenImageInput:                  opts.FrozenImageInput,
 		imageCapabilityChanged:            opts.ImageCapabilityChanged,
+		modelSettings:                     newControllerModelSettings(opts),
 		prompt:                            newControllerPromptState(opts.SystemPrompt, opts.Executor),
 		pinnedContextLoader:               opts.PinnedContextLoader,
 		sessionContextStatic:              opts.SessionContextStatic,
@@ -782,19 +791,21 @@ func New(opts Options) *Controller {
 	// state/event evidence. The recorder swallows its own failures — monitoring
 	// must never affect the agent pipeline. The session id is resolved lazily
 	// because the session path is only fixed once the first turn begins.
-	if c.jobs != nil && c.workspaceRoot != "" {
-		taskStore := opts.TaskStore
-		if taskStore == nil {
-			taskStore = taskmonitor.NewFileStore(filepath.Join(".reasonix", "tasks"))
-		}
-		c.jobs.SetTaskRecorder(taskmonitor.NewTaskRecorder(
-			taskStore,
-			c.workspaceRoot,
-			func() string { return c.parentSessionID() },
-		))
-	}
+	c.initializeTaskRecorder(opts.TaskStore)
 	c.initializeRuntimeState()
 	return c
+}
+
+func (c *Controller) initializeTaskRecorder(store taskmonitor.WriteStore) {
+	if c.jobs == nil || c.workspaceRoot == "" {
+		return
+	}
+	if store == nil {
+		store = taskmonitor.NewFileStore(filepath.Join(".reasonix", "tasks"))
+	}
+	c.jobs.SetTaskRecorder(taskmonitor.NewTaskRecorder(
+		store, c.workspaceRoot, func() string { return c.parentSessionID() },
+	))
 }
 
 // SetDisplayRecorder installs an optional hook used by frontends that persist a
@@ -3658,7 +3669,12 @@ func updateSessionListingProjection(s *agent.Session, path, modelRef, preview st
 	if !ok {
 		return fmt.Errorf("session persistence baseline missing after save")
 	}
-	_, err := agent.UpdateSessionListingProjectionIfCurrent(path, modelRef, preview, turns, markActivity, persisted)
+	var err error
+	if s.WriteAuthorityRequired() {
+		_, err = agent.UpdateOwnedSessionListingProjectionIfCurrent(path, modelRef, preview, turns, markActivity, persisted, s.WriteAuthority())
+	} else {
+		_, err = agent.UpdateSessionListingProjectionIfCurrent(path, modelRef, preview, turns, markActivity, persisted)
+	}
 	return err
 }
 
@@ -4951,6 +4967,20 @@ func (c *Controller) ImageCapabilityChanged() bool {
 	return c.imageCapabilityChanged != nil && c.imageCapabilityChanged()
 }
 
+// ModelSettingsState compares this immutable runtime with current disk config.
+// It is intentionally separate from provider-visible messages and metadata.
+func (c *Controller) ModelSettingsState() (applied, desired string, err error) {
+	if c.modelSettings.current == nil {
+		return "", "", nil
+	}
+	desired, err = c.modelSettings.current()
+	return c.modelSettings.revision, desired, err
+}
+
+// ModelSettingsSourceRevision identifies an immutable Desktop resolver bundle.
+// It is transport bookkeeping only, never part of the conversation.
+func (c *Controller) ModelSettingsSourceRevision() string { return c.modelSettings.sourceRevision }
+
 // InheritLifecycleFrom carries same-session lifecycle state across controller
 // rebuilds, such as model switches that preserve the conversation.
 func (c *Controller) InheritLifecycleFrom(prev *Controller) {
@@ -5061,6 +5091,11 @@ func (c *Controller) close(fireSessionEnd bool, jobsMode closeJobsMode) {
 		} else {
 			c.promptOwner.Clear()
 		}
+		// Join sidecar creation without waiting for the dispatcher itself: a
+		// model refresh may close this controller from inside that dispatcher.
+		c.inbox.mu.Lock()
+		c.inbox.closed = true
+		c.inbox.mu.Unlock()
 		if fireSessionEnd && started {
 			c.hooks.SessionEnd(context.Background(), "other")
 			c.extensionSessionEvent(extension.PointSessionEnd, dispatch.PhaseEnd, c.SessionPath())
