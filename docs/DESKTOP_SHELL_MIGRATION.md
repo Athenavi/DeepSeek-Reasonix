@@ -120,7 +120,8 @@ case. Met for the inventory; acceptance cases are listed under gates below.
   tabs; `-emit-contract` writes the generated TypeScript and JSON; the RPC
   native host, tray and quit hooks run over the shell connection:
   implemented, locally tested.
-- One pnpm workspace under `desktop/` for the frontend and the shell.
+- One pnpm workspace under `desktop/` for the frontend and the shell:
+  implemented.
 - The root Go module stays static-only; the desktop module keeps its own build.
 
 Exit condition: the service starts and is tested without Wails; every command
@@ -133,6 +134,19 @@ Main window, trusted preload, error recovery page, service supervisor,
 theme, title bar drag, shortcuts, file drop, clipboard, dialogs, remote Serve
 windows, menu, tray, background close and restore. The transcript kernel,
 stable message identity and single scroll writer are untouched.
+
+Status: the shell (`desktop/electron`), the frontend host adapter
+(`src/lib/desktopHost.ts`, boundary gate, one stylesheet with the drag-region
+rewrite) and the host-mode routes for tray, remote windows and relaunch are
+implemented and locally tested on macOS arm64: `pnpm --dir electron smoke`
+boots the real service in a disposable home and passes 12/12 (handshake,
+invoke, unknown-command rejection, window bounds, no Node or Wails globals in
+the renderer, clean exit of both processes); the full desktop Go lane and the
+frontend gates are green. Measured against the Wails baseline with the same
+script (`docs/desktop-migration/baseline/README.md`): time to a healthy
+frontend is unchanged within noise, process-tree memory is about 280 MiB
+higher, and SIGTERM now quits cleanly. Windows and Linux runs of the shell
+are external verification items.
 
 Exit condition: the whole existing desktop flow works in Electron with no
 mock fallback, no dead controls and no missing events; rapid session

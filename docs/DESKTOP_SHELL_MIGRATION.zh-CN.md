@@ -94,7 +94,7 @@ React 界面 ──preload 类型化 IPC──▶ Electron 主进程 ──stdio
 - `reasonix-desktop --host-rpc`：一个 Go 服务进程管理全部会话与标签；`-emit-contract`
   输出生成的 TypeScript 与 JSON；RPC 原生宿主、托盘与退出钩子经壳连接工作：
   implemented，locally tested。
-- `desktop/` 下统一的 pnpm workspace 管理前端与壳。
+- `desktop/` 下统一的 pnpm workspace 管理前端与壳：implemented。
 - 根 Go 模块保持纯静态构建；桌面模块保留自己的构建。
 
 退出条件：服务可脱离 Wails 启动和测试；所有命令由契约映射；业务代码没有直接壳调用。
@@ -105,6 +105,14 @@ React 界面 ──preload 类型化 IPC──▶ Electron 主进程 ──stdio
 资源 scheme、窗口状态、主题、标题栏拖动、快捷键、文件拖放、剪贴板、对话框、远程
 Serve 窗口、菜单、托盘、后台关闭与恢复。TranscriptKernel、稳定消息身份和单一滚动
 写入者不动。
+
+状态：壳（`desktop/electron`）、前端宿主适配层（`src/lib/desktopHost.ts`、边界门禁、单一
+样式表加拖动区域重写）以及托盘、远程窗口和重启的 host 模式路由已实现，并在 macOS arm64
+本地测试通过：`pnpm --dir electron smoke` 在一次性数据目录中启动真实服务，12/12 通过
+（握手、invoke、未知命令拒绝、窗口边界、渲染进程无 Node 与 Wails 全局对象、两进程干净
+退出）；桌面 Go 完整测试通道与前端门禁均通过。用同一脚本对照 Wails 基线
+（`docs/desktop-migration/baseline/README.md`）：前端就绪时间在噪声范围内不变，进程树
+内存高约 280 MiB，SIGTERM 现在能干净退出。Windows 与 Linux 上的壳运行属于外部验证项。
 
 退出条件：完整现有桌面流程在 Electron 上可用，无 mock 兜底、无空按钮、无遗漏事件；
 快速切换会话不串台。
