@@ -472,6 +472,23 @@
     }
   },
   {
+    "Name": "view_image",
+    "Description": "Read a local PNG, JPEG, GIF, or WebP image by path and return visual content through native vision or the configured image-understanding model. Use this for image paths instead of read_file. Maximum file size: 3 MiB; maximum dimensions: 40 million pixels.",
+    "ReadOnly": true,
+    "Schema": {
+      "properties": {
+        "path": {
+          "description": "Image file path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    }
+  },
+  {
     "Name": "wait",
     "Description": "Block until background jobs finish, then return each job's status and final output/answer. Use to collect the result of a task(run_in_background) or bash(run_in_background) before continuing. Omit job_ids to wait for every running job.",
     "ReadOnly": true,

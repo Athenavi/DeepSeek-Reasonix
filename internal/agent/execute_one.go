@@ -615,6 +615,10 @@ func (a *Agent) finishToolExecution(ctx context.Context, plan *toolCallPlan) too
 	// before evidence, hooks, and recovery observation, so every downstreamconsumer sees the final
 	// (possiblyreplaced) outcome.
 	result, err = a.interceptToolAfter(ctx, call, result, err)
+	var visionSummary *provider.VisionSummary
+	if err == nil {
+		result, visionSummary = a.processToolImages(cctx, result, images)
+	}
 	// A tool that refused its own call never ran:
 	// reportitlikethepermissionandplan-modeblocksaboveratherthanasanexecution failure.
 	if msg, refused := tool.BlockedMessage(err); refused {
@@ -666,7 +670,7 @@ func (a *Agent) finishToolExecution(ctx context.Context, plan *toolCallPlan) too
 	}
 	body, truncMsg, original, readObserver := a.boundIncompleteReadAwareResult(plan, result)
 	out := toolOutcome{
-		output: body, images: images, truncated: truncMsg != "" || original != "", truncMsg: truncMsg,
+		output: body, images: images, visionSummary: visionSummary, truncated: truncMsg != "" || original != "", truncMsg: truncMsg,
 		execution: execution, mcpApp: toProviderMCPApp(plan.mcpApp), recoveryGeneration: recoveryGen,
 	}
 	if original != "" {

@@ -19,6 +19,7 @@ import (
 	"reasonix/internal/config"
 	"reasonix/internal/event"
 	"reasonix/internal/evidence"
+	"reasonix/internal/imageinput"
 	"reasonix/internal/mcplaunch"
 	"reasonix/internal/permission"
 	"reasonix/internal/plugin"
@@ -354,7 +355,8 @@ func TestPlannerFirstOnDemandMCPCallPreservesImages(t *testing.T) {
 		{{Type: provider.ChunkText, Text: "done"}, {Type: provider.ChunkDone}},
 	}}
 	session := NewSession("sys")
-	planner := NewPlannerAgent(prov, reg, session, Options{}, event.Discard)
+	vision := &summaryProvider{}
+	planner := NewPlannerAgent(prov, reg, session, Options{ImageInput: &imageinput.Config{Model: "vision/model", Resolve: func(string) (provider.Provider, error) { return vision, nil }}}, event.Discard)
 	if host.HasClient("image") {
 		t.Fatal("test requires the MCP server to start on first tool dispatch")
 	}
@@ -374,6 +376,9 @@ func TestPlannerFirstOnDemandMCPCallPreservesImages(t *testing.T) {
 		}
 		if !strings.Contains(message.Content, "captured [image: image/png]") {
 			t.Fatalf("first on-demand MCP text = %q, want image placeholder", message.Content)
+		}
+		if message.VisionSummary == nil || !strings.Contains(message.Content, "OCR: Z7") || vision.calls.Load() != 1 {
+			t.Fatal("on-demand image did not use summary service")
 		}
 		return
 	}

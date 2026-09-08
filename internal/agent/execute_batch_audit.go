@@ -92,7 +92,7 @@ func (a *Agent) storeBatchToolResult(call provider.ToolCall, o toolOutcome) {
 	} else if provider.ToolResultRunState(provider.Message{Content: o.output + "\n" + o.errMsg}) == provider.ToolRunUnknown {
 		state = provider.ToolRunUnknown
 	}
-	msg := provider.Message{Role: provider.RoleTool, Content: o.output, Images: o.images, ToolCallID: call.ID, Name: call.Name, ToolRunState: state, ToolExecution: toProviderToolExecution(o.execution)}
+	msg := provider.Message{Role: provider.RoleTool, Content: o.output, Images: o.images, VisionSummary: o.visionSummary, ToolCallID: call.ID, Name: call.Name, ToolRunState: state, ToolExecution: toProviderToolExecution(o.execution)}
 	if o.rawOutput != "" && o.rawOutput != o.output {
 		msg.RawContent = o.rawOutput
 	}

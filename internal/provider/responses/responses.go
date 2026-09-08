@@ -367,7 +367,21 @@ func splitInstructions(messages []provider.Message) (string, []provider.Message)
 
 func messagesToInput(messages []provider.Message, vision, replayWebSearchItems, summary bool) []map[string]any {
 	input := make([]map[string]any, 0, len(messages)*2)
+	// Keep function outputs together before appending a vision user message,
+	// matching the Chat adapter while retaining provider-specific exclusions.
+	var pendingImages []map[string]string
+	flushImages := func() {
+		if len(pendingImages) > 0 {
+			parts := []map[string]string{{"type": "input_text", "text": "Images returned by the preceding tool call(s):"}}
+			parts = append(parts, pendingImages...)
+			input = append(input, map[string]any{"role": "user", "content": parts})
+			pendingImages = nil
+		}
+	}
 	for _, message := range messages {
+		if message.Role != provider.RoleTool {
+			flushImages()
+		}
 		switch message.Role {
 		case provider.RoleSystem, provider.RoleUser:
 			// Text-only turns keep the documented TextInput string shape.
@@ -443,8 +457,16 @@ func messagesToInput(messages []provider.Message, vision, replayWebSearchItems, 
 			input = append(input, map[string]any{
 				"type": "function_call_output", "call_id": message.ToolCallID, "output": message.Content,
 			})
+			if vision {
+				for _, ref := range message.Images {
+					if part := inputImagePart(ref); part != nil {
+						pendingImages = append(pendingImages, part)
+					}
+				}
+			}
 		}
 	}
+	flushImages()
 	return input
 }
 

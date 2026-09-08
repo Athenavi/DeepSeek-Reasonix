@@ -380,8 +380,19 @@ func (c *client) buildRequest(ctx context.Context, req provider.Request) anthReq
 		msgs = append(msgs, anthMessage{Role: role, Content: blocks})
 	}
 
+	var pendingImages []contentBlock
+	flushImages := func() {
+		if len(pendingImages) > 0 {
+			appendBlocks("user", pendingImages...)
+			pendingImages = nil
+		}
+	}
+
 	messages := c.replayMessages(req.Messages)
 	for _, m := range provider.SanitizeToolPairing(messages) {
+		if m.Role != provider.RoleTool {
+			flushImages()
+		}
 		switch m.Role {
 		case provider.RoleSystem:
 			if m.Content != "" {
@@ -410,6 +421,13 @@ func (c *client) buildRequest(ctx context.Context, req provider.Request) anthReq
 				}
 			}
 			appendBlocks("user", block)
+			if c.vision && c.deepseek {
+				for _, ref := range m.Images {
+					if src := imageSourceFromRef(ref); src != nil {
+						pendingImages = append(pendingImages, contentBlock{Type: "image", Source: src})
+					}
+				}
+			}
 		case provider.RoleAssistant:
 			var blocks []contentBlock
 			// Replay provider reasoning ahead of the content it led to. DeepSeek's
@@ -433,6 +451,8 @@ func (c *client) buildRequest(ctx context.Context, req provider.Request) anthReq
 			appendBlocks("assistant", blocks...)
 		}
 	}
+
+	flushImages()
 
 	tools := encodeAnthTools(c, req)
 	if !c.deepseek {

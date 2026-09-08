@@ -21,6 +21,7 @@ import (
 	"reasonix/internal/evidence"
 	"reasonix/internal/extension/dispatch"
 	"reasonix/internal/i18n"
+	"reasonix/internal/imageinput"
 	"reasonix/internal/instruction"
 	"reasonix/internal/jobs"
 	"reasonix/internal/mcpinteraction"
@@ -281,6 +282,8 @@ type ToolHooks interface {
 // Agent drives a single task: a Provider, a tool Registry, and a Session wired
 // into the main loop.
 type Agent struct {
+	imageInput   *imageinput.Service
+	nativeImages bool
 	agentConfig
 	// svc are the collaborators this agent talks to; see services.go.
 	svc agentServices
@@ -850,7 +853,8 @@ func (a *Agent) CompactNow(ctx context.Context, instructions string) error {
 
 // Options configures an Agent.
 type Options struct {
-	MaxSteps int
+	ImageInput *imageinput.Config
+	MaxSteps   int
 	// MaxStepsKey names the explicit runtime control shown when the MaxSteps guard
 	// is hit. Empty defaults to the generic max_steps tool/runtime parameter.
 	MaxStepsKey string
@@ -1084,6 +1088,8 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		reasoningByteLimit = defaultReasoningByteLimit
 	}
 	a := &Agent{
+		imageInput:   newImageInput(opts.ImageInput),
+		nativeImages: supportsNativeImages(prov),
 		svc: newAgentServices(prov, tools, sink, gate, planModeReadOnlyTrust,
 			sandboxEscapeApprover, configWriteApprover, hooks, opts),
 		agentConfig: agentConfig{

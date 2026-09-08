@@ -17,6 +17,7 @@ import (
 	"reasonix/internal/checkpoint"
 	"reasonix/internal/event"
 	"reasonix/internal/evidence"
+	"reasonix/internal/imageinput"
 	"reasonix/internal/jobs"
 	"reasonix/internal/memory"
 	"reasonix/internal/permission"
@@ -244,6 +245,7 @@ func (readOnlyBash) ReadOnly() bool { return true }
 // parallel research across independent areas (the parallel-dispatch path picks
 // these up only when readOnly, which task is not).
 type TaskTool struct {
+	imageInput                    *imageinput.Config
 	prov                          provider.Provider
 	pricing                       *provider.Pricing
 	quoteContext                  *event.QuoteContext
@@ -296,6 +298,7 @@ type TaskTool struct {
 // Prefer NewTaskToolWithOptions for new call sites; the positional NewTaskTool
 // remains as a compatibility wrapper for one full iteration cycle.
 type TaskToolOptions struct {
+	ImageInput                            *imageinput.Config
 	Provider                              provider.Provider
 	Pricing                               *provider.Pricing
 	QuoteContext                          *event.QuoteContext
@@ -326,6 +329,7 @@ func NewTaskToolWithOptions(opts TaskToolOptions) *TaskTool {
 		sysPrompt = DefaultTaskSystemPrompt
 	}
 	return &TaskTool{
+		imageInput:       opts.ImageInput,
 		prov:             opts.Provider,
 		pricing:          opts.Pricing,
 		quoteContext:     opts.QuoteContext,
