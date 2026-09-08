@@ -78,6 +78,7 @@ type sessionDAGState struct {
 	size            int64
 	lastGoodEnd     int64
 	damaged         bool
+	holes           int // unreadable lines skipped between good entries
 }
 
 func newSessionDAGState(path string) *sessionDAGState {
@@ -157,8 +158,7 @@ func (st *sessionDAGState) replayFrom(ctx context.Context, from int64, limits se
 			if errors.Is(err, io.EOF) {
 				return nil
 			}
-			st.damaged = true
-			return nil
+			return st.resumePastTornLine(ctx, limits)
 		}
 		if e.SchemaVersion != sessionDAGSchemaVersion {
 			return fmt.Errorf("decode session event log %s: unsupported schema version %d", st.path, e.SchemaVersion)

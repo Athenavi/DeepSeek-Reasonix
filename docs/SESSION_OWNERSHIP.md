@@ -26,7 +26,10 @@ appending: it decides who writes the derived `.jsonl`, the indexes, and the
 turn ledger, so a second window can join the same conversation without
 waiting. A turn opens with a `turn_begin` marker and closes with `turn_end`;
 a crash between them is noticed on the next open and the incomplete tail is
-set aside with a `rewind` marker, never truncated.
+set aside with a `rewind` marker, never truncated. When the shutdown save
+cannot take the save lock within its bounded wait, it appends the unsaved
+tail without the lock on a fresh `concurrent` head and leaves the derived
+files to the next locked save; a shutdown never writes a copy of the session.
 
 Path changes (`new`, `clear`) still use the prepare-before-publish handoff:
 the frontend acquires the target lease and binds the unpublished Session

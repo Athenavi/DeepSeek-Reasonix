@@ -3468,11 +3468,11 @@ func (c *Controller) Snapshot() error {
 	return c.snapshot(false, false, false)
 }
 
-// SnapshotForShutdown performs the final session snapshot and, only when the
-// compatibility file lock remains held for the full bounded wait, persists the
-// in-memory transcript to a distinct recovery branch before teardown proceeds.
-// Other snapshot errors retain their normal behavior and remain visible to the
-// caller.
+// SnapshotForShutdown performs the final session snapshot. Only when the
+// compatibility file lock stays held for the full bounded wait does it fall
+// back: a schema-2 log takes the unsaved tail without the lock, a schema-1
+// session gets a distinct recovery branch. Other snapshot errors retain their
+// normal behavior and remain visible to the caller.
 func (c *Controller) SnapshotForShutdown() error {
 	return c.snapshot(false, false, true)
 }
@@ -3556,7 +3556,7 @@ func (c *Controller) snapshotWithDurability(markActivity, forceRewrite, shutdown
 	}
 	if err != nil {
 		if shutdownRecovery && errors.Is(err, agent.ErrSessionFileLockHeld) {
-			recoveredPath, recoverErr := c.recoverShutdownSnapshot(path, err)
+			recoveredPath, recoverErr := c.recoverShutdownSave(s, path, err, forceRewrite)
 			if recoverErr != nil {
 				return false, recoverErr
 			}
@@ -3583,7 +3583,7 @@ func (c *Controller) snapshotWithDurability(markActivity, forceRewrite, shutdown
 		recoveredPath, outcome, recoverErr := c.recoverSnapshotConflict(path, err, forceRewrite)
 		if recoverErr != nil {
 			if shutdownRecovery && errors.Is(recoverErr, agent.ErrSessionFileLockHeld) {
-				recoveredPath, recoverErr = c.recoverShutdownSnapshot(path, recoverErr)
+				recoveredPath, recoverErr = c.recoverShutdownSave(s, path, recoverErr, forceRewrite)
 				if recoverErr != nil {
 					return false, recoverErr
 				}
@@ -3621,7 +3621,7 @@ func (c *Controller) snapshotWithDurability(markActivity, forceRewrite, shutdown
 	// like SetBranchModelPreserveUpdated. The single write subsumes the old
 	// EnsureBranchMeta / SetBranchModel / TouchBranchMeta sequence.
 	preview, turns := agent.SessionPreviewFromMessages(s.Snapshot())
-	if err := updateSessionListingProjection(s, path, modelRef, preview, turns, markActivity); err != nil {
+	if err := updateSessionListingProjection(s, path, modelRef, preview, turns, markActivity); err != nil && !listingDeferredAfterUnlockedAppend(s, path, err) {
 		return transcriptDurable, err
 	}
 	c.extensionSessionPayloadEvent(extension.PointSessionSave, savePayload)
