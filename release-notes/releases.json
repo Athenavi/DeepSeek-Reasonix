@@ -3,7 +3,7 @@
   "releases": [
     {
       "version": "1.38.3",
-      "date": "2026-09-08",
+      "date": "2026-09-09",
       "channel": "stable",
       "targetingVersion": 1,
       "title": {
@@ -11,8 +11,8 @@
         "zh": "Reasonix 1.38.3"
       },
       "summary": {
-        "en": "This release improves model settings persistence, unifies runtime state across local and remote sessions, and refines the desktop composer and turn results. It also fixes read-evidence handling, skill diagnostics, and several Windows-specific issues.",
-        "zh": "此版本改进了模型设置持久化，统一了本地与远程会话的运行时状态，并优化了桌面输入栏和本轮结果。同时修复了读取证据处理、技能诊断以及若干 Windows 特定问题。"
+        "en": "This release improves model settings persistence, runtime state consistency, read evidence handling, and desktop UI polish, along with several fixes for shutdown, settings layout, and skill diagnostics.",
+        "zh": "此版本改进了模型设置持久化、运行时状态一致性、读取证据处理以及桌面界面优化，并修复了关闭、设置布局和技能诊断等问题。"
       },
       "surfaces": [
         "desktop",
@@ -28,7 +28,7 @@
             "en": "Learn how model preferences and provider connections are saved and applied.",
             "zh": "了解模型偏好和供应商连接的保存与生效时机。"
           },
-          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/9a2abb24114d2b073c45bda82848e1cefeea10c0/docs/MODEL_SETTINGS.md"
+          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/27a409937d7431ffb2b5760feeef46ccf35eecab/docs/MODEL_SETTINGS.md"
         },
         {
           "title": {
@@ -37,9 +37,9 @@
           },
           "body": {
             "en": "Understand how local and remote session state is unified.",
-            "zh": "了解本地与远程会话状态如何统一。"
+            "zh": "了解本地和远程会话状态如何统一。"
           },
-          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/9a2abb24114d2b073c45bda82848e1cefeea10c0/docs/RUNTIME_STATE.md"
+          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/27a409937d7431ffb2b5760feeef46ccf35eecab/docs/RUNTIME_STATE.md"
         },
         {
           "title": {
@@ -50,7 +50,7 @@
             "en": "Inspect recorded file changes, check outcomes and their evidence for each turn.",
             "zh": "查看每轮记录的文件改动、检查结果及其证据。"
           },
-          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/9a2abb24114d2b073c45bda82848e1cefeea10c0/docs/TURN_RESULTS.md"
+          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/27a409937d7431ffb2b5760feeef46ccf35eecab/docs/TURN_RESULTS.md"
         },
         {
           "title": {
@@ -61,7 +61,7 @@
             "en": "Explore the refined composer controls and feedback.",
             "zh": "探索优化后的输入栏控件和反馈。"
           },
-          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/9a2abb24114d2b073c45bda82848e1cefeea10c0/docs/COMPOSER_CONTROLS.md"
+          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/27a409937d7431ffb2b5760feeef46ccf35eecab/docs/COMPOSER_CONTROLS.md"
         },
         {
           "title": {
@@ -72,7 +72,7 @@
             "en": "Learn about skill tool reference diagnostics.",
             "zh": "了解技能工具引用诊断。"
           },
-          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/9a2abb24114d2b073c45bda82848e1cefeea10c0/docs/CAPABILITY_DIAGNOSTICS.md"
+          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/27a409937d7431ffb2b5760feeef46ccf35eecab/docs/CAPABILITY_DIAGNOSTICS.md"
         }
       ],
       "highlights": [
@@ -167,6 +167,23 @@
           }
         ],
         "fixed": [
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Finish inbox scans before retiring a session runtime",
+              "zh": "会话运行时退出前完成收件箱扫描"
+            },
+            "body": {
+              "en": "Closing or replacing a session runtime waits for its autonomous inbox scan to finish. Model refresh can still retire its own runtime safely before the next queued request starts.",
+              "zh": "关闭或替换会话运行时时，会先等待自动收件箱扫描结束。模型刷新仍可在下一条排队请求启动前安全替换当前运行时。"
+            },
+            "refs": [
+              9978
+            ]
+          },
           {
             "targets": [
               "desktop",
