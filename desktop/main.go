@@ -113,6 +113,7 @@ func main() {
 	}
 	capturePreviousFatalCrash()
 	installFatalCrashOutput()
+	exitIfHostLaunchMode(os.Args[1:])
 
 	launch := parseDesktopLaunchArgs(os.Args[1:])
 	if maybeRelaunchPrimaryIfSuperseded(launch) {
