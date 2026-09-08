@@ -16028,7 +16028,6 @@ body > .mermaid-diagram--fullscreen {
   border-right: 1px solid var(--border);
   background: var(--bg-soft);
   padding: 10px;
-  overflow-y: auto;
 }
 
 .settings-center__navitem {
