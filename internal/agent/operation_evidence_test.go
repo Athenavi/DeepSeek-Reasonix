@@ -51,7 +51,7 @@ func newEvidenceAgent(t *testing.T, writer tool.Tool, gates bool) (*Agent, *evid
 	t.Helper()
 	reg := tool.NewRegistry()
 	reg.Add(writer)
-	a := New(&userInputCaptureProvider{}, reg, NewSession("system"), Options{ReadPipeline: ReadPipelineOptions{EvidenceGates: gates}}, event.Discard)
+	a := New(&userInputCaptureProvider{}, reg, NewSession("system"), Options{ReadPipeline: ReadPipelineOptions{LegacyEvidenceGates: !gates}}, event.Discard)
 	ledger := evidence.NewLedger()
 	a.task.ledger = ledger
 	return a, ledger
@@ -199,7 +199,7 @@ func TestEvidenceGateBlocksUnknownScopeWriterAfterABlock(t *testing.T) {
 		Path: "/w/a.go", WholeFile: true, Hashes: hashesFor("alpha"),
 	}})
 	reg.Add(undeclaredWriter{name: "bash"})
-	a := New(&userInputCaptureProvider{}, reg, NewSession("system"), Options{ReadPipeline: ReadPipelineOptions{EvidenceGates: true}}, event.Discard)
+	a := New(&userInputCaptureProvider{}, reg, NewSession("system"), Options{}, event.Discard)
 	a.task.ledger = evidence.NewLedger()
 	a.turn.evidenceBlocked = map[string]struct{}{}
 

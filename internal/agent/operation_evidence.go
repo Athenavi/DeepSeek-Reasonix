@@ -263,6 +263,12 @@ func (a *Agent) applyEvidenceGates(ctx context.Context, plan *toolCallPlan) (too
 	if resolved == nil || len(ambiguous) > 0 {
 		return toolOutcome{}, false
 	}
+	if _, anchored := resolved.(tool.AnchoredTextTarget); anchored {
+		// An anchor-based writer is already checked by the anchor safety audit,
+		// which re-resolves the target through the writer and verifies line
+		// hashes. Two gates must never enforce the same write.
+		return toolOutcome{}, false
+	}
 	boundary := observationBoundary(ctx, a.task.ledger.ObservationBoundary())
 	check := a.checkOperationEvidence(ctx, plan.call, resolved, boundary)
 	if a.turn.evidenceBlocked == nil {

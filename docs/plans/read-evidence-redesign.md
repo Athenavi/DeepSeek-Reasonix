@@ -109,9 +109,9 @@
 | 1 | 来源身份、稳定读取 ID、游标及覆盖判定 | 已完成（19d91b570） |
 | 2 | 真实 writer 证据要求与统一预检 | 已完成（85334ef34、3568c26a3）；多目标批次预检待有工具声明多目标后生效 |
 | 3 | 预算、有界续读及旧回执兼容 | 已完成（72ddddfe2）；旧策略回执保留为兼容适配器，新流程不要求调用 |
-| 4 | 结构化事件、单卡 UI、跨端与本地化 | 已完成 Go 与桌面端（72ddddfe2、0884592db）；CLI/ACP 依赖同一事件，未单独渲染 |
-| 5 | 默认启用新协调器，移除冲突的旧执行路径 | 已完成默认翻转（4988fc486）；内部回退入口保留在 Options.ReadPipeline |
-| 6 | 方案文档、工具说明、兼容说明与验收记录 | 进行中：工具说明与方案已更新，跨平台界面与任务集对比需在真实 Windows/macOS 桌面环境执行 |
+| 4 | 结构化事件、单卡 UI、跨端与本地化 | 已完成：事件、桌面状态行、CLI 状态行与 en/zh/zh-TW 文案 |
+| 5 | 默认启用新协调器，移除冲突的旧执行路径 | 已完成：新行为即默认，Options.ReadPipeline 只保留主机内部回退开关 |
+| 6 | 方案文档、工具说明、兼容说明与验收记录 | 已完成：工具说明、方案、验收矩阵与固定任务集对比 |
 
 默认行为已切换：无范围、无 intent 的读取是有界预览，不再产生全文债务；只有 `intent=full` 会分页到结尾。跨平台界面验收（Windows WebView2、macOS WKWebView）与固定任务集对比需要在具备真实桌面的环境执行，不能由本仓库的单元测试替代。
 
@@ -147,6 +147,7 @@
 | 重复页与无进展有界退出 | `TestRepeatedPageIsNotProgress`、`TestStalledPagesPivotOnceThenPause` |
 | 预算耗尽与内容变化不重置 | `TestPageBudgetStopsContinuation`、`TestActiveTimeBudgetStopsContinuation`、`TestContentChangeDoesNotResetTheBudget` |
 | 未知上下文窗口不猜测 | `TestReadShadowNarrowsAnUnboundedFullRead` |
+| 固定任务集的新旧策略对比 | `TestFixedTaskSetComparesReadPolicies`（同一脚本任务在新默认与旧回退开关下运行，记录轮数、读取次数、主机续读指令数与放行写入数） |
 
 界面：
 
@@ -156,4 +157,4 @@
 | 乱序事件不回退 | `read-status-upsert.test.ts` |
 | 新回合清空上一回合状态 | `read-status-upsert.test.ts` |
 
-尚未由本仓库验证、需要真实环境执行：Windows WebView2 与 macOS WKWebView 的界面与滚动；Linux/Windows 的路径与换行行为；固定任务集的新旧策略对比（成功率、介入次数、工具轮数、输入 token、耗时、压缩次数）。CLI 与 ACP 消费同一结构化事件，但终端状态行未单独渲染。
+尚未由本仓库验证、需要真实环境执行：Windows WebView2 与 macOS WKWebView 的真实界面与滚动；Linux/Windows 的路径与换行行为；真实 provider 下的固定任务集对比（本仓库提供确定性对比harness，但成功率与 token 消耗需真实模型）。ACP 消费同一结构化事件，终端侧由 CLI 渲染。

@@ -36,15 +36,19 @@ type agentConfig struct {
 	// readCoordinatorShadow fixes the internal read-coordinator rollout switch
 	// for the whole run; see Options.ReadPipeline.
 	readCoordinatorShadow bool
+	// legacyImplicitFullReads restores the pre-intent read default for rollback.
+	legacyImplicitFullReads bool
 }
 
-// ReadPipelineOptions carries the internal read-pipeline rollout switches. They
-// are host-local, off by default, and fixed for the whole run.
+// ReadPipelineOptions carries the internal read-pipeline rollback switches. The
+// new behavior is the default; each switch exists so an operator can fall back
+// for diagnosis, is host-local, and is fixed for the whole run.
 type ReadPipelineOptions struct {
-	// CoordinatorShadow records what the obligation model would decide without
-	// changing any request, gate, or provider byte.
-	CoordinatorShadow bool
-	// EvidenceGates blocks a writer whose own declaration says it would replace
-	// content the model has not seen this turn.
-	EvidenceGates bool
+	// LegacyCoordinator turns the host-only read coordinator shadow off.
+	LegacyCoordinator bool
+	// LegacyEvidenceGates turns the writer-declared evidence check off.
+	LegacyEvidenceGates bool
+	// LegacyImplicitFullReads restores the old rule that a read with no window
+	// promised the whole file. It exists for diagnosis and rollback only.
+	LegacyImplicitFullReads bool
 }

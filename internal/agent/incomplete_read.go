@@ -95,16 +95,19 @@ type incompleteRead struct {
 // incompleteReadState is shared by all calls in one Agent.Run. Parallel calls
 // are committed to it in provider order by executeBatch.finalize.
 type incompleteReadState struct {
-	mu                    sync.Mutex
-	entries               map[string]*incompleteRead
-	order                 []string
-	budgetInitialized     bool
-	budgetMaxTokens       int
-	budgetConsumedTokens  int
-	roundProgress         bool
-	roundViolation        bool
-	consecutiveViolations int
-	failure               *IncompleteReadError
+	mu sync.Mutex
+	// legacyImplicitFullReads restores the pre-intent rule for diagnosis; it is
+	// fixed for the run and never enters provider bytes.
+	legacyImplicitFullReads bool
+	entries                 map[string]*incompleteRead
+	order                   []string
+	budgetInitialized       bool
+	budgetMaxTokens         int
+	budgetConsumedTokens    int
+	roundProgress           bool
+	roundViolation          bool
+	consecutiveViolations   int
+	failure                 *IncompleteReadError
 }
 
 type incompleteReadTransition struct {
@@ -333,7 +336,7 @@ func (s *incompleteReadState) observeReadFile(
 		return s.observeStrategyReadLocked(entry, plan, args, rawOutput, truncated, recoveryOffset, resultRef, digest, trailer, observed, hasObservation, resultTokens, budget)
 	}
 
-	fullRead := entry != nil && entry.fullRead || args.fullRead()
+	fullRead := entry != nil && entry.fullRead || args.fullRead() || s.legacyImplicitFullRead(args)
 	if entry == nil {
 		entry = &incompleteRead{
 			requestPath: args.Path,
@@ -401,6 +404,11 @@ func (s *incompleteReadState) observeReadFile(
 		transition.record = append(transition.record, observed)
 	}
 	return transition
+}
+
+// legacyImplicitFullRead reproduces the pre-intent default for rollback only.
+func (s *incompleteReadState) legacyImplicitFullRead(args readFileArgs) bool {
+	return s.legacyImplicitFullReads && !args.LimitExplicit
 }
 
 func (s *incompleteReadState) configureAutoSourceLocked(entry *incompleteRead, args readFileArgs, trailer readFileTrailer) {
