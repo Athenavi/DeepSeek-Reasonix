@@ -12,7 +12,7 @@ function report(id) {
     for (let count = 32; count <= (phase === "mixed" ? 512 : 128); count += 32) samples.push(sample(phase, count));
   }
   samples.push(sample("settled", 512));
-  return { identity: structuredClone(identity), fixtures: structuredClone(MEMORY_FIXTURES), shard: { id, total: 3, executionId: "123:1" }, cycles: 128, mixedCycles: 512,
+  return { identity: structuredClone(identity), fixtures: structuredClone(MEMORY_FIXTURES), protocol: structuredClone(MEMORY_PROTOCOL), shard: { id, total: 3, executionId: "123:1" }, cycles: 128, mixedCycles: 512,
     shardComplete: true, protocolComplete: false, verdict: "SHARD_PASS", processes: [{ process: id, browser: "chromium-fixed", samples,
       snapshots: ["baseline", "full", "windowed", "safety", "mixed"].map(phase => ({ file: `${id}-${phase}.heapsnapshot`, summary: {} })),
       checks: { evidenceIntegrity: true, instrumentedOperationsReleased: true, noPageErrors: true }, metrics: { pageErrors: [] } }] };
@@ -35,6 +35,7 @@ for (const [name, mutate] of [
   ["dirty source", reports => { reports[1].identity.sourceStatus = " M source.ts"; }],
   ["another workflow attempt", reports => { reports[1].shard.executionId = "123:2"; }],
   ["different fixture", reports => { reports[1].fixtures.windowed.label = "short-fixture"; }],
+  ["old hydration protocol", reports => { reports[1].protocol.version = 1; }],
   ["short cycles", reports => { reports[1].cycles = 127; }],
   ["missing checkpoint", reports => { reports[1].processes[0].samples.splice(5, 1); }],
   ["missing heap snapshot", reports => { reports[1].processes[0].snapshots.pop(); }],

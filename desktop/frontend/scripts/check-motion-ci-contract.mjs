@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { ciUnitScripts } from "./ci-test-plan.mjs";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,14 +17,14 @@ const transcriptSelectionComponentSource = readFileSync(resolve(repoRoot, "deskt
 const transcriptSelectionSmokeSource = readFileSync(resolve(repoRoot, "desktop/transcript_selection_smoke_contract.js"), "utf8");
 const transcriptSelectionHostSource = readFileSync(resolve(repoRoot, "desktop/cmd/transcript-selection-smoke/host_windows.go"), "utf8");
 
-function jobBody(name, nextName) {
-  const match = workflow.match(new RegExp(`\\n  ${name}:\\n([\\s\\S]*?)\\n  ${nextName}:`));
+function jobBody(name) {
+  const match = workflow.match(new RegExp(`\\n  ${name}:\\n([\\s\\S]*?)(?=\\n  [a-z][a-z0-9-]*:|$)`));
   if (!match) throw new Error(`motion-ci-contract: could not locate ${name} job`);
   return match[1];
 }
 
 for (const [job, body, command] of [
-  ["desktop", jobBody("desktop", "desktop-macos"), "pnpm --dir frontend test:motion"],
+  ["desktop-frontend", jobBody("desktop-frontend"), "node frontend/scripts/run-ci-tests.mjs"],
   ["desktop-windows", jobBody("desktop-windows", "lint"), "pnpm --dir frontend test:motion"],
   ["required lint", jobBody("lint", "site"), "pnpm --dir desktop/frontend test:motion"],
 ]) {
@@ -138,8 +139,8 @@ if (motionScript.includes("transcript-virtualization.test.tsx")) {
 
 const motionBrowserCommand = "pnpm --dir frontend test:motion-browser";
 const motionBrowserRuns = workflow.match(/pnpm --dir frontend test:motion-browser(?:\s|$)/g)?.length ?? 0;
-if (!jobBody("desktop", "desktop-macos").includes(motionBrowserCommand) || motionBrowserRuns !== 1) {
-  throw new Error("motion-ci-contract: the Linux desktop job must run test:motion-browser exactly once");
+if (!jobBody("desktop-browser").includes(motionBrowserCommand) || motionBrowserRuns !== 1) {
+  throw new Error("motion-ci-contract: the Linux browser job must run test:motion-browser exactly once");
 }
 if (!packageJSON.scripts?.["test:motion-browser"]?.includes("approval-animation.mjs")) {
   throw new Error("motion-ci-contract: test:motion-browser must exercise the approval animation in real Chromium");
@@ -194,12 +195,10 @@ if (/transition-duration/.test(globalReducedMotion[1])) {
   throw new Error("motion-ci-contract: the global reduced-motion reset must not shorten transitions (same-frame geometry reads would lag)");
 }
 
-const transcriptCommand = "pnpm --dir frontend test:transcript";
-const desktopLinuxJob = jobBody("desktop", "desktop-macos");
-const transcriptRuns = desktopLinuxJob.match(/pnpm --dir frontend test:transcript(?:\s|$)/g)?.length ?? 0;
-if (!desktopLinuxJob.includes(transcriptCommand) || transcriptRuns !== 1) {
-  throw new Error("motion-ci-contract: the Linux desktop job must run test:transcript exactly once");
+if (!ciUnitScripts.includes("test:motion") || !ciUnitScripts.includes("test:transcript")) {
+  throw new Error("motion-ci-contract: Linux CI must include all dedicated motion and transcript suites");
 }
+const desktopLinuxJob = jobBody("desktop-browser");
 
 const transcriptBrowserCommand = "pnpm --dir frontend test:transcript-browser";
 const transcriptBrowserRuns = desktopLinuxJob.match(/pnpm --dir frontend test:transcript-browser(?:\s|$)/g)?.length ?? 0;
