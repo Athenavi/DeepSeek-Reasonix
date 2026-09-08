@@ -154,11 +154,34 @@ func TestRuntimeStateHTTPStatusUsesRequestedDetachedController(t *testing.T) {
 		RuntimeState event.RuntimeStateSnapshot `json:"runtimeState"`
 	}
 	runtimeStateHTTPGet(t, httpServer.URL+"/status?runtime=1&session="+url.QueryEscape(detachedPath), &status)
-	if status.SessionPath != detachedPath || !status.Running || status.RuntimeState.Phase != "executing" || status.RuntimeState.RuntimeEpoch != detached.RuntimeStateSnapshot().RuntimeEpoch {
+	if status.SessionPath != detachedPath {
+		t.Fatalf("detached status path = %q, want canonical identity %q", status.SessionPath, detachedPath)
+	}
+	if !status.Running || status.RuntimeState.Phase != "executing" || status.RuntimeState.RuntimeEpoch != detached.RuntimeStateSnapshot().RuntimeEpoch {
 		t.Fatalf("detached status was borrowed from foreground: %+v", status)
 	}
 	if foreground.RuntimeStateSnapshot().Running {
 		t.Fatal("fixture foreground unexpectedly running")
+	}
+}
+
+func TestOwnedRuntimeStatusCanonicalizesResponsePath(t *testing.T) {
+	dir := t.TempDir()
+	foreground := runtimeStateServeController(t, dir, "foreground", nil)
+	detached := runtimeStateServeController(t, dir, "detached", nil)
+	server := New(foreground, nil, config.ServeConfig{})
+	path := agent.CanonicalSessionPath(detached.SessionPath())
+	server.detached[path] = &detachedSession{path: path, ctrl: detached}
+	// A noncanonical spelling must not escape through the status response,
+	// even when lookup correctly resolves it to the detached owner.
+	raw := filepath.Dir(path) + string(filepath.Separator) + "." + string(filepath.Separator) + filepath.Base(path)
+	status, ok := server.ownedRuntimeStatusView(raw)
+	if !ok || status["sessionPath"] != path {
+		t.Fatalf("owned status did not preserve canonical identity: ok=%v path=%v want=%q", ok, status["sessionPath"], path)
+	}
+	state := status["runtimeState"].(event.RuntimeStateSnapshot)
+	if state.RuntimeEpoch != detached.RuntimeStateSnapshot().RuntimeEpoch {
+		t.Fatal("canonical response borrowed the foreground runtime")
 	}
 }
 
