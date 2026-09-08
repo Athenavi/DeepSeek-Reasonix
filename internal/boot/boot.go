@@ -123,7 +123,10 @@ type Options struct {
 	// StatsSource labels this frontend's usage records (desktop/cli/serve).
 	// Empty disables usage recording for this controller.
 	StatsSource string
-	TaskStore   taskmonitor.WriteStore // Authoritative store, never a SQLite catalog.
+	// FileBranchesOnly keeps fork/branch/switch/rewind on separate session
+	// files; the desktop is treated as opted in until its tabs bind to heads.
+	FileBranchesOnly bool
+	TaskStore        taskmonitor.WriteStore // Authoritative store, never a SQLite catalog.
 	// OnConfigLoadWarnings accepts resilient-loader warnings. Returning true
 	// lets boot suppress the duplicate migration diagnostic.
 	OnConfigLoadWarnings func([]string) bool
@@ -1827,6 +1830,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 		ReasoningLanguage:      config.ReasoningLanguageForEntry(entry, cfg.ReasoningLanguage()),
 		SessionContextStatic:   sessionContextStatic,
 		DisableColdResumePrune: !cfg.ColdResumePruneEnabled(),
+		FileBranchesOnly:       opts.FileBranchesOnly || opts.StatsSource == "desktop",
 		Shell:                  shell,
 		ApprovalTimeout:        opts.ApprovalTimeout,
 		Ablation:               opts.Ablation,

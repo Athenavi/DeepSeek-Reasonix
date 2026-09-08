@@ -304,7 +304,7 @@ func TestACPLoadAfterRestartFollowsRecoveryTranscript(t *testing.T) {
 // correctly, but session/load after restart falls back to the stale id-keyed
 // parent transcript.
 func TestACPLoadAfterRestartFollowsIntentionalBranch(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	id := "sess-branch-restart"
 	originalPath := transcriptPath(dir, id)
 	original := agent.NewSession("sys prompt")
