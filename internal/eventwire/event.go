@@ -24,6 +24,8 @@ type Event struct {
 	MemoryCitations  []MemoryCitation                 `json:"memoryCitations,omitempty"`
 	Level            string                           `json:"level,omitempty"`
 	Tool             *Tool                            `json:"tool,omitempty"`
+	ReadStatus       *ReadStatus                      `json:"readStatus,omitempty"`
+	ReadPause        *provider.ReadPause              `json:"readPause,omitempty"`
 	Usage            *Usage                           `json:"usage,omitempty"`
 	Approval         *Approval                        `json:"approval,omitempty"`
 	Ask              *Ask                             `json:"ask,omitempty"`

@@ -5113,6 +5113,7 @@ type HistoryMessage struct {
 	Archive          string                           `json:"archive,omitempty"`
 	DecisionReceipt  *provider.DecisionReceipt        `json:"decisionReceipt,omitempty"`
 	Readiness        *event.FinalReadiness            `json:"readiness,omitempty"`
+	ReadPause        *provider.ReadPause              `json:"readPause,omitempty"`
 	ProtocolRecovery *provider.ProtocolRecoveryAction `json:"protocolRecovery,omitempty"`
 	Diagnostic       *provider.FailureDiagnostic      `json:"diagnostic,omitempty"`
 	ServerSearch     []provider.ServerSearchCall      `json:"serverSearch,omitempty"`

@@ -41,7 +41,8 @@ import { createRafResizeUpdater } from "../lib/resizeDrag";
 import { observeComposerMenuViewport } from "../lib/composerMenuViewport";
 import { resolveComposerContentSizing } from "../lib/composerSizing";
 import { useToast } from "../lib/toast";
-import { type CollaborationMode, type CommandInfo, type ComposerInsertRequest, type ContextInfo, type DirEntry, type EffortInfo, type GoalRuntime, type HistoryMessage, type Mode, type PromptHistoryEntry, type QualityFloor, type SessionMeta, type SessionReference, type SlashArgItem, type SlashArgsResult, type ToolApprovalMode, type BalanceInfo } from "../lib/types";
+import { readStatusLabel, turnPhaseStatusLabel } from "../lib/readStatus";
+import { type CollaborationMode, type CommandInfo, type ComposerInsertRequest, type ContextInfo, type DirEntry, type EffortInfo, type GoalRuntime, type HistoryMessage, type Mode, type PromptHistoryEntry, type QualityFloor, type SessionMeta, type SessionReference, type SlashArgItem, type SlashArgsResult, type ToolApprovalMode, type BalanceInfo, type WireReadStatus } from "../lib/types";
 import { ComposerPinnedFilesShelf } from "./ComposerPinnedFilesShelf";
 import {
   formatWorkspaceReference,
@@ -548,6 +549,7 @@ export function Composer({
   qualityFloor,
   floorInferred,
   turnPhase,
+  readStatuses,
   goal,
   goalStatus,
   goalRuntime,
@@ -629,6 +631,8 @@ export function Composer({
   floorInferred?: boolean;
   /** Host turn phase: working | checking | verifying | reviewing */
   turnPhase?: string;
+  /** Live read progress keyed by read id; rendered as one status line. */
+  readStatuses?: Record<string, WireReadStatus>;
   goal?: string;
   goalStatus?: string;
   goalRuntime?: GoalRuntime;
@@ -3792,20 +3796,8 @@ export function Composer({
     subscribeLiveText,
     () => liveStore?.getModelActiveAt?.(tabId),
   );
-  const turnPhaseLabel = (() => {
-    switch ((turnPhase ?? "").trim()) {
-      case "checking":
-        return t("composer.turnPhaseChecking");
-      case "verifying":
-        return t("composer.turnPhaseVerifying");
-      case "reviewing":
-        return t("composer.turnPhaseReviewing");
-      case "working":
-        return t("composer.turnPhaseWorking");
-      default:
-        return t("composer.runAnnounceRunning");
-    }
-  })();
+  const turnPhaseLabel = turnPhaseStatusLabel(turnPhase, t);
+  const readStatusText = readStatusLabel(readStatuses, t);
   const runStateText = runtimeState.unknown ? t("runtime.unknown") : finishing ? t("runtime.finishing") : runtimeState.kind === "cancelling" ? t("status.jobStopping") : runtimeState.kind === "background_job" ? t("runtime.background", { count: runtimeState.state?.backgroundJobs ?? 0 }) : retry
     ? recoveryStatusText(t, retry, now)
     : waitingPrompt === "approval"
@@ -4405,13 +4397,13 @@ export function Composer({
           onKeyDown={onComposerResizeKeyDown}
           onDoubleClick={resetComposerHeight}
         />
-        {showRunStrip && runStateText && (
+        {(readStatusText || (showRunStrip && runStateText)) && (
           <div className={`composer-run-strip${waitingPrompt ? " composer-run-strip--waiting" : ""}`}>
             {!finishing && !runtimeState.unknown && <span className="composer-run-strip__dot" aria-hidden="true" />}
-            <span className="composer-run-strip__text">{runStateText}</span>
+            <span className="composer-run-strip__text">{readStatusText || runStateText}</span>
           </div>
         )}
-        <span className="sr-only" role="status">{runStateText}</span>
+        <span className="sr-only" role="status">{readStatusText || runStateText}</span>
         <div
           className={`composer${invocations.length > 0 ? " composer--has-invocation" : ""}${dragOver ? " composer--dragover" : ""}${disabled || readOnly ? " composer--disabled" : ""}${shellModeActive ? " composer--shell" : ""}`}
           onDrop={onDrop}

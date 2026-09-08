@@ -307,9 +307,11 @@ for (const path of localeChunks) {
   // Combined turn-result and model-application copy measures 64342 / 65119 B.
   // Runtime/receipt confirmation copy adds 89 / 99 B to the integrated
   // turn-result base (64219 / 64964 B). Measured: 64308 / 65063 B.
-  // Combined runtime confirmation and model-application copy measures
-  // 64438 / 65215 B; keep only the next one-decimal ceiling.
-  const budget = name.startsWith("zh-TW-") ? 63.7 * 1024 : 63.0 * 1024;
+  // Read-pause copy merges on top of that base: the combined chunks measure
+  // 64606 / 65349 B, so both dialect ceilings ratchet to the next tenth.
+  // Model-application copy on the read-pause base measures 64734 / 65499 B,
+  // adding 128 / 150 B. Retain only the next one-decimal ceiling.
+  const budget = name.startsWith("zh-TW-") ? 64.0 * 1024 : 63.3 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -439,9 +441,10 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // 5944 B (0.240%): 2483436 B total.
 // Durable session isolation and missed-completion reconciliation add 1232 B
 // (0.050% over that head), measuring 2484668 B total.
-// Keep the next tenth; gzip, CSS, and individual chunk limits stay unchanged.
-// Combined model-settings and runtime-state integration measures 2488334 B,
-// 3666 B (0.148%) over main-v2. Retain less than 0.2 KiB build headroom.
-const rawInitialBudgetKiB = 2_430.2;
+// The read-status line, read-pause card and their host wiring merge on top and
+// measure 2488853 B. Keep the next tenth; gzip, CSS, and chunk limits unchanged.
+// Combined model-settings and read-evidence integration measures 2492541 B,
+// adding 3688 B (0.148%) over the base. Retain the next one-decimal ceiling.
+const rawInitialBudgetKiB = 2_434.2;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
