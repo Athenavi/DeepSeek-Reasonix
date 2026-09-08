@@ -28,12 +28,22 @@ try {
     const tabs = await app.ListTabs();
     const tree = { topics: [] };
     const selected = tabs.find(tab => tab.sessionPath?.includes("small")) ?? tabs[0];
-    window.__runtimeFixture = { tab: selected, revision: 0, calls: [], fail: true, accept: (...args) => acceptRuntimeState(runtimeStateStore, ...args), topics: tree.topics };
+    window.__runtimeFixture = { tab: selected, revision: 0, calls: [], queries: [], fail: true, accept: (...args) => acceptRuntimeState(runtimeStateStore, ...args), topics: tree.topics };
     onRemoteTabOpened(tab => { window.__runtimeFixture.tab = tab; });
     onRemoteTabUpdated(tab => { window.__runtimeFixture.tab = tab; });
     const original = window.go;
     window.go = { main: { App: new Proxy({}, { get(_target, key) {
-      if (key === "EnqueueInboxFollowup" || key === "EnqueueInboxFollowupWithInvocations") return async (...args) => {
+      if (key === "CaptureInboxTarget") return async (tabId, sessionPath) => {
+        if (!sessionPath || sessionPath !== window.__runtimeFixture.tab.sessionPath) throw new Error("Composer did not bind its selected session path: " + JSON.stringify({ tabId, sessionPath, expected: window.__runtimeFixture.tab.sessionPath }));
+        const remote = window.__runtimeFixture.tab.remote;
+        return { tabId, sessionPath, generation: 1, selection: 0, remote: Boolean(remote), hostId: remote?.hostId, workspace: remote?.workspace };
+      };
+      if (key === "LookupInboxFollowupForTarget") return async (...args) => {
+        window.__runtimeFixture.queries.push(args);
+        if (window.__runtimeFixture.fail) throw new Error("receipt unavailable");
+        return { itemId: "runtime-queued", disposition: "idempotent_hit", position: 0, paused: false };
+      };
+      if (key === "EnqueueInboxFollowupForTarget") return async (...args) => {
         window.__runtimeFixture.calls.push(args);
         if (window.__runtimeFixture.fail) throw new Error("fixture enqueue unavailable");
         return { itemId: "runtime-queued", disposition: "queued", position: 1, paused: false };
@@ -64,11 +74,16 @@ try {
   await input.press("Enter");
   await page.waitForFunction(() => window.__runtimeFixture.calls.length === 1);
   check(await input.inputValue() === "durable next turn", "failed enqueue preserves draft");
+  await fs.mkdir("/tmp/reasonix-runtime-evidence", { recursive: true });
+  await page.screenshot({ path: "/tmp/reasonix-runtime-evidence/pending-followup.png" });
+  await publish("idle");
+  check(await page.locator(".composer__btn--send").getAttribute("aria-label") === "Check send result", "phase transition keeps receipt confirmation action");
   await page.evaluate(() => { window.__runtimeFixture.fail = false; });
   await input.press("Enter");
   await page.waitForFunction(() => document.querySelector("textarea.composer__input:not([aria-hidden=true])")?.value === "");
   const calls = await page.evaluate(() => window.__runtimeFixture.calls);
-  check(calls.length === 2 && calls[0].at(-1) === calls[1].at(-1), "retry reuses durable idempotency key");
+  const queries = await page.evaluate(() => window.__runtimeFixture.queries);
+  check(calls.length === 1 && queries.length === 1 && calls[0].at(-1) === queries[0].at(-1), "retry only queries the original durable idempotency key");
   await publish("idle", { backgroundJobs: 2 });
   await page.locator(".composer-run-strip").filter({ hasText: /2/ }).waitFor();
   check(await page.locator(".project-tree__folder-active-indicator:not(.project-tree__folder-active-indicator--static)").count() > 0, "background jobs keep project activity visible");
@@ -82,7 +97,7 @@ try {
   await page.locator(".composer-run-strip").filter({ hasText: /Finishing|正在收尾/ }).waitFor();
   await input.fill("remote durable next turn");
   await input.press("Enter");
-  await page.waitForFunction(() => window.__runtimeFixture.calls.length === 3);
+  await page.waitForFunction(() => window.__runtimeFixture.calls.length === 2);
   check(await input.inputValue() === "", "remote finishing queues the next input and clears it after receipt");
   await publish("executing", { freshness: "unknown" }, true);
   await page.locator(".composer-run-strip").filter({ hasText: /sync|同步/i }).waitFor();
@@ -100,4 +115,7 @@ try {
   await page.waitForFunction(() => document.querySelector(".transcript")?.textContent?.includes("Geometry contract fixture complete."));
   check(await page.locator(".remote-surface").count() === 0, "local switch retains ownership after remote runtime frames");
   check(errors.length === 0, "runtime scenarios produce no browser errors: " + errors.join("; "));
+} catch (error) {
+  console.error("Runtime fixture toasts:", await page.locator(".toast__text").allTextContents());
+  throw error;
 } finally { await browser.close(); await server.close(); }

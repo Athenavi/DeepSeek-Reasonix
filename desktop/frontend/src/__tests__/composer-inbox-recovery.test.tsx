@@ -679,13 +679,19 @@ console.log("\ncomposer inbox recovery");
 {
   const dom = installDom("zh-CN");
   const calls: { display: string; submit: string; id: string }[] = [];
+  const lookups: string[] = [];
   let rejectEnqueue = true, cancelled = 0, direct = 0;
   installBridgeApp({
     InboxSnapshot: async () => ({ ...recoveredSnapshot(0), paused: false, recovered: false }),
-    EnqueueInboxFollowup: async (_tab: string, display: string, submit: string, id: string) => {
+    CaptureInboxTarget: async () => ({ tabId: "tab-a", sessionPath: "session-a", generation: 1, selection: 0, remote: false }),
+    EnqueueInboxFollowupForTarget: async (_target: unknown, display: string, submit: string, _invocations: unknown, id: string) => {
       calls.push({ display, submit, id });
       if (rejectEnqueue) throw new Error("transport outcome unknown");
       return { itemId: "durable-followup", disposition: "queued_followup", position: 1, paused: false };
+    },
+    LookupInboxFollowupForTarget: async (_target: unknown, id: string) => {
+      lookups.push(id);
+      return { itemId: "durable-followup", disposition: "idempotent_hit", position: 0, paused: false };
     },
   });
   const snapshot: RuntimeProjection = { epoch: "finishing-test", revision: 1, topics: [], sessions: [{
@@ -695,7 +701,7 @@ console.log("\ncomposer inbox recovery");
       pendingPrompt: false, cancelRequested: false, cancellable: false, backgroundJobs: 0, activity: "" },
   }] };
   acceptRuntimeState(runtimeStateStore, snapshot, true);
-  const { root } = await renderComposer({ running: false, onSend: () => { direct++; }, onCancel: () => { cancelled++; } });
+  const { root } = await renderComposer({ running: false, inboxSessionPath: "session-a", onSend: () => { direct++; }, onCancel: () => { cancelled++; } });
   ok(Boolean(document.querySelector(".composer-run-strip")?.textContent?.includes("正在收尾")), "finishing is visibly announced from shared state after TurnDone");
   ok(!document.querySelector(".composer-card--running") && !document.querySelector(".composer-run-strip__dot"), "finishing does not animate as model execution");
   ok(!document.querySelector(".composer__btn--stop"), "finishing hides current-turn stop");
@@ -710,8 +716,8 @@ console.log("\ncomposer inbox recovery");
   ok(calls.length === 1 && input.value.includes("follow up"), "uncertain queue failure retains draft and makes one request");
   rejectEnqueue = false;
   await act(async () => { (document.querySelector(".composer__btn--send") as HTMLButtonElement).click(); await flushTimers(); });
-  ok(calls.length === 2 && calls[0].id !== "" && calls[0].id === calls[1].id, "explicit retry keeps original idempotency key");
-  ok(calls[1]?.submit === "follow up after cleanup" && input.value === "", "durable queue receipt clears the complete submitted draft");
+  ok(calls.length === 1 && calls[0].id !== "" && calls[0].id === lookups[0], "explicit retry only looks up the original idempotency key");
+  ok(calls[0]?.submit === "follow up after cleanup" && input.value === "", "durable queue receipt clears the complete submitted draft");
   ok(direct === 0 && cancelled === 0, "finishing neither directly submits nor cancels");
   await act(async () => { root.unmount(); });
   dom.window.close();

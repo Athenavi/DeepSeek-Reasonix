@@ -230,12 +230,9 @@ if (initialCSS.length > 0) {
 // shared title-safe shell, and the shared harness decision surface measure
 // 116.9 KiB gzip while reusing existing layout primitives. Retain a bounded
 // 0.1 KiB headroom ratchet.
-// Mainline provider/settings and recovery styles measure 119.435 KiB gzip.
-// Workbench's column-responsive welcome adds 291 bytes over the 119.479 KiB
-// toolbar-refresh base; round the measured 119.763 KiB to the next tenth.
-// Shared recovery banner and disabled-send states measure 119.989 KiB;
-// +231 gzip bytes over the prior welcome head, retaining the next tenth.
-assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 120.0 * 1024);
+// Workbench welcome and recovery styles measure 122869 B gzip on main-v2.
+// Turn result styles add 388 B after removing obsolete metrics (123257 B).
+assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 120.4 * 1024);
 if (localeChunks.length !== 2) {
   throw new Error(`expected 2 on-demand Chinese locale chunks, found ${localeChunks.length}`);
 }
@@ -300,11 +297,9 @@ for (const path of localeChunks) {
   // ceiling for cross-platform CI.
   // Search assignment copy adds 239 / 231 B over main-v2 (63147 / 63920 B).
   // Measured result: 63386 / 64151 B; retain bounded cross-platform headroom.
-  // Session recovery guidance adds 173 / 156 B over main-v2, measuring
-  // 62.173 / 62.887 KiB. Keep only the next one-decimal ceiling.
-  // Runtime finishing/unknown/job-count/queue copy adds 55 / 66 gzip bytes
-  // over current main-v2 (63665 / 64396 B): 63720 / 64462 B measured.
-  const budget = name.startsWith("zh-TW-") ? 63.0 * 1024 : 62.3 * 1024;
+  // Runtime/receipt confirmation copy adds 89 / 99 B to the integrated
+  // turn-result base (64219 / 64964 B). Measured: 64308 / 65063 B.
+  const budget = name.startsWith("zh-TW-") ? 63.6 * 1024 : 62.9 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -423,9 +418,10 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // against the 2398.0 KiB base; retain only the next one-decimal ceiling.
 // Shared availability, visible recovery and retry controls measure 2407.215 KiB
 // (+6.107 KiB, 0.25% over the prior welcome head). Retain the next tenth.
-// Shared runtime state on the recovery/welcome base measures 2467966 B
-// versus 2464907 B on main-v2 (+3059 B, 0.124%). Keep the next tenth;
-// initial gzip, deferred CSS and independent chunk budgets are unchanged.
-const rawInitialBudgetKiB = 2_410.2;
+// The integrated turn-result base measures 2477492 B. Runtime state and
+// session-bound receipt confirmation and its mock session contract add
+// 5944 B (0.240%): 2483436 B total.
+// Keep the next tenth; gzip, CSS, and individual chunk limits stay unchanged.
+const rawInitialBudgetKiB = 2_425.3;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

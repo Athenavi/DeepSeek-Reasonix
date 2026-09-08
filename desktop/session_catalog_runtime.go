@@ -189,10 +189,10 @@ func (a *App) runtimeOnlyProjectTopicsWithSessions(scope, workspaceRoot string) 
 		}
 		snapshots = append(snapshots, snapshot)
 	}
-	return a.runtimeProjectTopicNodes(scope, workspaceRoot, snapshots)
+	return a.runtimeProjectTopicNodes(scope, workspaceRoot, snapshots, true)
 }
 
-func (a *App) runtimeProjectTopicNodes(scope, workspaceRoot string, snapshots []catalogRuntimeSnapshot) ([]ProjectNode, map[string][]string) {
+func (a *App) runtimeProjectTopicNodes(scope, workspaceRoot string, snapshots []catalogRuntimeSnapshot, previews bool) ([]ProjectNode, map[string][]string) {
 	byTopic := map[string][]catalogRuntimeSnapshot{}
 	sessionsByTopic := map[string][]string{}
 	for _, snapshot := range snapshots {
@@ -212,6 +212,7 @@ func (a *App) runtimeProjectTopicNodes(scope, workspaceRoot string, snapshots []
 	out := []ProjectNode{}
 	for _, topicID := range topicIDs {
 		sessions := byTopic[topicID]
+		sort.Slice(sessions, func(i, j int) bool { return sessions[i].sessionPath < sessions[j].sessionPath })
 		kind := "topic"
 		sessionKind := "session"
 		if scope != "project" {
@@ -243,9 +244,13 @@ func (a *App) runtimeProjectTopicNodes(scope, workspaceRoot string, snapshots []
 			if sessionLabel == "" || sessionLabel == "." {
 				sessionLabel = label
 			}
+			preview := ""
+			if previews {
+				preview = sessionPreviewForPath(path)
+			}
 			node.Children = append(node.Children, ProjectNode{
 				Key: projectSessionNodeKey(scope, path), Kind: sessionKind, Label: sessionLabel,
-				Root: workspaceRoot, TopicID: topicID, SessionPath: path, Preview: sessionPreviewForPath(path),
+				Root: workspaceRoot, TopicID: topicID, SessionPath: path, Preview: preview,
 				Open: session.open, Running: running, Status: status,
 				TurnsState: string(sessioncatalog.TurnsUnknown), Health: string(sessioncatalog.HealthOK),
 				Children: []ProjectNode{},

@@ -16,7 +16,7 @@ import (
 func TestRuntimeStateCompletedTurnPublishesIdleProjectTree(t *testing.T) {
 	isolateDesktopUserDirs(t)
 	app := NewApp()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	app.ctx = ctx
 	snapshots := make(chan ProjectTreeRuntimeSnapshot, 64)

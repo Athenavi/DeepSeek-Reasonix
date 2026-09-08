@@ -1,5 +1,6 @@
 import { recoveryStatusText, type RecoveryRetry } from "../lib/recoveryStatus";
 import { useRuntimeSession } from "../lib/useRuntimeState";
+import { pendingFollowups, confirmFollowup, followupNotSubmitted, type PendingFollowup } from "../lib/pendingFollowup";
 import { useAppNavigationStore } from "../store/appNavigation";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -601,6 +602,7 @@ export function Composer({
   transientDismissSignal,
   sessionKey,
   inboxSessionPath,
+  inboxHostId,
   workspaceScopeKey,
   fileRefRefreshKey,
   guidanceConsumedKey,
@@ -707,6 +709,7 @@ export function Composer({
   transientDismissSignal?: number;
   sessionKey?: string;
   inboxSessionPath?: string;
+  inboxHostId?: string;
   workspaceScopeKey?: string;
   fileRefRefreshKey?: number | string;
   guidanceConsumedKey?: string;
@@ -738,7 +741,8 @@ export function Composer({
   const finishing = runtimeState.finishing;
   if (runtimeState.known) running = runtimeState.running ?? running;
   if (runtimeState.unknown) disabled = true;
-  const finishingRequests = useRef(new Map<string, { content: string; id: string }>());
+  const pendingKey = inboxHostId ? `${inboxHostId}\u0000${draftKey}` : draftKey;
+  const pendingFollowup = useSyncExternalStore(pendingFollowups.subscribe, () => pendingFollowups.get(pendingKey));
   const inboxSessionKey = inboxScopeKey(inboxSessionPath, workspaceScopeKey);
   const now = useTick(running);
   const [text, setText] = useState("");
@@ -1993,11 +1997,37 @@ export function Composer({
     showToast(text, "warn");
   }, [showToast, t]);
 
+  const followupDraftFingerprint = (key: string): string => {
+    const draft = key === activeDraftKeyRef.current ? {
+      text: textRef.current, invocations: invocationsRef.current, attachments: attachmentsRef.current,
+      workspaceRefs: workspaceRefsRef.current, sessionRefs: sessionRefsRef.current,
+      selectedTextRefs: selectedTextRefsRef.current, pastedBlocks: pastedBlocksRef.current,
+    } : draftsBySessionRef.current[key] ?? emptyComposerDraft();
+    return JSON.stringify([draft.text, draft.invocations, draft.attachments, draft.workspaceRefs,
+      draft.sessionRefs, draft.selectedTextRefs, draft.pastedBlocks]);
+  };
+
   const submit = async () => {
-    if (disabled || (!running && submitDisabled) || readOnly) return;
     const submitDraftKey = activeDraftKeyRef.current;
+    const submitPendingKey = pendingKey;
     const submitTabId = tabId;
     if (draftIsSubmitting(submitDraftKey)) return;
+    const unresolved = pendingFollowups.get(submitPendingKey);
+    if (unresolved) {
+      updateSubmittingForDraft(submitDraftKey, true);
+      try {
+        await confirmFollowup(app, unresolved);
+        if (pendingFollowups.get(submitPendingKey) === unresolved && followupDraftFingerprint(submitDraftKey) === unresolved.draft) clearSubmittedDraft(submitDraftKey);
+        pendingFollowups.clear(submitPendingKey, unresolved);
+        setGuidanceRetryNonce(value => value + 1);
+      } catch {
+        showToast(t("runtime.unconfirmed"), "warn");
+      } finally {
+        updateSubmittingForDraft(submitDraftKey, false);
+      }
+      return;
+    }
+    if (disabled || (!running && submitDisabled) || readOnly) return;
     const currentText = textRef.current;
     const rawDraft = trimInvocationDraft(currentText, invocationsRef.current);
     const typedGoalDraft = goalModeOn && !activeGoal && rawDraft.invocations.length === 0
@@ -2033,7 +2063,13 @@ export function Composer({
     }
     setComposerPrompt(null);
     updateSubmittingForDraft(submitDraftKey, true);
+    const submittedDraft = followupDraftFingerprint(submitDraftKey);
+    const currentSessionRefs = sessionRefsRef.current;
+    const currentSelectedTextRefs = selectedTextRefsRef.current;
+    const currentPastedBlocks = [...pastedBlocksRef.current];
     try {
+      const target = finishing && app.CaptureInboxTarget
+        ? await app.CaptureInboxTarget(submitTabId || "", inboxSessionPath || "") : undefined;
       const orderedAttachments = sortComposerAttachments(currentAttachments);
       const refs = [
         ...currentWorkspaceRefs.map((ref) => formatWorkspaceReference(ref.path, ref.isDir)),
@@ -2042,16 +2078,13 @@ export function Composer({
       const displayRefs = [
         ...currentWorkspaceRefs.map((ref) => formatWorkspaceReference(ref.displayPath || ref.path, ref.isDir)),
         ...orderedAttachments.map(formatAttachmentDisplayReference),
-        ...selectedTextRefsRef.current.map(formatSelectionLabel),
+        ...currentSelectedTextRefs.map(formatSelectionLabel),
       ].join(" ");
       const displayText = [trimmedText, displayRefs].filter(Boolean).join(trimmedText && displayRefs ? " " : "");
       // PR-B: when past:chats refs are attached, prepend their formatted transcript
       // to submitText only (displayText stays unchanged so the user still sees their
       // original prompt in the input preview). With no refs we keep the original
       // submitText verbatim — no header, no rewording, byte-identical to pre-PR-B.
-      const currentSessionRefs = sessionRefsRef.current;
-      const currentSelectedTextRefs = selectedTextRefsRef.current;
-      const currentPastedBlocks = [...pastedBlocksRef.current];
       const sessionContext = currentSessionRefs.length === 0 ? "" : await buildSessionContext(currentSessionRefs, t);
       const selectedTextContext = formatSelectedTextContext(currentSelectedTextRefs);
       const invocationText = serializeInvocationSubmit(trimmedText, trimmedDraft.invocations);
@@ -2084,20 +2117,24 @@ export function Composer({
           // Durable follow-up: only clear the composer after a durable receipt.
           const receiptTracker = guidanceReceiptTrackerRef.current;
           receiptTracker?.start(submitDraftKey);
+          let unresolvedRequest: PendingFollowup | undefined;
           try {
             const { enqueueInboxGuidance, enqueueInboxGuidanceForActiveTurn } = await import("../lib/inboxGuidanceSubmit");
-            const content = JSON.stringify([guidanceText, guidanceSubmitText, structured]);
-            let request = finishingRequests.current.get(submitDraftKey);
-            if (!request || request.content !== content) {
-              request = { content, id: `followup-${crypto.randomUUID()}` };
-              finishingRequests.current.set(submitDraftKey, request);
+            const request: PendingFollowup = { key: `followup-${crypto.randomUUID()}`, target,
+              tabId: submitTabId || "", display: guidanceText, submit: guidanceSubmitText, structured, draft: submittedDraft };
+            if (finishing) {
+              unresolvedRequest = request;
+              pendingFollowups.set(submitPendingKey, request);
             }
             const receipt = finishing
-              ? await enqueueInboxGuidance(app, submitTabId || "", guidanceText, guidanceSubmitText, structured, { idempotency: request.id })
+              ? target && app.EnqueueInboxFollowupForTarget
+                ? await app.EnqueueInboxFollowupForTarget(target, guidanceText, guidanceSubmitText, structured?.invocations ?? [], request.key)
+                : await enqueueInboxGuidance(app, submitTabId || "", guidanceText, guidanceSubmitText, structured, { idempotency: request.key })
               : await enqueueInboxGuidanceForActiveTurn(app, submitTabId || "", guidanceText, guidanceSubmitText, structured, turnId);
             if (receipt?.error) throw new Error(receipt.error);
+            if (!receipt?.itemId) throw new Error("Follow-up receipt unconfirmed");
             const consumedBeforeReceipt = receiptTracker?.takeConsumed(submitDraftKey, receipt.itemId) ?? false;
-            if (!consumedBeforeReceipt) {
+            if (!consumedBeforeReceipt && !finishing) {
               updatePendingGuidanceForDraft(submitDraftKey, (items) => {
                 const next = items.map((item) => receipt.paused ? { ...item, paused: true } : item);
                 if (next.some((item) => item.id === receipt.itemId)) return next;
@@ -2113,10 +2150,14 @@ export function Composer({
                 }];
               });
             }
-            clearSubmittedDraft(submitDraftKey);
-            finishingRequests.current.delete(submitDraftKey);
+            if ((!finishing || pendingFollowups.get(submitPendingKey) === request) && followupDraftFingerprint(submitDraftKey) === submittedDraft) clearSubmittedDraft(submitDraftKey);
+            if (finishing) {
+              pendingFollowups.clear(submitPendingKey, request);
+              setGuidanceRetryNonce(value => value + 1);
+            }
             if (finishing) showToast(t("runtime.queued"), "info");
           } catch (error) {
+            if (unresolvedRequest && followupNotSubmitted(error)) pendingFollowups.clear(submitPendingKey, unresolvedRequest);
             showToast(formatInboxError(error, locale), "warn");
             // Keep draft on durable failure.
           } finally {
@@ -3788,9 +3829,9 @@ export function Composer({
     : null;
   const submitEmpty = !text.trim() && attachments.length === 0 && workspaceRefs.length === 0 &&
     !invocations.some((invocation) => invocation.command.kind === "skill");
-  const submitBlocked = submitting || pendingPaste > 0 || (submitEmpty && !(goalModeOn && !activeGoal)) || disabled || (!running && submitDisabled) || readOnly;
+  const submitBlocked = submitting || (!pendingFollowup && (pendingPaste > 0 || (submitEmpty && !(goalModeOn && !activeGoal)) || disabled || (!running && submitDisabled) || readOnly));
   const submitUnavailableHint = !running && submitDisabled ? submitDisabledReason : undefined;
-  const submitTooltip = running
+  const submitTooltip = pendingFollowup ? t("runtime.checkReceipt") : running
     ? t("composer.queueGuidance", { combo: sendComboLabel })
     : t("composer.send", { combo: sendComboLabel });
   const composerPlaceholder = readOnly
@@ -4332,6 +4373,10 @@ export function Composer({
         </div>
       )}
       {retry?.recovery?.waiting && <Suspense fallback={null}><RecoveryWaitBanner retry={retry} now={now} onStop={() => void handleCancel()} stopDisabled={cancelSettlingDraftsRef.current.has(draftKey)} /></Suspense>}
+      {pendingFollowup && <div className="composer-guidance-item" role="status">
+        <span className="composer-guidance-item__text" title={pendingFollowup.display}>{pendingFollowup.display}</span>
+        <span>{t("runtime.unconfirmed")}</span>
+      </div>}
       <div
         className={`composer-card${composerHeight !== null || composerResizing ? " composer-card--resized" : ""}${composerAutoExpanded ? " composer-card--autosized" : ""}${composerAutoOverflow ? " composer-card--auto-overflow" : ""}${composerResizing ? " composer-card--resizing" : ""}${running && !finishing && !runtimeState.unknown ? (waitingPrompt ? " composer-card--waiting" : " composer-card--running") : ""}`}
         ref={composerCardRef}
@@ -4606,7 +4651,7 @@ export function Composer({
                   disabled={submitBlocked}
                   aria-label={submitTooltip}
                 >
-                  {running ? <CornerDownRight size={16} /> : <ArrowUp size={16} />}
+                  {pendingFollowup ? <Search size={16} /> : running ? <CornerDownRight size={16} /> : <ArrowUp size={16} />}
                 </button>
               </Tooltip>
               {submitUnavailableHint && <span className="composer-toolbar-send__hint">{submitUnavailableHint}</span>}

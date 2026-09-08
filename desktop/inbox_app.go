@@ -30,6 +30,7 @@ func inboxWailsError(err error) error {
 		target error
 		code   string
 	}{
+		{control.ErrInboxSessionChanged, "inbox_not_submitted"},
 		{sessioninbox.ErrCapacityItems, "inbox_capacity_items"},
 		{sessioninbox.ErrCapacityBytes, "inbox_capacity_bytes"},
 		{sessioninbox.ErrItemTooLarge, "inbox_item_too_large"},
@@ -201,7 +202,7 @@ func (a *App) EnqueueInboxSteerForTurn(tabID, turnID, display, submit, idempoten
 	if status.TurnID != turnID || !status.Running {
 		return InboxReceiptView{}, fmt.Errorf("turn %q is not the active turn for tab %q", turnID, tabID)
 	}
-	return a.enqueueInboxWithController(tabID, ctrl, sessioninbox.IntentSteer, display, submit, nil, idempotency, true, turnID)
+	return a.enqueueInboxWithController(tabID, ctrl, sessioninbox.IntentSteer, display, submit, nil, idempotency, true, turnID, "")
 }
 
 // SteerInboxItem attempts to apply an existing durable queue item to the
@@ -302,10 +303,10 @@ func (a *App) enqueueInbox(tabID string, intent sessioninbox.InboxIntent, displa
 	if err != nil {
 		return InboxReceiptView{}, err
 	}
-	return a.enqueueInboxWithController(tabID, ctrl, intent, display, submit, invocations, idempotency, trySteer, "")
+	return a.enqueueInboxWithController(tabID, ctrl, intent, display, submit, invocations, idempotency, trySteer, "", "")
 }
 
-func (a *App) enqueueInboxWithController(tabID string, ctrl control.SessionAPI, intent sessioninbox.InboxIntent, display, submit string, invocations []InvocationRequest, idempotency string, trySteer bool, turnID string) (InboxReceiptView, error) {
+func (a *App) enqueueInboxWithController(tabID string, ctrl control.SessionAPI, intent sessioninbox.InboxIntent, display, submit string, invocations []InvocationRequest, idempotency string, trySteer bool, turnID, expectedPath string) (InboxReceiptView, error) {
 	if ensurer, ok := ctrl.(interface{ EnsureSessionPath() }); ok {
 		ensurer.EnsureSessionPath()
 	}
@@ -318,13 +319,14 @@ func (a *App) enqueueInboxWithController(tabID string, ctrl control.SessionAPI, 
 		display = submit
 	}
 	req := control.InboxRequest{
-		Intent:      intent,
-		Display:     display,
-		Raw:         submit,
-		Submit:      submit,
-		Source:      "desktop",
-		Idempotency: strings.TrimSpace(idempotency),
-		Invocations: controlInvocationRequests(invocations),
+		ExpectedSessionPath: expectedPath,
+		Intent:              intent,
+		Display:             display,
+		Raw:                 submit,
+		Submit:              submit,
+		Source:              "desktop",
+		Idempotency:         strings.TrimSpace(idempotency),
+		Invocations:         controlInvocationRequests(invocations),
 	}
 	var (
 		rec sessioninbox.InboxReceipt

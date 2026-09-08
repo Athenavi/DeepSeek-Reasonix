@@ -75,7 +75,6 @@ func (m *Manager) StartForSession(parentSession, kind, label string, run func(ct
 }
 
 func (m *Manager) runJob(ctx context.Context, j *Job, run func(context.Context, io.Writer) (string, error)) {
-	parentSession, id, kind, label := j.SessionID, j.ID, j.Kind, j.Label
 	defer m.wg.Done()
 	result, err := runRecovered(ctx, jobWriter{j}, run)
 	j.mu.Lock()
@@ -132,7 +131,7 @@ func (m *Manager) runJob(ctx context.Context, j *Job, run func(context.Context, 
 	// Queue the drain note and closing Notice before terminal status so Wait
 	// cannot observe completion before DrainCompletedNote sees its bookkeeping.
 	// The structured runtime notification follows the actual done boundary.
-	m.recordCompletion(parentSession, id, kind, label, st, err)
+	parentSession := m.recordCompletion(j, st, err)
 
 	j.mu.Lock()
 	if j.status != Killed { // a concurrent Kill already published Killed — keep it
@@ -144,5 +143,5 @@ func (m *Manager) runJob(ctx context.Context, j *Job, run func(context.Context, 
 	}
 	j.mu.Unlock()
 	close(j.done)
-	m.notifyRuntime(parentSession, id)
+	m.notifyRuntime(parentSession, j.ID)
 }

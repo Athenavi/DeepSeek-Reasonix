@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"sort"
 	"sync"
@@ -56,12 +57,16 @@ func acceptRemoteRuntimeStateLocked(tab *remoteTab, path string, next event.Runt
 		if next.Revision == previous.Revision {
 			if previous != next {
 				slog.Warn("remote runtime snapshot version conflict", "source", "serve", "revision", next.Revision, "conflicts", remoteRuntimeDiagnostics.conflicts.Add(1))
+				return false
 			}
-			return false
+			if !authoritative || tab.runtimeUnknown[path] == 0 {
+				return false
+			}
 		}
 	}
 	tab.runtimeStates[path] = next
 	tab.runtime.syncFailed = false
+	delete(tab.runtimeUnknown, path)
 	delete(tab.runtimeConflicts, path)
 	if path == tab.routing.currentPath {
 		tab.runtime.snapshot = next
@@ -78,11 +83,12 @@ func acceptRemoteRuntimeStateLocked(tab *remoteTab, path string, next event.Runt
 
 func (a *App) acceptRemoteRuntimeFrame(tabID string, gen uint64, path string, frame json.RawMessage) {
 	var payload struct {
-		State *event.RuntimeStateSnapshot `json:"runtimeState"`
+		State json.RawMessage `json:"runtimeState"`
 	}
-	if json.Unmarshal(frame, &payload) != nil || payload.State == nil || !validRuntimeState(*payload.State) {
+	if json.Unmarshal(frame, &payload) != nil || len(payload.State) == 0 {
 		return
 	}
+	state, decodeErr := decodeRemoteRuntimeState(payload.State)
 	a.remoteTabMu.Lock()
 	tab := a.remoteTabs[tabID]
 	a.remoteTabMu.Unlock()
@@ -99,19 +105,26 @@ func (a *App) acceptRemoteRuntimeFrame(tabID string, gen uint64, path string, fr
 	if path == "" {
 		path = tab.routing.currentPath
 	}
+	if decodeErr != nil {
+		markRemoteRuntimeUnknownLocked(tab, path)
+		a.remoteTabMu.Unlock()
+		a.emitRuntimeStateChanged()
+		a.goRemoteTabSafe("remoteRuntimeSync", func() { _, _ = a.SyncRuntimeState() })
+		return
+	}
 	previous, found := tab.runtimeStates[path]
-	resync := !found || previous.RuntimeEpoch != payload.State.RuntimeEpoch || (previous.Revision == payload.State.Revision && previous != *payload.State)
+	resync := !found || previous.RuntimeEpoch != state.RuntimeEpoch || (previous.Revision == state.Revision && previous != state)
 	if resync {
-		if tab.runtimeConflicts[path] == *payload.State {
+		if tab.runtimeConflicts[path] == state {
 			resync = false
 		} else {
 			if tab.runtimeConflicts == nil {
 				tab.runtimeConflicts = map[string]event.RuntimeStateSnapshot{}
 			}
-			tab.runtimeConflicts[path] = *payload.State
+			tab.runtimeConflicts[path] = state
 		}
 	}
-	changed := acceptRemoteRuntimeStateLocked(tab, path, *payload.State, false)
+	changed := acceptRemoteRuntimeStateLocked(tab, path, state, false)
 	meta := remoteTabMetaLocked(tab)
 	a.remoteTabMu.Unlock()
 	if changed {
@@ -127,6 +140,7 @@ type remoteRuntimeTarget struct {
 	gen, selection uint64
 	client         *http.Client
 	states         map[string]event.RuntimeStateSnapshot
+	unknown        map[string]uint64
 }
 type remoteRuntimeConnection struct {
 	id, key, base string
@@ -159,10 +173,8 @@ func (a *App) SyncRuntimeState() (RuntimeStateProjection, error) {
 		conn := connections[key]
 		conn.id, conn.key, conn.base, conn.client = id, key, tab.base, tab.client
 		states := map[string]event.RuntimeStateSnapshot{}
-		for path, state := range tab.runtimeStates {
-			states[path] = state
-		}
-		conn.targets = append(conn.targets, remoteRuntimeTarget{id, tab.gen, tab.selectionRevision, tab.client, states})
+		maps.Copy(states, tab.runtimeStates)
+		conn.targets = append(conn.targets, remoteRuntimeTarget{id, tab.gen, tab.selectionRevision, tab.client, states, maps.Clone(tab.runtimeUnknown)})
 		connections[key] = conn
 	}
 	a.remoteTabMu.Unlock()
@@ -184,8 +196,14 @@ func (a *App) markRemoteRuntimeSyncFailed(targets []remoteRuntimeTarget, failed 
 	a.remoteTabMu.Lock()
 	defer a.remoteTabMu.Unlock()
 	for _, target := range targets {
-		if tab := a.remoteTabs[target.id]; tab != nil && tab.gen == target.gen && tab.client == target.client {
+		if tab := a.remoteTabs[target.id]; tab != nil && tab.gen == target.gen && tab.client == target.client && tab.selectionRevision == target.selection {
 			tab.runtime.syncFailed = failed
+			if failed {
+				markRemoteRuntimeUnknownLocked(tab, tab.routing.currentPath)
+				for path := range tab.runtimeStates {
+					markRemoteRuntimeUnknownLocked(tab, path)
+				}
+			}
 		}
 	}
 }
@@ -229,18 +247,34 @@ func (a *App) syncRemoteRuntimeConnection(conn remoteRuntimeConnection) error {
 	var payload struct {
 		SchemaVersion int `json:"schemaVersion"`
 		Sessions      []struct {
-			SessionPath string                     `json:"sessionPath"`
-			State       event.RuntimeStateSnapshot `json:"state"`
+			SessionPath string          `json:"sessionPath"`
+			State       json.RawMessage `json:"state"`
 		} `json:"sessions"`
 	}
 	err = json.NewDecoder(http.MaxBytesReader(nil, resp.Body, 4<<20)).Decode(&payload)
 	resp.Body.Close()
 	cancel()
-	if err != nil || resp.StatusCode != http.StatusOK || payload.SchemaVersion != 1 {
+	if err != nil || resp.StatusCode != http.StatusOK || payload.SchemaVersion != 1 || payload.Sessions == nil {
 		a.markRemoteRuntimeSyncFailed(conn.targets, true)
 		return fmt.Errorf("runtime state synchronization failed")
 	}
+	states := make(map[string]event.RuntimeStateSnapshot, len(payload.Sessions))
+	for _, session := range payload.Sessions {
+		state, decodeErr := decodeRemoteRuntimeState(session.State)
+		_, duplicate := states[session.SessionPath]
+		if decodeErr != nil || session.SessionPath == "" || duplicate {
+			a.markRemoteRuntimeSyncFailed(conn.targets, true)
+			return fmt.Errorf("invalid runtime state synchronization payload")
+		}
+		states[session.SessionPath] = state
+	}
+	a.applyRemoteRuntimeSnapshot(conn, states)
+	return nil
+}
+
+func (a *App) applyRemoteRuntimeSnapshot(conn remoteRuntimeConnection, states map[string]event.RuntimeStateSnapshot) {
 	a.remoteTabMu.Lock()
+	defer a.remoteTabMu.Unlock()
 	for _, target := range conn.targets {
 		tab := a.remoteTabs[target.id]
 		if tab == nil || tab.base != conn.base || tab.gen != target.gen || tab.client != target.client || tab.selectionRevision != target.selection || tab.routing.rehydratingPath != "" {
@@ -248,23 +282,38 @@ func (a *App) syncRemoteRuntimeConnection(conn remoteRuntimeConnection) error {
 		}
 		tab.runtime.syncFailed = false
 		seen := map[string]bool{}
-		for _, session := range payload.Sessions {
-			seen[session.SessionPath] = true
-			previous := tab.runtimeStates[session.SessionPath]
-			// A GET can establish an epoch only if no newer source update
-			// has changed this binding while it was in flight.
-			if previous.RuntimeEpoch != session.State.RuntimeEpoch && previous != target.states[session.SessionPath] {
+		for path, state := range states {
+			seen[path] = true
+			// A failure or malformed frame observed after this GET started
+			// requires a fresh request, even when the cached facts are unchanged.
+			if tab.runtimeUnknown[path] != target.unknown[path] {
 				continue
 			}
-			acceptRemoteRuntimeStateLocked(tab, session.SessionPath, session.State, true)
+			previous := tab.runtimeStates[path]
+			// A GET can establish an epoch only if no newer source update
+			// has changed this binding while it was in flight.
+			if previous.RuntimeEpoch != state.RuntimeEpoch && previous != target.states[path] {
+				continue
+			}
+			acceptRemoteRuntimeStateLocked(tab, path, state, true)
+		}
+		if !seen[tab.routing.currentPath] && tab.runtimeStates[tab.routing.currentPath] == target.states[tab.routing.currentPath] {
+			markRemoteRuntimeUnknownLocked(tab, tab.routing.currentPath)
 		}
 		for path, state := range tab.runtimeStates {
-			if !seen[path] && path != tab.routing.currentPath && state == target.states[path] {
+			if !seen[path] && path != tab.routing.currentPath && state == target.states[path] && tab.runtimeUnknown[path] == target.unknown[path] {
 				delete(tab.runtimeStates, path)
+				delete(tab.runtimeUnknown, path)
 				delete(tab.routing.running, path)
 			}
 		}
 	}
-	a.remoteTabMu.Unlock()
-	return nil
+}
+
+func markRemoteRuntimeUnknownLocked(tab *remoteTab, path string) {
+	if tab.runtimeUnknown == nil {
+		tab.runtimeUnknown = map[string]uint64{}
+	}
+	tab.runtime.revision++
+	tab.runtimeUnknown[path] = tab.runtime.revision
 }

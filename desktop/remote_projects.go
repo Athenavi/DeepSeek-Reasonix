@@ -93,6 +93,7 @@ type remoteTab struct {
 	// inactive, matching the local tab strip's running/prompt/job indicators.
 	runtime          remoteTabRuntimeState
 	runtimeStates    map[string]event.RuntimeStateSnapshot
+	runtimeUnknown   map[string]uint64
 	runtimeConflicts map[string]event.RuntimeStateSnapshot
 	// routing fences all-session SSE and retains background project-tree state.
 	routing remoteTabSessionRouting

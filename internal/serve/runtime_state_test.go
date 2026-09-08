@@ -337,9 +337,10 @@ func TestRuntimeStateInboxReceiptRetainsRichFollowupAndSessionFence(t *testing.T
 				}
 				u.RawQuery = query.Encode()
 				req, _ := http.NewRequest(http.MethodGet, u.String(), nil)
-				if fence == "header" {
+				switch fence {
+				case "header":
 					req.Header.Set(expectedSessionPathHeader, wrongPath)
-				} else if fence == "conflicting" {
+				case "conflicting":
 					req.Header.Set(expectedSessionPathHeader, ctrl.SessionPath())
 				}
 				response, err := http.DefaultClient.Do(req)

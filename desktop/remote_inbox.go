@@ -54,6 +54,10 @@ func (a *App) enqueueRemoteFollowup(tabID, display, submit string, invocations [
 	if err != nil {
 		return InboxReceiptView{}, err
 	}
+	return a.enqueueRemoteFollowupAt(client, base, path, display, submit, invocations, idempotency)
+}
+
+func (a *App) enqueueRemoteFollowupAt(client *http.Client, base, path, display, submit string, invocations []InvocationRequest, idempotency string) (InboxReceiptView, error) {
 	ctx, cancel := commandContext(a)
 	defer cancel()
 	body, err := json.Marshal(map[string]any{"intent": "followup", "input": submit, "display": display, "invocations": invocations, "idempotencyKey": idempotency})
@@ -72,6 +76,9 @@ func (a *App) enqueueRemoteFollowup(tabID, display, submit string, invocations [
 		} else {
 			err = fmt.Errorf("follow-up enqueue failed (%d)", resp.StatusCode)
 			if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+				if resp.StatusCode != http.StatusRequestTimeout {
+					return InboxReceiptView{}, inboxNotSubmitted(err)
+				}
 				return InboxReceiptView{}, err
 			}
 		}

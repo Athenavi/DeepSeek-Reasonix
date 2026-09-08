@@ -117,10 +117,6 @@ func cloneRuntimeTopics(topics []ProjectRuntimeTopic) []ProjectRuntimeTopic {
 	return result
 }
 
-func (a *App) projectTreeRuntimeSnapshot(revision uint64) ProjectTreeRuntimeSnapshot {
-	return ProjectTreeRuntimeSnapshot{Revision: revision, Topics: a.projectTreeRuntimeTopics(a.catalogRuntimeSnapshots())}
-}
-
 func (a *App) projectTreeRuntimeTopics(snapshots []catalogRuntimeSnapshot) []ProjectRuntimeTopic {
 	type runtimeGroup struct {
 		scope         string
@@ -147,7 +143,7 @@ func (a *App) projectTreeRuntimeTopics(snapshots []catalogRuntimeSnapshot) []Pro
 	topics := make([]ProjectRuntimeTopic, 0, len(keys))
 	for _, key := range keys {
 		group := groups[key]
-		nodes, _ := a.runtimeProjectTopicNodes(group.scope, group.workspaceRoot, group.snapshots)
+		nodes, _ := a.runtimeProjectTopicNodes(group.scope, group.workspaceRoot, group.snapshots, false)
 		if len(nodes) > 0 {
 			topics = append(topics, ProjectRuntimeTopic{Scope: group.scope, WorkspaceRoot: group.workspaceRoot, Node: nodes[0]})
 		}
@@ -207,8 +203,6 @@ const (
 	// used instead of a per-session P99: turn durations are not tracked
 	// per session in this package, and simplicity wins (#8528/#8555/#8859).
 	topicActivityStatusTTL = 10 * time.Minute
-	// topicActivityReapInterval is how often the watchdog scans for orphans.
-	topicActivityReapInterval = 30 * time.Second
 )
 
 // liveTopicActivityStatus reports statuses that must be terminated by a
@@ -220,23 +214,6 @@ func liveTopicActivityStatus(status string) bool {
 		return true
 	}
 	return false
-}
-
-// watchTopicActivityStatus reaps live activity statuses that have seen no
-// turn event for longer than the TTL — the missed-TurnDone safety net.
-func (a *App) watchTopicActivityStatus() {
-	a.goSafe("topicActivityWatchdog", func() {
-		ticker := time.NewTicker(topicActivityReapInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-a.bootContext().Done():
-				return
-			case now := <-ticker.C:
-				a.reapStaleTopicActivityStatus(now)
-			}
-		}
-	})
 }
 
 func (a *App) reapStaleTopicActivityStatus(now time.Time) {

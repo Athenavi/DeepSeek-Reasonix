@@ -3,6 +3,7 @@ import { mockProviderTemplate, mockPreset, mockBundlePreset, mockKimiAPIModels, 
 // @ts-ignore generated locally; fresh checkouts use the disabled drift check below.
 import type * as GeneratedApp from "../../wailsjs/go/main/App";
 import type { InvocationRequest } from "./invocationDisplay";
+import type { FollowupBindings } from "./pendingFollowup";
 import { addBreadcrumb } from "./breadcrumbs";
 import { maybeShare } from "./queryCoalesce";
 import { makeMockSessionCatalogBindings } from "./sessionCatalogBridge";
@@ -31,6 +32,8 @@ import { makeMockMCPAppBindings, type MCPAppBindings } from "./mcpAppBridge";
 import { makeMockPinnedContextBindings, type PinnedContextBindings } from "./pinnedContextBridge";
 import { createDesktopPreferencesMock } from "./desktopPreferencesMock";
 import type {
+  TurnChanges,
+  TurnFileChange,
   RemoteHostView,
   RemoteHostInput,
   RemoteConnectionStatus,
@@ -196,7 +199,7 @@ interface DesktopWindowState {
 }
 // AppBindings is the hand-written React-to-Go contract. _CheckGeneratedBindings
 // catches generated methods missing here; update this interface and typecheck.
-export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganizationBindings, HistoryCatalogBindings, TaskCatalogBindings, BlankProjectBindings, QualityFloorBindings, SessionTitleBindings, ScrollDiagnosticBindings, RemoteProjectBindings, MCPAppBindings, PinnedContextBindings {
+export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganizationBindings, HistoryCatalogBindings, TaskCatalogBindings, BlankProjectBindings, QualityFloorBindings, SessionTitleBindings, ScrollDiagnosticBindings, RemoteProjectBindings, MCPAppBindings, PinnedContextBindings, FollowupBindings {
   Platform(): Promise<string>;
   MinimiseMainWindow(): Promise<void>;
   ToggleMaximiseMainWindow(): Promise<void>;
@@ -257,8 +260,6 @@ export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganiza
     maxItems: number;
     maxBytes: number;
   }>;
-  EnqueueInboxFollowup(tabID: string, display: string, submit: string, idempotency: string): Promise<{ itemId: string; disposition: string; position: number; paused: boolean; idempotent?: boolean; error?: string }>;
-  EnqueueInboxFollowupWithInvocations(tabID: string, display: string, submit: string, invocations: InvocationRequest[], idempotency: string): Promise<{ itemId: string; disposition: string; position: number; paused: boolean; idempotent?: boolean; error?: string }>;
   EnqueueInboxSteer(tabID: string, display: string, submit: string, idempotency: string): Promise<{ itemId: string; disposition: string; position: number; paused: boolean; idempotent?: boolean; error?: string }>;
   EnqueueInboxSteerForTurn?(tabID: string, turnID: string, display: string, submit: string, idempotency: string): Promise<{ itemId: string; disposition: string; position: number; paused: boolean; idempotent?: boolean; error?: string }>;
   SteerInboxItem(tabID: string, itemID: string): Promise<{
@@ -490,6 +491,9 @@ export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganiza
   WorkspaceRevisionForTab(tabID: string): Promise<{ revisions: WorkspaceRevisions; watchState: "active" | "degraded" | "unavailable" }>;
   WorkspaceChanges(tabID: string): Promise<WorkspaceChangesView>;
   WorkspaceChangeDetail(tabID: string, path: string): Promise<WorkspaceChangeDetailView>;
+  WorkspaceTurnChanges(tabID: string, sessionPath: string, turn: number, resultID: string): Promise<TurnChanges>;
+  WorkspaceTurnChangeDetail(tabID: string, sessionPath: string, turn: number, resultID: string, path: string): Promise<TurnFileChange | null>;
+  TurnCheckLog(tabID: string, sessionPath: string, toolID: string, resultID: string): Promise<{ output: string; truncated: boolean } | null>;
   GitBranches(): Promise<string[]>;
   GitCheckout(branch: string): Promise<void>;
   WorkspaceGitHistory(tabID: string, path: string): Promise<GitCommitView[]>;
@@ -4178,6 +4182,11 @@ function makeMockApp(): AppBindings {
         ],
       };
     },
+    async WorkspaceTurnChanges(_tabID: string, _sessionPath: string, turn: number, _resultID: string) {
+      return { turn, coverage: "unknown" as const, files: [], reasons: [], added: 0, removed: 0 };
+    },
+    async WorkspaceTurnChangeDetail() { return null; },
+    async TurnCheckLog() { return null; },
     async WorkspaceChangeDetail(_tabID: string, path: string) {
       return {
         source: "git" as const,

@@ -224,9 +224,10 @@ type remoteTabStatusPayload struct {
 
 func (a *App) recordRemoteTabSessionStatus(tabID string, client *http.Client, gen, statusSeq uint64, status json.RawMessage) bool {
 	var payload remoteTabStatusPayload
-	if gen == 0 || statusSeq == 0 || json.Unmarshal(status, &payload) != nil {
+	if gen == 0 || statusSeq == 0 {
 		return false
 	}
+	decodeErr := json.Unmarshal(status, &payload)
 	a.remoteTabMu.Lock()
 	tab := a.remoteTabs[tabID]
 	a.remoteTabMu.Unlock()
@@ -238,6 +239,13 @@ func (a *App) recordRemoteTabSessionStatus(tabID string, client *http.Client, ge
 	a.remoteTabMu.Lock()
 	if a.remoteTabs[tabID] != tab || tab.client != client || tab.gen != gen || tab.runtime.revision != statusSeq {
 		a.remoteTabMu.Unlock()
+		return false
+	}
+	if decodeErr != nil {
+		markRemoteRuntimeUnknownLocked(tab, tab.routing.currentPath)
+		a.remoteTabMu.Unlock()
+		a.emitRuntimeStateChanged()
+		a.goRemoteTabSafe("remoteRuntimeSync", func() { _, _ = a.SyncRuntimeState() })
 		return false
 	}
 	// Serve still reports the outgoing foreground until an in-flight /resume
@@ -283,6 +291,13 @@ func applyRemoteTabStatusPayload(tab *remoteTab, payload remoteTabStatusPayload)
 	if payload.RuntimeState != nil && validRuntimeState(*payload.RuntimeState) {
 		acceptRemoteRuntimeStateLocked(tab, payload.SessionPath, *payload.RuntimeState, true)
 		payload.Running, payload.PendingPrompt, payload.BackgroundJobs, payload.CancelRequested, payload.Cancellable = nil, nil, nil, nil, nil
+	} else if payload.RuntimeState == nil && payload.Running != nil {
+		// An actual legacy status confirms only its selected session. Never
+		// leave a previous schema-1 observation shadowing these legacy facts.
+		delete(tab.runtimeStates, tab.routing.currentPath)
+		delete(tab.runtimeUnknown, tab.routing.currentPath)
+		tab.runtime.snapshot = event.RuntimeStateSnapshot{}
+		tab.runtime.syncFailed = false
 	}
 	if name := strings.TrimSpace(payload.SessionName); name != "" {
 		tab.session.name = name

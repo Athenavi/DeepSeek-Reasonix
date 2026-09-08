@@ -139,6 +139,7 @@ type Job struct {
 
 	artifactPath     string
 	artifactMetaPath string
+	artifactStatus   Status // last metadata phase; may precede published terminal status
 	artifactFile     *os.File
 	artifactComplete bool
 	artifactErr      string
@@ -404,7 +405,7 @@ func (m *Manager) startInvalid(parentSession, kind, label string, validationErr 
 	m.order = append(m.order, key)
 	m.mu.Unlock()
 	close(j.done)
-	m.recordCompletion(parentSession, id, kind, label, Failed, validationErr)
+	m.recordCompletion(j, Failed, validationErr)
 	m.notifyRuntime(parentSession, id)
 	return j
 }
@@ -467,6 +468,7 @@ func (m *Manager) artifactDirLocked(parentSession string) string {
 }
 
 func (m *Manager) writeJobMetaLocked(j *Job, st Status) error {
+	j.artifactStatus = st
 	if j.artifactMetaPath == "" {
 		return nil
 	}
@@ -641,17 +643,18 @@ func (m *Manager) monitorStalled(parentSession string, j *Job) {
 
 // recordCompletion queues the finished-job summary for DrainCompletedNote and
 // emits a closing Notice (warn for a failure, info otherwise).
-func (m *Manager) recordCompletion(parentSession, id, kind, label string, st Status, err error) {
+func (m *Manager) recordCompletion(j *Job, st Status, err error) string {
+	id, kind, label := j.ID, j.Kind, j.Label
 	tag := id
 	if label != "" {
 		tag = fmt.Sprintf("%s (%s)", id, label)
 	}
-	parentSession = strings.TrimSpace(parentSession)
 	shouldEmit := false
 	m.mu.Lock()
+	parentSession := strings.TrimSpace(j.SessionID)
 	if parentSession != "" && m.destroying[parentSession] {
 		m.mu.Unlock()
-		return
+		return parentSession
 	}
 	m.completed = append(m.completed, completion{
 		sessionID: parentSession,
@@ -677,6 +680,7 @@ func (m *Manager) recordCompletion(parentSession, id, kind, label string, st Sta
 	if shouldEmit {
 		m.sink.Emit(event.Event{Kind: event.Notice, Code: event.NoticeCodeBackgroundJobFinished, Level: level, Text: text, Detail: detail})
 	}
+	return parentSession
 }
 
 func (m *Manager) recordStalled(parentSession, id, kind, label string) {
@@ -1147,25 +1151,32 @@ func (m *Manager) SetActiveSessionPath(parentSession, sessionPath string) {
 	loaded := m.loaded[parentSession]
 	m.mu.Unlock()
 
+	var migrationErr error
 	if oldDir != "" && newDir != "" && oldDir != newDir {
 		oldSession := parentSession
 		if adoptDefault {
 			oldSession = ""
 		}
-		if err := m.migrateArtifactDirForSession(oldSession, oldDir, newDir); err != nil {
-			if adoptDefault {
-				m.mu.Lock()
-				m.adoptUnscopedJobsLocked(parentSession)
-				m.mu.Unlock()
+		migrationErr = m.migrateArtifactDirForSession(oldSession, oldDir, newDir)
+	}
+	if adoptDefault {
+		m.mu.Lock()
+		adopted := m.adoptUnscopedJobsLocked(parentSession)
+		m.mu.Unlock()
+		for _, j := range adopted {
+			j.mu.Lock()
+			st := j.artifactStatus
+			if st == "" {
+				st = j.status
 			}
-			m.recordArtifactMigrationError(parentSession, err)
-		} else {
-			m.mu.Lock()
-			if adoptDefault {
-				m.adoptUnscopedJobsLocked(parentSession)
+			if err := m.writeJobMetaLocked(j, st); err != nil {
+				j.noteArtifactErr("ownership metadata: " + err.Error())
 			}
-			m.mu.Unlock()
+			j.mu.Unlock()
 		}
+	}
+	if migrationErr != nil {
+		m.recordArtifactMigrationError(parentSession, migrationErr)
 	}
 	if !loaded {
 		m.loadSessionArtifacts(parentSession, sessionPath, newDir)
@@ -1181,10 +1192,11 @@ func (m *Manager) hasUnscopedJobsLocked() bool {
 	return false
 }
 
-func (m *Manager) adoptUnscopedJobsLocked(parentSession string) {
+func (m *Manager) adoptUnscopedJobsLocked(parentSession string) []*Job {
+	var adopted []*Job
 	parentSession = strings.TrimSpace(parentSession)
 	if parentSession == "" {
-		return
+		return adopted
 	}
 	for i := range m.completed {
 		if strings.TrimSpace(m.completed[i].sessionID) == "" {
@@ -1204,7 +1216,12 @@ func (m *Manager) adoptUnscopedJobsLocked(parentSession string) {
 			continue
 		}
 		delete(m.jobs, oldKey)
+		// Manager readers and artifact writers use distinct locks. Ownership
+		// changes hold both, always in manager-before-job order.
+		j.mu.Lock()
 		j.SessionID = parentSession
+		j.mu.Unlock()
+		adopted = append(adopted, j)
 		m.jobs[newKey] = j
 		for i, key := range m.order {
 			if key == oldKey {
@@ -1212,6 +1229,7 @@ func (m *Manager) adoptUnscopedJobsLocked(parentSession string) {
 			}
 		}
 	}
+	return adopted
 }
 
 func (m *Manager) recordArtifactMigrationError(parentSession string, err error) {
