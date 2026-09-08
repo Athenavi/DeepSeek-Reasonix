@@ -72,6 +72,10 @@ jobs:
   test:
     needs: changes
     if: always()
+    # Backstop against a wedged step holding the workflow's concurrency group:
+    # the Windows full-suite step has outlived its own timeout and kept the job
+    # alive. Normal full-suite wall time is 8-12 minutes per platform.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
