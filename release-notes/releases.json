@@ -51,6 +51,26 @@
           ]
         },
         {
+          "kind": "improved",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Transcript renderer replacement",
+            "zh": "会话渲染器替换"
+          },
+          "body": {
+            "en": "The transcript now runs on the full DOM/windowed renderer with one scroll writer and one input-intent owner, replacing Virtuoso. Tail-follow intent and measured-height publication survive native scrolling, so visible content is no longer squeezed during fast scrolls.",
+            "zh": "会话记录改用 Full DOM/窗口化渲染器，由单一滚动写入者与输入意图所有者驱动，替代 Virtuoso。原生滚动中的尾部跟随意图与实测高度发布得以保留，快速滚动时可见内容不再被挤压。"
+          },
+          "refs": [
+            9893,
+            9895,
+            9896,
+            9897
+          ]
+        },
+        {
           "kind": "new",
           "targets": [
             "desktop"
@@ -373,6 +393,41 @@
           "refs": [
             9956
           ]
+        },
+        {
+          "kind": "new",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Standard and Deep session display",
+            "zh": "Standard / Deep 会话展示设置"
+          },
+          "body": {
+            "en": "A single session-experience setting controls how much completed work stays visible: Standard collapses finished work, Deep keeps it expanded. The backend owns persistence and startup snapshots.",
+            "zh": "新增统一的会话展示设置：Standard 折叠已完成内容，Deep 保持展开；持久化与启动快照由后端权威管理。"
+          },
+          "refs": [
+            9894
+          ]
+        },
+        {
+          "kind": "improved",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Independent model connections and model preferences",
+            "zh": "独立模型连接与模型偏好"
+          },
+          "body": {
+            "en": "Model services are independent connections with stable identities, display names and separate credentials. Adding a connection selects a brand, product and protocol, and first-run setup opens this flow.",
+            "zh": "模型服务成为具有稳定标识、显示名称与独立凭据的独立连接；新增连接时选择品牌、产品与协议，首次启动设置即进入该流程。"
+          },
+          "refs": [
+            9907
+          ]
         }
       ],
       "changes": {
@@ -437,6 +492,22 @@
             },
             "refs": [
               9933
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Standard and Deep session display",
+              "zh": "Standard / Deep 会话展示设置"
+            },
+            "body": {
+              "en": "A single session-experience setting controls how much completed work stays visible: Standard collapses finished work, Deep keeps it expanded. The backend owns persistence and startup snapshots.",
+              "zh": "新增统一的会话展示设置：Standard 折叠已完成内容，Deep 保持展开；持久化与启动快照由后端权威管理。"
+            },
+            "refs": [
+              9894
             ]
           }
         ],
@@ -503,6 +574,42 @@
             },
             "refs": [
               9943
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Transcript renderer replacement",
+              "zh": "会话渲染器替换"
+            },
+            "body": {
+              "en": "The transcript now runs on the full DOM/windowed renderer with one scroll writer and one input-intent owner, replacing Virtuoso. Tail-follow intent and measured-height publication survive native scrolling, so visible content is no longer squeezed during fast scrolls.",
+              "zh": "会话记录改用 Full DOM/窗口化渲染器，由单一滚动写入者与输入意图所有者驱动，替代 Virtuoso。原生滚动中的尾部跟随意图与实测高度发布得以保留，快速滚动时可见内容不再被挤压。"
+            },
+            "refs": [
+              9893,
+              9895,
+              9896,
+              9897
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Independent model connections and model preferences",
+              "zh": "独立模型连接与模型偏好"
+            },
+            "body": {
+              "en": "Model services are independent connections with stable identities, display names and separate credentials. Adding a connection selects a brand, product and protocol, and first-run setup opens this flow.",
+              "zh": "模型服务成为具有稳定标识、显示名称与独立凭据的独立连接；新增连接时选择品牌、产品与协议，首次启动设置即进入该流程。"
+            },
+            "refs": [
+              9907
             ]
           }
         ],
