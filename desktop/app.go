@@ -417,6 +417,8 @@ type App struct {
 	// succeeded. DOM navigation alone is not application health.
 	startupReady     atomic.Bool
 	webView2Recovery *webView2RecoveryCoordinator
+	// hostShell is non-nil only under the Electron shell (--host-rpc).
+	hostShell *hostShellBridge
 }
 
 type desktopShellRuntimeState struct {
@@ -499,8 +501,10 @@ func (a *App) startup(ctx context.Context) {
 	// lifecycle evidence. This remains correct on Linux where Wails invokes
 	// OnStartup before its DBus single-instance handoff.
 	initializeLifecycleDiagnostics(a)
-	a.startWindowsWebView2StartupFallback(ctx)
-	a.webView2Recovery.startGuidance(ctx)
+	if !a.hostMode() {
+		a.startWindowsWebView2StartupFallback(ctx)
+		a.webView2Recovery.startGuidance(ctx)
+	}
 	a.desktopShell.coordinator.start(ctx)
 	a.lifecycle.tracker.markAsync("ready")
 	if a.remoteWindowTicket != "" {
@@ -510,17 +514,9 @@ func (a *App) startup(ctx context.Context) {
 		a.watchRemoteWindowOwner(ctx)
 		return
 	}
-	installSystemQuitHook()
+	a.startNativeShellSupport()
 	a.enableDeferredRebuildRetry()
 	a.startHistoryIndexMigration()
-	a.goSafe("repairDesktopIconIntegration", func() {
-		if err := repairDesktopIconIntegration(); err != nil {
-			slog.Debug("desktop: repair native icon integration", "err", err)
-		}
-	})
-	a.goSafe("applyWindowIconsFromExecutable", func() {
-		applyWindowIconsFromExecutable()
-	})
 
 	if cfg, err := config.Load(); err == nil && cfg.DesktopMetrics() && version != "dev" {
 		a.metrics.Store(newMetricsAggregator(config.MemoryUserDir()))
@@ -528,7 +524,6 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.recordPreviousRunDiagnostics()
 	a.observeIncompleteWindowRestore()
-	a.startMainThreadWatchdog()
 
 	a.heartbeat = newHeartbeatEngine(a)
 	a.heartbeat.Start()
@@ -924,7 +919,9 @@ func (a *App) shutdown(context.Context) {
 func (a *App) domReady(_ context.Context) {
 	// JSC has installed its lazy signal handlers by this point. Restore the
 	// SA_ONSTACK flags required by Go; this is a no-op outside Linux.
-	repairWebKitSignalHandlers()
+	if !a.hostMode() {
+		repairWebKitSignalHandlers()
+	}
 
 	if a.remoteWindowTicket != "" {
 		a.domReadyRemoteWindow()

@@ -132,13 +132,17 @@ func runHostRPC(app *App, stdin io.Reader, stdout io.Writer) int {
 		MaxWriteStall:         30 * time.Second,
 		Name:                  "desktop-host",
 	})
+	bridge := &hostShellBridge{app: app}
 	server := hostrpc.NewServer(conn, hostrpc.ServerConfig{
 		Registry:   registry,
 		Contract:   hostrpc.Build(registry, hostEventNames),
-		Hooks:      hostRPCHooks(appCtx, app, hostrpc.Resources{Origin: origin, Token: token}),
+		Hooks:      hostRPCHooks(appCtx, app, bridge, hostrpc.Resources{Origin: origin, Token: token}),
 		Identity:   hostIdentity(),
 		Generation: "g-" + generation,
 	})
+	bridge.server = server
+	app.hostShell = bridge
+	app.setNativeHost(rpcNativeHost{server: server})
 	runtimeEventsEmitFallback = func(_ context.Context, name string, payload ...any) {
 		server.Emit(name, payload...)
 	}
@@ -151,7 +155,7 @@ func runHostRPC(app *App, stdin io.Reader, stdout io.Writer) int {
 
 // hostRPCHooks binds the lifecycle requests to the App hooks Wails used to
 // call, always with the service-lifetime context the App stores.
-func hostRPCHooks(ctx context.Context, app *App, resources hostrpc.Resources) hostrpc.Hooks {
+func hostRPCHooks(ctx context.Context, app *App, bridge *hostShellBridge, resources hostrpc.Resources) hostrpc.Hooks {
 	return hostrpc.Hooks{
 		Hello: func(hostrpc.HelloParams) (hostrpc.HelloResult, error) {
 			width, height := initialDesktopWindowSize(false)
@@ -167,10 +171,15 @@ func hostRPCHooks(ctx context.Context, app *App, resources hostrpc.Resources) ho
 				},
 			}, nil
 		},
-		Start:       func(context.Context) error { app.startup(ctx); return nil },
-		DOMReady:    func(context.Context) error { app.domReady(ctx); return nil },
-		BeforeClose: func(context.Context, string) bool { return app.beforeClose(ctx) },
+		Start:    func(context.Context) error { app.startup(ctx); return nil },
+		DOMReady: func(context.Context) error { app.domReady(ctx); return nil },
+		RendererAttached: func(context.Context, int) error {
+			app.ReportDesktopWebViewReady()
+			return nil
+		},
+		BeforeClose: func(_ context.Context, reason string) bool { return bridge.beforeClose(ctx, reason) },
 		Shutdown:    func(context.Context) error { app.shutdown(ctx); return nil },
+		HostEvent:   bridge.handleHostEvent,
 	}
 }
 
