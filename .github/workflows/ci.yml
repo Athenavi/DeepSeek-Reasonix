@@ -444,11 +444,6 @@ jobs:
           cache: pnpm
           cache-dependency-path: desktop/pnpm-lock.yaml
 
-      - name: Install Wails CLI
-        run: |
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-          go install "github.com/wailsapp/wails/v2/cmd/wails@$(cat "$GITHUB_WORKSPACE/.wails-version")"
-
       - name: gofmt
         run: |
           unformatted=$(gofmt -l .)
@@ -467,24 +462,34 @@ jobs:
             exit 1
           fi
 
-      # WebKitGTK 4.0 toolchain (pinned to ubuntu-22.04; no webkit2_41 tag).
+      # The Go module still links WebKitGTK through Wails until phase F removes
+      # the old shell, so compiling it (including the emit-contract entry point
+      # below) needs the 4.0 headers on this ubuntu-22.04 runner.
       - name: Install Linux build deps
         run: |
           sudo apt-get update
           sudo apt-get install -y dbus-daemon gcc libgtk-3-dev libwebkit2gtk-4.0-dev xvfb
 
+      # The packaged Electron shell embeds desktopContract.json; a stale
+      # frontend/src/generated would ship a shell/service protocol mismatch.
+      - name: Check desktop host contract drift
+        run: |
+          go run . -emit-contract frontend/src/generated
+          if ! git diff --exit-code -- frontend/src/generated; then
+            echo "desktop contract is stale - run 'cd desktop && go run . -emit-contract frontend/src/generated' and commit."
+            exit 1
+          fi
+
       - name: Build frontend
         run: |
-          wails generate module
           pnpm --dir frontend install --frozen-lockfile
-          pnpm --dir frontend build
+          pnpm --dir frontend build:electron
 
       - uses: actions/upload-artifact@v7
         with:
           name: desktop-frontend-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             desktop/frontend/dist
-            desktop/frontend/wailsjs
           if-no-files-found: error
           retention-days: 3
 
@@ -566,35 +571,6 @@ jobs:
       - name: test -race
         run: go test -race ./...
 
-  # Ubuntu 24.04 ships WebKitGTK 4.1 only. Keep this capability build separate
-  # from the 22.04/4.0 leg so neither runtime becomes a distro whitelist.
-  desktop-linux-webkit41:
-    needs: changes
-    if: always() && (github.event_name != 'pull_request' || needs.changes.outputs.desktop != 'false')
-    runs-on: ubuntu-24.04
-    defaults:
-      run:
-        working-directory: desktop
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: desktop/go.mod
-          cache: true
-          cache-dependency-path: desktop/go.sum
-
-      - name: Install WebKitGTK 4.1 build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y dbus-daemon gcc libgtk-3-dev libwebkit2gtk-4.1-dev xvfb
-
-      - name: Build and test WebKitGTK 4.1 observer
-        run: go test -tags webkit2_41 ./...
-
-      - name: WebKitGTK 4.1 native recovery smoke
-        run: xvfb-run -a env WEBKIT_DISABLE_COMPOSITING_MODE=1 go test -tags 'webkit2_41 reasonix_webkit_smoke' . -run '^TestWebKitNativeRecoverySmoke$'
-
   # desktop/ is a separate module, so the root macOS matrix above does not
   # compile or exercise the native PTY and FSEvents implementations.
   desktop-macos:
@@ -624,11 +600,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: desktop/pnpm-lock.yaml
 
-      - name: Install Wails CLI and build frontend
+      - name: Build frontend
         run: |
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-          go install "github.com/wailsapp/wails/v2/cmd/wails@$(cat "$GITHUB_WORKSPACE/.wails-version")"
-          wails generate module
           pnpm --dir frontend install --frozen-lockfile
           pnpm --dir frontend build
 
@@ -669,6 +642,19 @@ jobs:
           working-directory: desktop
           args: --timeout=5m
 
+      # Packaging validation, not a code gate: run it on pushes to main-v2 (the
+      # release pipeline packages again anyway), and let pull requests stop
+      # after the lint step. Ad-hoc signs (no Apple secrets in CI) and skips
+      # the DMG.
+      - name: Package Electron app and verify bundle members
+        if: github.event_name != 'pull_request'
+        timeout-minutes: 25
+        env:
+          DESKTOP_BUILD_SKIP_DMG: "1"
+        run: |
+          ../scripts/desktop-build.sh darwin/arm64 v0.0.0-ci canary
+          node packaging/verify.mjs ../dist/Reasonix-darwin-arm64.zip
+
   # Desktop project-root matching is case-insensitive only on Windows
   # (sameDesktopPath folds case when os.PathSeparator is '\'), so the
   # regression tests for that contract are named *OnWindows and can never
@@ -704,16 +690,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: desktop/pnpm-lock.yaml
 
-      - name: Install Wails CLI
-        run: |
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-          go install "github.com/wailsapp/wails/v2/cmd/wails@$(cat "$GITHUB_WORKSPACE/.wails-version")"
-
       # go:embed of frontend/dist needs a built frontend before the package
       # compiles, same as the ubuntu desktop leg.
       - name: Build frontend
         run: |
-          wails generate module
           pnpm --dir frontend install --frozen-lockfile
           pnpm --dir frontend build
 
@@ -770,22 +750,19 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      # Build the real Wails executable on every desktop PR and exercise the
-      # exact production startup path in Microsoft's installed WebView2 runtime.
-      # The frontend and bindings were already built above, so this skips only
-      # duplicate build work, not the native shell.
-      - name: Build Wails executable for native startup smoke
-        timeout-minutes: 10
-        run: wails build -clean -s -skipbindings -nopackage -platform windows/amd64 -webview2 embed
-
-      - name: Smoke-test Wails/WebView2 native startup
-        shell: pwsh
-        timeout-minutes: 2
+      # Package the real Electron shell on every desktop PR and exercise the
+      # production startup path (shell -> Go service handshake) in the packaged
+      # layout. package.mjs builds the frontend itself (build:electron flavor).
+      - name: Package Electron shell for native startup smoke
+        timeout-minutes: 15
         run: |
-          ../scripts/test-webview2-native-smoke.ps1 `
-            -ExecutablePath "build/bin/reasonix-desktop.exe" `
-            -TimeoutSeconds 60 `
-            -HealthySeconds 5
+          pnpm install --frozen-lockfile
+          go build -trimpath -ldflags "-s -w" -o build/bin/reasonix-desktop.exe .
+          node packaging/package.mjs windows/amd64 v0.0.0-ci canary
+
+      - name: Smoke-test Electron native startup
+        timeout-minutes: 3
+        run: node packaging/smoke.mjs build/electron/windows-amd64/app --service build/bin/reasonix-desktop.exe
 
       - name: test (Windows desktop and update helper)
         # Normal wall time is 6-7 minutes; a loaded runner has exceeded 15 with
@@ -816,6 +793,12 @@ jobs:
         if: github.event_name != 'pull_request'
         timeout-minutes: 20
         run: ../scripts/desktop-build.sh windows/amd64 v0.0.0-ci canary
+
+      - name: Verify packaged Windows artifacts
+        if: github.event_name != 'pull_request'
+        run: |
+          node packaging/verify.mjs ../dist/Reasonix-windows-amd64.zip
+          node packaging/signing-files.mjs build/windows/signing-payload --check
 
   # repolint scans desktop/ and sdk/ too, so this job also runs for diffs the
   # `code` filter would otherwise skip.

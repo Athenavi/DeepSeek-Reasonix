@@ -11,5 +11,9 @@
   "engines": {
     "node": ">=24",
     "pnpm": ">=10 <11"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "@electron/universal": "3.0.6"
   }
 }

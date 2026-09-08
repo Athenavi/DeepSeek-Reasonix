@@ -35,11 +35,11 @@ for (const [job, body, command] of [
 
 const windowsJob = jobBody("desktop-windows", "lint");
 for (const required of [
-  "wails build -clean -s -skipbindings -nopackage -platform windows/amd64 -webview2 embed",
+  "node packaging/package.mjs windows/amd64 v0.0.0-ci canary",
   "Test WebView2 native smoke state machine",
   "../scripts/test-webview2-native-smoke.ps1 -SelfTest",
-  "Smoke-test Wails/WebView2 native startup",
-  "../scripts/test-webview2-native-smoke.ps1",
+  "Smoke-test Electron native startup",
+  "node packaging/smoke.mjs build/electron/windows-amd64/app --service build/bin/reasonix-desktop.exe",
   "Test WebView2 transcript selection compositor",
   "../scripts/test-transcript-selection-webview2.ps1 -Iterations 3",
   "Upload WebView2 transcript selection evidence",
@@ -228,4 +228,4 @@ for (const required of [
   }
 }
 
-console.log("motion-ci-contract: browser approval behavior and exact-binary WebView2 startup are separate release gates without production smoke instrumentation");
+console.log("motion-ci-contract: browser approval behavior and packaged Electron startup are separate release gates without production smoke instrumentation");
