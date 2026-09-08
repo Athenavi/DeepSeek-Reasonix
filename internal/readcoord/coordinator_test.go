@@ -215,6 +215,28 @@ func TestObserveIgnoresEnvelopesWithoutIdentity(t *testing.T) {
 	}
 }
 
+func TestObserveWithoutBeginDerivesTheRequirementFromIntent(t *testing.T) {
+	c := New()
+	if _, ok := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 10), true)); !ok {
+		t.Fatal("an unregistered full read must still be folded")
+	}
+	ob, _ := c.Get("ir-1")
+	if ob.Requirement.Intent != tool.ReadIntentFull || !ob.Requirement.WholeFile {
+		t.Fatalf("requirement = %+v, want a whole-file full read", ob.Requirement)
+	}
+	if ob.State != StateSatisfied {
+		t.Fatalf("state = %s, want satisfied after a complete full read", ob.State)
+	}
+
+	inspect, ok := c.Observe(envelope("ir-2", "/w/b.go", "rw1:v1", tool.ReadIntentInspect, nil, ranges(0, 200), false))
+	if !ok || inspect.To != StateSatisfied {
+		t.Fatalf("inspect transition = %+v (ok=%v)", inspect, ok)
+	}
+	if got, _ := c.Get("ir-2"); got.Requirement.WholeFile || len(got.Requirement.Ranges) != 0 {
+		t.Fatalf("inspect requirement = %+v, want no coverage debt", got.Requirement)
+	}
+}
+
 func TestSnapshotIsOrderedByKey(t *testing.T) {
 	c := New()
 	for _, key := range []string{"ir-b", "ir-a"} {

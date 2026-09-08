@@ -207,6 +207,62 @@ func TestReadEnvelopeKeepsUnicodeWindowsIntact(t *testing.T) {
 	}
 }
 
+func TestReadIntentDefaultsAndExplicitForms(t *testing.T) {
+	dir, _ := writeEnvelopeFixture(t, "a.go", 10)
+	r := readFile{workDir: dir}
+	cases := []struct {
+		args       string
+		wantIntent tool.ReadIntent
+		wantWindow bool
+	}{
+		{`{"path":"a.go"}`, tool.ReadIntentInspect, false},
+		{`{"path":"a.go","offset":1}`, tool.ReadIntentRange, true},
+		{`{"path":"a.go","limit":5}`, tool.ReadIntentRange, true},
+		{`{"path":"a.go","intent":"full"}`, tool.ReadIntentFull, false},
+		{`{"path":"a.go","intent":"inspect","offset":1,"limit":5}`, tool.ReadIntentInspect, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.args, func(t *testing.T) {
+			env, _, ok := readEnvelope(t, r, tc.args)
+			if !ok {
+				t.Fatalf("ReadEnvelope(%s) reported no envelope", tc.args)
+			}
+			if env.Intent != tc.wantIntent {
+				t.Fatalf("Intent = %q, want %q", env.Intent, tc.wantIntent)
+			}
+			if (env.RequestedRange != nil) != tc.wantWindow {
+				t.Fatalf("RequestedRange = %+v, want present=%v", env.RequestedRange, tc.wantWindow)
+			}
+		})
+	}
+}
+
+func TestReadIntentRejectsConflictingParameters(t *testing.T) {
+	dir, _ := writeEnvelopeFixture(t, "a.go", 3)
+	r := readFile{workDir: dir}
+	cases := []struct {
+		name string
+		args string
+		want string
+	}{
+		{"full with a window", `{"path":"a.go","intent":"full","offset":1}`, "intent=full cannot be combined"},
+		{"full with a limit", `{"path":"a.go","intent":"full","limit":10}`, "intent=full cannot be combined"},
+		{"range without a window", `{"path":"a.go","intent":"range"}`, "intent=range requires"},
+		{"unknown intent", `{"path":"a.go","intent":"peek"}`, "intent must be inspect, range, or full"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := r.Execute(context.Background(), json.RawMessage(tc.args))
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Execute(%s) error = %v, want one containing %q", tc.args, err, tc.want)
+			}
+			if _, ok := r.ReadEnvelope(json.RawMessage(tc.args), "  1→a\n"); ok {
+				t.Fatalf("ReadEnvelope(%s) must not describe a rejected call", tc.args)
+			}
+		})
+	}
+}
+
 func TestReadEnvelopeRejectsCallsWithoutAPath(t *testing.T) {
 	r := readFile{workDir: t.TempDir()}
 	if _, ok := r.ReadEnvelope(json.RawMessage(`{"offset":1}`), "   1→a\n"); ok {

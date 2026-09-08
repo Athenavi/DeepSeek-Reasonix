@@ -50,10 +50,81 @@ const (
 	readFileDefaultLimit = 2000 // lines returned when limit is unset
 )
 
+// readFileParams is one validated read_file call with defaults applied.
+type readFileParams struct {
+	Path   string
+	Offset int
+	Limit  int
+}
+
+// readWindowGiven reports whether the call named an explicit line window.
+func readWindowGiven(args json.RawMessage) bool {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(args, &fields); err != nil {
+		return false
+	}
+	_, offset := fields["offset"]
+	_, limit := fields["limit"]
+	return offset || limit
+}
+
+// parseReadFileParams validates one read_file call and applies the documented
+// defaults, so Execute and ReadEnvelope agree on what was requested.
+func parseReadFileParams(args json.RawMessage) (readFileParams, error) {
+	var p struct {
+		Path   string `json:"path"`
+		Intent string `json:"intent,omitempty"`
+		Offset int    `json:"offset,omitempty"`
+		Limit  int    `json:"limit,omitempty"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return readFileParams{}, fmt.Errorf("invalid args: %w", err)
+	}
+	if p.Path == "" {
+		return readFileParams{}, fmt.Errorf("path is required")
+	}
+	if _, err := readIntentFor(p.Intent, readWindowGiven(args)); err != nil {
+		return readFileParams{}, err
+	}
+	if p.Offset < 0 {
+		p.Offset = 0
+	}
+	if p.Limit <= 0 {
+		p.Limit = readFileDefaultLimit
+	}
+	return readFileParams{Path: p.Path, Offset: p.Offset, Limit: p.Limit}, nil
+}
+
+// readIntentFor resolves the effective read intent and rejects combinations
+// that would leave the caller unsure which promise the call made.
+func readIntentFor(explicit string, windowGiven bool) (tool.ReadIntent, error) {
+	switch tool.ReadIntent(strings.TrimSpace(explicit)) {
+	case "":
+		if windowGiven {
+			return tool.ReadIntentRange, nil
+		}
+		return tool.ReadIntentInspect, nil
+	case tool.ReadIntentInspect:
+		return tool.ReadIntentInspect, nil
+	case tool.ReadIntentRange:
+		if !windowGiven {
+			return "", fmt.Errorf("intent=range requires an explicit offset or limit; pass the window to read, or use intent=inspect for a bounded preview")
+		}
+		return tool.ReadIntentRange, nil
+	case tool.ReadIntentFull:
+		if windowGiven {
+			return "", fmt.Errorf("intent=full cannot be combined with offset or limit; omit them to scan the whole file, or use intent=range for one window")
+		}
+		return tool.ReadIntentFull, nil
+	default:
+		return "", fmt.Errorf("intent must be inspect, range, or full (got %q)", explicit)
+	}
+}
+
 func (readFile) Name() string { return "read_file" }
 
 func (readFile) Description() string {
-	return "Read a text file with optional line offset/limit. Output prefixes each line with its 1-based number (e.g. `   42→...`) so subsequent edit_file calls can target exact lines. Use `offset` and `limit` to page through large files; the tool reports total length and pagination hints in a trailer. Independent reads with no data dependency should be issued in the same round."
+	return "Read a text file with optional line offset/limit. Output prefixes each line with its 1-based number (e.g. `   42→...`) so subsequent edit_file calls can target exact lines. Use `offset` and `limit` to page through large files; the tool reports total length and pagination hints in a trailer. Set `intent` to state why you are reading: inspect (default, a bounded preview), range (an explicit window), or full (scan the whole file). Independent reads with no data dependency should be issued in the same round."
 }
 
 func (readFile) Schema() json.RawMessage {
@@ -61,6 +132,7 @@ func (readFile) Schema() json.RawMessage {
 "type":"object",
 "properties":{
   "path":{"type":"string","description":"File path"},
+  "intent":{"type":"string","enum":["inspect","range","full"],"description":"Why you are reading. inspect (default): a bounded preview; one page is a complete answer. range (default when offset or limit is given): an explicit window. full: scan the whole file, paging until every line has been delivered."},
   "offset":{"type":"integer","description":"0-based line offset to start reading from (default 0)","minimum":0},
   "limit":{"type":"integer","description":"Maximum lines to return (default 2000)","minimum":1}
 },
@@ -107,18 +179,18 @@ func (r readFile) ObserveModelText(args json.RawMessage, output string) (tool.Mo
 func (r readFile) ReadEnvelope(args json.RawMessage, output string) (tool.ReadResultEnvelope, bool) {
 	var p struct {
 		Path   string `json:"path"`
+		Intent string `json:"intent,omitempty"`
 		Offset int    `json:"offset"`
 		Limit  int    `json:"limit"`
 	}
 	if err := json.Unmarshal(args, &p); err != nil || strings.TrimSpace(p.Path) == "" {
 		return tool.ReadResultEnvelope{}, false
 	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(args, &fields); err != nil {
+	windowGiven := readWindowGiven(args)
+	intent, err := readIntentFor(p.Intent, windowGiven)
+	if err != nil {
 		return tool.ReadResultEnvelope{}, false
 	}
-	_, offsetExplicit := fields["offset"]
-	_, limitExplicit := fields["limit"]
 	if p.Offset < 0 {
 		p.Offset = 0
 	}
@@ -130,11 +202,10 @@ func (r readFile) ReadEnvelope(args json.RawMessage, output string) (tool.ReadRe
 	env := tool.ReadResultEnvelope{
 		ProtocolVersion: tool.ReadResultProtocolVersion,
 		Source:          tool.ReadResultSource{CanonicalPath: rp.Path},
-		Intent:          tool.ReadIntentInspect,
+		Intent:          intent,
 	}
-	if offsetExplicit || limitExplicit {
+	if windowGiven {
 		requested := tool.ReadRange{Start: p.Offset, End: p.Offset + p.Limit}
-		env.Intent = tool.ReadIntentRange
 		env.RequestedRange = &requested
 	}
 	if window, ok := tool.ParseReadWindow(output); ok {
@@ -168,16 +239,9 @@ func (readFile) SnipHint() tool.SnipHint {
 }
 
 func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, error) {
-	var p struct {
-		Path   string `json:"path"`
-		Offset int    `json:"offset,omitempty"`
-		Limit  int    `json:"limit,omitempty"`
-	}
-	if err := json.Unmarshal(args, &p); err != nil {
-		return "", fmt.Errorf("invalid args: %w", err)
-	}
-	if p.Path == "" {
-		return "", fmt.Errorf("path is required")
+	p, err := parseReadFileParams(args)
+	if err != nil {
+		return "", err
 	}
 	rp := resolveReadablePath(r.workDir, p.Path, r.paths)
 	p.Path = rp.Path
@@ -188,12 +252,6 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 			return "", fmt.Errorf("read %s: %s", displayPath, rp.ErrorText(err))
 		}
 		return "", err
-	}
-	if p.Offset < 0 {
-		p.Offset = 0
-	}
-	if p.Limit <= 0 {
-		p.Limit = readFileDefaultLimit
 	}
 
 	// The host overlay (unsaved editor buffers) wins over the disk when it can
