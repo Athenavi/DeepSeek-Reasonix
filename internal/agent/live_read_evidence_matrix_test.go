@@ -50,8 +50,8 @@ func TestLiveReadEvidenceMatrix(t *testing.T) {
 		for _, effort := range []string{"disabled", "high"} {
 			for _, name := range names {
 				t.Run(model+"/"+effort+"/"+name, func(t *testing.T) {
-					if ctx.Err() != nil || totalTokens >= 3_000_000 || totalRequests >= 600 {
-						t.Fatal("live suite resource ceiling reached")
+					if ctx.Err() != nil || !budget.admit() || totalTokens >= 3_000_000 || totalRequests >= 600 {
+						t.Skip("live suite resource ceiling reached; scenario NOT verified")
 					}
 					p := officialMatrixProvider(t, key, model, "chat", effort, server.URL)
 					result := runReadEvidenceLiveCase(t, ctx, p, name, "deepseek/"+model)
@@ -70,6 +70,9 @@ func TestLiveReadEvidenceMatrix(t *testing.T) {
 		}
 	}
 	t.Logf("LIVE_TOTAL requests=%d tokens=%d", totalRequests, totalTokens)
+	budget.mu.Lock()
+	t.Logf("LIVE_HTTP_BUDGET requests=%d charged_tokens=%d (includes unresolved reservations)", budget.requests, budget.tokens)
+	budget.mu.Unlock()
 }
 
 type readEvidenceLiveResult struct {
@@ -116,7 +119,6 @@ func (g *readEvidenceLiveGate) Check(_ context.Context, _ string, args json.RawM
 type readEvidenceLiveSink struct {
 	incompleteReadEventSink
 	onStatus func(*event.ReadStatusPayload)
-	budget   *liveReadBudget
 }
 
 func (s *readEvidenceLiveSink) Emit(e event.Event) {
@@ -232,7 +234,7 @@ func runReadEvidenceLiveCase(t *testing.T, parent context.Context, p provider.Pr
 		}
 	}
 	budget, _ := parent.Value(liveReadBudgetKey{}).(*liveReadBudget)
-	sink := &readEvidenceLiveSink{budget: budget}
+	sink := &readEvidenceLiveSink{}
 	changed := false
 	if name == "stale_version" {
 		sink.onStatus = func(status *event.ReadStatusPayload) {

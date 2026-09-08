@@ -74,5 +74,13 @@ request's input usage.
 The paid matrix retains the original 64 cases and adds 32 targeted cases plus
 12 exact-write cases. Its HTTP relay caps all upstream attempts at 600, reserves
 128,000 tokens before each request, retains reservations when usage is unknown,
-and stops at 3 million tokens or four hours. It stores no credentials or request
+and stops at 3 million tokens or four hours. The relay enforces a 2,048-token
+output cap, including adapters that otherwise omit it, and credits known usage
+even when a downstream client closes before the final SSE sentinel. It stores no credentials or request
 bodies. Model task failures and host invariant failures remain separate results.
+
+Native verification found that informational pause receipts were folded into
+completed process material. Read pauses now remain outside the process fold,
+after the preserved candidate response, without an implicit continuation action.
+Pause outcomes also remain distinct from provider errors in desktop metrics and
+telemetry. The same rendering regression covers the live/history notice shape.

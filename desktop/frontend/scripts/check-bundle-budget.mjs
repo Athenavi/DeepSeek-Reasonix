@@ -298,7 +298,10 @@ for (const path of localeChunks) {
   // Measured result: 63386 / 64151 B; retain bounded cross-platform headroom.
   // Read pause reasons and recovery guidance measure 63682 / 64421 B.
   // Keep less than 0.2 KiB headroom per locale for Node/zlib variation.
-  const budget = name.startsWith("zh-TW-") ? 63.0 * 1024 : 62.3 * 1024;
+  // The integrated composer and persistent read-pause copy measure 63785 /
+  // 64530 B with Node 26: zh-TW exceeds the old ceiling by 18 B. Advance only
+  // that locale by 0.1 KiB; leave other locale budgets unchanged.
+  const budget = name.startsWith("zh-TW-") ? 63.1 * 1024 : 62.3 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -413,6 +416,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2399.2 KiB; retain the same bounded 0.2 KiB build headroom.
 // Search-assignment bridge and metadata add 1.0 KiB over the measured
 // main-v2 baseline (2399.3 KiB); result 2400.3 KiB plus 0.2 KiB headroom.
-const rawInitialBudgetKiB = 2_400.5;
+// Read-pause receipts and the merged composer measure 2401.8 KiB raw.
+// Keep 0.2 KiB headroom; gzip and per-chunk limits remain independently checked.
+const rawInitialBudgetKiB = 2_402.0;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
