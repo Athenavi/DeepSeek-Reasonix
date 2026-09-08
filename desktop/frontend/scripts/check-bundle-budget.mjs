@@ -230,12 +230,9 @@ if (initialCSS.length > 0) {
 // shared title-safe shell, and the shared harness decision surface measure
 // 116.9 KiB gzip while reusing existing layout primitives. Retain a bounded
 // 0.1 KiB headroom ratchet.
-// Mainline provider/settings and recovery styles measure 119.435 KiB gzip.
-// Workbench's column-responsive welcome adds 291 bytes over the 119.479 KiB
-// toolbar-refresh base; round the measured 119.763 KiB to the next tenth.
-// Shared recovery banner and disabled-send states measure 119.989 KiB;
-// +231 gzip bytes over the prior welcome head, retaining the next tenth.
-assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 120.0 * 1024);
+// Workbench welcome and recovery styles measure 122869 B gzip on main-v2.
+// Turn result styles add 388 B after removing obsolete metrics (123257 B).
+assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 120.4 * 1024);
 if (localeChunks.length !== 2) {
   throw new Error(`expected 2 on-demand Chinese locale chunks, found ${localeChunks.length}`);
 }
@@ -300,9 +297,11 @@ for (const path of localeChunks) {
   // ceiling for cross-platform CI.
   // Search assignment copy adds 239 / 231 B over main-v2 (63147 / 63920 B).
   // Measured result: 63386 / 64151 B; retain bounded cross-platform headroom.
-  // Read-pause and mainline session-recovery copy together measure
-  // 63957 / 64685 B with Node 26. Keep the next one-decimal ceiling.
-  const budget = name.startsWith("zh-TW-") ? 63.2 * 1024 : 62.5 * 1024;
+  // Turn result copy adds 554 / 566 B to the latest-base chunks, measuring
+  // 64219 / 64964 B with recovery guidance included. Round to the next tenth.
+  // Read-pause copy merges on top of that base: the combined chunks measure
+  // 64512 / 65253 B, so both dialect ceilings ratchet to the next tenth.
+  const budget = name.startsWith("zh-TW-") ? 63.8 * 1024 : 63.0 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -421,8 +420,11 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // against the 2398.0 KiB base; retain only the next one-decimal ceiling.
 // Shared availability, visible recovery and retry controls measure 2407.215 KiB
 // (+6.107 KiB, 0.25% over the prior welcome head). Retain the next tenth.
-// The integrated read-pause/history path measures 2469104 B (2411.234 KiB).
-// Retain approximately 0.2 KiB headroom; gzip/chunk limits remain independent.
-const rawInitialBudgetKiB = 2_411.5;
+// Turn results add 12585 B (0.51%) over main-v2's 2464923 B: bounded receipt
+// projection, status presentation and view bindings. Result: 2477508 B.
+// The read-status line, read-pause card and their host wiring add 4156 B
+// (0.17%) on top of that base; merged result: 2481664 B. Retain the next
+// one-decimal ceiling with the same bounded 0.2 KiB build headroom.
+const rawInitialBudgetKiB = 2_423.7;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

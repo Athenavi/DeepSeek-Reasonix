@@ -18,7 +18,9 @@ import { answerPromptForActiveTurn, normalizeTurnSubmit, resolveActiveTurnId, re
 import { findTabAfterSubmitFailure, reduceManagementConfirmation, reduceSubmitFailure } from "./turnSubmissionFailure";
 import { formatContextMaintenanceNotice, isNewMaintenanceOperation, rememberMaintenanceOperation } from "./contextMaintenanceTypes";
 import { formatGuardianAssessmentNotice } from "./guardianEvents";
-import { completionSummaryPresentation, normalizeCompletionSummary, sessionQualityFloor } from "./completionSummary";
+import { normalizeCompletionSummary } from "./completionSummary";
+import { historicalResultNotice, withRunningChecks, withTurnResult } from "./completionResultState";
+import { mergeTurnResult } from "./turnResult";
 import { invalidateSharedQuery } from "./queryCoalesce";
 import { replayPendingPromptsForActiveTab } from "./promptReplay";
 import { createRafBatch } from "./rafBatch";
@@ -36,6 +38,8 @@ import {
   errorMessage,
   readinessMissingIds,
 } from "./controllerNotices";
+import { applyReadStatusEvent, type ReadStatusHost } from "./readStatus";
+import { upsertReadPause } from "./readPause";
 import { applyHydrateErrorState, hydratePlaceholderItems as resolveHydratePlaceholders } from "./hydrateErrorState";
 import { isHostRecoveryGuidance } from "./hostRecoverySteer";
 import { activeTabHydrationPlan, canAdoptUnboundLiveSurface, duplicateLiveItemIds, hasCachedLiveTurn, hasReusableCachedTranscript, hydratedHistoryApplyMode, sameSessionHydrateIdentity, sameSessionPlaceholderItems, shouldPreferResidentHistory, type HydrateSurfacePolicy } from "./hydrateHistoryApply";
@@ -53,8 +57,6 @@ import { useNavigationIntentFence } from "./useNavigationIntentFence";
 import type { SearchSource } from "./searchSources";
 import { attachWebSearchOutput, historySearchAndAnswer } from "./searchTranscript";
 import { fileDiffFromWire, parseTodos, summarize, summarizeFileDiff, type ToolFileDiff } from "./tools";
-import { applyReadStatusEvent, type ReadStatusHost } from "./readStatus";
-import { upsertReadPause } from "./readPause";
 import { modeHasAutoApproveTools, normalizeMode, normalizeToolApprovalMode, type QualityFloor } from "./types";
 import type {
   BalanceInfo,
@@ -302,6 +304,7 @@ export type Item =
       profile?: { model?: string; effort?: string }; // subagent model/effort from tool event
       argChars?: number; // args still streaming from the model: cumulative chars received
       subagentProgress?: SubagentProgress; // in-memory-only preview, never hydrated from history
+      verifying?: boolean; // Host-confirmed check execution; never inferred from prose.
     }
   | {
       kind: "extension";
@@ -887,6 +890,11 @@ export function historyMessagesToItems(messages: HistoryMessage[], idPrefix: str
     if (m.role === "notice") {
       if (m.code === "incomplete_read") {
         items = upsertReadPause(items, m.readPause, `${idPrefix}${seq++}`);
+        continue;
+      }
+      if (m.completionReceipt || m.completionSummary) {
+        const result = historicalResultNotice(m, `${idPrefix}${seq}`);
+        if (result) { items.push(result); seq++; }
         continue;
       }
       if (m.code === "protocol_recovery" && m.pending && m.protocolRecovery?.id) {
@@ -1541,9 +1549,12 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       };
     }
     case "turn_phase": {
+      if (e.turnId && s.activeTurnId && e.turnId !== s.activeTurnId) return s;
       const phase = (e.phase ?? e.text ?? "").trim();
       if (!phase) return s;
-      return { ...s, turnPhase: phase, running: true, turnActive: true, cancellable: true };
+      const next = { ...s, turnPhase: phase, running: true, turnActive: true, cancellable: true };
+      if (phase === "verifying" || phase === "checking") return withTurnResult(next, { ...mergeTurnResult(s.completionSummary, undefined, e.turnId), checking: true });
+      return withRunningChecks(next);
     }
     case "turn_status": {
       if (e.turnId && s.activeTurnId && e.turnId !== s.activeTurnId) return s;
@@ -1585,16 +1596,8 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
     }
     case "completion_summary": {
       if (!e.completion) return s;
-      const completionSummary = normalizeCompletionSummary(e.completion);
-      const presentation = completionSummaryPresentation(completionSummary, sessionQualityFloor(s.meta), t);
-      if (!presentation) return { ...s, completionSummary };
-      return {
-        ...s, completionSummary, seq: s.seq + 1,
-        items: [...s.items, {
-          kind: "notice", id: `q${s.seq}`, level: presentation.level, variant: "completion",
-          title: presentation.title, text: presentation.body, action: "open_changes", completionSummary,
-        }],
-      };
+      if (e.turnId && s.activeTurnId && e.turnId !== s.activeTurnId) return s;
+      return withTurnResult(s, normalizeCompletionSummary({ ...s.completionSummary, ...e.completion, turnId: e.turnId ?? s.activeTurnId }));
     }
     case "text":
     case "reasoning": {
@@ -1771,7 +1774,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       // A nested result refreshes its sub-agent parent's recent activity.
       if (t.parentId) touchSubagentParent(next, t.parentId);
       const items = preserveToolPayloads ? next : compactArchivedToolItems(next);
-      return attachWebSearchOutput({ ...s, items }, t.name, t.output, t.err, idx >= 0 && next[idx]?.kind === "tool" ? next[idx].id : t.id);
+      return withRunningChecks(attachWebSearchOutput({ ...s, items }, t.name, t.output, t.err, idx >= 0 && next[idx]?.kind === "tool" ? next[idx].id : t.id));
     }
     case "tool_progress": {
       const t = e.tool;
@@ -1785,10 +1788,10 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       if (idx < 0) return s;
       const next = [...s.items];
       const it = next[idx];
-      if (it.kind === "tool") next[idx] = { ...it, output: (it.output ?? "") + (t.output ?? "") };
+      if (it.kind === "tool") next[idx] = { ...it, output: (it.output ?? "") + (t.output ?? ""), verifying: it.verifying || (t.verifying && it.status === "running") };
       // Streaming output of a sub-agent's real tool refreshes its card.
       if (t.parentId) touchSubagentParent(next, t.parentId);
-      return { ...s, items: next };
+      return withRunningChecks({ ...s, items: next });
     }
     case "usage": {
       if (!countsTowardCurrentTurn(s)) return s;
@@ -1958,7 +1961,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
         items = finalized.filter((item) => item.kind !== "notice" || item.variant !== "delivery" || !todoOnlyMissing(item.missing));
       }
       if (e.outcome === "incomplete_read") {
-        items = upsertReadPause(finalized, e.readPause, `read-pause-${e.turnId ?? s.seq}`);
+        items = upsertReadPause(items, e.readPause, `read-pause-${e.turnId ?? s.seq}`);
       } else if (e.outcome === "final_readiness") {
         const previous = items.map((item) => item.kind === "notice" && item.variant === "delivery"
           ? { ...item, action: undefined }
@@ -2038,6 +2041,10 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       };
       // Close user-wait unless the plan approval gate remains open.
       next = keepPlanApproval ? beginPromptWait(next, now) : endPromptWait(next, now);
+      if (e.receipt || s.completionSummary) {
+        const summary = mergeTurnResult(s.completionSummary, e.receipt, e.turnId, e.checkpointTurn);
+        return withTurnResult(next, { ...summary, checking: false });
+      }
       return next;
     }
     default: return s;
@@ -2051,6 +2058,7 @@ export function reducer(s: State, a: Action): State {
       const userItemId = `u${seq}`;
       return {
         ...s,
+        completionSummary: undefined,
         seq: seq + 1,
         items: [...s.items.map(item => item.kind==="notice" && item.action==="recover_context" ? {...item,action:undefined} : item), { kind: "user", id: userItemId, submissionId: a.submissionId, text: a.text, submitText: a.submitText, createdAt: Date.now() }],
         running: true,

@@ -106,6 +106,7 @@ export interface WireShellExecution {
 }
 
 export interface WireTool {
+	verifying?: boolean;
   id?: string;
   name: string;
   args?: string;
@@ -386,6 +387,7 @@ export interface MemoryCitation {
 }
 
 export interface WireEvent extends RecoveryEventFields {
+	receipt?: WireCompletionReceipt;
 	readPause?: import("./readPause").WireReadPause;
   kind: EventKind;
   readStatus?: WireReadStatus;
@@ -445,9 +447,16 @@ export interface WireEvent extends RecoveryEventFields {
 }
 
 export interface WireCompletionSummary {
+	/** Local projection fields, preserved with the historical result card. */
+	receipt?: WireCompletionReceipt;
+	turnId?: string;
+	checkpointTurn?: number;
+	checking?: boolean;
+	liveChecks?: { toolCallId: string; command: string; output?: string }[];
   preset: string;
   verdict: string;
-  mutations: number;
+	mutations: number;
+	changed_files?: number;
   checks_passed: number;
   checks_failed: number;
   checks_suppressed: number;
@@ -459,6 +468,9 @@ export interface WireCompletionSummary {
   /** Backend decision; authoritative when floor is present. */
   attention?: boolean;
 }
+
+export type { TurnFileChange, TurnChanges, WireCompletionReceipt } from "./turnResultTypes";
+import type { WireCompletionReceipt } from "./turnResultTypes";
 
 export type WorkspaceWatchState = "active" | "degraded" | "unavailable";
 export type WorkspaceChangeOp = "create" | "write" | "remove" | "rename" | "unknown";
@@ -802,6 +814,9 @@ export interface ChangedFileInfo {
 
 // Bound-method payloads (desktop/app.go).
 export interface HistoryMessage {
+	completionReceipt?: WireCompletionReceipt;
+	completionSummary?: WireCompletionSummary;
+	turnId?: string;
 	readPause?: import("./readPause").WireReadPause;
   role: string;
   content: string;
