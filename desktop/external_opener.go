@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"reasonix/internal/config"
 )
 
@@ -312,7 +310,7 @@ func (a *App) SaveLocalPathAs(path string) (string, error) {
 	if a.ctx == nil {
 		return "", nil
 	}
-	target, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+	target, err := a.nativeHost().SaveFileDialog(a.ctx, nativeDialogOptions{
 		Title:                "Save file as",
 		DefaultDirectory:     filepath.Dir(path),
 		DefaultFilename:      filepath.Base(path),

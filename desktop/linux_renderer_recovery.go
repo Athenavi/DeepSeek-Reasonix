@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"reasonix/internal/config"
 	"reasonix/internal/fileutil"
 )
@@ -224,7 +222,7 @@ func (c *linuxWebKitRecoveryCoordinator) requestCompatibilityRestart(source stri
 		})
 		if err == nil {
 			c.app.forceQuit.Store(true)
-			wailsruntime.Quit(c.app.ctx)
+			c.app.nativeHost().Quit(c.app.ctx)
 			return
 		}
 		slog.Error("desktop: renderer compatibility relaunch failed", "err", err)
@@ -248,8 +246,8 @@ func (c *linuxWebKitRecoveryCoordinator) showCompatibilityFailure() {
 		c.app.desktopShell.coordinator.markFailed()
 	}
 	recordLinuxRendererRecoveryOutcome("failed")
-	result, err := wailsruntime.MessageDialog(c.app.ctx, wailsruntime.MessageDialogOptions{
-		Type:  wailsruntime.WarningDialog,
+	result, err := c.app.nativeHost().MessageDialog(c.app.ctx, nativeMessageOptions{
+		Type:  nativeDialogWarning,
 		Title: "Reasonix renderer unavailable / Reasonix 渲染器不可用",
 		Message: "Reasonix could not confirm that the desktop interface is responsive, including in software-rendering compatibility mode. You can keep waiting or exit safely.\n\n" +
 			"Reasonix 无法确认桌面界面已恢复响应，软件渲染兼容模式也未通过检查。你可以继续等待，或安全退出。",
@@ -259,7 +257,7 @@ func (c *linuxWebKitRecoveryCoordinator) showCompatibilityFailure() {
 	})
 	if err == nil && result == "Exit / 退出" {
 		c.app.forceQuit.Store(true)
-		wailsruntime.Quit(c.app.ctx)
+		c.app.nativeHost().Quit(c.app.ctx)
 	}
 }
 

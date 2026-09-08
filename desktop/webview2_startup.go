@@ -4,8 +4,6 @@ import (
 	"context"
 	goruntime "runtime"
 	"time"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const windowsWebView2StartupFallbackDelay = 15 * time.Second
@@ -37,8 +35,8 @@ func (a *App) startWindowsWebView2StartupFallback(ctx context.Context) {
 		if a.startupReady.Load() {
 			return
 		}
-		_, _ = runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
-			Type:          runtime.WarningDialog,
+		_, _ = a.nativeHost().MessageDialog(ctx, nativeMessageOptions{
+			Type:          nativeDialogWarning,
 			Title:         "Reasonix startup delayed / Reasonix 启动延迟",
 			Message:       windowsWebView2StartupFallbackMessage,
 			Buttons:       []string{"OK"},

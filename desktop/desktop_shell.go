@@ -6,8 +6,6 @@ import (
 	goruntime "runtime"
 	"sync"
 	"time"
-
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const (
@@ -31,7 +29,7 @@ const (
 )
 
 // desktopShellCoordinator is the single owner of main-window lifecycle state.
-// Native window commands remain on the Wails runtime boundary, while every
+// Native window commands stay behind the nativeHost boundary, while every
 // startup, tray, second-instance, menu and watchdog presentation goes through
 // Present so platform ordering cannot drift again.
 type desktopShellCoordinator struct {
@@ -186,7 +184,7 @@ func (c *desktopShellCoordinator) Present(source string) {
 	}
 	c.mu.Lock()
 	wasMaximised := c.app.backgroundMaximised.Swap(false)
-	applyDesktopPresentPlan(c.app.ctx, desktopPresentPlanFor(goruntime.GOOS, wasMaximised))
+	applyDesktopPresentPlan(c.app.ctx, c.app.nativeHost(), desktopPresentPlanFor(goruntime.GOOS, wasMaximised))
 	c.backgroundHidden = false
 	c.presented = true
 	c.phase = desktopShellVisible
@@ -209,7 +207,7 @@ func (c *desktopShellCoordinator) hideToBackground(ctx context.Context, canHide 
 	c.backgroundHidden = true
 	c.presented = false
 	c.phase = desktopShellBackgroundHidden
-	hideForBackground(ctx)
+	hideForBackground(ctx, c.app.nativeHost())
 	return true
 }
 
@@ -256,17 +254,17 @@ func desktopPresentPlanFor(goos string, wasMaximised bool) []desktopPresentActio
 	return append(actions, desktopPresentWindowShow, desktopPresentUnminimise)
 }
 
-func applyDesktopPresentPlan(ctx context.Context, actions []desktopPresentAction) {
+func applyDesktopPresentPlan(ctx context.Context, host nativeHost, actions []desktopPresentAction) {
 	for _, action := range actions {
 		switch action {
 		case desktopPresentApplicationShow:
-			wailsruntime.Show(ctx)
+			host.ShowApplication(ctx)
 		case desktopPresentMaximise:
-			wailsruntime.WindowMaximise(ctx)
+			host.MaximiseWindow(ctx)
 		case desktopPresentWindowShow:
-			wailsruntime.WindowShow(ctx)
+			host.ShowWindow(ctx)
 		case desktopPresentUnminimise:
-			wailsruntime.WindowUnminimise(ctx)
+			host.UnminimiseWindow(ctx)
 		}
 	}
 }

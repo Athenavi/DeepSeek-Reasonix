@@ -4,4 +4,4 @@ package main
 
 import "context"
 
-func showWindowsWebView2RecoveryGuidance(context.Context) {}
+func showWindowsWebView2RecoveryGuidance(context.Context, nativeHost) {}

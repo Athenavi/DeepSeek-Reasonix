@@ -14,8 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"reasonix/internal/config"
 )
 
@@ -314,7 +312,7 @@ func (c *webView2RecoveryCoordinator) requestRestart(reason string) {
 			return
 		}
 		if c.app != nil && c.app.ctx != nil {
-			runtime.Quit(c.app.ctx)
+			c.app.nativeHost().Quit(c.app.ctx)
 		}
 	})
 }
@@ -338,7 +336,7 @@ func (c *webView2RecoveryCoordinator) startGuidance(ctx context.Context) {
 		if c.app != nil {
 			c.app.showMainWindowFrom("webview2_recovery_guidance")
 		}
-		showWindowsWebView2RecoveryGuidance(ctx)
+		showWindowsWebView2RecoveryGuidance(ctx, c.app.nativeHost())
 		_ = c.journal.append("guidance_shown", "crash_loop_guard")
 	}()
 }

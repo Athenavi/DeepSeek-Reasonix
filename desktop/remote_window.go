@@ -23,7 +23,6 @@ import (
 	"unicode"
 
 	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"reasonix/internal/config"
 	"reasonix/internal/proc"
@@ -472,7 +471,7 @@ func (a *App) watchRemoteWindowOwner(ctx context.Context) {
 	}
 	a.goSafe("remoteWindowOwner", func() {
 		if waitForRemoteWindowOwnerExit(ctx, pid) {
-			runtime.Quit(ctx)
+			a.nativeHost().Quit(ctx)
 		}
 	})
 }
@@ -580,12 +579,12 @@ func (a *App) domReadyRemoteWindow() {
 	}
 	if err != nil {
 		slog.Warn("remote window: reject launch ticket", "err", err)
-		runtime.Quit(a.ctx)
+		a.nativeHost().Quit(a.ctx)
 		return
 	}
 	if launch.HostKey != a.remoteWindowHostKey {
 		slog.Warn("remote window: ticket host does not match window identity")
-		runtime.Quit(a.ctx)
+		a.nativeHost().Quit(a.ctx)
 		return
 	}
 	a.remoteWindowMu.Lock()
@@ -593,8 +592,8 @@ func (a *App) domReadyRemoteWindow() {
 		a.applyRemoteWindowLaunchLocked(launch, true)
 	}
 	a.remoteWindowMu.Unlock()
-	runtime.WindowCenter(a.ctx)
-	runtime.WindowShow(a.ctx)
+	a.nativeHost().CenterWindow(a.ctx)
+	a.nativeHost().ShowWindow(a.ctx)
 }
 
 // secondInstanceRemoteWindow is the existing window's side of the per-host
@@ -613,8 +612,8 @@ func (a *App) secondInstanceRemoteWindow(data options.SecondInstanceData) {
 	if ticket == "" {
 		// A second launch without a ticket (e.g. a launcher invocation): just
 		// bring the existing remote window forward.
-		runtime.WindowCenter(a.ctx)
-		runtime.WindowShow(a.ctx)
+		a.nativeHost().CenterWindow(a.ctx)
+		a.nativeHost().ShowWindow(a.ctx)
 		return
 	}
 	launch, err := consumeRemoteWindowLaunch(ticket)
@@ -637,16 +636,17 @@ func (a *App) secondInstanceRemoteWindow(data options.SecondInstanceData) {
 // a handoff arriving before domReady cannot be overridden by the initial
 // ticket, and vice versa.
 func (a *App) applyRemoteWindowLaunchLocked(launch *remoteWindowLaunch, initial bool) {
+	host := a.nativeHost()
 	if launch.Title != "" {
-		runtime.WindowSetTitle(a.ctx, launch.Title)
+		host.SetWindowTitle(a.ctx, launch.Title)
 	}
-	if js, err := remoteWindowNavigationJS(launch.URL); err == nil {
-		runtime.WindowExecJS(a.ctx, js)
+	if isSafeRemoteWindowURL(launch.URL) {
+		host.NavigateRemoteWindow(a.ctx, launch.URL)
 	}
-	if !initial && runtime.WindowIsMinimised(a.ctx) {
-		runtime.WindowUnminimise(a.ctx)
+	if !initial && host.WindowIsMinimised(a.ctx) {
+		host.UnminimiseWindow(a.ctx)
 	}
-	runtime.WindowCenter(a.ctx)
-	runtime.WindowShow(a.ctx)
+	host.CenterWindow(a.ctx)
+	host.ShowWindow(a.ctx)
 	a.remoteWindow = launch
 }

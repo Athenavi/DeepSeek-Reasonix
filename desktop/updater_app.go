@@ -10,8 +10,6 @@ import (
 	"runtime"
 	"strings"
 
-	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"reasonix/desktop/internal/update"
 	"reasonix/internal/installlayout"
 	"reasonix/internal/repair"
@@ -142,7 +140,7 @@ func (a *App) openDownloadPage(selectedChannel string) {
 		}
 	}
 	if a.ctx != nil {
-		wruntime.BrowserOpenURL(a.ctx, page)
+		a.nativeHost().OpenExternal(a.ctx, page)
 	}
 }
 
@@ -529,10 +527,7 @@ func (a *App) reqCtx() context.Context {
 }
 
 func (a *App) emitProgress(requestID, selectedChannel, expectedVersion, phase string, received, total int64, errMsg string) {
-	if a.ctx == nil {
-		return
-	}
-	wruntime.EventsEmit(a.ctx, "updater:progress", updateProgress{
+	a.emitRuntimeEvent("updater:progress", updateProgress{
 		RequestID: requestID,
 		Version:   expectedVersion,
 		Channel:   normalizeUpdateChannel(selectedChannel),

@@ -27,8 +27,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"reasonix/desktop/internal/instanceidentity"
 	"reasonix/internal/agent"
 	"reasonix/internal/billing"
@@ -107,6 +105,7 @@ type PromptHistoryResult struct {
 // forwards events tagged with tabId to the webview via runtime.EventsEmit.
 type App struct {
 	ctx          context.Context
+	host         nativeHost
 	workspaceHub *workspaceChangeHub
 	topicState   *topicStateManager
 	// topicTitleMutationMu keeps the authoritative title commit and its Tab /
@@ -450,6 +449,7 @@ func (a *App) jsProfilingMiddleware() func(http.Handler) http.Handler {
 // last session's desktop-tabs.json.
 func NewApp() *App {
 	a := &App{
+		host:                 wailsNativeHost{},
 		tabs:                 map[string]*WorkspaceTab{},
 		runtimeByID:          map[string]*desktopSessionRuntime{},
 		runtimeBySessionKey:  map[string]*desktopSessionRuntime{},
@@ -577,7 +577,7 @@ func (a *App) beforeClose(ctx context.Context) bool {
 				return backgroundCloseUsesApplicationHide(goruntime.GOOS) || a.isTrayReady()
 			})
 		}
-		hideForBackground(ctx)
+		hideForBackground(ctx, a.nativeHost())
 		return true
 	}
 	return false
@@ -677,15 +677,15 @@ func (a *App) quitApp() {
 		return
 	}
 	a.forceQuit.Store(true)
-	runtime.Quit(a.ctx)
+	a.nativeHost().Quit(a.ctx)
 }
 
-func hideForBackground(ctx context.Context) {
+func hideForBackground(ctx context.Context, host nativeHost) {
 	if backgroundCloseUsesApplicationHide(goruntime.GOOS) {
-		runtime.Hide(ctx)
+		host.HideApplication(ctx)
 		return
 	}
-	runtime.WindowHide(ctx)
+	host.HideWindow(ctx)
 }
 
 func backgroundCloseUsesApplicationHide(goos string) bool {
@@ -934,43 +934,7 @@ func (a *App) domReady(_ context.Context) {
 		a.desktopShell.coordinator.markDOMReady()
 	}
 
-	state, ok := loadWindowState()
-	if ok {
-		// Validate saved position against current screens. Wails v2 doesn't
-		// expose per-screen origin (x,y offsets) so we can only do a basic
-		// sanity check. Windows border insets (commonly x=-8,y=-8) are legal;
-		// large off-screen positions (unplugged external display) re-center.
-		maxW, maxH := 0, 0
-		screens, err := runtime.ScreenGetAll(a.ctx)
-		if err == nil {
-			for _, sc := range screens {
-				if sc.Size.Width > maxW {
-					maxW = sc.Size.Width
-				}
-				if sc.Size.Height > maxH {
-					maxH = sc.Size.Height
-				}
-			}
-		}
-		if windowPositionRestorable(state, maxW, maxH) {
-			runtime.WindowSetPosition(a.ctx, state.X, state.Y)
-		} else {
-			runtime.WindowCenter(a.ctx)
-		}
-	} else {
-		runtime.WindowCenter(a.ctx)
-	}
-
-	if ok && state.Maximised {
-		if goruntime.GOOS == "windows" {
-			// Preserve the established Windows maximise -> show ordering through
-			// the unified presentation plan without appending SW_RESTORE.
-			a.backgroundMaximised.Store(true)
-		} else {
-			runtime.WindowMaximise(a.ctx)
-		}
-	}
-
+	a.restoreWindowGeometry()
 	a.showMainWindowFrom("startup_dom_ready")
 }
 
@@ -4761,7 +4725,7 @@ func (a *App) PickWorkspace() (string, error) {
 		cur = tab.WorkspaceRoot
 	}
 	a.mu.RUnlock()
-	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+	dir, err := a.nativeHost().OpenDirectoryDialog(a.ctx, nativeDialogOptions{
 		Title:            "Choose working folder",
 		DefaultDirectory: dialogDefaultDirectory(cur),
 	})
@@ -8245,7 +8209,7 @@ func (a *App) PickSkillFolder() (string, error) {
 		return "", nil
 	}
 	cur, _ := os.Getwd()
-	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+	dir, err := a.nativeHost().OpenDirectoryDialog(a.ctx, nativeDialogOptions{
 		Title:            "Choose skills folder",
 		DefaultDirectory: dialogDefaultDirectory(cur),
 	})
@@ -8266,7 +8230,7 @@ func (a *App) PickPluginFolder() (string, error) {
 	if strings.TrimSpace(cur) == "" {
 		cur, _ = os.Getwd()
 	}
-	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+	dir, err := a.nativeHost().OpenDirectoryDialog(a.ctx, nativeDialogOptions{
 		Title:            "Choose plugin folder",
 		DefaultDirectory: dialogDefaultDirectory(cur),
 	})
@@ -10622,7 +10586,7 @@ func (a *App) PickExportFile(defaultFilename, mimeType string) (string, error) {
 	}
 	defaultFilename = safeExportFilename(defaultFilename)
 	ext := strings.ToLower(filepath.Ext(defaultFilename))
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+	path, err := a.nativeHost().SaveFileDialog(a.ctx, nativeDialogOptions{
 		Title:                "Export session",
 		DefaultDirectory:     dialogDefaultDirectory(a.activeWorkspaceRoot()),
 		DefaultFilename:      defaultFilename,
@@ -10890,21 +10854,21 @@ func safeExportFilename(name string) string {
 	return filepath.Base(name)
 }
 
-func exportFileFilters(mimeType, ext string) []runtime.FileFilter {
+func exportFileFilters(mimeType, ext string) []nativeFileFilter {
 	switch mimeType {
 	case "text/markdown":
-		return []runtime.FileFilter{{DisplayName: "Markdown (*.md)", Pattern: "*.md"}}
+		return []nativeFileFilter{{DisplayName: "Markdown (*.md)", Pattern: "*.md"}}
 	case "application/json":
-		return []runtime.FileFilter{{DisplayName: "JSON (*.json)", Pattern: "*.json"}}
+		return []nativeFileFilter{{DisplayName: "JSON (*.json)", Pattern: "*.json"}}
 	case "application/pdf":
-		return []runtime.FileFilter{{DisplayName: "PDF (*.pdf)", Pattern: "*.pdf"}}
+		return []nativeFileFilter{{DisplayName: "PDF (*.pdf)", Pattern: "*.pdf"}}
 	case "image/png":
-		return []runtime.FileFilter{{DisplayName: "PNG image (*.png)", Pattern: "*.png"}}
+		return []nativeFileFilter{{DisplayName: "PNG image (*.png)", Pattern: "*.png"}}
 	}
 	if ext != "" {
-		return []runtime.FileFilter{{DisplayName: strings.ToUpper(strings.TrimPrefix(ext, ".")) + " files (*" + ext + ")", Pattern: "*" + ext}}
+		return []nativeFileFilter{{DisplayName: strings.ToUpper(strings.TrimPrefix(ext, ".")) + " files (*" + ext + ")", Pattern: "*" + ext}}
 	}
-	return []runtime.FileFilter{{DisplayName: "All files (*.*)", Pattern: "*.*"}}
+	return []nativeFileFilter{{DisplayName: "All files (*.*)", Pattern: "*.*"}}
 }
 
 // AttachmentDataURL returns a safe data URL for a stored image attachment.
@@ -11704,9 +11668,9 @@ func (a *App) ConfirmAction(req NativeConfirmRequest) (bool, error) {
 	if a.ctx == nil {
 		return false, nil
 	}
-	dialogType := runtime.QuestionDialog
+	dialogType := nativeDialogQuestion
 	if req.Destructive {
-		dialogType = runtime.WarningDialog
+		dialogType = nativeDialogWarning
 	}
 	confirm := req.ConfirmLabel
 	if confirm == "" {
@@ -11734,7 +11698,7 @@ func (a *App) ConfirmAction(req NativeConfirmRequest) (bool, error) {
 		// does NOT accidentally confirm. ESC always maps to CancelButton.
 		defaultBtn = cancel
 	}
-	result, err := runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+	result, err := a.nativeHost().MessageDialog(a.ctx, nativeMessageOptions{
 		Type:          dialogType,
 		Title:         title,
 		Message:       body,

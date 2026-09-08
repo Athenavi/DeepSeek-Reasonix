@@ -5,7 +5,6 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // createAppMenu builds the native application menu bar. macOS only: it's the
@@ -23,13 +22,11 @@ func (a *App) createAppMenu() *menu.Menu {
 
 	fileMenu := m.AddSubmenu("File")
 	fileMenu.AddText("Settings", keys.CmdOrCtrl(","), func(_ *menu.CallbackData) {
-		if a.ctx != nil {
-			runtime.EventsEmit(a.ctx, "app:open-settings")
-		}
+		a.emitRuntimeEvent("app:open-settings")
 	})
 	fileMenu.AddText("Toggle Developer Tools", keys.CmdOrCtrl("i"), func(_ *menu.CallbackData) {
 		if a.ctx != nil {
-			runtime.WindowExecJS(a.ctx, `window.webkit.messageHandlers.external.postMessage("wails:openInspector");`)
+			a.nativeHost().OpenDevTools(a.ctx)
 		}
 	})
 	fileMenu.AddText("Show Reasonix", nil, func(_ *menu.CallbackData) {

@@ -2,15 +2,11 @@
 
 package main
 
-import (
-	"context"
+import "context"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-)
-
-func showWindowsWebView2RecoveryGuidance(ctx context.Context) {
-	_, _ = runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
-		Type:  runtime.WarningDialog,
+func showWindowsWebView2RecoveryGuidance(ctx context.Context, host nativeHost) {
+	_, _ = host.MessageDialog(ctx, nativeMessageOptions{
+		Type:  nativeDialogWarning,
 		Title: "Reasonix WebView2 recovery / WebView2 恢复",
 		Message: "Reasonix stopped automatic recovery because WebView2 failed again within five minutes. " +
 			"Repair or update Microsoft Edge WebView2 Runtime, update the graphics driver, then restart Reasonix.\n\n" +

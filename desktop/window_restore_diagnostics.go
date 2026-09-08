@@ -95,7 +95,7 @@ func (a *App) showMainWindowFrom(source string) {
 		if a.desktopShell.coordinator != nil {
 			a.desktopShell.coordinator.Present(source)
 		} else {
-			applyDesktopPresentPlan(a.ctx, desktopPresentPlanFor("", a.backgroundMaximised.Swap(false)))
+			applyDesktopPresentPlan(a.ctx, a.nativeHost(), desktopPresentPlanFor("", a.backgroundMaximised.Swap(false)))
 		}
 		a.kickDeferredRebuildRetry()
 		return
@@ -116,7 +116,7 @@ func (a *App) showMainWindowFrom(source string) {
 	if a.desktopShell.coordinator != nil {
 		a.desktopShell.coordinator.Present(source)
 	} else {
-		applyDesktopPresentPlan(a.ctx, desktopPresentPlanFor("", a.backgroundMaximised.Swap(false)))
+		applyDesktopPresentPlan(a.ctx, a.nativeHost(), desktopPresentPlanFor("", a.backgroundMaximised.Swap(false)))
 	}
 	a.goSafe("windowRestoreMonitor", func() {
 		restored := waitForWindowRestoreConfirmation()

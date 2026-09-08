@@ -131,8 +131,6 @@ import "C"
 
 import (
 	"time"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const windowRestoreFailureVisibilityTimeout = 2 * time.Second
@@ -154,7 +152,7 @@ func showWindowRestoreFailure(app *App) {
 	// gtk_window_present is safe to repeat and is the only Linux presentation
 	// action. Show the native warning after it, so failure cannot strand a
 	// background-only process.
-	runtime.WindowUnminimise(app.ctx)
+	app.nativeHost().UnminimiseWindow(app.ctx)
 	dialogDone := make(chan struct{})
 	app.goSafe("windowRestoreFailureVisibility", func() {
 		timer := time.NewTimer(windowRestoreFailureVisibilityTimeout)
@@ -172,8 +170,8 @@ func showWindowRestoreFailure(app *App) {
 		app.forceQuit.Store(true)
 		C.reasonix_quit_unreachable_window()
 	})
-	_, _ = runtime.MessageDialog(app.ctx, runtime.MessageDialogOptions{
-		Type:  runtime.WarningDialog,
+	_, _ = app.nativeHost().MessageDialog(app.ctx, nativeMessageOptions{
+		Type:  nativeDialogWarning,
 		Title: "Reasonix window recovery / Reasonix 窗口恢复",
 		Message: "Reasonix could not confirm that the main window is visible. The window was presented again; if it remains unavailable, exit Reasonix normally and restart it.\n\n" +
 			"Reasonix 无法确认主窗口已可见，已再次尝试呈现窗口；若仍不可用，请正常退出后重新启动。",
