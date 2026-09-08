@@ -16,6 +16,7 @@ import (
 )
 
 type remoteModelSettingsStatus struct {
+	config.ModelSettingsOwnership
 	Version           int      `json:"version"`
 	Revision          string   `json:"revision"`
 	Model             string   `json:"model"`
@@ -25,45 +26,13 @@ type remoteModelSettingsStatus struct {
 }
 
 func credentialProxyScope(host, workspace string) string {
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%d:%s%s", len(host), host, workspace)))
+	sum := sha256.Sum256(fmt.Appendf(nil, "%d:%s%s", len(host), host, workspace))
 	return hex.EncodeToString(sum[:])
 }
 
-// Retirement is driven by Serve's live runtime ownership, never a wall clock.
-// An HTTP request that already acquired a route keeps it until it returns.
-func (a *App) reconcileCredentialProxyGenerations(host, workspace string, status remoteModelSettingsStatus) {
-	if status.Version != 1 || status.UnversionedOwners {
-		return
-	}
-	owned := map[string]bool{}
-	for _, revision := range status.OwnedRevisions {
-		owned[revision] = true
-	}
-	a.credProxyMu.Lock()
-	p := a.credProxy
-	a.credProxyMu.Unlock()
-	if p == nil {
-		return
-	}
-	p.updateMu.Lock()
-	defer p.updateMu.Unlock()
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	scope := credentialProxyScope(host, workspace)
-	for token, route := range p.routes {
-		if route.scope != scope || owned[route.revision] || len(route.holds) > 0 {
-			continue
-		}
-		route.retired = true
-		if route.active == 0 {
-			delete(p.routes, token)
-		}
-	}
-}
-
 // Status refreshes already run when foreground/background work settles. Read
-// ownership under the same manager gate as snapshot installation so an old
-// status response can never retire a newer route that is being published.
+// ownership under the manager gate, then reject receipts overtaken by source
+// refreshes using the Serve-wide ownership sequence.
 func (a *App) refreshRemoteModelOwnership(ctx context.Context, tabID string, client *http.Client, generation uint64) {
 	a.remoteMu.Lock()
 	manager, ok := a.remoteRuntime.(*desktopRemoteManager)
@@ -100,7 +69,9 @@ func (a *App) refreshRemoteModelOwnership(ctx context.Context, tabID string, cli
 	}
 	status, err := remoteModelSettingsRequest(ctx, client, base, path, nil)
 	if err == nil && manager.isCurrent(host, managed) {
-		a.reconcileCredentialProxyGenerations(host, workspace, status)
+		if !a.reconcileCredentialProxyGenerations(host, workspace, status) {
+			return
+		}
 		// Serve may have applied a new snapshot itself for a browser or queued
 		// turn. Reflect that acknowledgement on the same bound Desktop target.
 		if cfg, loadErr := config.LoadModelRuntimeSnapshot("."); loadErr == nil {
@@ -263,11 +234,14 @@ func (a *App) serveModelSettingsSource(w http.ResponseWriter, r *http.Request, r
 		http.Error(w, "invalid model settings offer", http.StatusBadRequest)
 		return
 	}
-	a.finishCredentialProxyOffer(route.host, route.workspace, request.PreviousOfferID)
+	offers := []string{request.PreviousOfferID}
 	if request.Mode == "finish" {
-		a.finishCredentialProxyOffer(route.host, route.workspace, request.OfferID)
+		offers = append(offers, request.OfferID)
 	}
-	a.reconcileCredentialProxyGenerations(route.host, route.workspace, remoteModelSettingsStatus{Version: 1, OwnedRevisions: request.OwnedRevisions, UnversionedOwners: request.UnversionedOwners})
+	if !a.reconcileCredentialProxyGenerations(route.host, route.workspace, remoteModelSettingsStatus{ModelSettingsOwnership: request.ModelSettingsOwnership, Version: 1, OwnedRevisions: request.OwnedRevisions, UnversionedOwners: request.UnversionedOwners}, offers...) {
+		http.Error(w, "stale model settings ownership", http.StatusConflict)
+		return
+	}
 	cfg, err := config.LoadModelRuntimeSnapshot(".")
 	if err != nil {
 		http.Error(w, "cannot read saved model settings", http.StatusServiceUnavailable)
@@ -293,10 +267,19 @@ func (a *App) serveModelSettingsSource(w http.ResponseWriter, r *http.Request, r
 			http.Error(w, "cannot prepare saved model settings", http.StatusConflict)
 			return
 		}
+		if !a.reserveCredentialProxyInstall(route.host, route.workspace, request.OfferID, response.Revision, request.OwnershipIncarnation) {
+			a.finishCredentialProxyOffer(route.host, route.workspace, request.OfferID)
+			http.Error(w, "model settings owner was replaced", http.StatusConflict)
+			return
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(response)
 }
+
+type remoteModelSettingsRejection struct{ message string }
+
+func (e *remoteModelSettingsRejection) Error() string { return e.message }
 
 func remoteModelSettingsRequest(ctx context.Context, client *http.Client, base, expectedPath string, body any) (remoteModelSettingsStatus, error) {
 	var result remoteModelSettingsStatus
@@ -324,11 +307,11 @@ func remoteModelSettingsRequest(ctx context.Context, client *http.Client, base, 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed {
-		return result, fmt.Errorf("saved model settings require a newer remote Serve; upgrade or safely reconnect after its current work finishes")
+		return result, &remoteModelSettingsRejection{message: "saved model settings require a newer remote Serve; upgrade or safely reconnect after its current work finishes"}
 	}
 	if resp.StatusCode != http.StatusOK {
 		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return result, fmt.Errorf("remote model settings status %d: %s", resp.StatusCode, strings.TrimSpace(string(detail)))
+		return result, &remoteModelSettingsRejection{message: fmt.Sprintf("remote model settings status %d: %s", resp.StatusCode, strings.TrimSpace(string(detail)))}
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&result); err != nil {
 		return result, err
@@ -443,8 +426,11 @@ func applyRemoteModelSettingsSnapshot(ctx context.Context, client *http.Client, 
 			readCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			observed, readErr := remoteModelSettingsRequest(readCtx, client, base, expectedPath, nil)
-			if readErr != nil || observed.Revision != bundle.Revision || observed.Model != remoteRef {
+			if readErr != nil {
 				return status, err
+			}
+			if observed.Revision != bundle.Revision || observed.Model != remoteRef {
+				return observed, err
 			}
 			status = observed
 		}

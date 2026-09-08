@@ -35,7 +35,7 @@ func TestModelSettingsChildCreatedAfterSaveInheritsAcceptedRunSnapshot(t *testin
 			} `json:"messages"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			http.Error(w, "bad request", 400)
+			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
 		requests <- observed{request.Model, r.Header.Get("Authorization")}
@@ -105,13 +105,13 @@ func TestModelSettingsChildCreatedAfterSaveInheritsAcceptedRunSnapshot(t *testin
 		}
 	}
 	assertRequests("old-child", "old-key")
-	var childResult string
+	var childResult strings.Builder
 	for _, message := range old.History() {
 		if message.Role == provider.RoleTool {
-			childResult += message.Content
+			childResult.WriteString(message.Content)
 		}
 	}
-	if !strings.Contains(childResult, "snapshot child answer") {
+	if !strings.Contains(childResult.String(), "snapshot child answer") {
 		t.Fatal("the real task tool did not finish its child")
 	}
 	next, err := Build(ctx, Options{WorkspaceRoot: root, Sink: event.Discard})

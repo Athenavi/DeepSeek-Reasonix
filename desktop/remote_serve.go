@@ -78,6 +78,9 @@ func (m *desktopRemoteManager) SwitchCredentialProxyModel(ctx context.Context, h
 	if err != nil {
 		return err
 	}
+	if !m.pinModelSettingsOwnership(app, hostID, workspace, mh, status) {
+		return fmt.Errorf("remote Serve must support ordered model settings ownership")
+	}
 	remotePort, err := ensureCredentialProxyForward(mh.client, hostID, port)
 	if err != nil {
 		return fmt.Errorf("credential proxy: reverse tunnel: %w", err)
@@ -86,15 +89,13 @@ func (m *desktopRemoteManager) SwitchCredentialProxyModel(ctx context.Context, h
 	if err != nil {
 		return err
 	}
-	defer app.finishCredentialProxyOffer(hostID, workspace, bundle.OfferID)
-	status, err = applyRemoteModelSettingsSnapshot(ctx, client, serve.view.LocalURL, expectedPath, remoteRef, bundle, status)
+	_, err = app.installRemoteModelSettingsSnapshot(ctx, client, serve.view.LocalURL, hostID, workspace, expectedPath, remoteRef, bundle, status)
 	if err != nil {
 		return err
 	}
 	if !m.isCurrent(hostID, mh) {
 		return fmt.Errorf("remote connection changed while applying model settings")
 	}
-	app.reconcileCredentialProxyGenerations(hostID, workspace, status)
 	app.remoteTabMu.Lock()
 	for _, tab := range app.remoteTabs {
 		if tab != nil && tab.ref.HostID == hostID && tab.ref.Workspace == workspace && tab.routing.currentPath == expectedPath {

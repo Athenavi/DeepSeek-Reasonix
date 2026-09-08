@@ -20,6 +20,9 @@ This record distinguishes implemented behavior from release qualification. The c
 | Source refresh supersession and uncertain completion | Shared runtime-owner refresh, source revision fencing and retained offers | `TestModelSettingsSourceFencesOvertakenBuildAndUncertainFinish` |
 | Detached remote work retains its own admission boundary | `internal/serve/model_settings_detached.go` | `TestDetachedModelSettingsRefreshTargetsItsOwnerAndPreservesFailure`, `TestDetachedModelSettingsKeepsQueuedOwnerUntilAdmission` |
 | Bounded remote ownership does not evict accepted routes | Proxy-scoped offer admission | `TestRemoteModelOfferCapacityPreservesOwnedRoutes` |
+| Late ownership receipts and replaced connections cannot revoke current routes | Serve-wide incarnation/sequence, atomically pinned connection identity and route reconciliation | `TestRemoteOwnershipRejectsOvertakenReceipts`, `TestRemoteReplacedConnectionCannotPinOwnership`, `TestRemoteIncarnationReclaimsOldReservationsAndRejectsLateBuilders` |
+| Rejected installs release reservations; unknown installs retain them until confirmed | Typed rejection and positive ownership readback | `TestRemoteInstallDistinguishesRejectionFromLostAcknowledgement`, `TestRemoteUnknownInstallRetainsOfferUntilOwned` |
+| Controller shutdown prevents late inbox sidecar creation | Inbox open seal and synchronously registered publication kick | `TestClosedControllerCannotOpenInboxFromLateDispatch`, `TestStaleRecoveryCannotOverwritePublishedForegroundRoute` |
 | HTTP retry retains accepted credentials after a save | Immutable provider credentials across transport retries | `TestModelSettingsHTTPRetryKeepsAcceptedCredential` returns an actual 503, then checks the retry and next runtime |
 
 ## Deterministic qualification
@@ -35,7 +38,7 @@ go test -race ./internal/config ./internal/boot ./internal/control ./internal/bo
 go run ./tools/repolint
 ```
 
-The frontend test set includes receipt recovery, delayed editor saves, remote behavior and long-history performance. Uncertain writes are read back, never automatically repeated. Candidate route reservations prevent an older ownership response from retiring routes still being installed; accepted old requests release their own references on completion.
+The frontend test set includes receipt recovery, delayed editor saves, remote behavior and long-history performance. Uncertain writes are read back, never automatically repeated. Candidate route reservations protect builds, and Serve-wide ordered ownership receipts prevent stale status from retiring a published route. Offer release and retirement are atomic. Accepted old requests release their own references on completion.
 
 ## Native Windows release gate
 

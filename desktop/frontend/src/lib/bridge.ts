@@ -552,7 +552,6 @@ export interface AppBindings extends ModelSettingsBindings, SessionCatalogBindin
   SaveDoc(path: string, body: string): Promise<string>;
   SaveDocForTab(tabID: string, path: string, body: string): Promise<string>;
   DesktopStartupSettings(): Promise<DesktopStartupSettingsView>;
-  Settings(): Promise<SettingsView>;
   HooksSettings(scope: string): Promise<HooksSettingsView>;
   SaveHooksSettings(scope: string, hooks: HookConfigView[]): Promise<void>;
   SaveHooksSettingsForRoot(scope: string, projectRoot: string, hooks: HookConfigView[]): Promise<void>;
@@ -4530,16 +4529,7 @@ function makeMockApp(): AppBindings {
         conversationWidth,
       })) as DesktopStartupSettingsView;
     },
-    async Settings() {
-      await loadMockProviderCatalog();
-      for (const preset of mockProviderPresetViews()) {
-        const existing = settings.providerPresets.find(p => p.id === preset.id);
-        if (existing) existing.catalog = preset.catalog;
-        else settings.providerPresets.push(preset);
-      }
-      return JSON.parse(JSON.stringify(settings)) as SettingsView;
-    },
-    ...makeMockModelSettingsBindings(settings),
+    ...makeMockModelSettingsBindings(settings, loadMockProviderCatalog, mockProviderPresetViews),
     async StorageSettings() { return { defaultWorkspace: cwd, statePath: `${cwd}/.reasonix`, cachePath: `${cwd}/.reasonix/cache`, extensionsPath: `${cwd}/.reasonix/plugins` }; },
     async HooksSettings(scope: string) {
       const key = scope === "project" ? "project" : "global";

@@ -74,6 +74,7 @@ type inboxState struct {
 	admissionMu sync.Mutex
 	mu          sync.Mutex
 	store       *sessioninbox.Store
+	closed      bool // seals new sidecar opens when controller teardown starts
 	// activeItemIDs includes the running follow-up and every accepted steer.
 	// TurnDone durable-acks the set so multi-steer rounds leave no orphans.
 	activeItemIDs map[string]struct{}
@@ -202,6 +203,9 @@ func (c *Controller) ensureInbox() (*sessioninbox.Store, error) {
 	if c.inbox.store != nil && c.inbox.store.SessionPath() == path {
 		return c.inbox.store, nil
 	}
+	if c.inbox.closed {
+		return nil, fmt.Errorf("controller inbox is closed")
+	}
 	if c.inbox.store != nil {
 		c.inbox.store.Close()
 		c.inbox.store = nil
@@ -231,6 +235,9 @@ func (c *Controller) rebindInbox() {
 	path := c.SessionPath()
 	c.inbox.mu.Lock()
 	defer c.inbox.mu.Unlock()
+	if c.inbox.closed {
+		return
+	}
 	if c.inbox.store != nil {
 		if path != "" && c.inbox.store.SessionPath() == path {
 			return

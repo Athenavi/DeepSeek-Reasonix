@@ -87,6 +87,14 @@ func TestRemoteModelSourceRefreshesAutonomousHTTPRunAndRetiresOldRoute(t *testin
 	srv := serve.New(old, bc, config.ServeConfig{AuthMode: "none"})
 	srv.SetControllerBuildOptions(opts)
 	defer srv.Close()
+	statusRequest := httptest.NewRequest(http.MethodGet, "/model-settings", nil)
+	statusRequest.Host = "127.0.0.1"
+	statusResponse := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(statusResponse, statusRequest)
+	var initialOwnership remoteModelSettingsStatus
+	if err := json.Unmarshal(statusResponse.Body.Bytes(), &initialOwnership); err != nil || !app.pinCredentialProxyOwnership("source-host", "source-workspace", initialOwnership) {
+		t.Fatal("could not establish source ownership", err)
+	}
 	app.finishCredentialProxyOffer("source-host", "source-workspace", bundle.OfferID)
 	if err := old.RunTurn(ctx, "first remote run"); err != nil {
 		t.Fatal(err)
@@ -194,14 +202,18 @@ func TestRemoteModelOwnershipRetiresOldRouteAfterInFlightRequest(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal(ctx.Err())
 	}
-	app.reconcileCredentialProxyGenerations("host", "workspace", remoteModelSettingsStatus{Version: 1, OwnedRevisions: []string{"old", "new"}})
+	status := remoteModelSettingsStatus{Version: 1, ModelSettingsOwnership: config.ModelSettingsOwnership{OwnershipIncarnation: "serve", OwnershipSeq: 1}, OwnedRevisions: []string{"old", "new"}}
+	app.pinCredentialProxyOwnership("host", "workspace", status)
+	app.reconcileCredentialProxyGenerations("host", "workspace", status)
 	p.mu.Lock()
 	preserved := p.routes[old.token] != nil && !p.routes[old.token].retired
 	p.mu.Unlock()
 	if !preserved {
 		t.Fatal("detached owner lost its route")
 	}
-	app.reconcileCredentialProxyGenerations("host", "workspace", remoteModelSettingsStatus{Version: 1, OwnedRevisions: []string{"new"}})
+	status.OwnershipSeq++
+	status.OwnedRevisions = []string{"new"}
+	app.reconcileCredentialProxyGenerations("host", "workspace", status)
 	p.mu.Lock()
 	retained := p.routes[old.token] != nil && p.routes[old.token].retired && p.routes[next.token] != nil
 	p.mu.Unlock()
@@ -319,7 +331,7 @@ func TestRemoteModelSnapshotPreservesWirePrefixAndKeepsKeysLocal(t *testing.T) {
 					t.Fatalf("%s changed through snapshot proxy\ndirect=%s\nproxy=%s", field, direct[field], proxied[field])
 				}
 			}
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				h := <-headers
 				key := h.Get("Authorization")
 				if kind == "anthropic" {

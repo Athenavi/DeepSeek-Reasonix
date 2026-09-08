@@ -57,7 +57,7 @@ func (s *Server) beforeDetachedInboxDispatch(ctrl *control.Controller) (func(), 
 		replacement, _ := owner.ctrl.(*control.Controller)
 		release()
 		if replacement != nil {
-			go replacement.NotifyInboxRuntimeReady()
+			replacement.NotifyInboxRuntimeReady()
 		}
 		return nil, control.ErrInboxRuntimeUnpublished
 	}

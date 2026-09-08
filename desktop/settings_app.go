@@ -1469,13 +1469,6 @@ func (a *App) refreshActiveTabMetaExtras() {
 	}
 }
 
-// applyGlobalProviderConfigChange commits globally; affected runtimes observe
-// it at their next run boundary, including detached runtimes.
-func (a *App) applyGlobalProviderConfigChange(setting, operation, detachedAction string, mutate func(*config.Config) error) error {
-	_, err := a.applyModelConfigChangeWithWarning(setting, mutate)
-	return err
-}
-
 func (a *App) applyConfigOnly(mutate func(*config.Config) error) error {
 	unlock := config.LockUserConfigEdits()
 	defer unlock()
@@ -1539,18 +1532,6 @@ func (a *App) deferredRebuildWarningForTab(setting string, err error, tab *Works
 		a.scheduleDeferredRebuild(tab.ID, setting)
 	}
 	return warning, true
-}
-
-func appendSettingsWarning(existing, warning string) string {
-	existing = strings.TrimSpace(existing)
-	warning = strings.TrimSpace(warning)
-	if existing == "" {
-		return warning
-	}
-	if warning == "" {
-		return existing
-	}
-	return existing + "\n" + warning
 }
 
 // loadDesktopUserConfigForEdit loads the user config for a write path. Pending
@@ -2668,28 +2649,6 @@ func (a *App) UpgradeDeepSeekProviderAccess(name string) (string, error) {
 	return "", nil
 }
 
-// visibleTabsForGlobalRuntimeUpgrade returns every visible runtime that must
-// observe a user-global provider protocol change. A detached controller cannot
-// use rebuildSettingTurnLocked because it is intentionally absent from a.tabs;
-// reject before mutating config so it never remains silently pinned to the old
-// protocol. runtime mutation admission and all turn gates are held by callers.
-func (a *App) visibleTabsForGlobalRuntimeMutation(detachedAction string) ([]*WorkspaceTab, error) {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	for _, tab := range a.detachedSessions {
-		if tab != nil && tab.Ctrl != nil {
-			return nil, fmt.Errorf("background session is still open; reopen or close it before %s", detachedAction)
-		}
-	}
-	tabs := make([]*WorkspaceTab, 0, len(a.tabs))
-	for _, id := range a.orderedTabIDsLocked() {
-		if tab := a.tabs[id]; tab != nil {
-			tabs = append(tabs, tab)
-		}
-	}
-	return tabs, nil
-}
-
 // AddProviderPresetAccess installs one editable custom-provider preset. Unlike
 // official built-ins, these entries are saved as normal providers so users can
 // tweak endpoints, model lists, and capability overrides after the one-click
@@ -2979,19 +2938,6 @@ func (a *App) FetchAllProviderModelCatalogs(providers []ProviderView) map[string
 	return results
 }
 
-// rebuildActiveSettingRuntimeMutationLocked refreshes the active controller
-// while lockRuntimeMutation and all runtime turn gates are held.
-func (a *App) rebuildActiveSettingRuntimeMutationLocked(setting string) error {
-	tab := a.activeTab()
-	if tab == nil {
-		if a.ctx == nil {
-			return nil
-		}
-		return fmt.Errorf("no active tab")
-	}
-	return a.rebuildSettingTurnLocked(setting, tab, true, false)
-}
-
 // SetProviderKey writes a secret to Reasonix's global .env under the given
 // env-var name (the one a provider's api_key_env points at) and rebuilds so it
 // resolves immediately.
@@ -3032,61 +2978,6 @@ func (a *App) SaveProviderKey(apiKeyEnv, value string) (string, error) {
 		return "", fmt.Errorf("this provider has no api_key_env set")
 	}
 	return a.SetProviderKey(apiKeyEnv, value)
-}
-
-func (a *App) ensureProviderAccessForKey(apiKeyEnv string) error {
-	apiKeyEnv = strings.TrimSpace(apiKeyEnv)
-	if apiKeyEnv == "" {
-		return nil
-	}
-	// Pure load-modify-save on the user config; the caller (SetProviderKey)
-	// rebuilds after we return, outside the config edit lock.
-	unlock := config.LockUserConfigEdits()
-	defer unlock()
-	cfg, path, err := a.loadDesktopUserConfigForEdit()
-	if err != nil {
-		return err
-	}
-	access := providerAccessSet(cfg.Desktop.ProviderAccess)
-	changed := false
-	addAccess := func(name string) {
-		if name == "" || access[name] {
-			return
-		}
-		addProviderAccess(cfg, name)
-		access[name] = true
-		changed = true
-	}
-	for i := range cfg.Providers {
-		p := cfg.Providers[i]
-		if strings.TrimSpace(p.APIKeyEnv) != apiKeyEnv {
-			continue
-		}
-		if len(p.ModelList()) == 0 {
-			continue
-		}
-		if isOfficialBuiltInProvider(p) {
-			addAccess(config.CanonicalDesktopOfficialProviderName(p.Name))
-		} else {
-			addAccess(strings.TrimSpace(p.Name))
-		}
-	}
-	if !changed && apiKeyEnv == "DEEPSEEK_API_KEY" {
-		entries, _, err := officialProviderTemplate("deepseek", cfg.DeepSeekOfficialPricingLanguage())
-		if err != nil {
-			return err
-		}
-		for _, e := range entries {
-			if err := cfg.UpsertProvider(e); err != nil {
-				return err
-			}
-			addAccess(e.Name)
-		}
-	}
-	if !changed {
-		return nil
-	}
-	return cfg.SaveTo(path)
 }
 
 // ClearProviderKey removes a provider secret from Reasonix's global .env

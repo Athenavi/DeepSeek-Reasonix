@@ -5071,6 +5071,11 @@ func (c *Controller) close(fireSessionEnd bool, jobsMode closeJobsMode) {
 		} else {
 			c.promptOwner.Clear()
 		}
+		// Join sidecar creation without waiting for the dispatcher itself: a
+		// model refresh may close this controller from inside that dispatcher.
+		c.inbox.mu.Lock()
+		c.inbox.closed = true
+		c.inbox.mu.Unlock()
 		if fireSessionEnd && started {
 			c.hooks.SessionEnd(context.Background(), "other")
 			c.extensionSessionEvent(extension.PointSessionEnd, dispatch.PhaseEnd, c.SessionPath())

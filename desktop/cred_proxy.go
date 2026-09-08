@@ -11,11 +11,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -59,6 +59,7 @@ type credentialProxy struct {
 	server              *http.Server
 	port                int
 	routes              map[string]*credProxyRoute
+	ownership           map[string]*credentialProxyOwnership
 	modelSettingsSource func(http.ResponseWriter, *http.Request, *credProxyRoute)
 }
 
@@ -126,9 +127,7 @@ func (p *credentialProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if len(route.extraBody) > 0 {
 				var payload map[string]any
 				if json.Unmarshal(body, &payload) == nil && payload != nil {
-					for key, value := range route.extraBody {
-						payload[key] = value
-					}
+					maps.Copy(payload, route.extraBody)
 					if encoded, err := json.Marshal(payload); err == nil {
 						body = encoded
 					}
@@ -244,24 +243,6 @@ func (p *credentialProxy) setRouteLocked(token, ref string, up proxyUpstream) {
 	}
 }
 
-type credentialRouteRegistration struct {
-	token string
-	ref   string
-}
-
-func (p *credentialProxy) routeRegistrationsLocked() []credentialRouteRegistration {
-	p.mu.Lock()
-	registrations := make([]credentialRouteRegistration, 0, len(p.routes))
-	for token, route := range p.routes {
-		if route != nil && strings.TrimSpace(route.ref) != "" {
-			registrations = append(registrations, credentialRouteRegistration{token: token, ref: route.ref})
-		}
-	}
-	p.mu.Unlock()
-	sort.Slice(registrations, func(i, j int) bool { return registrations[i].token < registrations[j].token })
-	return registrations
-}
-
 func (p *credentialProxy) close() {
 	p.mu.Lock()
 	server, listener := p.server, p.ln
@@ -354,14 +335,6 @@ func credentialProxyModelTokenFor(secret, hostID, workspace, modelRef string, re
 		_, _ = mac.Write([]byte(field))
 	}
 	return hex.EncodeToString(mac.Sum(nil))[:32]
-}
-
-func (a *App) credentialProxyModelToken(hostID, workspace, modelRef string) (string, error) {
-	secret, err := a.credentialProxySecret()
-	if err != nil {
-		return "", err
-	}
-	return credentialProxyModelTokenFor(secret, hostID, workspace, modelRef), nil
 }
 
 // credentialProxyRouteInfo is everything a serve bootstrap needs to install

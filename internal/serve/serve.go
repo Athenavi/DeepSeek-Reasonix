@@ -66,9 +66,10 @@ type Server struct {
 	buildControllerWithOptions func(ctx context.Context, ref string, opts boot.Options) (*control.Controller, error)
 	// buildOptions preserves process-local CLI knobs when multi-session Serve
 	// creates a foreground replacement after detaching a busy controller.
-	buildOptions         boot.Options
-	managedModels        *config.ModelRuntimeSettings // bindMu; immutable once accepted
-	modelSettingsOfferID string                       // bindMu; unacknowledged source route reservation
+	buildOptions           boot.Options
+	managedModels          *config.ModelRuntimeSettings  // bindMu; immutable once accepted
+	modelSettingsOfferID   string                        // bindMu; unacknowledged source route reservation
+	modelSettingsOwnership config.ModelSettingsOwnership // bindMu; all foreground and detached owners
 	// rebuildController rebuilds the same model/runtime generation for an
 	// extension reload. Tests inject it to exercise publication and failure
 	// paths without starting real providers or sidecars.

@@ -149,6 +149,8 @@ func TestStaleRecoveryCannotOverwritePublishedForegroundRoute(t *testing.T) {
 	old := control.New(control.Options{SessionPath: oldPath})
 	next := control.New(control.Options{SessionPath: newPath})
 	server := New(old, bc, config.ServeConfig{})
+	t.Cleanup(old.Close)
+	t.Cleanup(server.Close)
 	tag := NewSessionTagSink(bc)
 	server.RegisterSessionTag(old, tag)
 	recoverOld := server.sessionRecoveryHandler(old, nil)

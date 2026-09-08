@@ -249,6 +249,7 @@ func TestSwitchModelRefreshesLeadingSystemPrompt(t *testing.T) {
 		Sink:       bc,
 	})
 	s := &Server{ctrl: old, bc: bc}
+	t.Cleanup(s.Close)
 	s.buildController = func(_ context.Context, _ string) (*control.Controller, error) {
 		return control.New(control.Options{
 			Executor:   agent.New(nil, nil, agent.NewSession("new system prompt"), agent.Options{}, event.Discard),

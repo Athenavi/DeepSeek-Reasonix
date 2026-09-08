@@ -46,6 +46,10 @@ func (c *Controller) endRotation() {
 // rejection can never disappear in the handoff window.
 func (c *Controller) maybeDispatchInbox() {
 	c.inbox.mu.Lock()
+	if c.inbox.closed {
+		c.inbox.mu.Unlock()
+		return
+	}
 	c.inbox.dispatchPending = true
 	if c.inbox.dispatching {
 		c.inbox.mu.Unlock()

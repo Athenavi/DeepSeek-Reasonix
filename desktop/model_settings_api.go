@@ -390,7 +390,7 @@ func validateModelSettingsFields(change ModelSettingsChange) error {
 	}
 	allowed = " Kind RequestID ExpectedFingerprint " + allowed + " "
 	value, typ := reflect.ValueOf(change), reflect.TypeOf(change)
-	for i := 0; i < value.NumField(); i++ {
+	for i := range value.NumField() {
 		if !value.Field(i).IsZero() && !strings.Contains(allowed, " "+typ.Field(i).Name+" ") {
 			return fmt.Errorf("unexpected field %s for %s", typ.Field(i).Tag.Get("json"), change.Kind)
 		}

@@ -39,6 +39,7 @@ type ModelRuntimeSettings struct {
 // Offer ownership protects candidate routes until Serve publishes or rejects
 // them. IDs are random correlation values and never enter user configuration.
 type ModelSettingsSourceRequest struct {
+	ModelSettingsOwnership
 	Mode              string   `json:"mode"`
 	OfferID           string   `json:"offerID"`
 	PreviousOfferID   string   `json:"previousOfferID,omitempty"`
@@ -47,6 +48,12 @@ type ModelSettingsSourceRequest struct {
 	RemotePort        int      `json:"remotePort,omitempty"`
 	OwnedRevisions    []string `json:"ownedRevisions"`
 	UnversionedOwners bool     `json:"unversionedOwners"`
+}
+
+// ModelSettingsOwnership orders complete owner snapshots within one Serve.
+type ModelSettingsOwnership struct {
+	OwnershipIncarnation string `json:"ownershipIncarnation"`
+	OwnershipSeq         uint64 `json:"ownershipSeq"`
 }
 
 type ModelSettingsSourceResponse struct {
@@ -74,7 +81,7 @@ type ModelRuntimePreferences struct {
 func (c *Config) RuntimeModelPreferences() ModelRuntimePreferences {
 	var out ModelRuntimePreferences
 	src, dst := reflect.ValueOf(c.Agent), reflect.ValueOf(&out).Elem()
-	for i := 0; i < dst.NumField(); i++ {
+	for i := range dst.NumField() {
 		dst.Field(i).Set(src.FieldByName(dst.Type().Field(i).Name))
 	}
 	return out
@@ -156,7 +163,7 @@ func (settings *ModelRuntimeSettings) Apply(c *Config, root string) error {
 	}
 	declared, _ := project["agent"].(map[string]any)
 	src, dst := reflect.ValueOf(frozen.Preferences), reflect.ValueOf(&c.Agent).Elem()
-	for i := 0; i < src.NumField(); i++ {
+	for i := range src.NumField() {
 		field := src.Type().Field(i)
 		if _, explicit := declared[field.Tag.Get("toml")]; !explicit {
 			dst.FieldByName(field.Name).Set(src.Field(i))
@@ -180,4 +187,4 @@ func (settings *ModelRuntimeSettings) Apply(c *Config, root string) error {
 	return nil
 }
 
-func (p *ProviderEntry) CredentialProxyURL() string { return p.credentialProxyURL }
+func (e *ProviderEntry) CredentialProxyURL() string { return e.credentialProxyURL }

@@ -1,4 +1,5 @@
-import type { ProviderCatalog, ProviderPresetView } from "./providerCatalogTypes";
+import type { ProviderCatalog } from "./providerCatalogTypes";
+export type { SettingsView } from "./settingsViewTypes";
 export type { ProviderProtocolEndpoint, ProviderCatalog, ProviderPresetView } from "./providerCatalogTypes";
 import type { RecoveryEventFields } from "./recoveryStatus";
 // Wire contract — mirrors desktop/wire.go (itself mirroring internal/serve/wire.go).
@@ -2257,51 +2258,6 @@ export interface BotConnectionDiagnostic {
   reportKind: string;
   reportDetail: string;
   occurredAt: string;
-}
-
-export interface SettingsView {
-	modelSettingsFingerprint?: string;
-  defaultModel: string;
-  plannerModel: string;
-  visionModel: string;
-  webSearchModel?: string;
-  webSearchModels?: string[];
-  webSearchModelStatus?: string;
-  webSearchModelReason?: string;
-  effectiveWebSearchModel?: string;
-  webSearchModelOverridden?: boolean;
-  subagentModel: string;
-  subagentEffort: string;
-  autoPlan: string;
-  providers: ProviderView[];
-  officialProviders: ProviderView[];
-  providerPresets: ProviderPresetView[];
-  permissions: PermissionsView;
-  sandbox: SandboxView;
-  network: NetworkView;
-  agent: AgentView;
-  bot: BotSettingsView;
-  desktopLanguage: string; // "" | "en" | "zh"; empty = auto
-  desktopCurrency?: string; // "" | "CNY" | "USD"; absent/empty = follow language
-  desktopLayoutStyle: string; // "classic" | "workbench" | "creation"
-  desktopTheme: string; // "auto" | "dark" | "light"
-  desktopThemeStyle: string;
-  desktopTerminalTheme: string; // "auto" follows app | "dark" | "light"
-  closeBehavior: string; // "background" | "quit"
-  displayMode: string; sessionExperience?: "standard" | "deep"; reasoningDisplayMode: string; reasoningDisplayModeExplicit?: boolean;
-  statusBarStyle: string; // "icon" | "text"
-  statusBarItems: string[]; // ordered visible status bar item ids
-  defaultToolApprovalMode: ToolApprovalMode | string; // default for newly-created sessions
-  checkUpdates: boolean; // check for new versions on startup
-  updateChannel: string; // compatibility field; always "stable"
-  telemetry: boolean; // anonymous launch ping + scrubbed next-launch native crash diagnostics
-  metrics: boolean; // aggregate quality/lifecycle metrics (anonymous signal/bucket counts)
-  configPath: string;
-  shadowedByPath?: string; // workspace reasonix.toml that outranks configPath, when one exists
-  providerKinds: string[]; // provider implementations the kernel registered (for the kind picker)
-  autoApproveTools: boolean;
-  bypass: boolean; // legacy JSON key for live YOLO/full-access tool auto-approval
-  conversationWidth?: string; // "standard" | "full"; absent from older Wails payloads
 }
 
 export type { ModelSettingsChange, ModelSettingsResult } from "./modelSettingsTypes";

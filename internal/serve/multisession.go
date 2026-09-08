@@ -297,7 +297,7 @@ func (s *Server) registerDetached(ctrl control.SessionAPI, keeper *control.Sessi
 	slog.Info("serve: session detached", "session", path, "running", controllerHasActiveRuntimeWork(ctrl))
 	go s.watchDetached(d)
 	if concrete, ok := ctrl.(*control.Controller); ok {
-		go concrete.NotifyInboxRuntimeReady()
+		concrete.NotifyInboxRuntimeReady()
 	}
 	return d, nil
 }
@@ -600,7 +600,7 @@ func (s *Server) publishControllerSwap(expect, next control.SessionAPI, path str
 	s.bc.SetCurrentSession(path)
 	if ctrl, ok := next.(*control.Controller); ok {
 		ctrl.SetBeforeInboxDispatch(s.beforeInboxDispatch)
-		go ctrl.NotifyInboxRuntimeReady()
+		ctrl.NotifyInboxRuntimeReady()
 	}
 	return true
 }

@@ -1,6 +1,7 @@
 package serve
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 const modelSettingsProtocolVersion = 1
 
 type modelSettingsStatusView struct {
+	config.ModelSettingsOwnership
 	Version           int      `json:"version"`
 	Revision          string   `json:"revision"`
 	Model             string   `json:"model"`
@@ -50,8 +52,13 @@ func (s *Server) admitModelSettingsRunLocked(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *Server) modelSettingsStatusLocked() modelSettingsStatusView {
+	if s.modelSettingsOwnership.OwnershipIncarnation == "" {
+		s.modelSettingsOwnership.OwnershipIncarnation = rand.Text()
+	}
+	s.modelSettingsOwnership.OwnershipSeq++
 	current := s.ctl()
 	view := modelSettingsStatusView{Version: modelSettingsProtocolVersion, Model: current.ModelRef(), SessionPath: current.SessionPath(), OwnedRevisions: []string{}}
+	view.ModelSettingsOwnership = s.modelSettingsOwnership
 	owners := []control.SessionAPI{current}
 	s.detachedMu.Lock()
 	for _, detached := range s.detached {

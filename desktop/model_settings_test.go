@@ -548,7 +548,7 @@ func TestModelSettingsRunningToolContinuationKeepsOldConnection(t *testing.T) {
 	if calls.Load() != 2 {
 		t.Fatalf("expected tool continuation, got %d requests", calls.Load())
 	}
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		if got := <-auth; got != "Bearer old-credential" {
 			t.Fatalf("current work switched key: %q", got)
 		}

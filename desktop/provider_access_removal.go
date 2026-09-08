@@ -280,37 +280,6 @@ func retargetProviderReferences(c *config.Config, names []string, fallbackRef st
 	}
 }
 
-func providerReferencesAny(c *config.Config, names []string) bool {
-	if providerRefMatchesAny(c, c.DefaultModel, names) ||
-		providerRefMatchesAny(c, c.Agent.PlannerModel, names) ||
-		providerRefMatchesAny(c, c.Agent.SubagentModel, names) {
-		return true
-	}
-	for _, ref := range c.Agent.SubagentModels {
-		if providerRefMatchesAny(c, ref, names) {
-			return true
-		}
-	}
-	return false
-}
-
-// providerAuxiliaryReferencesAny reports whether a controller's planner or
-// sub-agent wiring was assembled from a provider being removed. Unlike
-// default_model, these references affect the whole runtime regardless of the
-// tab's selected chat model.
-func providerAuxiliaryReferencesAny(c *config.Config, names []string) bool {
-	if providerRefMatchesAny(c, c.Agent.PlannerModel, names) ||
-		providerRefMatchesAny(c, c.Agent.SubagentModel, names) {
-		return true
-	}
-	for _, ref := range c.Agent.SubagentModels {
-		if providerRefMatchesAny(c, ref, names) {
-			return true
-		}
-	}
-	return false
-}
-
 func (a *App) planProviderRemoval(names []string, official bool) (providerRemovalPlan, error) {
 	root := a.activeWorkspaceRoot()
 	unlock, err := lockProviderRemovalState()

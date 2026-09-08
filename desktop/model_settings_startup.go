@@ -119,13 +119,13 @@ type tabStartupState struct {
 	modelApplication tabModelApplicationState
 }
 
-func (tab *WorkspaceTab) startupState() tabStartupState {
-	return tabStartupState{tab.StartupErr, tab.StartupErrLeaseHeld, tab.Ready, tab.modelApplication}
+func (t *WorkspaceTab) startupState() tabStartupState {
+	return tabStartupState{t.StartupErr, t.StartupErrLeaseHeld, t.Ready, t.modelApplication}
 }
 
-func (tab *WorkspaceTab) restoreStartupState(state tabStartupState) {
-	tab.StartupErr = state.err
-	tab.StartupErrLeaseHeld = state.leaseHeld
-	tab.Ready = state.ready
-	tab.modelApplication = state.modelApplication
+func (t *WorkspaceTab) restoreStartupState(state tabStartupState) {
+	t.StartupErr = state.err
+	t.StartupErrLeaseHeld = state.leaseHeld
+	t.Ready = state.ready
+	t.modelApplication = state.modelApplication
 }

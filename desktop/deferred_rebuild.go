@@ -128,21 +128,6 @@ func (a *App) scheduleDeferredStartupBuild(tabID string) {
 	a.scheduleDeferredRebuild(tabID, deferredStartupBuildLabel)
 }
 
-func isDeferredStartupBuild(setting string) bool {
-	return setting == deferredStartupBuildLabel
-}
-
-func isDeferredRuntimeReload(setting string) bool {
-	return setting == deferredRuntimeReloadLabel
-}
-
-func (a *App) clearDeferredRebuild(tabID string) {
-	d := &a.deferredRebuild
-	d.mu.Lock()
-	delete(d.pending, tabID)
-	d.mu.Unlock()
-}
-
 func (a *App) deferredRebuildSequence(tabID string) uint64 {
 	d := &a.deferredRebuild
 	d.mu.Lock()

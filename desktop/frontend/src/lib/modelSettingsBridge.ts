@@ -1,15 +1,20 @@
 import type { AppBindings } from "./bridge";
-import type { SettingsView } from "./types";
+import type { ProviderPresetView, SettingsView } from "./types";
 import type { ModelSettingsChange, ModelSettingsResult } from "./modelSettingsTypes";
 
 export interface ModelSettingsBindings {
+  Settings(): Promise<SettingsView>;
   ApplyModelSettings(change: ModelSettingsChange): Promise<ModelSettingsResult>;
   GetModelSettingsRequest(requestId: string): Promise<ModelSettingsResult>;
   GetModelSettingsApplication(): Promise<ModelSettingsResult>;
   RetryModelSettingsApplication(tabID: string): Promise<ModelSettingsResult>;
 }
 
-export function makeMockModelSettingsBindings(settings: SettingsView): ModelSettingsBindings {
+export function makeMockModelSettingsBindings(
+  settings: SettingsView,
+  loadCatalog: () => Promise<void> = async () => {},
+  presets: () => ProviderPresetView[] = () => [],
+): ModelSettingsBindings {
   const receipts = new Map<string, ModelSettingsResult>();
   const remember = (result: ModelSettingsResult) => {
     receipts.set(result.requestId, result);
@@ -17,6 +22,15 @@ export function makeMockModelSettingsBindings(settings: SettingsView): ModelSett
     return result;
   };
   return {
+    async Settings() {
+      await loadCatalog();
+      for (const preset of presets()) {
+        const existing = settings.providerPresets.find(p => p.id === preset.id);
+        if (existing) existing.catalog = preset.catalog;
+        else settings.providerPresets.push(preset);
+      }
+      return JSON.parse(JSON.stringify(settings)) as SettingsView;
+    },
     async GetModelSettingsApplication(this: AppBindings): Promise<ModelSettingsResult> {
       return {requestId: "", persisted: true, revision: settings.modelSettingsFingerprint!, application: "not_required", targets: [], issues: [], appliedCatalogs: []};
     },

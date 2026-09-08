@@ -97,6 +97,7 @@ func (s *Server) refreshModelSettingsOwnerLocked(ctx context.Context, owner mode
 			status := s.modelSettingsStatusLocked()
 			sourceRequest = config.ModelSettingsSourceRequest{Mode: "prepare", OfferID: offerID, PreviousOfferID: (*owner.offerID), Model: sourceModelRef(settings, ref), AppliedRevision: settings.Revision, RemotePort: port, OwnedRevisions: status.OwnedRevisions, UnversionedOwners: status.UnversionedOwners}
 			(*owner.offerID) = offerID
+			sourceRequest.ModelSettingsOwnership = status.ModelSettingsOwnership
 			response, err := requestModelSettingsSource(ctx, settings, sourceRequest)
 			if err != nil {
 				return err
@@ -137,6 +138,7 @@ func (s *Server) refreshModelSettingsOwnerLocked(ctx context.Context, owner mode
 			}
 			status := s.modelSettingsStatusLocked()
 			sourceRequest.Mode = "finish"
+			sourceRequest.ModelSettingsOwnership = status.ModelSettingsOwnership
 			sourceRequest.PreviousOfferID = ""
 			sourceRequest.OwnedRevisions, sourceRequest.UnversionedOwners = status.OwnedRevisions, status.UnversionedOwners
 			ack, ackErr := requestModelSettingsSource(ctx, ackSettings, sourceRequest)
@@ -206,7 +208,7 @@ func (s *Server) beforeInboxDispatch(ctrl *control.Controller) (func(), error) {
 	if current := s.ctl(); current != ctrl {
 		s.bindMu.Unlock()
 		if replacement, ok := current.(*control.Controller); ok {
-			go replacement.NotifyInboxRuntimeReady()
+			replacement.NotifyInboxRuntimeReady()
 		}
 		return nil, control.ErrInboxRuntimeUnpublished
 	}

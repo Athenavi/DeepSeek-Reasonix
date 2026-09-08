@@ -20,6 +20,9 @@
 | 连续保存超过构建进度及完成响应丢失 | 共享运行时所有者刷新、源版本校验和候选保留 | `TestModelSettingsSourceFencesOvertakenBuildAndUncertainFinish` |
 | 远程后台分离工作保留自己的接纳边界 | `internal/serve/model_settings_detached.go` | `TestDetachedModelSettingsRefreshTargetsItsOwnerAndPreservesFailure`、`TestDetachedModelSettingsKeepsQueuedOwnerUntilAdmission` |
 | 远程所有权达到容量上限时不清理已接受路由 | 代理范围内的候选接纳 | `TestRemoteModelOfferCapacityPreservesOwnedRoutes` |
+| 迟到回执和旧连接不能撤销当前路由 | Serve 实例及递增序列、原子连接身份绑定和路由回收 | `TestRemoteOwnershipRejectsOvertakenReceipts`、`TestRemoteReplacedConnectionCannotPinOwnership`、`TestRemoteIncarnationReclaimsOldReservationsAndRejectsLateBuilders` |
+| 明确拒绝释放候选；结果未知时保留至确认 | 拒绝类型与正向所有权回读 | `TestRemoteInstallDistinguishesRejectionFromLostAcknowledgement`、`TestRemoteUnknownInstallRetainsOfferUntilOwned` |
+| 控制器关闭后不再创建 inbox 文件 | inbox 打开封锁和同步登记的发布通知 | `TestClosedControllerCannotOpenInboxFromLateDispatch`、`TestStaleRecoveryCannotOverwritePublishedForegroundRoute` |
 | 保存后的 HTTP 重试保持已接受的凭据 | 传输重试复用不可变服务凭据 | `TestModelSettingsHTTPRetryKeepsAcceptedCredential` 返回真实 503，验证重试和下一运行 |
 
 ## 确定性验证
@@ -35,7 +38,7 @@ go test -race ./internal/config ./internal/boot ./internal/control ./internal/bo
 go run ./tools/repolint
 ```
 
-前端测试包含回执恢复、延迟保存草稿、远程行为和长历史性能。结果不明的写入先回读，不自动重做。候选路由保留机制避免较旧的所有权响应清理正在安装的新路由；已接受的旧请求在完成时释放自己的引用。
+前端测试包含回执恢复、延迟保存草稿、远程行为和长历史性能。结果不明的写入先回读，不自动重做。候选保留机制保护构建过程，Serve 全局有序的所有权回执阻止旧状态撤销已发布路由。候选释放与路由回收原子完成；已接受的旧请求在完成时释放自己的引用。
 
 ## Windows 原生发布门槛
 
