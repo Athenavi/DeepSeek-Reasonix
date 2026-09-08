@@ -1,7 +1,14 @@
 import { app, clipboard, dialog, ipcMain, net, protocol, screen, session, shell } from "electron";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { IPC } from "../shared/ipc.js";
+import { IPC, type BrowserTakeoverKind } from "../shared/ipc.js";
+import { ActionExecutor } from "./browser/actions.js";
+import { DocumentRegistry } from "./browser/documents.js";
+import { DownloadTracker } from "./browser/downloads.js";
+import { ElectronGuestViewFactory } from "./browser/electronGuestViews.js";
+import { GrantRegistry } from "./browser/grants.js";
+import { buildBrowserHostCalls } from "./browser/hostCalls.js";
+import { BrowserSurfaceManager } from "./browser/surfaceManager.js";
 import { emptyContract, loadContract, type LoadedContract } from "./contract.js";
 import { DialogHost } from "./dialogs.js";
 import { renderFailurePage, type ShellAction } from "./failurePage.js";
@@ -21,6 +28,12 @@ import { TrayHost } from "./tray.js";
 import { DEFAULT_GEOMETRY, MainWindow } from "./window.js";
 
 const MAIN_WINDOW_PERMISSIONS = new Set(["clipboard-read", "clipboard-sanitized-write", "fullscreen", "notifications"]);
+const TAKEOVER_KINDS = new Set<string>(["mousedown", "keydown", "wheel", "touchstart", "pointerdown"]);
+
+function safeDirName(value: string): string {
+  const name = value.replace(/[^A-Za-z0-9._-]+/g, "_");
+  return name === "" ? "user" : name;
+}
 
 app.setName("Reasonix");
 const dev = (process.env.REASONIX_DEV ?? "").trim() !== "";
@@ -94,6 +107,35 @@ function bootstrap(dataHome: string): void {
     },
   });
 
+  const downloads = new DownloadTracker({
+    tabForWebContents: (id) => {
+      const tab = browser.all().find((entry) => entry.view.page.id === id);
+      return tab ? { id: tab.id, taskId: tab.taskId } : undefined;
+    },
+    defaultDirectory: (taskId) => join(app.getPath("userData"), "downloads", safeDirName(taskId)),
+    onUpdate: (download) => mainWindow.send(IPC.browserDownload, download),
+    log,
+  });
+  const guestViews = new ElectronGuestViewFactory({
+    window: () => mainWindow.browserWindow,
+    preloadPath: join(__dirname, "guest-preload.cjs"),
+    log,
+    onSession: (_partition, guestSession) => {
+      guestSession.on("will-download", (_event, item, contents) => downloads.handleWillDownload(item, contents.id));
+    },
+  });
+  const browser = new BrowserSurfaceManager({
+    views: guestViews,
+    contentSize: () => mainWindow.contentSize(),
+    onTakeover: (tab, reason) => void service.hostEvent("browser.takeover", { tabId: tab.id, epoch: tab.epoch, reason }),
+    onCrash: (tab, reason) => void service.hostEvent("browser.crash", { tabId: tab.id, epoch: tab.epoch, reason }),
+    log,
+  });
+  browser.subscribe((tabs) => mainWindow.send(IPC.browserTabs, tabs));
+  const grants = new GrantRegistry({ generation: () => service.generation });
+  const documents = new DocumentRegistry();
+  const actions = new ActionExecutor({ surfaces: browser, documents });
+
   const remote = new RemoteWindowHost({
     platform: process.platform,
     icon: windowIcon,
@@ -118,7 +160,10 @@ function bootstrap(dataHome: string): void {
       shutdown: () => service.shutdown(),
     },
     app: { quit: () => app.quit(), relaunch: (args) => app.relaunch({ args }) },
+    // Website views go first: a WebContents closing after its window is
+    // gone is the ordering that left orphaned renderers in the prototype.
     onCloseAllowed: () => {
+      browser.destroyAll();
       mainWindow.allowClose();
       remote.closeAll();
       tray.destroy();
@@ -151,6 +196,7 @@ function bootstrap(dataHome: string): void {
         primary: display.id === primary,
       }));
     },
+    browser: buildBrowserHostCalls({ surfaces: browser, grants, documents, actions, downloads }),
   });
 
   const service = new ServiceSupervisor(
@@ -179,7 +225,10 @@ function bootstrap(dataHome: string): void {
       }), 10_000)),
       onRequest: (method, params) => dispatchHostCall(hostCalls, method, params),
       onEvent: (frame) => mainWindow.send(IPC.event, frame),
-      onState: (state) => mainWindow.send(IPC.serviceState, state),
+      onState: (state) => {
+        mainWindow.send(IPC.serviceState, state);
+        grants.observeGeneration(state.generation);
+      },
       onReady: (hello: HelloResult) => {
         log.info(`desktop service ready: generation ${hello.runtimeGeneration}, pid ${hello.service.pid}`);
         if (!mainWindow.browserWindow) mainWindow.create(hello.window);
@@ -228,7 +277,28 @@ function bootstrap(dataHome: string): void {
       serviceState: () => service.current,
       clipboard,
       openExternal: (url) => shell.openExternal(url),
+      browser: {
+        list: () => browser.list(),
+        open: async (url, options) => browser.view(await browser.open(url, options)),
+        close: (tabId) => browser.close(tabId),
+        activate: (tabId) => browser.activate(tabId),
+        navigate: async (tabId, target) => {
+          await browser.navigate(tabId, target);
+        },
+        setZoom: (tabId, factor) => browser.setZoom(tabId, factor),
+        toggleDevTools: (tabId) => browser.toggleDevTools(tabId),
+        resume: (tabId) => browser.resume(tabId),
+        setLayout: (rect) => browser.setLayout(rect),
+        setOverlay: (active) => browser.setOverlay(active),
+      },
       log,
+    });
+    // Reports from the guest preload: the sender must be one of our website
+    // views, which takeoverFromSender checks by WebContents id.
+    ipcMain.on(IPC.browserTakeover, (event, payload: unknown) => {
+      const kind = typeof payload === "object" && payload !== null ? (payload as { kind?: unknown }).kind : undefined;
+      if (typeof kind !== "string" || !TAKEOVER_KINDS.has(kind)) return;
+      browser.takeoverFromSender(event.sender.id, kind as BrowserTakeoverKind);
     });
     installApplicationMenu({
       platform: process.platform,

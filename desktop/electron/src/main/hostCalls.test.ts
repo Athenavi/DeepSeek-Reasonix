@@ -52,6 +52,31 @@ test("every documented host/* method is dispatched with parsed params", async ()
   }
 });
 
+test("browser host calls merge into the table when the surface is wired", async () => {
+  const { table, calls } = deps();
+  await assert.rejects(dispatchHostCall(table, "host/browser.tabs.list", {}), (error: unknown) => error instanceof RpcError && error.code === -32601);
+
+  const merged = buildHostCallTable({
+    ...({
+      window: {
+        show: () => {}, hide: () => {}, maximise: () => {}, unmaximise: () => {}, minimise: () => {}, unminimise: () => {},
+        toggleMaximise: () => {}, center: () => {}, isMaximised: () => false, isMinimised: () => false,
+        setPosition: () => {}, setTitle: () => {}, toggleDevTools: () => {},
+      },
+      dialogs: { openDirectory: async () => ({ path: "" }), openFile: async () => ({ paths: [] }), saveFile: async () => ({ path: "" }), message: async () => ({ button: "" }) },
+      tray: { ensure: () => ({ ready: false, reason: "x" }), destroy: () => {} },
+      remote: { open: () => ({ windowId: "" }), navigate: () => {}, focus: () => {}, close: () => {} },
+      lifecycle: { approve: () => {}, relaunch: () => {} },
+      openExternal: async () => {},
+      hideApp: () => {},
+      screens: () => [],
+      browser: { "host/browser.tabs.list": () => ({ tabs: ["tab-1"] }) },
+    } satisfies HostCallDeps),
+  });
+  assert.deepEqual(await dispatchHostCall(merged, "host/browser.tabs.list", {}), { tabs: ["tab-1"] });
+  assert.deepEqual(calls, [], "the plain table was not touched");
+});
+
 test("unknown host methods fail with -32601 and never hit Object.prototype", async () => {
   const { table } = deps();
   for (const method of ["host/window.explode", "toString", "__proto__", "hasOwnProperty"]) {

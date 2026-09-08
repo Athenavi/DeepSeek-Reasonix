@@ -21,6 +21,8 @@ const common = {
 
 await build({ ...common, entryPoints: [resolve(root, "src/main/index.ts")], outfile: resolve(dist, "main.cjs") });
 await build({ ...common, entryPoints: [resolve(root, "src/preload/index.ts")], outfile: resolve(dist, "preload.cjs") });
+// The website-view preload: sandboxed, so it bundles nothing but the channel name.
+await build({ ...common, entryPoints: [resolve(root, "src/main/browser/guestPreload.ts")], outfile: resolve(dist, "guest-preload.cjs") });
 
 // hostrpc.Contract.Canonical: sorted keys, no whitespace, no HTML escaping.
 function sortKeys(value) {

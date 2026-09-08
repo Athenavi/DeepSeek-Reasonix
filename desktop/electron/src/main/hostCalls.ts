@@ -58,6 +58,9 @@ export interface ScreenInfo {
   primary: boolean;
 }
 
+export type HostCall = (params: Params) => Promise<unknown> | unknown;
+export type HostCallTable = Record<string, HostCall>;
+
 export interface HostCallDeps {
   window: WindowHostApi;
   dialogs: DialogHostApi;
@@ -67,10 +70,8 @@ export interface HostCallDeps {
   openExternal(url: string): Promise<void>;
   hideApp(): void;
   screens(): ScreenInfo[];
+  browser?: HostCallTable;
 }
-
-export type HostCall = (params: Params) => Promise<unknown> | unknown;
-export type HostCallTable = Record<string, HostCall>;
 
 const remoteInput = (params: Params) => ({ hostKey: str(params, "hostKey"), url: str(params, "url"), title: str(params, "title") });
 
@@ -139,6 +140,7 @@ export function buildHostCallTable(deps: HostCallDeps): HostCallTable {
       tooltip: str(params, "tooltip", "Reasonix"),
     }),
     "host/tray.destroy": done(() => deps.tray.destroy()),
+    ...(deps.browser ?? {}),
   };
 }
 

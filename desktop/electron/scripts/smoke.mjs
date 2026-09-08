@@ -124,6 +124,22 @@ try {
   const errors = await page.evaluate(() => document.querySelector(".error-boundary, [data-crash-overlay]") !== null);
   check("no crash overlay is showing", !errors);
 
+  const tab = await page.evaluate(() => window.reasonixDesktop.browser.open("example.com", { temporary: true }));
+  check("browser opens a website view", typeof tab.id === "string" && tab.url.startsWith("https://example.com"), `${tab.id} ${tab.url}`);
+  const title = await page.evaluate(async (tabId) => {
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      const tabs = await window.reasonixDesktop.browser.list();
+      const found = tabs.find((entry) => entry.id === tabId);
+      if (found && found.title !== "") return found.title;
+      await new Promise((resolveWait) => setTimeout(resolveWait, 200));
+    }
+    return "";
+  }, tab.id);
+  check("the website view loads example.com", title === "Example Domain", `title=${JSON.stringify(title)}`);
+  await page.evaluate((tabId) => window.reasonixDesktop.browser.close(tabId), tab.id);
+  const remaining = await page.evaluate(() => window.reasonixDesktop.browser.list());
+  check("browser tab closes cleanly", remaining.every((entry) => entry.id !== tab.id), `${remaining.length} tabs left`);
+
   await page.screenshot({ path: join(artifacts, "main-window.png") });
   const tree = processTree(shellPid);
   const servicePids = tree.filter((p) => p.comm.includes("reasonix-desktop")).map((p) => p.pid);

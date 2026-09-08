@@ -24,8 +24,40 @@ renderer (reasonix://app) ──preload (window.reasonixDesktop)──▶ main p
 | `src/main/hostCalls.ts` | `host/*` dispatch table |
 | `src/main/lifecycle.ts` | quit sequencing (`beforeClose` → `shutdown` → stdin close → exit) |
 | `src/main/menu.ts`, `tray.ts`, `dialogs.ts`, `remoteWindows.ts` | native surfaces |
+| `src/main/browser/` | in-app browser: website views, snapshots, actions, downloads, grants |
 | `src/preload/index.ts` | the single `window.reasonixDesktop` object |
 | `src/shared/ipc.ts` | channel names and types shared by main and preload |
+
+## Browser surface
+
+The shell can host real websites next to the app UI (contract:
+[`docs/DESKTOP_BROWSER.md`](../../docs/DESKTOP_BROWSER.md)). Every tab is a
+sandboxed `WebContentsView` managed by `browser/surfaceManager.ts`; the React
+panel drives it through `reasonixDesktop.browser.*` (user surface, no grant),
+and Go drives it through the `host/browser.*` host calls
+(`browser/hostCalls.ts`), which require a per-task grant that dies with the
+service generation.
+
+| Module | Concern |
+| --- | --- |
+| `guestView.ts`, `electronGuestViews.ts` | the `WebContentsView` behind injected interfaces; tests use fakes |
+| `surfaceManager.ts` | tabs, layout/overlay visibility, take-over and crash recovery |
+| `grants.ts`, `errors.ts` | per-task grants and the `-32010/-32011/-32012` contract codes |
+| `snapshotScript.ts`, `snapshot.ts`, `pageScripts.ts` | serialised page walkers: aria-style snapshot, ref resolve/locate/select |
+| `documents.ts`, `refResolver.ts` | document tokens; a navigation or take-over stales every earlier ref |
+| `actions.ts`, `keys.ts`, `upload.ts` | trusted input dispatch: click, type, press, scroll, select, upload |
+| `screenshot.ts` | element/full-page captures into the task scratch directory |
+| `downloads.ts` | `will-download` routing, progress events, per-tab waits |
+| `guestPreload.ts` | website-view preload; only reports user input for take-over |
+| `fakeGuestViews.ts` | in-memory views so all of the above runs under plain `node --test` |
+
+User input in a website view flips the tab to human mode (take-over), bumps
+its epoch and is reported to Go as `browser.takeover`; `browser.resume` hands
+it back. Agent-dispatched input is marked so its echo is not a take-over.
+Downloads land in the task's scratch directory when one is registered by a
+`browser.act`/`browser.screenshot` call, otherwise in
+`userData/downloads/<taskId>`; the renderer hears about them through
+`reasonixDesktop.browser.onDownload`.
 
 ## Build
 
@@ -116,6 +148,10 @@ pnpm test          # node --test; pure modules only, Electron is injected throug
   token is attached in the main process; it never reaches any renderer.
 - Remote Serve windows use their own `persist:remote-<hostKey>` session, no
   preload, sandbox on, popups denied, navigation pinned to the page origin.
+- Website views are sandboxed `WebContentsView`s on the `persist:browser`
+  partition (`temp:<id>` for temporary tabs) with a preload that only reports
+  user input. `host/browser.*` calls need a grant scoped to one task and one
+  service generation; reads and writes refuse a tab in human mode.
 - `shell.openExternal` from the renderer accepts `http:`, `https:` and
   `mailto:` only.
 - The service is restarted automatically at most three times per five

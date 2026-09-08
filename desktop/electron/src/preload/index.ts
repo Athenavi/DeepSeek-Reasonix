@@ -1,5 +1,18 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
-import { hostOS, IPC, type ContractInfo, type EventFrame, type IpcResult, type ServiceState, type WindowTheme } from "../shared/ipc.js";
+import {
+  hostOS,
+  IPC,
+  type BrowserDownloadView,
+  type BrowserLayoutRect,
+  type BrowserNavigateTarget,
+  type BrowserOpenOptions,
+  type BrowserTabView,
+  type ContractInfo,
+  type EventFrame,
+  type IpcResult,
+  type ServiceState,
+  type WindowTheme,
+} from "../shared/ipc.js";
 
 type Listener = (...args: unknown[]) => void;
 
@@ -93,6 +106,57 @@ function onServiceState(listener: (state: ServiceState) => void): () => void {
   };
 }
 
+let lastTabs: BrowserTabView[] | null = null;
+const tabListeners = new Set<(tabs: BrowserTabView[]) => void>();
+ipcRenderer.on(IPC.browserTabs, (_event, tabs: BrowserTabView[]) => {
+  lastTabs = Array.isArray(tabs) ? tabs : [];
+  for (const listener of [...tabListeners]) listener(lastTabs);
+});
+
+// Fires immediately with the current list so a panel that mounts late never
+// waits for the next change.
+function onTabs(listener: (tabs: BrowserTabView[]) => void): () => void {
+  tabListeners.add(listener);
+  if (lastTabs) listener(lastTabs);
+  else {
+    void call(IPC.browserList).then((tabs) => {
+      if (lastTabs || !tabListeners.has(listener)) return;
+      lastTabs = Array.isArray(tabs) ? (tabs as BrowserTabView[]) : [];
+      listener(lastTabs);
+    }).catch(() => undefined);
+  }
+  return () => {
+    tabListeners.delete(listener);
+  };
+}
+
+const downloadListeners = new Set<(download: BrowserDownloadView) => void>();
+ipcRenderer.on(IPC.browserDownload, (_event, download: BrowserDownloadView) => {
+  for (const listener of [...downloadListeners]) listener(download);
+});
+
+function onDownload(listener: (download: BrowserDownloadView) => void): () => void {
+  downloadListeners.add(listener);
+  return () => {
+    downloadListeners.delete(listener);
+  };
+}
+
+const browser = {
+  list: () => call(IPC.browserList) as Promise<BrowserTabView[]>,
+  open: (url: string, opts?: BrowserOpenOptions) => call(IPC.browserOpen, url, opts ?? {}) as Promise<BrowserTabView>,
+  close: (tabId: string) => call(IPC.browserClose, tabId).then(() => undefined),
+  activate: (tabId: string | null) => call(IPC.browserActivate, tabId).then(() => undefined),
+  navigate: (tabId: string, target: BrowserNavigateTarget) => call(IPC.browserNavigate, tabId, target).then(() => undefined),
+  setZoom: (tabId: string, factor: number) => call(IPC.browserSetZoom, tabId, factor).then(() => undefined),
+  toggleDevTools: (tabId: string) => call(IPC.browserToggleDevTools, tabId).then(() => undefined),
+  resume: (tabId: string) => call(IPC.browserResume, tabId).then(() => undefined),
+  setLayout: (rect: BrowserLayoutRect | null) => fire(IPC.browserSetLayout, rect),
+  setOverlay: (active: boolean) => fire(IPC.browserSetOverlay, active),
+  onTabs,
+  onDownload,
+};
+
 contextBridge.exposeInMainWorld("reasonixDesktop", {
   kind: "electron",
   contract: readContract(),
@@ -121,4 +185,5 @@ contextBridge.exposeInMainWorld("reasonixDesktop", {
     getPathForFile: (file: File) => webUtils.getPathForFile(file),
     onServiceState,
   },
+  browser,
 });

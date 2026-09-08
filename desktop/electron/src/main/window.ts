@@ -218,6 +218,13 @@ export class MainWindow {
     this.browserWindow?.close();
   }
 
+  contentSize(): { width: number; height: number } | null {
+    const win = this.browserWindow;
+    if (!win) return null;
+    const [width, height] = win.getContentSize();
+    return { width, height };
+  }
+
   bounds(): WindowBounds {
     const win = this.browserWindow;
     if (!win) return { x: 0, y: 0, width: 0, height: 0, maximised: false };

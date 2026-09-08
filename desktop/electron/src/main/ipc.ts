@@ -1,8 +1,18 @@
 import type { IpcMain, IpcMainEvent, IpcMainInvokeEvent } from "electron";
-import { IPC, type IpcResult, type ServiceState, type WindowBounds, type WindowTheme } from "../shared/ipc.js";
+import {
+  IPC,
+  type BrowserLayoutRect,
+  type BrowserNavigateTarget,
+  type BrowserOpenOptions,
+  type BrowserTabView,
+  type IpcResult,
+  type ServiceState,
+  type WindowBounds,
+  type WindowTheme,
+} from "../shared/ipc.js";
 import { isAllowedCommand, type LoadedContract } from "./contract.js";
 import { errorText, type Logger } from "./log.js";
-import { finite } from "./params.js";
+import { bool, finite, record, str } from "./params.js";
 import { RpcError } from "./rpc.js";
 
 export interface RendererWindowApi {
@@ -16,6 +26,21 @@ export interface RendererWindowApi {
   setBackgroundColour(r: number, g: number, b: number, a: number): void;
 }
 
+// The user-driven browser panel: no grant is involved because the user is
+// the one acting, but every call is still gated on the trusted sender.
+export interface BrowserRendererApi {
+  list(): BrowserTabView[];
+  open(url: string, options: Required<BrowserOpenOptions>): Promise<BrowserTabView>;
+  close(tabId: string): void;
+  activate(tabId: string | null): void;
+  navigate(tabId: string, target: BrowserNavigateTarget): Promise<void>;
+  setZoom(tabId: string, factor: number): void;
+  toggleDevTools(tabId: string): void;
+  resume(tabId: string): void;
+  setLayout(rect: BrowserLayoutRect | null): void;
+  setOverlay(active: boolean): void;
+}
+
 export interface RendererIpcDeps {
   ipcMain: IpcMain;
   contract: LoadedContract;
@@ -24,7 +49,23 @@ export interface RendererIpcDeps {
   serviceState(): ServiceState;
   clipboard: { writeText(text: string): Promise<void> | void; readText(): Promise<string> | string };
   openExternal(url: string): Promise<void>;
+  browser?: BrowserRendererApi;
   log: Logger;
+}
+
+const NAVIGATE_ACTIONS = new Set(["back", "forward", "reload", "stop"]);
+
+export function parseNavigateTarget(value: unknown): BrowserNavigateTarget {
+  const target = record(value);
+  const action = str(target, "action");
+  if (NAVIGATE_ACTIONS.has(action)) return { action: action as BrowserNavigateTarget["action"] };
+  return { url: str(target, "url") };
+}
+
+export function parseLayout(value: unknown): BrowserLayoutRect | null {
+  if (value === null || value === undefined) return null;
+  const rect = record(value);
+  return { x: finite(rect.x, Number.NaN), y: finite(rect.y, Number.NaN), width: finite(rect.width, Number.NaN), height: finite(rect.height, Number.NaN) };
 }
 
 const EXTERNAL_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
@@ -84,4 +125,25 @@ export function registerRendererIpc(deps: RendererIpcDeps): void {
   handle(IPC.windowGetBounds, () => deps.window.bounds());
   handle(IPC.windowSetTheme, (theme) => deps.window.setTheme(theme === "light" || theme === "dark" ? theme : "system"));
   handle(IPC.windowSetBackground, (r, g, b, a) => deps.window.setBackgroundColour(finite(r), finite(g), finite(b), finite(a, 255)));
+
+  const browser = deps.browser;
+  if (!browser) return;
+  const tabId = (value: unknown): string => {
+    if (typeof value !== "string" || value === "") throw new Error("tabId must be a non-empty string");
+    return value;
+  };
+  handle(IPC.browserList, () => browser.list());
+  handle(IPC.browserOpen, (url, options) => {
+    if (typeof url !== "string") throw new Error("url must be a string");
+    const opts = record(options);
+    return browser.open(url, { temporary: bool(opts, "temporary"), taskId: str(opts, "taskId", "user") || "user" });
+  });
+  handle(IPC.browserClose, (id) => browser.close(tabId(id)));
+  handle(IPC.browserActivate, (id) => browser.activate(id === null || id === undefined ? null : tabId(id)));
+  handle(IPC.browserNavigate, (id, target) => browser.navigate(tabId(id), parseNavigateTarget(target)));
+  handle(IPC.browserSetZoom, (id, factor) => browser.setZoom(tabId(id), finite(factor, Number.NaN)));
+  handle(IPC.browserToggleDevTools, (id) => browser.toggleDevTools(tabId(id)));
+  handle(IPC.browserResume, (id) => browser.resume(tabId(id)));
+  handle(IPC.browserSetLayout, (rect) => browser.setLayout(parseLayout(rect)));
+  handle(IPC.browserSetOverlay, (active) => browser.setOverlay(active === true));
 }
