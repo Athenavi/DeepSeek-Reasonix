@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
@@ -90,6 +91,11 @@ func (a *Agent) storeBatchToolResult(call provider.ToolCall, o toolOutcome) {
 	msg := provider.Message{Role: provider.RoleTool, Content: o.output, Images: o.images, VisionSummary: o.visionSummary, ToolCallID: call.ID, Name: call.Name, ToolRunState: state, ToolExecution: toProviderToolExecution(o.execution)}
 	if o.rawOutput != "" && o.rawOutput != o.output {
 		msg.RawContent = o.rawOutput
+	}
+	if env, ok := a.readResultEnvelopeFor(call, o); ok {
+		if raw, err := json.Marshal(env); err == nil {
+			msg.ReadResult = raw
+		}
 	}
 	a.sess.conversation.Add(msg)
 }

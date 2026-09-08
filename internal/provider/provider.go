@@ -105,6 +105,10 @@ type Message struct {
 	// ModelMessagesbeforeanyproviderrequestsotoolschemasandprompt-cacheprefixes stay stable.
 	ToolExecution *ToolExecution `json:"tool_execution,omitempty"`
 	ToolRunState  ToolRunState   `json:"tool_run_state,omitempty"`
+	// ReadResult is the host-only delivery envelope of a reader tool result. It
+	// is persisted for diagnostics and stripped by ModelMessages; provider
+	// serializers must never emit it on the wire.
+	ReadResult json.RawMessage `json:"read_result,omitempty"`
 	// MCPApp is the local MCP Apps presentation for results from App-capableservers. Persisted for
 	// Desktopcardsand stripped by ModelMessages;
 	// provider serializers must never emit it on the wire.

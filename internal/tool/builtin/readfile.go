@@ -81,33 +81,79 @@ func (r readFile) ObserveModelText(args json.RawMessage, output string) (tool.Mo
 	if err := json.Unmarshal(args, &p); err != nil || strings.TrimSpace(p.Path) == "" {
 		return tool.ModelTextObservation{}, false
 	}
-	rp := resolveReadablePath(r.workDir, p.Path, r.paths)
-	var start int
-	var hashes []string
-	for line := range strings.SplitSeq(output, "\n") {
-		arrow := strings.Index(line, "→")
-		if arrow <= 0 {
-			continue
-		}
-		lineNo, err := strconv.Atoi(strings.TrimSpace(line[:arrow]))
-		if err != nil || lineNo < 1 {
-			continue
-		}
-		if len(hashes) == 0 {
-			start = lineNo
-		} else if lineNo != start+len(hashes) {
-			// A page boundary or malformed output is not a contiguous model
-			// observation; fail closed instead of stitching unrelated windows.
-			return tool.ModelTextObservation{}, false
-		}
-		lineText := line[arrow+len("→"):]
-		sum := sha256.Sum256([]byte(lineText))
-		hashes = append(hashes, hex.EncodeToString(sum[:]))
-	}
-	if len(hashes) == 0 {
+	window, ok := tool.ParseReadWindow(output)
+	if !ok {
 		return tool.ModelTextObservation{}, false
 	}
-	return tool.ModelTextObservation{Path: rp.Path, StartLine: start, LineHashes: hashes}, true
+	hashes := make([]string, len(window.Lines))
+	for i, line := range window.Lines {
+		sum := sha256.Sum256([]byte(line))
+		hashes[i] = hex.EncodeToString(sum[:])
+	}
+	rp := resolveReadablePath(r.workDir, p.Path, r.paths)
+	return tool.ModelTextObservation{Path: rp.Path, StartLine: window.StartLine, LineHashes: hashes}, true
+}
+
+// ReadEnvelope reports what one read_file call delivered: its intent, the
+// requested window, the delivered window, the paging state, and the content
+// version of the delivered lines. read_id, result_ref and workspace_id are host
+// identity the agent fills in; total_lines and total_bytes stay empty because
+// the reader never scans ahead to count them.
+func (r readFile) ReadEnvelope(args json.RawMessage, output string) (tool.ReadResultEnvelope, bool) {
+	var p struct {
+		Path   string `json:"path"`
+		Offset int    `json:"offset"`
+		Limit  int    `json:"limit"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil || strings.TrimSpace(p.Path) == "" {
+		return tool.ReadResultEnvelope{}, false
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(args, &fields); err != nil {
+		return tool.ReadResultEnvelope{}, false
+	}
+	_, offsetExplicit := fields["offset"]
+	_, limitExplicit := fields["limit"]
+	if p.Offset < 0 {
+		p.Offset = 0
+	}
+	if p.Limit <= 0 {
+		p.Limit = readFileDefaultLimit
+	}
+
+	rp := resolveReadablePath(r.workDir, p.Path, r.paths)
+	env := tool.ReadResultEnvelope{
+		ProtocolVersion: tool.ReadResultProtocolVersion,
+		Source:          tool.ReadResultSource{CanonicalPath: rp.Path},
+		Intent:          tool.ReadIntentInspect,
+	}
+	if offsetExplicit || limitExplicit {
+		requested := tool.ReadRange{Start: p.Offset, End: p.Offset + p.Limit}
+		env.Intent = tool.ReadIntentRange
+		env.RequestedRange = &requested
+	}
+	if window, ok := tool.ParseReadWindow(output); ok {
+		env.DeliveredRanges = []tool.ReadRange{window.Range()}
+		env.Source.VersionToken = tool.ReadWindowVersionToken(rp.Path, window)
+	}
+
+	trailer := tool.ParseReadTrailer(output)
+	env.HasMore = trailer.HasMore
+	env.EOF = !trailer.HasMore
+	switch {
+	case trailer.LocalSafety:
+		env.SourceCut = tool.ReadCutSafetyPage
+	case trailer.HasMore:
+		env.SourceCut = tool.ReadCutPageLimit
+	}
+	if trailer.HasMore {
+		env.NextCursor = tool.EncodeReadCursor(tool.ReadCursor{
+			Path:      rp.Path,
+			Version:   env.Source.VersionToken,
+			NextStart: trailer.NextOffset,
+		})
+	}
+	return env, true
 }
 
 // SnipHint front-loads file content: the most relevant lines are near the top,
