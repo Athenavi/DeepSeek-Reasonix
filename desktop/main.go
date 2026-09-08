@@ -106,14 +106,14 @@ func preparePrimaryDesktopRuntime(app *App) {
 
 func main() {
 	prepareLinuxRendererCompatibilityEnvironment()
-	// Detached macOS self-update child: wait for the old PID, hold the shared
-	// repair mutation lock, then swap the .app bundle. Must run before Wails.
+	// The detached macOS self-update child must run before any shell starts.
 	if handled, exitCode := maybeRunMacUpdateHandoff(os.Args[1:]); handled {
 		os.Exit(exitCode)
 	}
 	capturePreviousFatalCrash()
 	installFatalCrashOutput()
 	exitIfHostLaunchMode(os.Args[1:])
+	exitIfShellBootstrapped(os.Args[1:])
 
 	launch := parseDesktopLaunchArgs(os.Args[1:])
 	if maybeRelaunchPrimaryIfSuperseded(launch) {
