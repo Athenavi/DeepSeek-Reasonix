@@ -232,6 +232,8 @@ func (a *App) commitRemoteTabOpenRegistration(registration *remoteTabOpenRegistr
 		return true
 	}
 	defer existing.selectionMu.Unlock()
+	existing.routeEventMu.Lock()
+	defer existing.routeEventMu.Unlock()
 	a.remoteTabMu.Lock()
 	defer a.remoteTabMu.Unlock()
 	if a.remoteTabs[registration.reuseID] != existing {
@@ -729,19 +731,6 @@ func waitForRemoteHost(rt remoteKernel, hostID string, timeout time.Duration) er
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-}
-
-func (a *App) emitRemoteTabState(tabID, state, errMsg string) {
-	a.remoteTabMu.Lock()
-	tab := a.remoteTabs[tabID]
-	if tab == nil {
-		a.remoteTabMu.Unlock()
-		return
-	}
-	tab.state = state
-	tab.err = errMsg
-	a.remoteTabMu.Unlock()
-	a.emitRemoteEvent(fmt.Sprintf("remote-tab:%s:state", tabID), RemoteTabStateView{State: state, Error: errMsg})
 }
 
 // remoteWorkspaceName is posix-safe (remote paths on a Windows host must not

@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"reasonix/internal/i18n"
 	"reasonix/internal/provider"
@@ -78,6 +79,17 @@ func TestExplainError(t *testing.T) {
 		}
 	}
 
+	notFoundCause := &provider.APIError{Provider: "deepseek-anthropic", ProviderDisplayName: "Deepseek2", Protocol: "openai", Status: 404}
+	notFound := explainError(notFoundCause)
+	for _, want := range []string{"Deepseek2 · Chat Completions", i18n.M.ProviderErrNotFound} {
+		if !strings.Contains(notFound.Error(), want) {
+			t.Errorf("404 = %q, want %q", notFound.Error(), want)
+		}
+	}
+	if d := provider.DiagnoseFailure(notFound); d.ProviderID != "deepseek-anthropic" || d.ProviderDisplayName != "Deepseek2" || d.Protocol != "openai" || d.Status != 404 {
+		t.Fatalf("explained 404 diagnostic = %+v", d)
+	}
+
 	jsonBody := explainError(&provider.APIError{Provider: "deepseek", Status: 400, Body: `{"error":{"message":"This model's maximum context length is 65536 tokens.","type":"invalid_request_error"}}`})
 	if !strings.Contains(jsonBody.Error(), i18n.M.ProviderErrBadRequest) || !strings.Contains(jsonBody.Error(), "maximum context length") {
 		t.Errorf("400 should append the provider reason from a JSON body, got %q", jsonBody.Error())
@@ -92,6 +104,16 @@ func TestExplainError(t *testing.T) {
 	})
 	if !strings.Contains(limit.Error(), "810882") || !strings.Contains(limit.Error(), "1048576") || !strings.Contains(limit.Error(), "Compact") {
 		t.Errorf("context overflow should name numbers and recovery, got %q", limit.Error())
+	}
+
+	unnumbered := explainError(&provider.ContextLimitError{
+		APIError: &provider.APIError{Provider: "glm", Status: 400, Body: `{"error":{"code":"1261","message":"Prompt exceeds max length"}}`},
+	})
+	if strings.Contains(unnumbered.Error(), fmt.Sprintf(i18n.M.ProviderErrContextOverflowFmt, 0, 0, 0, 0)) {
+		t.Errorf("an overflow without token numbers must not quote zeros, got %q", unnumbered.Error())
+	}
+	if !strings.Contains(unnumbered.Error(), i18n.M.ProviderErrBadRequest) || !strings.Contains(unnumbered.Error(), "Prompt exceeds max length") {
+		t.Errorf("an overflow without token numbers should keep the provider reason, got %q", unnumbered.Error())
 	}
 
 	toolSchema := explainError(&provider.APIError{
@@ -179,6 +201,29 @@ func TestExplainError(t *testing.T) {
 	//nolint:errorlint // identity check: explainError must return the same error, unwrapped.
 	if explainError(plain) != plain {
 		t.Error("unknown errors should pass through unchanged")
+	}
+}
+
+func TestExplainRecoveryWaitExhaustedKeepsTypeAndCause(t *testing.T) {
+	cause := &provider.APIError{Provider: "deepseek", Status: 503, Body: `{"error":{"message":"upstream overloaded"}}`}
+	got := explainError(&provider.RecoveryWaitExhaustedError{Phase: "headers", Status: 503, Waited: 9*time.Minute + 33*time.Second + 400*time.Millisecond, Attempts: 13, Cause: cause})
+	for _, want := range []string{fmt.Sprintf(i18n.M.ProviderErrWaitExhaustedFmt, "9m33s"), "HTTP 503", "upstream overloaded"} {
+		if !strings.Contains(got.Error(), want) {
+			t.Errorf("explanation = %q, want it to contain %q", got.Error(), want)
+		}
+	}
+	if strings.Contains(got.Error(), i18n.M.ProviderErrServerBusy) || strings.Contains(got.Error(), "provider unreachable for") {
+		t.Errorf("explanation must describe the exhausted wait, not the last status: %q", got.Error())
+	}
+	if d := provider.DiagnoseFailure(got); d.Kind != "recovery_wait_exhausted" || d.Status != 503 {
+		t.Errorf("diagnostic = %+v", d)
+	}
+	if turnOutcome(got) != "" {
+		t.Errorf("an exhausted wait is an ordinary failure, got outcome %q", turnOutcome(got))
+	}
+	connect := explainError(&provider.RecoveryWaitExhaustedError{Phase: "connect", Waited: 10 * time.Minute, Attempts: 12, Cause: io.ErrUnexpectedEOF})
+	if !strings.Contains(connect.Error(), fmt.Sprintf(i18n.M.ProviderErrWaitExhaustedFmt, "10m0s")) || !strings.Contains(connect.Error(), io.ErrUnexpectedEOF.Error()) {
+		t.Errorf("connect explanation = %q", connect.Error())
 	}
 }
 

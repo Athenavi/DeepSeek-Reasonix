@@ -285,9 +285,9 @@ func ApplyUserConfigUpgradesOnStartup(path string) (bool, error) {
 	if header.ConfigVersion == defaultVersion && !classicDesktopLayout {
 		return false, nil
 	}
-	// Version 7 already completed the older migrations. Preserve its original
+	// Versions 7 and 8 already completed the older migrations. Preserve their
 	// TOML byte-for-byte except for the protocol scalars and version marker.
-	if header.ConfigVersion >= deepSeekScheduledPricingConfigVersion && header.ConfigVersion < deepSeekChatDefaultConfigVersion && !classicDesktopLayout {
+	if header.ConfigVersion >= deepSeekScheduledPricingConfigVersion && header.ConfigVersion < deepSeekOfficialChatUpgradeConfigVersion && !classicDesktopLayout {
 		return upgradeDeepSeekChatDefaultFileLocked(path)
 	}
 	cfg := LoadForEdit(path)
@@ -326,6 +326,10 @@ func ApplyUserConfigUpgradesOnStartup(path string) (bool, error) {
 	}
 	if header.ConfigVersion < deepSeekChatDefaultConfigVersion {
 		restoreDeepSeekChatDefaults(cfg)
+		changed = true
+	}
+	if header.ConfigVersion < deepSeekOfficialChatUpgradeConfigVersion {
+		migrateOfficialDeepSeekChat(cfg)
 		changed = true
 	}
 	if !changed {

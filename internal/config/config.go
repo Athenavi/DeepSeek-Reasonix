@@ -275,43 +275,6 @@ type CLIConfig struct {
 	UpdateChannel string `toml:"update_channel"`
 }
 
-// DesktopConfig controls desktop-only UI preferences. It is intentionally
-// separate from top-level language and [ui] so desktop choices do not affect CLI
-// language, terminal colours, or provider-visible prompt/request data.
-type DesktopConfig struct {
-	Language                string   `toml:"language"`                   // auto|en|zh; empty/auto = browser/OS auto-detect
-	Currency                string   `toml:"currency"`                   // legacy display currency; migrated to [billing].display_currency
-	LayoutStyle             string   `toml:"layout_style"`               // workbench|creation; legacy classic is migrated on startup
-	Theme                   string   `toml:"theme"`                      // auto|dark|light; empty resolves to auto
-	ThemeStyle              string   `toml:"theme_style"`                // graphite|aurora|slate|carbon|nocturne|amber and legacy aliases
-	TerminalTheme           string   `toml:"terminal_theme"`             // auto|dark|light; auto follows the desktop app theme
-	ExternalOpener          string   `toml:"external_opener"`            // preferred installed app used by the desktop Open control
-	CloseBehavior           string   `toml:"close_behavior"`             // quit|background; desktop window close behavior
-	DisplayMode             string   `toml:"display_mode"`               // standard|compact (legacy "minimal" maps to compact); transcript display mode
-	StatusBarStyle          string   `toml:"status_bar_style"`           // icon|text; desktop status bar metric labels
-	StatusBarItems          []string `toml:"status_bar_items"`           // ordered visible desktop status bar items
-	DefaultToolApprovalMode string   `toml:"default_tool_approval_mode"` // ask|auto|yolo; defaults to auto for newly-created desktop sessions
-	CheckUpdates            *bool    `toml:"check_updates"`              // startup update checks; nil keeps the default enabled
-	// UpdateChannel is a legacy compatibility field. It is accepted on read but
-	// ignored and omitted from future canonical writes.
-	UpdateChannel        string   `toml:"update_channel"`
-	Telemetry            *bool    `toml:"telemetry"`       // anonymous launch ping plus scrubbed next-launch native crash diagnostics; nil keeps the default enabled
-	Metrics              *bool    `toml:"metrics"`         // aggregate desktop metrics (anonymous signal/bucket counts, including lifecycle health; no content); nil keeps the default enabled
-	ProviderAccess       []string `toml:"provider_access"` // desktop-only list of provider entries shown in Settings > Model > Access
-	ExpandThinking       bool     `toml:"expand_thinking"` // deprecated compatibility alias: true maps to auto
-	ReasoningDisplayMode string   `toml:"reasoning_display_mode"`
-	ConversationWidth    string   `toml:"conversation_width"` // standard|full; max transcript width; empty = standard
-}
-
-// DesktopExternalOpener returns the selected opener id; unavailable ids fall
-// back to the platform file manager in the desktop shell.
-func (c *Config) DesktopExternalOpener() string {
-	if c == nil {
-		return ""
-	}
-	return strings.ToLower(strings.TrimSpace(c.Desktop.ExternalOpener))
-}
-
 // NotificationsConfig controls optional system notifications for CLI chat/run.
 type NotificationsConfig struct {
 	Enabled         bool `toml:"enabled"`
@@ -490,19 +453,6 @@ func (c *Config) UICloseBehavior() string {
 	return c.DesktopCloseBehavior()
 }
 
-// DesktopDisplayMode normalizes the transcript display mode. Default is
-// "standard" (flat rendering, no folding).
-func (c *Config) DesktopDisplayMode() string {
-	switch strings.ToLower(strings.TrimSpace(c.Desktop.DisplayMode)) {
-	case "standard":
-		return "standard"
-	case "compact", "minimal":
-		return "compact"
-	default:
-		return "standard"
-	}
-}
-
 // DesktopConversationWidth returns the normalized desktop conversation width.
 // Unknown and missing values fall back to standard for backward compatibility.
 func (c *Config) DesktopConversationWidth() string {
@@ -536,15 +486,18 @@ func (c *Config) DesktopDefaultToolApprovalMode() string {
 }
 
 // DesktopStatusBarStyle normalizes the desktop status bar metric label style.
-// Default is "text"; explicit "icon" preserves the user's compact choice.
+// Unmigrated configurations adopt icon labels once; later choices are preserved.
 func (c *Config) DesktopStatusBarStyle() string {
+	if !c.Desktop.StatusBarStyleInitialized {
+		return "icon"
+	}
 	switch strings.ToLower(strings.TrimSpace(c.Desktop.StatusBarStyle)) {
 	case "icon":
 		return "icon"
 	case "text":
 		return "text"
 	default:
-		return "text"
+		return "icon"
 	}
 }
 
@@ -1290,6 +1243,7 @@ type AgentConfig struct {
 	PlannerMaxSteps int     `toml:"planner_max_steps"`
 	Temperature     float64 `toml:"temperature"`
 	PlannerModel    string  `toml:"planner_model"`
+	WebSearchModel  string  `toml:"web_search_model"` // empty or auto preserves automatic search selection
 	// VisionModel is empty (off), "auto", or a canonical provider/model ref
 	// used to summarize images before a text-only executor turn.
 	VisionModel         string  `toml:"vision_model"`
@@ -1363,6 +1317,7 @@ type AgentConfig struct {
 // token budget; the harness compacts older history as a turn's prompt approaches
 // it (see agent compaction). 0 disables compaction for the instance.
 type ProviderEntry struct {
+	DisplayName   string            `toml:"display_name,omitempty"` // UI label; Name remains the stable routing identity.
 	Name          string            `toml:"name"`
 	Kind          string            `toml:"kind"`
 	BaseURL       string            `toml:"base_url"`
@@ -1628,16 +1583,6 @@ func (e *ProviderEntry) modelOverrideForModel(model string) (ProviderModelOverri
 	if ov, ok := e.ModelOverrides[model]; ok {
 		return ov, true
 	}
-	keys := make([]string, 0, len(e.ModelOverrides))
-	for k := range e.ModelOverrides {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	for _, k := range keys {
-		if strings.EqualFold(strings.TrimSpace(k), model) {
-			return e.ModelOverrides[k], true
-		}
-	}
 	return ProviderModelOverride{}, false
 }
 
@@ -1858,7 +1803,7 @@ const LanguagePolicy = `Reply in the same language the user is using in their mo
 // Default returns the built-in default configuration.
 func Default() *Config {
 	return &Config{
-		ConfigVersion:    8,
+		ConfigVersion:    9,
 		DefaultModel:     "deepseek-flash",
 		CredentialsStore: CredentialsStoreAuto,
 		UI:               UIConfig{Theme: "auto", ShowTurnUsage: true},

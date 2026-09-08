@@ -24,6 +24,7 @@ import (
 // — the caller emits ToolDispatch/ToolResult — so it is safe to invoke fromparallel goroutines. Stages:
 // parse → policy → prepare → finish.
 func (a *Agent) executeOne(ctx context.Context, turn *turnRuntime, call provider.ToolCall) (out toolOutcome) {
+	defer func() { out.runState = outcomeRunState(out) }()
 	ctx = withTurnState(a.withAgentContext(ctx), turn)
 	plan := &toolCallPlan{call: call}
 	defer func() {
@@ -646,7 +647,8 @@ func (a *Agent) finishToolExecution(ctx context.Context, plan *toolCallPlan) too
 		rawErr := fmt.Sprintf("error: %v\n%s", err, detail)
 		body, truncMsg, original := a.boundProviderVisibleResult(rawErr, call.Name, call.ID)
 		out := toolOutcome{
-			output: body, errMsg: firstLine(err.Error()), truncated: truncMsg != "" || original != "", truncMsg: truncMsg,
+			runState: outcomeRunState(toolOutcome{executed: true, output: rawErr}),
+			output:   body, errMsg: firstLine(err.Error()), truncated: truncMsg != "" || original != "", truncMsg: truncMsg,
 			execution: execution, mcpApp: toProviderMCPApp(plan.mcpApp), recoveryGeneration: recoveryGen, subagentOutcome: subagentOutcomeFromError(err),
 		}
 		if original != "" {
@@ -664,9 +666,15 @@ func (a *Agent) finishToolExecution(ctx context.Context, plan *toolCallPlan) too
 	if a.svc.hooks != nil && call.Name == "task" && !isBackgroundTaskCall(call.Arguments) {
 		a.svc.hooks.SubagentStop(ctx, result)
 	}
+	runState := outcomeRunState(toolOutcome{executed: true, output: result})
+	var visionSummary *provider.VisionSummary
+	if runState == provider.ToolRunCompleted {
+		processed := a.processToolImages(cctx, result, images)
+		result, visionSummary = processed.text, processed.summary
+	}
 	body, truncMsg, original, readObserver := a.boundIncompleteReadAwareResult(plan, result)
 	out := toolOutcome{
-		output: body, images: images, truncated: truncMsg != "" || original != "", truncMsg: truncMsg,
+		runState: runState, output: body, images: images, visionSummary: visionSummary, truncated: truncMsg != "" || original != "", truncMsg: truncMsg,
 		execution: execution, mcpApp: toProviderMCPApp(plan.mcpApp), recoveryGeneration: recoveryGen,
 	}
 	if original != "" {

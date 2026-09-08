@@ -4,7 +4,7 @@
     "commented-code": 0,
     "complexity": 1961,
     "essay": 1966,
-    "file-size": 108949,
+    "file-size": 103891,
     "function-size": 8448,
     "layering": 1,
     "marker": 0,
@@ -65,9 +65,6 @@
     "desktop/external_opener_windows_test.go": {
       "essay": 2
     },
-    "desktop/frontend/src/App.tsx": {
-      "file-size": 4778
-    },
     "desktop/frontend/src/__tests__/app-chrome-tabs.test.ts": {
       "test-file-size": 27
     },
@@ -75,7 +72,7 @@
       "test-file-size": 307
     },
     "desktop/frontend/src/__tests__/composer-goal-toggle.test.tsx": {
-      "test-file-size": 1758
+      "test-file-size": 1764
     },
     "desktop/frontend/src/__tests__/composer-session-draft.test.tsx": {
       "test-file-size": 505
@@ -90,7 +87,7 @@
       "test-file-size": 352
     },
     "desktop/frontend/src/__tests__/settings-refresh-snapshot.test.tsx": {
-      "test-file-size": 228
+      "test-file-size": 229
     },
     "desktop/frontend/src/__tests__/tab-switch-hydration.test.tsx": {
       "test-file-size": 162
@@ -99,19 +96,19 @@
       "file-size": 235
     },
     "desktop/frontend/src/components/CapabilitiesPanel.tsx": {
-      "file-size": 2641
+      "file-size": 2643
     },
     "desktop/frontend/src/components/Composer.tsx": {
       "file-size": 4002
     },
     "desktop/frontend/src/components/ContextPanel.tsx": {
-      "file-size": 52
+      "file-size": 36
     },
     "desktop/frontend/src/components/HistoryPanel.tsx": {
       "file-size": 7
     },
     "desktop/frontend/src/components/MemoryPanel.tsx": {
-      "file-size": 1088
+      "file-size": 1089
     },
     "desktop/frontend/src/components/Message.tsx": {
       "file-size": 29
@@ -129,16 +126,13 @@
       "file-size": 43
     },
     "desktop/frontend/src/components/ThemeGallery.tsx": {
-      "file-size": 489
+      "file-size": 490
     },
     "desktop/frontend/src/components/ThemeLibrary.tsx": {
-      "file-size": 158
-    },
-    "desktop/frontend/src/components/Transcript.tsx": {
-      "file-size": 264
+      "file-size": 159
     },
     "desktop/frontend/src/components/UsageStatsPanel.tsx": {
-      "file-size": 276
+      "file-size": 277
     },
     "desktop/frontend/src/components/WorkspacePanel.tsx": {
       "file-size": 1346
@@ -846,7 +840,7 @@
     },
     "internal/config/edit.go": {
       "essay": 5,
-      "file-size": 1679
+      "file-size": 1680
     },
     "internal/config/edit_test.go": {
       "test-file-size": 2425
@@ -891,7 +885,7 @@
       "function-size": 946
     },
     "internal/config/render_test.go": {
-      "test-file-size": 759
+      "test-file-size": 761
     },
     "internal/control/approval.go": {
       "essay": 5,

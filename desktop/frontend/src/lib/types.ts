@@ -1,3 +1,5 @@
+import type { ProviderCatalog, ProviderPresetView } from "./providerCatalogTypes";
+export type { ProviderProtocolEndpoint, ProviderCatalog, ProviderPresetView } from "./providerCatalogTypes";
 import type { RecoveryEventFields } from "./recoveryStatus";
 // Wire contract — mirrors desktop/wire.go (itself mirroring internal/serve/wire.go).
 // One event channel carries every kind; `kind` discriminates the payload.
@@ -382,6 +384,8 @@ export interface MemoryCitation {
 
 export interface WireEvent extends RecoveryEventFields {
   kind: EventKind;
+  /** session_changed: the transcript was replaced under the same path (head switch, clear). */
+  sessionReset?: boolean;
   promptId?: string;
   promptKind?: "ask" | "approval" | "plan" | "recovery" | "mcp" | string;
   promptLegacy?: boolean;
@@ -411,7 +415,7 @@ export interface WireEvent extends RecoveryEventFields {
   outcome?: "completed" | "partial" | "blocked" | "final_readiness" | "recovery_paused" | "completion_uncertain";
   readiness?: WireFinalReadiness;
   protocolRecovery?: { id: string };
-  diagnostic?: { kind: string; status?: number; traceId?: string };
+  diagnostic?: { kind: string; status?: number; traceId?: string; providerId?: string; providerDisplayName?: string; protocol?: string; requestPath?: string };
   /** Optional: "headers" | "stream". Older clients ignore unknown fields. */
   retryScope?: "headers" | "stream" | "protocol";
   streamAttempt?: WireStreamAttempt;
@@ -639,6 +643,8 @@ export interface RecoveryPreferenceRequest {
   workspaceRoot?: string;
   topicId: string;
   path: string;
+  /** Head inside a schema-2 log; empty for file-based recovery versions. */
+  headId?: string;
 }
 
 export interface RecoveryCleanupItem {
@@ -817,7 +823,7 @@ export interface HistoryMessage {
   decisionReceipt?: WireDecisionReceipt;
   readiness?: WireFinalReadiness;
   protocolRecovery?: { id: string };
-  diagnostic?: { kind: string; status?: number; traceId?: string };
+  diagnostic?: { kind: string; status?: number; traceId?: string; providerId?: string; providerDisplayName?: string; protocol?: string; requestPath?: string };
   serverSearch?: HistoryServerSearch[];
 }
 
@@ -1476,6 +1482,7 @@ export interface MCPMarketplaceView {
 }
 
 export interface ModelInfo {
+  displayName?: string;
   ref: string; // "provider/model" — pass to SetModel
   provider: string;
   model: string;
@@ -1485,8 +1492,9 @@ export interface ModelInfo {
 }
 
 export interface EffortInfo {
+  options?: { id: string; name: string; description?: string }[];
   supported: boolean;
-  current: string; // "auto" | "low" | "medium" | "high" | "xhigh" | "max"
+  current: string; // adapter-owned ID; "auto" inherits the configured default
   default: string;
   levels: string[];
 }
@@ -1623,7 +1631,7 @@ export interface MemoryView {
 }
 
 // SettingsTab is the top-level navigation item in the Settings Centre modal.
-export type SettingsTab = "general" | "models" | "providers" | "bots" | "mcp" | "remote" | "skills" | "subagents" | "plugins" | "memory" | "hooks" | "diagnostics" | "shortcuts" | "permissions" | "sandbox" | "network" | "appearance" | "storage" | "updates";
+export type SettingsTab = "general" | "models" | "model-stats" | "providers" | "bots" | "mcp" | "remote" | "skills" | "subagents" | "plugins" | "memory" | "hooks" | "diagnostics" | "shortcuts" | "permissions" | "sandbox" | "network" | "appearance" | "storage" | "updates";
 
 /** Extension runtime doctor report from App.RuntimeDoctor. */
 export interface RuntimeDoctorReport {
@@ -1740,7 +1748,10 @@ export interface CapabilityIssue {
 }
 // Settings panel payloads (desktop/settings_app.go).
 export interface ProviderView {
+  displayName?: string;
   name: string;
+  presetId?: string; // stable curated identity; read-only in the connection editor
+  catalog?: ProviderCatalog; // protocol routes for this installed connection, including hidden legacy presets
   builtIn: boolean;
   added: boolean;
   kind: string;
@@ -1802,31 +1813,7 @@ export interface ProviderModelCapabilityUpdate {
   inputModalities: string[];
 }
 
-export interface ProviderPresetView {
-  id: string;
-  label: string;
-  description: string;
-  keyEnv: string;
-  recommended?: boolean;
-  billingMode?: string;
-  displayGroup?: string;
-  displaySection?: string;
-  displayTier?: "primary" | "advanced" | "compatibility" | string;
-  routeKind?: string;
-  optional?: boolean;
-  displayOrder?: number;
-  providerNames: string[];
-  models: string[];
-  added: boolean;
-  status?: "available" | "installed" | "installed_modified" | "partial" | "name_conflict" | "similar_existing";
-  statusProviderNames?: string[];
-  missingProviderNames?: string[];
-  keySet: boolean;
-  requiresKey?: boolean;
-  configured?: boolean;
-  keySource?: string;
-  keySourcePath?: string;
-}
+
 
 export interface ProviderModelOverrideView {
   model: string;
@@ -2262,6 +2249,12 @@ export interface SettingsView {
   defaultModel: string;
   plannerModel: string;
   visionModel: string;
+  webSearchModel?: string;
+  webSearchModels?: string[];
+  webSearchModelStatus?: string;
+  webSearchModelReason?: string;
+  effectiveWebSearchModel?: string;
+  webSearchModelOverridden?: boolean;
   subagentModel: string;
   subagentEffort: string;
   autoPlan: string;
@@ -2280,7 +2273,7 @@ export interface SettingsView {
   desktopThemeStyle: string;
   desktopTerminalTheme: string; // "auto" follows app | "dark" | "light"
   closeBehavior: string; // "background" | "quit"
-  displayMode: string; reasoningDisplayMode: string; reasoningDisplayModeExplicit?: boolean;
+  displayMode: string; sessionExperience?: "standard" | "deep"; reasoningDisplayMode: string; reasoningDisplayModeExplicit?: boolean;
   statusBarStyle: string; // "icon" | "text"
   statusBarItems: string[]; // ordered visible status bar item ids
   defaultToolApprovalMode: ToolApprovalMode | string; // default for newly-created sessions
@@ -2303,7 +2296,7 @@ export interface DesktopStartupSettingsView {
   desktopTheme: string; // "auto" | "dark" | "light"
   desktopThemeStyle: string;
   desktopTerminalTheme: string; // "auto" follows app | "dark" | "light"
-  displayMode: string; reasoningDisplayMode: string; reasoningDisplayModeExplicit?: boolean;
+  displayMode: string; sessionExperience?: "standard" | "deep"; reasoningDisplayMode: string; reasoningDisplayModeExplicit?: boolean;
   statusBarStyle: string; // "icon" | "text"
   statusBarItems: string[]; // ordered visible status bar item ids
   checkUpdates: boolean; // check for new versions on startup

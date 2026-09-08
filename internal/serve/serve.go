@@ -998,7 +998,9 @@ func (s *Server) fork(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, sessionInUseError(err), http.StatusConflict)
 		return
 	}
-	writeJSON(w, map[string]string{"path": path})
+	// path is the session the controller is on now; branch is what the fork
+	// created: the same path for a file fork, a head id inside a schema-2 log.
+	writeJSON(w, map[string]string{"path": s.ctl().SessionPath(), "branch": path})
 }
 
 // summarize runs summarize-from or summarize-up-to on a turn.

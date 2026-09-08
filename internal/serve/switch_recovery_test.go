@@ -120,6 +120,7 @@ func primarySessionFiles(paths []string) []string {
 // bound the just-recovered transcript back to the original file, so every
 // later save re-conflicted and derived yet another recovery branch.
 func TestSwitchModelContinuesRecoveryPathAfterSnapshotConflict(t *testing.T) {
+	t.Setenv(agent.SessionLogSchemaEnv, "v1")
 	t.Setenv("REASONIX_HOME", t.TempDir())
 	dir := t.TempDir()
 	originalPath := filepath.Join(dir, "switch-conflict.jsonl")

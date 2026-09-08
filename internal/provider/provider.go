@@ -43,6 +43,9 @@ const (
 // Message is a single conversation message.
 type Message struct {
 	Role Role `json:"role"`
+	// ID is local transcript identity (stable across saves, reloads, and log
+	// branches). Adapters never copy it to the wire; older readers ignore it.
+	ID string `json:"id,omitempty"`
 	// Origin distinguishes real user input from host-generated user-role protocol
 	// messages. omitempty keeps legacy sessions readable by previous releases.
 	Origin MessageOrigin `json:"origin,omitempty"`
@@ -1019,11 +1022,13 @@ func MissingToolCallReasoningWarningFingerprint(p Provider) string {
 
 // Config is a resolved provider instance configuration.
 type Config struct {
-	Name    string         // instance name, e.g. "deepseek"
-	BaseURL string         // OpenAI-compatible endpoint
-	Model   string         // model id
-	APIKey  string         // resolved from api_key_env
-	Extra   map[string]any // kind-specific options
+	Name        string         // stable instance id, e.g. "deepseek-anthropic"
+	DisplayName string         // user-editable label; empty falls back to Name
+	Protocol    string         // configured wire adapter id
+	BaseURL     string         // OpenAI-compatible endpoint
+	Model       string         // model id
+	APIKey      string         // resolved from api_key_env
+	Extra       map[string]any // kind-specific options
 	// ModelInfo is adapter-owned metadata for the exact model instance. It is
 	// optional so existing third-party factories remain source-compatible.
 	ModelInfo *ModelInfo
@@ -1039,12 +1044,14 @@ type Config struct {
 // Body and extract it themselves. Providersshould return this (rather than a generic status error)
 // forauthfailures.
 type AuthError struct {
-	Provider  string // the provider instance name, e.g. "deepseek"
-	KeyEnv    string // the api_key_env the key is read from, when known
-	KeySource string // human-readable source of KeyEnv, when known
-	Status    int    // the HTTP status (401 or 403)
-	HasKey    bool   // a non-empty key was sent — the server rejected it, vs. no key configured at all
-	Body      string // trimmed response-body snippet, the server's verbatim reason when it gave one
+	Provider            string // stable provider instance id, e.g. "deepseek"
+	ProviderDisplayName string // user-editable display label
+	Protocol            string // configured wire adapter id
+	KeyEnv              string // the api_key_env the key is read from, when known
+	KeySource           string // human-readable source of KeyEnv, when known
+	Status              int    // the HTTP status (401 or 403)
+	HasKey              bool   // a non-empty key was sent — the server rejected it, vs. no key configured at all
+	Body                string // trimmed response-body snippet, the server's verbatim reason when it gave one
 }
 
 func (e *AuthError) Error() string {
@@ -1056,7 +1063,7 @@ func (e *AuthError) Error() string {
 		key += " from " + e.KeySource
 	}
 	return fmt.Sprintf("authentication failed for provider %q (HTTP %d): %s is invalid or expired — update it (in .env or your environment) and retry, or run `reasonix setup`",
-		e.Provider, e.Status, key)
+		ProviderDisplayLabel(e.Provider, e.ProviderDisplayName, e.Protocol), e.Status, key)
 }
 
 // Factory builds a Provider from a resolved Config.

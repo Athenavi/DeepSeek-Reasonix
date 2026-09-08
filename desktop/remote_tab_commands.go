@@ -138,6 +138,10 @@ func (a *App) resumeRemoteTabSessionPathForOpenSelection(tabID, name, sessionPat
 	}
 	consumeQueuedRemoteTabOpenSelectionLocked(tab, selectionRevision)
 	client, base, gen := tab.client, tab.base, tab.gen
+	failureRoute := remoteTabProvisionalResume{
+		targetPath: tab.routing.currentPath, pathRevision: tab.routing.pathRevision,
+		selectionRevision: tab.selectionRevision, previousSelection: previous,
+	}
 	a.remoteTabMu.Unlock()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -148,8 +152,7 @@ func (a *App) resumeRemoteTabSessionPathForOpenSelection(tabID, name, sessionPat
 	} else {
 		entries, err := serveSessions(ctx, client, base)
 		if err != nil {
-			a.transitionRemoteTabState(tabID, gen, "ready", "ready", fmt.Sprintf("Could not open remote session %q: %v", name, err))
-			return false
+			return a.completeRemoteTabResumeFailure(tabID, tab, client, gen, failureRoute, fmt.Sprintf("Could not open remote session %q: %v", name, err))
 		}
 		for _, entry := range entries {
 			if entry.Name == name {
@@ -164,23 +167,16 @@ func (a *App) resumeRemoteTabSessionPathForOpenSelection(tabID, name, sessionPat
 		// before the request returns so the all-session pump does not discard its
 		// handoff output or prompt replay as background work.
 		route := a.beginRemoteTabProvisionalResume(tabID, tab, client, gen, target.Path)
+		route.previousSelection = previous
 		mountedPath, err := servePostSessionPath(ctx, client, serveURL(base, "/resume"), body)
 		if err != nil {
 			var statusErr *serveHTTPStatusError
 			if errors.As(err, &statusErr) {
-				if !a.rollbackRemoteTabProvisionalResume(tabID, tab, client, gen, route) {
-					// A newer route already superseded this request. Its identity is
-					// authoritative, so the open-selection rollback must not run.
-					return true
-				}
+				message := err.Error()
 				if remoteSessionTransitionBusy(err) {
-					a.transitionRemoteTabState(tabID, gen, "ready", "ready", "Finish the current turn before switching sessions.")
-					return false
+					message = "Finish the current turn before switching sessions."
 				}
-				// A received HTTP rejection is definitive: Serve did not commit the
-				// target, so the previous ready route remains authoritative.
-				a.transitionRemoteTabState(tabID, gen, "ready", "ready", err.Error())
-				return false
+				return a.completeRemoteTabResumeFailure(tabID, tab, client, gen, route, message)
 			}
 			// A transport failure is ambiguous: Serve may have committed the
 			// resume before the tunnel lost its response. Query its current route
@@ -224,8 +220,7 @@ func (a *App) resumeRemoteTabSessionPathForOpenSelection(tabID, name, sessionPat
 		a.goRemoteTabSafe("remoteTabResumeStatus", func() { _, _ = a.RemoteTabStatus(tabID) })
 		return true
 	}
-	a.transitionRemoteTabState(tabID, gen, "ready", "ready", fmt.Sprintf("remote session %q not found", name))
-	return false
+	return a.completeRemoteTabResumeFailure(tabID, tab, client, gen, failureRoute, fmt.Sprintf("remote session %q not found", name))
 }
 
 func (a *App) SetRemoteSessionPinned(hostID, workspace, name string, pinned bool) error {
@@ -699,6 +694,6 @@ func (a *App) rotateRemoteTabSession(tabID, path string) error {
 	a.remoteTabMu.Unlock()
 	a.emitRemoteEvent("remote-tab:updated", meta)
 	a.saveTabsFromRemote()
-	a.emitRemoteTabState(tabID, "ready", "")
+	a.emitRemoteTabStateLocked(tab, "ready", "")
 	return nil
 }

@@ -23,8 +23,12 @@ const noticeCodeKeys: Record<string, DictKey> = {
   session_recovery_adopted_covered: "recovery.noticeAdoptedCovered",
   session_recovery_depth_cap: "recovery.noticeKeptCurrent",
   session_shutdown_recovery_forked: "recovery.noticeSavedCopy",
+  session_concurrent_writer: "recovery.noticeConcurrentWriter",
+  session_head_switched: "recovery.noticeHeadSwitched",
+  session_head_selected: "recovery.noticeHeadSelected",
   decision_receipt: "notice.decisionReceiptTitle",
   context_editing_fallback: "notice.contextEditingFallback",
+  turn_stalled: "notice.turnStalled",
 };
 
 const streamInterruptReasonCodeKeys: Record<string, DictKey> = {

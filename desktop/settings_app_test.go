@@ -1550,7 +1550,8 @@ func TestUpgradeDeepSeekProviderAccessContinuesAfterWorkspaceBuildFailure(t *tes
 		t.Fatal(err)
 	}
 	// The explicit Settings action runs after the one-time startup migration.
-	raw := `config_version = 8
+	// The running app has completed the startup migration before a manual switch.
+	raw := `config_version = 9
 default_model = "deepseek-flash/deepseek-v4-flash"
 
 [desktop]

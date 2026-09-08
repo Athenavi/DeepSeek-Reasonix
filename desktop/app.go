@@ -2516,73 +2516,6 @@ func (a *App) PreviewRewindForTab(tabID string, turn int, scope string) RewindPl
 	return view
 }
 
-// CommitRewindForTab executes prepare (if planID empty) then commit immediately.
-func (a *App) CommitRewindForTab(tabID, planID string, turn int, scope string) RewindResultView {
-	tab, ctrl := a.tabAndCtrlByID(tabID)
-	if a.tabIsReadOnly(tab) {
-		return RewindResultView{OK: false, Error: readOnlyChannelErr().Error()}
-	}
-	if ctrl == nil {
-		return RewindResultView{OK: false, Error: "no controller"}
-	}
-	s := control.RewindBoth
-	switch scope {
-	case "code":
-		s = control.RewindCode
-	case "conversation":
-		s = control.RewindConversation
-	}
-	if planID == "" {
-		plan, err := ctrl.PrepareRewind(turn, s)
-		if err != nil {
-			return RewindResultView{OK: false, Error: err.Error()}
-		}
-		// Conversation-only is allowed when its boundary is valid. File scopes
-		// never fall back to the legacy force-restore path.
-		if s == control.RewindConversation {
-			if !plan.CanConversation {
-				return RewindResultView{OK: false, Error: nonEmptyStr(plan.DisabledReason, "conversation rewind unavailable")}
-			}
-		} else if !plan.CanFiles {
-			return RewindResultView{OK: false, Error: nonEmptyStr(plan.DisabledReason, "file rewind unavailable"), Conflicts: conflictStrings(plan), Coverage: string(plan.Coverage)}
-		}
-		planID = plan.PlanID
-	}
-	result, err := ctrl.CommitRewind(planID)
-	view := rewindResultToView(result)
-	if err != nil {
-		view.OK = false
-		if view.Error == "" {
-			view.Error = err.Error()
-		}
-		return view
-	}
-	if view.OK && view.ConversationForked && strings.TrimSpace(view.Branch) != "" && tab != nil {
-		view = a.attachForkedRewindTab(tab, view)
-	}
-	return view
-}
-
-// UndoRewindForTab undoes the last successful rewind on the tab when available.
-func (a *App) UndoRewindForTab(tabID, transactionID string) RewindResultView {
-	tab, ctrl := a.tabAndCtrlByID(tabID)
-	if a.tabIsReadOnly(tab) {
-		return RewindResultView{OK: false, Error: readOnlyChannelErr().Error()}
-	}
-	if ctrl == nil {
-		return RewindResultView{OK: false, Error: "no controller"}
-	}
-	result, err := ctrl.UndoRewind(transactionID)
-	view := rewindResultToView(result)
-	if err != nil {
-		view.OK = false
-		if view.Error == "" {
-			view.Error = err.Error()
-		}
-	}
-	return view
-}
-
 // PreviewWorkspaceFileRevertForTab prepares a single-file session-owned revert.
 func (a *App) PreviewWorkspaceFileRevertForTab(tabID, path string) RewindPlanView {
 	tab, ctrl := a.tabAndCtrlByID(tabID)
@@ -5169,7 +5102,32 @@ type HistoryMessage struct {
 	DecisionReceipt  *provider.DecisionReceipt        `json:"decisionReceipt,omitempty"`
 	Readiness        *event.FinalReadiness            `json:"readiness,omitempty"`
 	ProtocolRecovery *provider.ProtocolRecoveryAction `json:"protocolRecovery,omitempty"`
+	Diagnostic       *provider.FailureDiagnostic      `json:"diagnostic,omitempty"`
 	ServerSearch     []provider.ServerSearchCall      `json:"serverSearch,omitempty"`
+}
+
+func interruptedTurnHistoryNotice(recovery *provider.InterruptedTurnRecovery) HistoryMessage {
+	if recovery != nil && recovery.TerminalStatus == "failed" {
+		diagnostic := recovery.FailureDiagnostic
+		message := "The provider request failed. Check the connection settings and try again."
+		detail := provider.FailureDiagnosticDetail(diagnostic)
+		if diagnostic != nil {
+			if statusMessage := i18n.M.ProviderStatusMessage(diagnostic.Status); statusMessage != "" {
+				message = statusMessage
+			} else if diagnostic.Status > 0 {
+				message = fmt.Sprintf("Provider request failed (HTTP %d).", diagnostic.Status)
+			}
+			label := provider.ProviderDisplayLabel(diagnostic.ProviderID, diagnostic.ProviderDisplayName, diagnostic.Protocol)
+			if label != "" {
+				message = label + ": " + message
+			}
+		}
+		return HistoryMessage{Role: "notice", Level: "warn", Code: event.NoticeCodeProviderRequestFailed, Content: message, Detail: detail, Diagnostic: diagnostic}
+	}
+	return HistoryMessage{
+		Role: "notice", Level: "info", Code: event.NoticeCodeCancelledTurn,
+		Content: "This turn was interrupted. Partial output is kept for reference; only completed tool pairs and a bounded recovery summary enter the next model turn. Inspect the workspace before continuing or reverting changes.",
+	}
 }
 
 type HistoryToolCall struct {
@@ -5650,10 +5608,7 @@ func (state *historyMessageConvertState) convertHistoryMessage(
 		})
 	}
 	if m.LocalOnly && m.InterruptedTurn != nil {
-		out = append(out, HistoryMessage{
-			Role: "notice", Level: "info", Code: event.NoticeCodeCancelledTurn,
-			Content: "This turn was interrupted. Partial output is kept for reference; only completed tool pairs and a bounded recovery summary enter the next model turn. Inspect the workspace before continuing or reverting changes.",
-		})
+		out = append(out, interruptedTurnHistoryNotice(m.InterruptedTurn))
 	}
 	if m.Role == provider.RoleUser {
 		key := messageDisplayKey(agent.UserMessageText(m))
@@ -9265,13 +9220,15 @@ type ModelInfo struct {
 	Current       bool   `json:"current"`
 	ContextWindow int    `json:"contextWindow,omitempty"`
 	Vision        bool   `json:"vision,omitempty"`
+	DisplayName   string `json:"displayName,omitempty"`
 }
 
 type EffortInfo struct {
-	Supported bool     `json:"supported"`
-	Current   string   `json:"current"`
-	Default   string   `json:"default"`
-	Levels    []string `json:"levels"`
+	Options   []provider.ReasoningOption `json:"options,omitempty"`
+	Supported bool                       `json:"supported"`
+	Current   string                     `json:"current"`
+	Default   string                     `json:"default"`
+	Levels    []string                   `json:"levels"`
 }
 
 // Models flattens the configured providers into their (provider, model) pairs —
@@ -9835,7 +9792,7 @@ func (a *App) EffortForTab(tabID string) EffortInfo {
 	if levels == nil {
 		levels = []string{}
 	}
-	return EffortInfo{Supported: true, Current: config.EffortDisplay(entry), Default: cap.Default, Levels: levels}
+	return EffortInfo{Supported: true, Current: config.EffortDisplay(entry), Default: cap.Default, Levels: levels, Options: config.ReasoningCapabilityForEntry(entry).Options}
 }
 
 func (a *App) SetEffort(level string) error {

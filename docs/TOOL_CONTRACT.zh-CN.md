@@ -23,6 +23,7 @@
 | `notebook_edit` | false | 编辑 Jupyter notebook 的单个 cell。 |
 | `read_file` | true | 按可分页的行号格式读取文本文件。无依赖的读取应同轮下发。 |
 | `todo_write` | true | 记录并替换当前工作的结构化任务列表。 |
+| `view_image` | true | 按路径读取本地 PNG、JPEG、GIF 或 WebP，通过结构化图片通道交给视觉模型。最大 3 MiB、4000 万像素，沿用读取权限。 |
 | `wait` | true | 等待后台 job 完成并返回最终输出。 |
 | `web_fetch` | true | 通过 HTTP/HTTPS 获取 URL 文本内容。 |
 | `write_file` | false | 写入文件内容，必要时创建父目录。 |
@@ -116,7 +117,7 @@ registry 中供调度，但不会展开到 top-level provider schema；模型通
 每个任务共享同一套精简的 provider 可见核心：直接编码工具、后台 shell 生命周期工具，
 以及稳定的能力代理：
 
-`bash`, `bash_output`, `edit_file`, `kill_shell`, `read_file`,
+`bash`, `bash_output`, `edit_file`, `kill_shell`, `read_file`, `view_image`,
 `wait`, `write_file`, `compress`（若注册），以及 `use_capability`。
 
 可选工具（`glob`、`grep`、`ls`、`web_fetch`、MCP、skills、subagents、docs、会话历史、

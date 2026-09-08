@@ -21,6 +21,7 @@ import (
 	"reasonix/internal/evidence"
 	"reasonix/internal/extension/dispatch"
 	"reasonix/internal/i18n"
+	"reasonix/internal/imageinput"
 	"reasonix/internal/instruction"
 	"reasonix/internal/jobs"
 	"reasonix/internal/mcpinteraction"
@@ -281,6 +282,7 @@ type ToolHooks interface {
 // Agent drives a single task: a Provider, a tool Registry, and a Session wired
 // into the main loop.
 type Agent struct {
+	imageInput agentImageInput
 	agentConfig
 	// svc are the collaborators this agent talks to; see services.go.
 	svc agentServices
@@ -850,7 +852,8 @@ func (a *Agent) CompactNow(ctx context.Context, instructions string) error {
 
 // Options configures an Agent.
 type Options struct {
-	MaxSteps int
+	ImageInput *imageinput.Config
+	MaxSteps   int
 	// MaxStepsKey names the explicit runtime control shown when the MaxSteps guard
 	// is hit. Empty defaults to the generic max_steps tool/runtime parameter.
 	MaxStepsKey string
@@ -1084,6 +1087,7 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		reasoningByteLimit = defaultReasoningByteLimit
 	}
 	a := &Agent{
+		imageInput: newImageInput(opts.ImageInput, prov),
 		svc: newAgentServices(prov, tools, sink, gate, planModeReadOnlyTrust,
 			sandboxEscapeApprover, configWriteApprover, hooks, opts),
 		agentConfig: agentConfig{
@@ -2006,7 +2010,7 @@ func upsertPartialToolCall(calls []provider.ToolCall, call provider.ToolCall) []
 	return append(calls, call)
 }
 
-func (a *Agent) recordInterruptedDisplay(text, reasoning string, calls []provider.ToolCall, pending bool, workDurationMs int64) {
+func (a *Agent) recordInterruptedDisplay(text, reasoning string, calls []provider.ToolCall, pending bool, terminalErr error, workDurationMs int64) {
 	displayCalls := make([]provider.ToolCall, 0, len(calls))
 	interrupted := make([]string, 0, len(calls))
 	notStarted := make([]provider.InterruptedToolSummary, 0, len(calls))
@@ -2024,6 +2028,12 @@ func (a *Agent) recordInterruptedDisplay(text, reasoning string, calls []provide
 			notStarted = append(notStarted, provider.InterruptedToolSummary{ID: call.ID, Name: name})
 		}
 	}
+	terminalStatus := "interrupted"
+	var failureDiagnostic *provider.FailureDiagnostic
+	if terminalErr != nil && !errors.Is(terminalErr, context.Canceled) {
+		terminalStatus = "failed"
+		failureDiagnostic = provider.DiagnoseFailure(terminalErr)
+	}
 	a.sess.conversation.Add(provider.Message{
 		Role:             provider.RoleTool,
 		Content:          text,
@@ -2034,6 +2044,8 @@ func (a *Agent) recordInterruptedDisplay(text, reasoning string, calls []provide
 		WorkDurationMs:   workDurationMs,
 		LocalOnly:        true,
 		InterruptedTurn: &provider.InterruptedTurnRecovery{
+			TerminalStatus:          terminalStatus,
+			FailureDiagnostic:       failureDiagnostic,
 			Pending:                 pending,
 			InterruptedTools:        interrupted,
 			NotStartedTools:         notStarted,
