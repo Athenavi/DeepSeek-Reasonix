@@ -2,6 +2,384 @@
   "schemaVersion": 1,
   "releases": [
     {
+      "version": "1.38.3",
+      "date": "2026-09-08",
+      "channel": "stable",
+      "targetingVersion": 1,
+      "title": {
+        "en": "Reasonix 1.38.3",
+        "zh": "Reasonix 1.38.3"
+      },
+      "summary": {
+        "en": "This release improves model settings persistence, unifies runtime state across local and remote sessions, and refines the desktop composer and turn results. It also fixes read-evidence handling, skill diagnostics, and several Windows-specific issues.",
+        "zh": "此版本改进了模型设置持久化，统一了本地与远程会话的运行时状态，并优化了桌面输入栏和本轮结果。同时修复了读取证据处理、技能诊断以及若干 Windows 特定问题。"
+      },
+      "surfaces": [
+        "desktop",
+        "cli",
+        "service"
+      ],
+      "guides": [
+        {
+          "title": {
+            "en": "Model Settings",
+            "zh": "模型设置"
+          },
+          "body": {
+            "en": "Learn how model preferences and provider connections are saved and applied.",
+            "zh": "了解模型偏好和提供程序连接如何保存和应用。"
+          },
+          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/9a2abb24114d2b073c45bda82848e1cefeea10c0/docs/MODEL_SETTINGS.md"
+        },
+        {
+          "title": {
+            "en": "Runtime State",
+            "zh": "运行时状态"
+          },
+          "body": {
+            "en": "Understand how local and remote session state is unified.",
+            "zh": "了解本地与远程会话状态如何统一。"
+          },
+          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/9a2abb24114d2b073c45bda82848e1cefeea10c0/docs/RUNTIME_STATE.md"
+        },
+        {
+          "title": {
+            "en": "Turn Results",
+            "zh": "本轮结果"
+          },
+          "body": {
+            "en": "See how turn results present verified changes and check outcomes.",
+            "zh": "了解本轮结果如何展示已验证的更改和检查结果。"
+          },
+          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/9a2abb24114d2b073c45bda82848e1cefeea10c0/docs/TURN_RESULTS.md"
+        },
+        {
+          "title": {
+            "en": "Composer Controls",
+            "zh": "输入栏控件"
+          },
+          "body": {
+            "en": "Explore the refined composer controls and feedback.",
+            "zh": "探索优化后的输入栏控件和反馈。"
+          },
+          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/9a2abb24114d2b073c45bda82848e1cefeea10c0/docs/COMPOSER_CONTROLS.md"
+        },
+        {
+          "title": {
+            "en": "Capability Diagnostics",
+            "zh": "能力诊断"
+          },
+          "body": {
+            "en": "Learn about skill tool reference diagnostics.",
+            "zh": "了解技能工具引用诊断。"
+          },
+          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/9a2abb24114d2b073c45bda82848e1cefeea10c0/docs/CAPABILITY_DIAGNOSTICS.md"
+        }
+      ],
+      "highlights": [
+        {
+          "kind": "improved",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Model settings can be saved independently",
+            "zh": "模型设置可独立保存"
+          },
+          "body": {
+            "en": "Model preferences and provider connections can now be saved without an active session. Existing sessions retain their selected model, and changes are applied before the next accepted run.",
+            "zh": "现在无需活动会话即可保存模型偏好和提供程序连接。现有会话保留其选定的模型，更改将在下一次接受的运行前应用。"
+          },
+          "refs": [
+            9973
+          ]
+        },
+        {
+          "kind": "improved",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Unified runtime state across local and remote sessions",
+            "zh": "统一本地与远程会话的运行时状态"
+          },
+          "body": {
+            "en": "Completed tasks no longer leave the sidebar spinning. Runtime state is now consistent across local Desktop, Serve, and remote sessions, with reliable reconciliation on reconnect.",
+            "zh": "已完成的任务不再让侧边栏持续旋转。运行时状态现在在本地桌面、Serve 和远程会话之间保持一致，并在重新连接时可靠地协调。"
+          },
+          "refs": [
+            9971
+          ]
+        },
+        {
+          "kind": "improved",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Trustworthy turn results",
+            "zh": "可信的本轮结果"
+          },
+          "body": {
+            "en": "The completion card now shows confirmed net file changes, recorded check outcomes, and direct access to evidence for that specific turn.",
+            "zh": "完成卡片现在显示确认的净文件更改、记录的检查结果，以及直接访问该轮次的证据。"
+          },
+          "refs": [
+            9869
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Read evidence and pause recovery completed",
+            "zh": "读取证据与暂停恢复改造完成"
+          },
+          "body": {
+            "en": "Large-file previews no longer become implicit full-read obligations, and verified full reads no longer reopen after deduplication. Pauses are now reported accurately.",
+            "zh": "大文件预览不再隐式成为完整读取义务，已验证的完整读取在去重后不会重新打开。暂停现在能准确报告。"
+          },
+          "refs": [
+            9966
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Skill tool reference diagnostics fixed",
+            "zh": "技能工具引用诊断已修复"
+          },
+          "body": {
+            "en": "False use_capability warnings in built-in review skills are fixed, and both doctor entrypoints now check effective skill tool references consistently.",
+            "zh": "内置审查技能中的 use_capability 误报警告已修复，两个 doctor 入口点现在一致地检查有效的技能工具引用。"
+          },
+          "refs": [
+            9962
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Settings search and save bar overlap prevented",
+            "zh": "设置搜索框与保存栏遮挡已修复"
+          },
+          "body": {
+            "en": "The settings search field no longer overlaps the save bar, and Hooks and Network save actions stay in normal form flow.",
+            "zh": "设置搜索字段不再与保存栏重叠，Hooks 和 Network 的保存操作保持在正常的表单流程中。"
+          },
+          "refs": [
+            9969
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop",
+            "cli",
+            "service"
+          ],
+          "title": {
+            "en": "Windows runtime and update CI gates restored",
+            "zh": "Windows 运行时及更新发布门禁已恢复"
+          },
+          "body": {
+            "en": "Fixed Windows-specific issues with detached session status, concurrent legacy-update recovery, and task snapshot saving.",
+            "zh": "修复了 Windows 特定的分离会话状态、并发旧版更新恢复和任务快照保存问题。"
+          },
+          "refs": [
+            9974
+          ]
+        }
+      ],
+      "changes": {
+        "new": [
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Refined Workbench welcome and recovery",
+              "zh": "优化工作台欢迎页与会话恢复"
+            },
+            "body": {
+              "en": "Empty Workbench sessions show a centered welcome and composer. History-load failures and remote connection interruptions now show a persistent recovery strip.",
+              "zh": "空工作台会话显示居中的欢迎页和输入栏。历史加载失败和远程连接中断现在显示持久的恢复条。"
+            },
+            "refs": [
+              9961
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Refined composer controls and feedback",
+              "zh": "优化输入栏交互与运行反馈"
+            },
+            "body": {
+              "en": "Plan, goal, and delivery options move into the add menu with removable active-mode chips. The inline running ticker is replaced with a theme-aware perimeter trace.",
+              "zh": "计划、目标和交付选项移入添加菜单，并带有可移除的活动模式标签。内联运行指示器被主题感知的周边轨迹取代。"
+            },
+            "refs": [
+              9958
+            ]
+          }
+        ],
+        "improved": [
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Model settings persistence improvements",
+              "zh": "模型设置持久化改进"
+            },
+            "body": {
+              "en": "Persistence validates operation-specific requests, compares settings revisions, and returns idempotent receipts before runtime application.",
+              "zh": "持久化验证特定操作的请求，比较设置修订，并在运行时应用前返回幂等回执。"
+            },
+            "refs": [
+              9973
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Runtime state reconciliation improvements",
+              "zh": "运行时状态协调改进"
+            },
+            "body": {
+              "en": "Reconciliation now occurs on attachment, focus, and reconnect, with a 30-second check and bounded failure backoff.",
+              "zh": "协调现在在附加、聚焦和重新连接时进行，带有 30 秒检查和有界失败退避。"
+            },
+            "refs": [
+              9971
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Turn results presentation improvements",
+              "zh": "本轮结果展示改进"
+            },
+            "body": {
+              "en": "Added View changes and View check details actions, a per-turn workspace panel, and a link back to the full workspace view.",
+              "zh": "添加了查看更改和查看检查详情操作、每轮工作区面板，以及返回完整工作区视图的链接。"
+            },
+            "refs": [
+              9869
+            ]
+          }
+        ],
+        "fixed": [
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Read evidence fixes",
+              "zh": "读取证据修复"
+            },
+            "body": {
+              "en": "Reader-owned versioned envelopes and writer-owned preflight checks preserve current-version requirements. Structured deduplication references only original text.",
+              "zh": "读取者拥有的版本化信封和写入者拥有的预检检查保留当前版本要求。结构化去重仅引用原始文本。"
+            },
+            "refs": [
+              9966
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Skill diagnostics fixes",
+              "zh": "技能诊断修复"
+            },
+            "body": {
+              "en": "Built-in identities are read from the compiled registry, and both doctor entrypoints use the same discovery options and precedence.",
+              "zh": "内置身份从编译注册表读取，两个 doctor 入口点使用相同的发现选项和优先级。"
+            },
+            "refs": [
+              9962
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Settings layout fixes",
+              "zh": "设置布局修复"
+            },
+            "body": {
+              "en": "Search field stays outside the scrolling navigation list, and save actions wrap on narrow windows.",
+              "zh": "搜索字段保持在滚动导航列表之外，保存操作在窄窗口上换行。"
+            },
+            "refs": [
+              9969
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli",
+              "service"
+            ],
+            "title": {
+              "en": "Windows-specific fixes",
+              "zh": "Windows 特定修复"
+            },
+            "body": {
+              "en": "Canonicalized owned status paths, fixed concurrent legacy-update recovery sharing violations, and bounded atomic-rename retry for task snapshots.",
+              "zh": "规范化拥有的状态路径，修复并发旧版更新恢复的共享冲突，并为任务快照使用有界原子重命名重试。"
+            },
+            "refs": [
+              9974
+            ]
+          }
+        ]
+      },
+      "upgrade": [],
+      "risks": [],
+      "contributors": [
+        "SivanCola"
+      ],
+      "links": {
+        "github": "https://github.com/esengine/DeepSeek-Reasonix/releases/tag/desktop-v1.38.3",
+        "compare": "https://github.com/esengine/DeepSeek-Reasonix/compare/desktop-v1.38.2...desktop-v1.38.3",
+        "download": "https://reasonix.io/?download=desktop&channel=stable#start"
+      },
+      "releaseId": "1.38.3",
+      "baseVersion": "1.38.3",
+      "status": "reviewed",
+      "previousRelease": "1.38.2",
+      "builds": {
+        "cli": "v1.38.3",
+        "desktop": "v1.38.3",
+        "npm": "1.38.3"
+      }
+    },
+    {
       "version": "1.38.2",
       "date": "2026-09-08",
       "channel": "stable",
