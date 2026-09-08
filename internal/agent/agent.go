@@ -2010,7 +2010,7 @@ func upsertPartialToolCall(calls []provider.ToolCall, call provider.ToolCall) []
 	return append(calls, call)
 }
 
-func (a *Agent) recordInterruptedDisplay(text, reasoning string, calls []provider.ToolCall, pending bool, workDurationMs int64) {
+func (a *Agent) recordInterruptedDisplay(text, reasoning string, calls []provider.ToolCall, pending bool, terminalErr error, workDurationMs int64) {
 	displayCalls := make([]provider.ToolCall, 0, len(calls))
 	interrupted := make([]string, 0, len(calls))
 	notStarted := make([]provider.InterruptedToolSummary, 0, len(calls))
@@ -2028,6 +2028,12 @@ func (a *Agent) recordInterruptedDisplay(text, reasoning string, calls []provide
 			notStarted = append(notStarted, provider.InterruptedToolSummary{ID: call.ID, Name: name})
 		}
 	}
+	terminalStatus := "interrupted"
+	var failureDiagnostic *provider.FailureDiagnostic
+	if terminalErr != nil && !errors.Is(terminalErr, context.Canceled) {
+		terminalStatus = "failed"
+		failureDiagnostic = provider.DiagnoseFailure(terminalErr)
+	}
 	a.sess.conversation.Add(provider.Message{
 		Role:             provider.RoleTool,
 		Content:          text,
@@ -2038,6 +2044,8 @@ func (a *Agent) recordInterruptedDisplay(text, reasoning string, calls []provide
 		WorkDurationMs:   workDurationMs,
 		LocalOnly:        true,
 		InterruptedTurn: &provider.InterruptedTurnRecovery{
+			TerminalStatus:          terminalStatus,
+			FailureDiagnostic:       failureDiagnostic,
 			Pending:                 pending,
 			InterruptedTools:        interrupted,
 			NotStartedTools:         notStarted,

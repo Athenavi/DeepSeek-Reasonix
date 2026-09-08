@@ -34,6 +34,11 @@
     }
   },
   "deepseek|global|api": {
+    "anthropic": {
+      "baseUrl": "https://api.deepseek.com/anthropic",
+      "source": "https://api-docs.deepseek.com/guides/anthropic_api",
+      "checkedOn": "2026-09-08"
+    },
     "openai": {
       "baseUrl": "https://api.deepseek.com/v1",
       "source": "https://api-docs.deepseek.com/",

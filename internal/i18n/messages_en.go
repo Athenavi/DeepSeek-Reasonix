@@ -537,6 +537,7 @@ var English = Messages{
 	SearchSourcesNotProvided:       "Search completed; the provider did not supply usable structured sources.",
 	ProtocolRecoveryLabel:          "Recover from valid history",
 	ProviderErrInsufficientBalance: "Insufficient balance (HTTP 402): your account is out of credit. Top up your account, then retry.",
+	ProviderErrNotFound:            "Request endpoint not found (HTTP 404). Check the API format and request address.",
 	ProviderErrUnprocessable:       "Invalid parameters (HTTP 422): a request parameter was rejected. This is likely a bug — please report it if it persists.",
 	ProviderErrInputSensitive:      "MiniMax rejected the input during content review (error 1026). The review may include conversation history and tool results; adjust the relevant content or start a new session with only the necessary context. Repeating the same request is unlikely to help.",
 	ProviderErrOutputSensitive:     "MiniMax rejected the generated output during content review (error 1027). Adjust the request and try again, or use another provider if the rejection persists.",

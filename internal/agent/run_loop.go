@@ -220,7 +220,7 @@ func (a *Agent) runToolLoop(ctx context.Context, state *turnRuntime) (runErr err
 			// Exhausted stream retries (or a non-retryable error): persist one
 			// bounded LocalOnly recovery record for the next real user message.
 			// Intermediate failed attempts never wrote session state.
-			a.recordInterruptedDisplay(text, reasoning, partialCalls, true, state.workDurationMs())
+			a.recordInterruptedDisplay(text, reasoning, partialCalls, true, err, state.workDurationMs())
 			// A broken provider stream can otherwise look like a silent hang
 			// followed only by the generic interrupted-turn notice (#9560).
 			if code, msg := streamInterruptNotice(err); msg != "" {

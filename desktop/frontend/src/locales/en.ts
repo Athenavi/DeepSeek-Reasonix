@@ -6,7 +6,7 @@
 export const en = {
   // shared verbs / chrome
   "common.close": "Close",
-  "settings.providerProtocolMismatch": "The endpoint path does not match the selected API format. Check it before saving.",
+  "settings.providerProtocolMismatch": "The endpoint does not match the selected API format.",
   "settings.imageInputLabel": "Image input",
   "settings.imageInputModeAria": "Image input mode for {model}",
   "settings.imageInputAuto": "Auto",

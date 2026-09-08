@@ -1,4 +1,4 @@
-import type { ProviderPresetView } from "./providerCatalogTypes";
+import type { ProviderCatalog, ProviderPresetView } from "./providerCatalogTypes";
 export type { ProviderProtocolEndpoint, ProviderCatalog, ProviderPresetView } from "./providerCatalogTypes";
 import type { RecoveryEventFields } from "./recoveryStatus";
 // Wire contract — mirrors desktop/wire.go (itself mirroring internal/serve/wire.go).
@@ -415,7 +415,7 @@ export interface WireEvent extends RecoveryEventFields {
   outcome?: "completed" | "partial" | "blocked" | "final_readiness" | "recovery_paused" | "completion_uncertain";
   readiness?: WireFinalReadiness;
   protocolRecovery?: { id: string };
-  diagnostic?: { kind: string; status?: number; traceId?: string };
+  diagnostic?: { kind: string; status?: number; traceId?: string; providerId?: string; providerDisplayName?: string; protocol?: string; requestPath?: string };
   /** Optional: "headers" | "stream". Older clients ignore unknown fields. */
   retryScope?: "headers" | "stream" | "protocol";
   streamAttempt?: WireStreamAttempt;
@@ -822,7 +822,7 @@ export interface HistoryMessage {
   decisionReceipt?: WireDecisionReceipt;
   readiness?: WireFinalReadiness;
   protocolRecovery?: { id: string };
-  diagnostic?: { kind: string; status?: number; traceId?: string };
+  diagnostic?: { kind: string; status?: number; traceId?: string; providerId?: string; providerDisplayName?: string; protocol?: string; requestPath?: string };
   serverSearch?: HistoryServerSearch[];
 }
 
@@ -1749,6 +1749,8 @@ export interface CapabilityIssue {
 export interface ProviderView {
   displayName?: string;
   name: string;
+  presetId?: string; // stable curated identity; read-only in the connection editor
+  catalog?: ProviderCatalog; // protocol routes for this installed connection, including hidden legacy presets
   builtIn: boolean;
   added: boolean;
   kind: string;

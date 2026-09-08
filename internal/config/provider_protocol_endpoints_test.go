@@ -18,6 +18,7 @@ func TestDocumentedProtocolEndpoints(t *testing.T) {
 		}
 	}
 	cases := []struct{ id, kind, want string }{
+		{"deepseek-anthropic", "anthropic", "https://api.deepseek.com/anthropic"},
 		{"kimi-coding-plan", "openai", "https://api.kimi.com/coding/v1"},
 		{"siliconflow", "anthropic", "https://api.siliconflow.cn"},
 		{"ppio", "openai", "https://api.ppio.com/openai"},

@@ -538,6 +538,7 @@ var Chinese = Messages{
 	SearchSourcesNotProvided:       "搜索已完成，供应商未提供可用的结构化来源。",
 	ProtocolRecoveryLabel:          "从有效历史恢复",
 	ProviderErrInsufficientBalance: "余额不足 (HTTP 402)：账户余额不足，请前往充值后重试。",
+	ProviderErrNotFound:            "请求地址不存在（HTTP 404）。请检查 API 格式和请求地址。",
 	ProviderErrUnprocessable:       "参数错误 (HTTP 422)：某个请求参数被拒绝，通常是程序缺陷。若持续出现请反馈。",
 	ProviderErrInputSensitive:      "输入被 MiniMax 内容审查拒绝（错误码 1026）。审查对象可能包含会话历史和工具结果；请调整相关内容，或新建会话仅保留必要上下文。原样重试通常无效。",
 	ProviderErrOutputSensitive:     "MiniMax 生成的内容被内容审查拒绝（错误码 1027）。请调整请求内容后重试；若持续出现，可改用其他服务商。",
