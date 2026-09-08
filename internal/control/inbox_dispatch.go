@@ -108,19 +108,14 @@ func (c *Controller) dispatchInboxOnce() inboxDispatchResult {
 	if c.SessionPath() == "" {
 		return inboxDispatchIdle
 	}
-	st, err := c.ensureInbox()
+	meta, ok, err := c.nextInboxDispatchItem()
 	if err != nil {
 		slog.Warn("controller: open inbox for dispatch", "err", err)
 		return inboxDispatchRetry
 	}
-	meta, ok := st.NextQueued()
 	c.inbox.mu.Lock()
-	afterScan := c.inbox.afterDispatchScan
 	beforeSubmit := c.inbox.beforeDispatchSubmit
 	c.inbox.mu.Unlock()
-	if afterScan != nil {
-		afterScan(ok)
-	}
 	if !ok {
 		return inboxDispatchIdle
 	}
@@ -143,6 +138,29 @@ func (c *Controller) dispatchInboxOnce() inboxDispatchResult {
 	}
 	// A competing turn or rotation owns the next kick when its gate releases.
 	return inboxDispatchIdle
+}
+
+func (c *Controller) nextInboxDispatchItem() (sessioninbox.InboxItemMeta, bool, error) {
+	c.inbox.scanMu.Lock()
+	defer c.inbox.scanMu.Unlock()
+	c.inbox.mu.Lock()
+	closed := c.inbox.closed
+	afterScan := c.inbox.afterDispatchScan
+	c.inbox.mu.Unlock()
+	if closed {
+		return sessioninbox.InboxItemMeta{}, false, nil
+	}
+	st, err := c.ensureInbox()
+	if err != nil {
+		return sessioninbox.InboxItemMeta{}, false, err
+	}
+	// NextQueued refreshes disk state and may create its transaction-lock
+	// directory. Keep that access inside the same shutdown boundary as Open.
+	meta, ok := st.NextQueued()
+	if afterScan != nil {
+		afterScan(ok)
+	}
+	return meta, ok, nil
 }
 
 func (c *Controller) scheduleInboxDispatchRetry() {

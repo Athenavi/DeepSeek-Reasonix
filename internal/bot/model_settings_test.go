@@ -5,15 +5,33 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"time"
 
 	"reasonix/internal/config"
 	"reasonix/internal/control"
+	"reasonix/internal/history"
 	"reasonix/internal/provider"
+	"reasonix/internal/stats"
 )
 
 func TestBotNewRunAppliesModelSettingsAndKeepsSessionOnFailure(t *testing.T) {
+	closeCatalogs := func() {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := history.CloseSharedCatalog(ctx); err != nil {
+			t.Fatalf("close shared history catalog: %v", err)
+		}
+		if err := stats.CloseUsageCatalogs(ctx); err != nil {
+			t.Fatalf("close usage catalogs: %v", err)
+		}
+	}
+	closeCatalogs()
 	t.Setenv("REASONIX_HOME", t.TempDir())
 	root := t.TempDir()
+	// These projections belong to the process, not an individual controller.
+	// Release SQLite handles before the isolated home is removed on Windows.
+	t.Cleanup(closeCatalogs)
 	cfg := config.Default()
 	cfg.Providers = []config.ProviderEntry{{Name: "snapshot", Kind: "openai", BaseURL: "http://127.0.0.1:1/v1", Model: "m", APIKeyEnv: "BOT_SNAPSHOT_TEST_KEY"}}
 	cfg.DefaultModel = "snapshot/m"

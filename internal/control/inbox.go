@@ -74,9 +74,12 @@ type inboxState struct {
 	// admissionMu serializes competing admission state machines. Snapshot
 	// recovery and completion never hold it across Store I/O.
 	admissionMu sync.Mutex
-	mu          sync.Mutex
-	store       *sessioninbox.Store
-	closed      bool // seals new sidecar opens when controller teardown starts
+	// scanMu joins autonomous sidecar reads at shutdown without waiting for a
+	// dispatcher that may itself retire this controller during host admission.
+	scanMu sync.Mutex
+	mu     sync.Mutex
+	store  *sessioninbox.Store
+	closed bool // seals new sidecar opens when controller teardown starts
 	// activeItemIDs includes the running follow-up and every accepted steer.
 	// TurnDone durable-acks the set so multi-steer rounds leave no orphans.
 	activeItemIDs map[string]struct{}
