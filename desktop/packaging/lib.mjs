@@ -175,8 +175,11 @@ function darwinBundleMembers() {
     "Contents/Info.plist",
     `Contents/MacOS/${PRODUCT.executable}`,
     `Contents/MacOS/${PRODUCT.serviceExecutable}`,
-    `Contents/MacOS/${PRODUCT.cliExecutable}`,
     `Contents/Resources/service/${PRODUCT.serviceExecutable}`,
+    // The CLI sidecar lives in Resources/service/, never Contents/MacOS/: on
+    // case-insensitive APFS "reasonix" there collides with the Electron main
+    // executable "Reasonix" and cp would clobber it.
+    `Contents/Resources/service/${PRODUCT.cliExecutable}`,
     "Contents/Resources/app.asar",
     "Contents/Resources/app/index.html",
     "Contents/Resources/build.json",

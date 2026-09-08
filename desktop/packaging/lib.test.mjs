@@ -136,7 +136,7 @@ test("required members cover every artifact and the checks report gaps", () => {
   assert.deepEqual(checkMembers(macEntries.slice(1), "darwin-zip").missing, [macEntries[0]]);
   assert.deepEqual(checkMembers([...macEntries, "Reasonix.app/Contents/MacOS/reasonix-guard"], "darwin-zip").forbidden, ["Reasonix.app/Contents/MacOS/reasonix-guard"]);
   assert.ok(macEntries.includes("Reasonix.app/Contents/MacOS/reasonix-desktop"));
-  assert.ok(macEntries.includes("Reasonix.app/Contents/MacOS/reasonix"));
+  assert.ok(macEntries.includes("Reasonix.app/Contents/Resources/service/reasonix"));
   assert.ok(macEntries.includes("Reasonix.app/Contents/Resources/service/reasonix-desktop"));
   assert.deepEqual(checkMembers(requiredMembers("darwin-app-dir").map(String), "darwin-app-dir").missing, []);
 

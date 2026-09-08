@@ -199,7 +199,11 @@ darwin)
 	mkdir -p "$app/Contents/Resources/service"
 	cp "$service_out" "$app/Contents/MacOS/$BINNAME"
 	cp "$service_out" "$app/Contents/Resources/service/$BINNAME"
-	cp "$cli_out" "$app/Contents/MacOS/$CLINAME"
+	# Contents/MacOS already holds the Electron executable "Reasonix"; on
+	# case-insensitive APFS a "reasonix" sibling would overwrite it, so the
+	# CLI sidecar ships next to the service copy the shell actually launches
+	# (desktopCLIBinaryPath resolves it beside the running service).
+	cp "$cli_out" "$app/Contents/Resources/service/$CLINAME"
 	if [ -e "$app/Contents/MacOS/$GUARDNAME" ]; then
 		echo "macOS bundle must not include $GUARDNAME" >&2
 		exit 1
