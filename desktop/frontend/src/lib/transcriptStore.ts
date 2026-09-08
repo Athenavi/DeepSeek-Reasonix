@@ -42,6 +42,7 @@ import {
   type Item,
 } from "./useController";
 import { localizedNoticeText, quietTranscriptNoticeKey } from "./controllerNotices";
+import { readPauseItem } from "./readPause";
 import type {
   HistoryContentChunk,
   HistoryContentRef,
@@ -240,6 +241,10 @@ function convertRecord(
     return { items, claims, unresolvedIds, pendingPositional, matches };
   }
   if (m.role === "notice") {
+    if (m.code === "incomplete_read") {
+      items.push(readPauseItem(m.readPause, id));
+      return { items, claims, unresolvedIds, pendingPositional, matches };
+    }
     if (m.content.trim() !== "" || m.decisionReceipt) {
       if (!quietTranscriptNoticeKey(m.content, m.code)) {
         const text = localizedNoticeText(m.content, m.code);

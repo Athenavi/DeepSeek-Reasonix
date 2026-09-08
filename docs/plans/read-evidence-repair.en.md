@@ -84,3 +84,6 @@ completed process material. Read pauses now remain outside the process fold,
 after the preserved candidate response, without an implicit continuation action.
 Pause outcomes also remain distinct from provider errors in desktop metrics and
 telemetry. The same rendering regression covers the live/history notice shape.
+The paginated TranscriptStore uses that same conversion, including empty-body
+LocalOnly receipts; cold backend slices and repeated frontend page loads are
+tested independently from the legacy full-history converter.

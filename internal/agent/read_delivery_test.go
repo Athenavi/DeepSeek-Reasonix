@@ -132,6 +132,16 @@ func TestReadDeliveryAfterRealContextProjection(t *testing.T) {
 		a.sess.compactionMu.Unlock()
 	}}
 	a = newIncompleteReadTestAgent(p, incompleteReadBuiltin(t), NewSession("system"), event.Discard)
+	// This fixture specifically requires an unchanged first request body.
+	// Isolate the process-wide latency median: other tests' microsecond model
+	// calls can otherwise append a valid soft-budget nudge to that body.
+	a.modelRef = t.Name()
+	key := a.softBudgetHistoryKey()
+	t.Cleanup(func() {
+		readonlySoftBudgetHistory.Lock()
+		delete(readonlySoftBudgetHistory.byKey, key)
+		readonlySoftBudgetHistory.Unlock()
+	})
 	if err := a.Run(context.Background(), "Read the full file and verify it."); err != nil {
 		t.Fatal(err)
 	}
