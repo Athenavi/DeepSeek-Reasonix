@@ -1952,7 +1952,7 @@ export const en = {
   "settings.statusBarItemsHiddenEmpty": "Hidden items will appear here",
   "settings.statusBarItemsHiddenEmptyHint": "Clear an item on the left, or drag it here to hide it.",
   "settings.statusBarItem.model": "Model",
-  "settings.statusBarItem.workspace": "Workspace",
+  "settings.statusBarItem.workspace": "Workspace and branch",
   "settings.statusBarItem.gitBranch": "Git branch",
   "settings.statusBarItem.drag": "Drag to move {label}",
   "settings.statusBarItem.moveUp": "Move {label} up",
@@ -3589,6 +3589,8 @@ export const en = {
   "context.moreSources": "{count} more sources",
   "context.requests": "Requests",
   "context.time": "Runtime",
+  "context.sessionTime": "Session time",
+  "context.turnTime": "Turn time",
   "context.durationSeconds": "{seconds}s",
   "context.durationMinutesSeconds": "{minutes}m {seconds}s",
 

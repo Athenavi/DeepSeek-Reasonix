@@ -40,7 +40,8 @@ function flushTimers(): Promise<void> {
 
 async function readRunMetrics() {
   await act(async () => {
-    (document.querySelector(".context-ring") as HTMLButtonElement).click();
+    const ring = document.querySelector(".context-ring") as HTMLButtonElement;
+    if (ring.getAttribute("aria-expanded") !== "true") ring.click();
     await flushTimers();
   });
   return ` ${document.querySelector(".context-ring-popover")?.textContent ?? ""}`;
@@ -519,6 +520,83 @@ console.log("\ncomposer run strip");
   await act(async () => {
     root.unmount();
   });
+  dom.window.close();
+}
+
+// Metrics survive wait/retry/completion and derive completed time from the
+// controller timestamp, including when mounting an already completed tab.
+{
+  const dom = installDom();
+  const start = Date.now() - 30_000;
+  const { root, rerender } = await renderComposer({
+    running: true, turnStartAt: start, turnTokens: 100,
+    turnOutputTokens: 20, turnModelActiveMs: 2_000,
+  });
+  await rerender({ pendingApprovalLabel: "Run command", disabled: true });
+  ok((await readRunMetrics()).includes("100 tokens"), "approval wait retains turn tokens");
+  await rerender({ pendingApprovalLabel: null, disabled: false,
+    retry: { attempt: 1, max: 3 } });
+  ok((await readRunMetrics()).includes("10 tokens/s"), "retry retains throughput");
+  await rerender({ running: false, retry: undefined, turnDoneAt: start + 20_000,
+    lastTurnOutputTokens: 24, turnWaitAccumMs: 0 });
+  const completed = await readRunMetrics();
+  ok(/19s|20s/.test(completed), `completed duration uses the controller timestamp minus local wait (got "${completed}")`);
+  ok(completed.includes("104 tokens"), "completion keeps final in-flight token estimates");
+  await rerender({ sessionKey: "completed-tab", tabId: "completed-tab" });
+  ok((await readRunMetrics()).includes("20s"), "switching to a completed tab preserves its duration");
+  await rerender({ running: true, turnStartAt: Date.now(), turnDoneAt: 0,
+    turnTokens: 0, turnOutputTokens: 0, turnModelActiveMs: 0 });
+  ok(!(await readRunMetrics()).includes("104 tokens"), "new turn does not inherit previous turn metrics");
+  await act(async () => { root.unmount(); });
+  dom.window.close();
+}
+
+{
+  const dom = installDom();
+  const picked: string[] = [];
+  let modelChanges = 0;
+  const { root, rerender } = await renderComposer({
+    effort: { supported: true, current: "auto", default: "high", levels: ["auto", "high", "max"] },
+    onSetEffort: level => picked.push(level),
+    onSwitchModel: () => { modelChanges += 1; },
+  });
+  const trigger = document.querySelector<HTMLButtonElement>(".composer-effort-control button");
+  if (!trigger) throw new Error("missing independent effort selector");
+  await act(async () => { trigger.click(); await flushTimers(); });
+  const high = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')].find(e => e.textContent === "high");
+  if (!high) throw new Error("missing high effort option");
+  await act(async () => { high.click(); await flushTimers(); });
+  eq(picked.join(","), "high", "separate effort selector changes reasoning effort");
+  eq(modelChanges, 0, "changing effort does not switch models");
+  eq(trigger.getAttribute("aria-expanded"), "false", "effort menu closes after selection");
+  await rerender({ effort: { supported: false, current: "auto", default: "auto", levels: [] } });
+  eq(document.querySelector(".composer-effort-control"), null, "unsupported models hide effort control");
+  await act(async () => root.unmount());
+  dom.window.close();
+}
+
+{
+  const dom = installDom();
+  const floors: string[] = [];
+  const modeChanges: string[] = [];
+  const { root, rerender } = await renderComposer({ collaborationMode: "plan", onSetQualityFloor: floor => floors.push(floor), onSetCollaborationMode: mode => modeChanges.push(mode) });
+  eq(document.querySelector(".composer-delivery-trigger"), null, "default standard has no delivery chip");
+  await act(async () => {
+    document.querySelector<HTMLButtonElement>(".composer-content-trigger")?.click();
+    await flushTimers();
+  });
+  const toggle = document.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]');
+  if (!toggle) throw new Error("delivery toggle missing");
+  eq(toggle.getAttribute("aria-checked"), "false", "delivery is off by default");
+  await act(async () => { toggle.click(); await flushTimers(); });
+  eq(floors.at(-1), "delivery", "delivery toggle enables delivery verification");
+  await rerender({ qualityFloor: "delivery" });
+  const chip = document.querySelector<HTMLButtonElement>(".composer-delivery-trigger");
+  if (!chip) throw new Error("delivery chip missing");
+  await act(async () => { chip.click(); await flushTimers(); });
+  eq(floors.at(-1), "standard", "closing delivery chip restores implicit standard");
+  eq(modeChanges.length, 0, "delivery does not change Plan or Goal mode");
+  await act(async () => root.unmount());
   dom.window.close();
 }
 

@@ -72,7 +72,7 @@
       "test-file-size": 307
     },
     "desktop/frontend/src/__tests__/composer-goal-toggle.test.tsx": {
-      "test-file-size": 1758
+      "test-file-size": 1764
     },
     "desktop/frontend/src/__tests__/composer-session-draft.test.tsx": {
       "test-file-size": 505
@@ -840,7 +840,7 @@
     },
     "internal/config/edit.go": {
       "essay": 5,
-      "file-size": 1679
+      "file-size": 1680
     },
     "internal/config/edit_test.go": {
       "test-file-size": 2425
@@ -885,7 +885,7 @@
       "function-size": 946
     },
     "internal/config/render_test.go": {
-      "test-file-size": 759
+      "test-file-size": 761
     },
     "internal/control/approval.go": {
       "essay": 5,

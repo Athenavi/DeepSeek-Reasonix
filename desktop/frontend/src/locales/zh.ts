@@ -1954,7 +1954,7 @@ export const zh: Record<DictKey, string> = {
   "settings.statusBarItemsHiddenEmpty": "未显示的项目将出现在此处",
   "settings.statusBarItemsHiddenEmptyHint": "取消勾选左侧项目，或拖动到此处隐藏。",
   "settings.statusBarItem.model": "模型",
-  "settings.statusBarItem.workspace": "工作区",
+  "settings.statusBarItem.workspace": "工作区与分支",
   "settings.statusBarItem.gitBranch": "Git 分支",
   "settings.statusBarItem.drag": "拖拽移动 {label}",
   "settings.statusBarItem.moveUp": "上移 {label}",
@@ -3592,6 +3592,8 @@ export const zh: Record<DictKey, string> = {
   "context.moreSources": "还有 {count} 个来源",
   "context.requests": "请求数",
   "context.time": "运行时间",
+  "context.sessionTime": "会话耗时",
+  "context.turnTime": "本轮耗时",
   "context.durationSeconds": "{seconds}秒",
   "context.durationMinutesSeconds": "{minutes}分{seconds}秒",
 

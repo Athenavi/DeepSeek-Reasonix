@@ -249,7 +249,7 @@ export function StatusBar({
   const displayWorkspacePath = (workspacePath || workspaceName || "").trim();
   const workspaceLabel = compactPath(displayWorkspacePath, workspaceName);
   const branchLabel = (gitBranch || "").trim();
-  const workspaceTitle = displayWorkspacePath ? workspaceTooltip(t, displayWorkspacePath, workspacePath, branchLabel) : "";
+  const workspaceTitle = workspaceTooltip(t, displayWorkspacePath, workspacePath, branchLabel);
   const turnLabel = formatTurnCount(sessionTurns, t);
   const tokenLabel = markEstimated(formatTokenCount(sessionTokens), sessionEstimated);
   const turnTokenLabel = markEstimated(formatTokenCount(turnTokens), turnEstimated);
@@ -297,19 +297,11 @@ export function StatusBar({
         </span>
       </Tooltip>
     ),
-    workspace: workspaceLabel ? (
+    workspace: branchLabel || workspaceLabel ? (
       <Tooltip label={workspaceTitle} className="statusbar__metric statusbar__metric--workspace">
         <span className="stat statusbar__workspace">
-          <span className="stat__label stat__label--icon" aria-hidden="true"><Folder size={12} /></span>
-          <b>{workspaceLabel}</b>
-        </span>
-      </Tooltip>
-    ) : null,
-    git_branch: branchLabel ? (
-      <Tooltip label={`${t("status.gitBranchTitle")}: ${branchLabel}`} className="statusbar__metric statusbar__metric--branch">
-        <span className="stat statusbar__branch">
-          <span className="stat__label stat__label--icon" aria-hidden="true"><GitBranch size={12} /></span>
-          <b>{branchLabel}</b>
+          <span className="stat__label stat__label--icon" aria-hidden="true">{branchLabel ? <GitBranch size={12} /> : <Folder size={12} />}</span>
+          <b>{branchLabel || workspaceLabel}</b>
         </span>
       </Tooltip>
     ) : null,

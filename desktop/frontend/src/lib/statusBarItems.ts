@@ -1,7 +1,6 @@
 export const STATUS_BAR_ITEM_IDS = [
   "model",
   "workspace",
-  "git_branch",
   "cache",
   "cache_avg",
   "session_tokens",
@@ -27,7 +26,10 @@ export function normalizeStatusBarItems(items: readonly string[] | null | undefi
   const out: StatusBarItemId[] = [];
   const seen = new Set<string>();
   for (const raw of items ?? []) {
-    const id = String(raw ?? "").trim();
+    const value = String(raw ?? "").trim();
+    // Older preferences stored workspace and branch independently. Keep their
+    // first configured position while rendering one combined workspace item.
+    const id = value === "git_branch" ? "workspace" : value;
     if (!statusBarItemSet.has(id) || seen.has(id)) continue;
     out.push(id as StatusBarItemId);
     seen.add(id);

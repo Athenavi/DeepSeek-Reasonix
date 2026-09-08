@@ -40,10 +40,10 @@ console.log("\nstatus bar workspace");
 {
   const defaultItems = DEFAULT_STATUS_BAR_ITEMS as readonly string[];
   ok(defaultItems.includes("workspace"), "workspace is a default configurable status item");
-  ok(defaultItems.includes("git_branch"), "git branch is a default configurable status item");
+  ok(!defaultItems.includes("git_branch"), "branch is merged into the workspace setting");
   ok(
-    normalizeStatusBarItems(["git_branch", "workspace", "cache"]).join(",") === "git_branch,workspace,cache",
-    "workspace items preserve configured order",
+    normalizeStatusBarItems(["git_branch", "workspace", "cache"]).join(",") === "workspace,cache",
+    "legacy workspace items merge at their first configured position",
   );
 }
 
@@ -108,7 +108,7 @@ console.log("\nstatus bar workspace");
     gitBranch: "feature/meta",
   };
   const html = renderStatusBar(propsWithLegacySandbox);
-  ok(html.includes("workspace/repo"), "workspace chip uses workspace path");
+  ok(!html.includes("workspace/repo"), "workspace path stays out of the visible branch label");
   ok(!html.includes("sandbox/repo"), "workspace chip does not display sandbox path");
   ok(html.includes("feature/meta"), "git branch remains visible");
 }
@@ -131,8 +131,9 @@ console.log("\nstatus bar workspace");
     workspaceName: "repo",
     gitBranch: "feature/meta",
   });
-  ok(html.indexOf("feature/meta") >= 0 && html.indexOf("workspace/repo") >= 0, "workspace and git branch render as configured items");
-  ok(html.indexOf("feature/meta") < html.indexOf("workspace/repo"), "workspace items follow configured order");
+  ok(html.includes("feature/meta") && !html.includes("workspace/repo"), "combined chip shows only the current branch");
+  ok((html.match(/class="stat statusbar__workspace"/g) || []).length === 1, "legacy items render one combined chip");
+  ok(!html.includes('<b>…/workspace/repo</b>'), "workspace path is not a separate visible label when a branch is available");
 }
 
 {

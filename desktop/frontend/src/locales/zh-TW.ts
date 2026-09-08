@@ -2570,6 +2570,8 @@ export const zhTW: Record<DictKey, string> = {
   "context.sessionCost": "本次費用",
   "context.requests": "請求數",
   "context.time": "執行時間",
+  "context.sessionTime": "會話耗時",
+  "context.turnTime": "本輪耗時",
   "context.durationSeconds": "{seconds}秒",
   "context.durationMinutesSeconds": "{minutes}分{seconds}秒",
 
@@ -3067,7 +3069,7 @@ export const zhTW: Record<DictKey, string> = {
   "settings.statusBarItemsHiddenEmpty": "未顯示的項目將出現在此處",
   "settings.statusBarItemsHiddenEmptyHint": "取消勾選左側項目，或拖動到此處隱藏。",
   "settings.statusBarItem.model": "模型",
-  "settings.statusBarItem.workspace": "工作區",
+  "settings.statusBarItem.workspace": "工作區與分支",
   "settings.statusBarItem.gitBranch": "Git 分支",
   "settings.statusBarItem.drag": "拖拽移動 {label}",
   "settings.statusBarItem.moveUp": "上移 {label}",

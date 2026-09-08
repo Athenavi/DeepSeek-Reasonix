@@ -580,6 +580,8 @@ export function Composer({
   decisionPending = false,
   ready,
   turnStartAt,
+  turnDoneAt,
+  lastTurnOutputTokens,
   turnWaitAccumMs = 0,
   promptWaitStartedAt,
   turnTokens,
@@ -665,6 +667,8 @@ export function Composer({
   // and a completed turn may have installed skills or MCP prompts.
   ready?: boolean;
   turnStartAt?: number;
+  turnDoneAt?: number;
+  lastTurnOutputTokens?: number;
   // Tab-scoped user-wait from the controller (approval/ask). Counts while the
   // tab is in the background so Composer does not invent a wait start on focus.
   turnWaitAccumMs?: number;
@@ -3742,18 +3746,20 @@ export function Composer({
         : running && !suspendedByDecision
           ? turnPhaseLabel
           : null;
-  const runMetrics = !retry && !pauseWorkClock && running && turnStartAt
+  const runMetrics = turnStartAt && (running || turnDoneAt)
     ? (() => {
-        const elapsedMs = Math.max(0, now - turnStartAt - waitAccumMs);
+        const metricsNow = running ? now : turnDoneAt!;
+        const elapsedMs = Math.max(0, metricsNow - turnStartAt - waitAccumMs);
         const usageTokens = turnTokens ?? 0;
         // Include streaming tool-call args in the estimate so TPS stays
         // meaningful while the model streams a write_file / long tool body.
         const inFlightChars = Math.max(0, liveTextChars - (turnOutputCharsAtUsage ?? 0)) + (turnArgChars ?? 0);
-        const estimatedChars = Math.round(inFlightChars / 4);
+        const estimatedChars = running ? Math.round(inFlightChars / 4)
+          : Math.max(0, (lastTurnOutputTokens ?? turnOutputTokens ?? 0) - (turnOutputTokens ?? 0));
         const liveTokens = usageTokens + estimatedChars;
         const outTok: number = (turnOutputTokens ?? 0) + estimatedChars;
         const modelActiveAt = liveModelActiveAt ?? turnModelActiveAt;
-        const modelElapsedMs = Math.max(0, turnModelActiveMs + (modelActiveAt && modelActiveAt > 0 ? Math.max(0, now - modelActiveAt) : 0));
+        const modelElapsedMs = Math.max(0, turnModelActiveMs + (modelActiveAt && modelActiveAt > 0 ? Math.max(0, metricsNow - modelActiveAt) : 0));
         const tps = outTok > 0 && modelElapsedMs >= 500 ? Math.round(outTok / (modelElapsedMs / 1000)) : null;
         return { elapsed: fmtElapsed(elapsedMs), tokens: liveTokens > 0 ? `${formatTokens(liveTokens)} ${t("status.tokens")}` : null, tps: tps !== null ? `${tps} tokens/s` : null };
       })()
