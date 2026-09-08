@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo } from "react";
 import { useCommittedCommand } from "../lib/useCommittedCommand";
 import type { useNavigationSurface } from "../lib/useNavigationSurface";
 import type { HistoryLoadTrigger, Item } from "../lib/useController";
+import type { SessionAvailability } from "../lib/sessionAvailability";
 
 type NavigationSurfaceApi = ReturnType<typeof useNavigationSurface>;
 
@@ -21,6 +22,8 @@ export type TranscriptSurfaceProjectionInput = {
   singleSurface: boolean;
   controllerReady: boolean;
   heroLayout: boolean;
+  availability: SessionAvailability;
+  sessionActivity: boolean;
   imDetailActive: boolean;
   sessionHasContent: boolean;
   commitRendered: NavigationSurfaceApi["commitRendered"];
@@ -47,6 +50,8 @@ export function useTranscriptSurfaceProjection(input: TranscriptSurfaceProjectio
   // Exclude IM/Bot detail: hero CSS collapses .main, which also hosts that panel.
   const emptyHero =
     input.heroLayout &&
+    input.availability.kind === "ready" &&
+    !input.sessionActivity &&
     !transitioning &&
     !input.imDetailActive &&
     !input.sessionHasContent &&

@@ -247,6 +247,7 @@ export type ComposerSurfaceInput = {
     runtimeTransitioning: boolean;
     controllerReady: boolean;
     showContextWindowRing: boolean;
+    submitDisabledReason?: string;
   };
   base: ComposerBase;
   tab: { readOnly?: boolean; floorInferred?: boolean } | undefined;
@@ -313,6 +314,7 @@ export function buildComposerSurface(input: ComposerSurfaceInput): DecisionFoote
       readOnly: Boolean(input.tab?.readOnly),
       disabled: view.runtimeTransitioning || view.rewindCommitting || view.messageActionPending || view.decisionActive,
       submitDisabled: view.remote ? !remoteComposer.ready || !remoteComposer.profileReady : !view.controllerReady,
+      submitDisabledReason: view.submitDisabledReason,
       decisionPending: view.rewindCommitting || view.messageActionPending || view.decisionActive,
       ready: view.remote ? remoteComposer.ready && remoteComposer.profileReady : view.controllerReady,
       liveStore: view.remote ? remoteComposer.liveStore : input.localLiveStore,

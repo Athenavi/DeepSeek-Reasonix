@@ -233,7 +233,9 @@ if (initialCSS.length > 0) {
 // Mainline provider/settings and recovery styles measure 119.435 KiB gzip.
 // Workbench's column-responsive welcome adds 291 bytes over the 119.479 KiB
 // toolbar-refresh base; round the measured 119.763 KiB to the next tenth.
-assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 119.8 * 1024);
+// Shared recovery banner and disabled-send states measure 119.989 KiB;
+// +231 gzip bytes over the prior welcome head, retaining the next tenth.
+assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 120.0 * 1024);
 if (localeChunks.length !== 2) {
   throw new Error(`expected 2 on-demand Chinese locale chunks, found ${localeChunks.length}`);
 }
@@ -298,7 +300,9 @@ for (const path of localeChunks) {
   // ceiling for cross-platform CI.
   // Search assignment copy adds 239 / 231 B over main-v2 (63147 / 63920 B).
   // Measured result: 63386 / 64151 B; retain bounded cross-platform headroom.
-  const budget = name.startsWith("zh-TW-") ? 62.8 * 1024 : 62.1 * 1024;
+  // Session recovery guidance adds 173 / 156 B over main-v2, measuring
+  // 62.173 / 62.887 KiB. Keep only the next one-decimal ceiling.
+  const budget = name.startsWith("zh-TW-") ? 62.9 * 1024 : 62.2 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -415,6 +419,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // main-v2 baseline (2399.3 KiB); result 2400.3 KiB plus 0.2 KiB headroom.
 // Workbench welcome plus toolbar-refresh integration measures 2401.108 KiB
 // against the 2398.0 KiB base; retain only the next one-decimal ceiling.
-const rawInitialBudgetKiB = 2_401.2;
+// Shared availability, visible recovery and retry controls measure 2407.215 KiB
+// (+6.107 KiB, 0.25% over the prior welcome head). Retain the next tenth.
+const rawInitialBudgetKiB = 2_407.3;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { useCommittedCommand } from "../lib/useCommittedCommand";
+import { projectSessionAvailability } from "../lib/sessionAvailability";
 import { useWailsResizeFix } from "../lib/useWailsResizeFix";
 import type { RemoteSessionApi } from "../lib/useRemoteSession";
 import { activeLeaseBlockedTab } from "../lib/tabMetaRefresh";
@@ -625,6 +626,7 @@ export function useAppSessionComposition(input: AppSessionCompositionInput) {
   // openTopic/blank/resume navigation uses, so rapidly clicking between two
   // running sessions can't run two switchTab() calls concurrently. Concurrent
   // switches race on the backend SetActiveTab/confirmBackendActiveTab ordering,
+  const availability = projectSessionAvailability({ local: state, remote: remoteSurfaceActive ? remoteSession : undefined });
   const {
     transcriptHydrating, emptyHero,
     visibleTranscriptItems, visibleTranscriptTabId, visibleTranscriptGeometryKey,
@@ -645,6 +647,10 @@ export function useAppSessionComposition(input: AppSessionCompositionInput) {
     singleSurface: singleSurfaceLayout,
     controllerReady,
     heroLayout: desktopLayoutStyle === "creation" || desktopLayoutStyle === "workbench",
+    availability,
+    sessionActivity: Boolean(conversationView.runtime.running || conversationView.runtime.pendingPrompt
+      || conversationView.runtime.approval || conversationView.runtime.ask || conversationView.runtime.extensionForm
+      || conversationView.runtime.mcpInteraction || (remoteSurfaceActive && (remoteSession.promptError || remoteSession.error))),
     imDetailActive: Boolean(sidebarImDetailConnection),
     sessionHasContent,
     commitRendered: commitRenderedTranscriptSurface,
@@ -709,7 +715,7 @@ export function useAppSessionComposition(input: AppSessionCompositionInput) {
     todoPanel: { showTodos, scopedTodoBatch, todos, dismissTodos, handleTodoContinue },
     delivery: { handleDeliveryContinue },
     transcript: {
-      transcriptHydrating, emptyHero,
+      transcriptHydrating, emptyHero, availability,
       visibleTranscriptItems, visibleTranscriptTabId, visibleTranscriptGeometryKey,
       handleLoadOlderHistory, handleSurfacePaintReady, latestGuidanceConsumed, handleTranscriptPrompt,
     },
