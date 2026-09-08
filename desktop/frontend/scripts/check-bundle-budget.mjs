@@ -421,6 +421,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // against the 2398.0 KiB base; retain only the next one-decimal ceiling.
 // Shared availability, visible recovery and retry controls measure 2407.215 KiB
 // (+6.107 KiB, 0.25% over the prior welcome head). Retain the next tenth.
-const rawInitialBudgetKiB = 2_407.3;
+// The desktop host adapter (Electron preload bridge beside the Wails bridge)
+// measures 2408.4 KiB; the Wails half leaves with the old shell. Next tenth.
+const rawInitialBudgetKiB = 2_408.5;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

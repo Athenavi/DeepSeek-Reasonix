@@ -151,7 +151,9 @@ import type {
   SessionClearResult,
 } from "./types";
 import { browserPreviewShellSupport } from "./shellSupportPreview";
+import { desktopHost } from "./desktopHost";
 export * from "./remoteTabEvents";
+export { installWailsNonFileDragErrorSuppression, isTransientWailsIPCError, isWailsNonFileDragError, isWailsNonFileDragErrorEvent } from "./wailsDragErrors";
 export const COMPACT_RATIO_MIN_PERCENT = 30, COMPACT_RATIO_MAX_PERCENT = 85;
 
 export interface DesktopShellStatusView {
@@ -771,44 +773,12 @@ export type _CheckGenToApp = AssertNever<
   GeneratedAppMissing extends true ? never : Exclude<GeneratedAppKeys, keyof AppBindings>
 >;
 
-interface WailsRuntime {
-  EventsOn(name: string, cb: (...data: unknown[]) => void): () => void;
-  BrowserOpenURL(url: string): void;
-  WindowSetSystemDefaultTheme?(): void;
-  WindowSetLightTheme?(): void;
-  WindowSetDarkTheme?(): void;
-  WindowSetBackgroundColour?(r: number, g: number, b: number, a: number): void;
-  WindowGetSize?(): Promise<{ w: number; h: number }>;
-  WindowGetPosition?(): Promise<{ x: number; y: number }>;
-  WindowIsMaximised?(): Promise<boolean>;
-  ClipboardSetText?(text: string): Promise<boolean>;
-  ClipboardGetText?(): Promise<string>;
-  // Native OS file drop; useDropTarget gates delivery to --wails-drop-target elements. Absent in browser mocks.
-  OnFileDrop?(cb: (x: number, y: number, paths: string[]) => void, useDropTarget: boolean): void;
-  OnFileDropOff?(): void;
-}
-
-declare global {
-  interface Window {
-    runtime?: WailsRuntime;
-    go?: { main?: { App?: AppBindings } };
-  }
-}
-
 // Must match desktop/app.go's eventChannel constant.
 const EVENT_CHANNEL = "agent:event";
-const RECENT_NATIVE_FILE_DRAG_MS = 2000;
-const WAILS_NON_FILE_DRAG_MESSAGE = "additional File object is not a file on the disk";
-const UNCAUGHT_ERROR_PREFIX_RE = /^Uncaught(?:\s+\(in promise\))?(?:\s+\w*Error)?:\s*/i;
-const WAILS_IPC_CONNECTING_RE = /Failed to execute 'send' on 'WebSocket': Still in CONNECTING state/i;
-const WAILS_IPC_NULL_SEND_RE = /Cannot read properties of null \(reading 'send'\)/i;
 
-// Resolve the Wails binding at CALL time, not module-load time: in dev the Wails
-// runtime can inject window.go AFTER this module first evaluates, so snapshotting
-// once would pin the browser mock for the whole session (and show fake data — the
-// dev mock's model list leaking into the real app was exactly this bug).
-function realApp(): AppBindings | undefined {
-  return typeof window !== "undefined" ? window.go?.main?.App : undefined;
+function hostEvents(name: string, cb: (...args: unknown[]) => void): (() => void) | null {
+  const host = desktopHost();
+  return host.kind === "none" ? null : host.events.on(name, cb);
 }
 
 let mockSingleton: AppBindings | null = null;
@@ -819,10 +789,7 @@ function getMock(): AppBindings {
 
 // onEvent subscribes to the agent's typed event stream; returns an unsubscribe.
 export function onEvent(cb: (e: WireEvent) => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn(EVENT_CHANNEL, (payload) => cb(payload as WireEvent));
-  }
-  return mockSubscribe(cb);
+  return hostEvents(EVENT_CHANNEL, (payload) => cb(payload as WireEvent)) ?? mockSubscribe(cb);
 }
 
 export interface TerminalOutputEvent {
@@ -842,23 +809,21 @@ function terminalEventPayload<T>(payload: unknown): T | null {
 }
 
 export function onTerminalOutput(cb: (event: TerminalOutputEvent) => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn("terminal:output", (payload) => {
-      const event = terminalEventPayload<TerminalOutputEvent>(payload);
-      if (event?.id && typeof event.data === "string") cb(event);
-    });
-  }
+  const off = hostEvents("terminal:output", (payload) => {
+    const event = terminalEventPayload<TerminalOutputEvent>(payload);
+    if (event?.id && typeof event.data === "string") cb(event);
+  });
+  if (off) return off;
   mockTerminalOutputListeners.add(cb);
   return () => mockTerminalOutputListeners.delete(cb);
 }
 
 export function onTerminalExit(cb: (event: TerminalExitEvent) => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn("terminal:exit", (payload) => {
-      const event = terminalEventPayload<TerminalExitEvent>(payload);
-      if (event?.id && typeof event.exitCode === "number") cb(event);
-    });
-  }
+  const off = hostEvents("terminal:exit", (payload) => {
+    const event = terminalEventPayload<TerminalExitEvent>(payload);
+    if (event?.id && typeof event.exitCode === "number") cb(event);
+  });
+  if (off) return off;
   mockTerminalExitListeners.add(cb);
   return () => mockTerminalExitListeners.delete(cb);
 }
@@ -878,118 +843,19 @@ export function __emitMockTerminalExit(event: TerminalExitEvent): void {
 // channel from the agent stream); returns an unsubscribe. Must match the event
 // name emitted in desktop/updater_app.go.
 export function onUpdaterProgress(cb: (p: UpdateProgress) => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn("updater:progress", (p) => cb(p as UpdateProgress));
-  }
+  const off = hostEvents("updater:progress", (p) => cb(p as UpdateProgress));
+  if (off) return off;
   updaterListeners.add(cb);
   return () => {
     updaterListeners.delete(cb);
   };
 }
 
-function errorMessage(err: unknown): string {
-  if (err && typeof err === "object" && "message" in err) {
-    const msg = (err as { message?: unknown }).message;
-    if (typeof msg === "string") return msg;
-  }
-  return String(err);
-}
-
-export function isWailsNonFileDragError(err: unknown, recentNativeFileDrag = false): boolean {
-  const msg = errorMessage(err).trim().replace(UNCAUGHT_ERROR_PREFIX_RE, "");
-  if (msg.includes(WAILS_NON_FILE_DRAG_MESSAGE)) return true;
-  return recentNativeFileDrag && msg.toLowerCase() === "invalid argument";
-}
-
-export function isWailsNonFileDragErrorEvent(
-  event: Pick<ErrorEvent, "error" | "message">,
-  recentNativeFileDrag = false,
-): boolean {
-  if (isWailsNonFileDragError(event.error ?? event.message, recentNativeFileDrag)) return true;
-  return event.error != null && isWailsNonFileDragError(event.message, recentNativeFileDrag);
-}
-
-export function isTransientWailsIPCError(err: unknown): boolean {
-  const msg = errorMessage(err).trim().replace(UNCAUGHT_ERROR_PREFIX_RE, "");
-  return WAILS_IPC_CONNECTING_RE.test(msg) || WAILS_IPC_NULL_SEND_RE.test(msg);
-}
-
-function dataTransferLooksLikeFileDrag(dt: DataTransfer | null): boolean {
-  if (!dt) return false;
-  if (dt.files?.length > 0) return true;
-  return Array.from(dt.types ?? []).includes("Files");
-}
-
-let wailsDragSuppressionRefs = 0;
-let wailsDragSuppressionUninstall: (() => void) | null = null;
-let lastNativeFileDragAt = 0;
-
-export function installWailsNonFileDragErrorSuppression(): () => void {
-  if (typeof window === "undefined") return () => {};
-
-  wailsDragSuppressionRefs += 1;
-  if (!wailsDragSuppressionUninstall) {
-    const markNativeFileDrag = (e: DragEvent) => {
-      if (dataTransferLooksLikeFileDrag(e.dataTransfer)) lastNativeFileDragAt = Date.now();
-    };
-    const hasRecentNativeFileDrag = () => Date.now() - lastNativeFileDragAt <= RECENT_NATIVE_FILE_DRAG_MS;
-    const suppressNonFileDragError = (e: ErrorEvent) => {
-      if (isWailsNonFileDragErrorEvent(e, hasRecentNativeFileDrag()) || isTransientWailsIPCError(e.error ?? e.message)) {
-        e.preventDefault();
-      }
-    };
-    const suppressNonFileDragRejection = (e: PromiseRejectionEvent) => {
-      if (isWailsNonFileDragError(e.reason, hasRecentNativeFileDrag()) || isTransientWailsIPCError(e.reason)) {
-        e.preventDefault();
-      }
-    };
-
-    window.addEventListener("dragenter", markNativeFileDrag, true);
-    window.addEventListener("dragover", markNativeFileDrag, true);
-    window.addEventListener("drop", markNativeFileDrag, true);
-    window.addEventListener("error", suppressNonFileDragError);
-    window.addEventListener("unhandledrejection", suppressNonFileDragRejection);
-    wailsDragSuppressionUninstall = () => {
-      window.removeEventListener("dragenter", markNativeFileDrag, true);
-      window.removeEventListener("dragover", markNativeFileDrag, true);
-      window.removeEventListener("drop", markNativeFileDrag, true);
-      window.removeEventListener("error", suppressNonFileDragError);
-      window.removeEventListener("unhandledrejection", suppressNonFileDragRejection);
-      lastNativeFileDragAt = 0;
-    };
-  }
-
-  let disposed = false;
-  return () => {
-    if (disposed) return;
-    disposed = true;
-    wailsDragSuppressionRefs = Math.max(0, wailsDragSuppressionRefs - 1);
-    if (wailsDragSuppressionRefs === 0 && wailsDragSuppressionUninstall) {
-      wailsDragSuppressionUninstall();
-      wailsDragSuppressionUninstall = null;
-    }
-  };
-}
-
-// onFilesDropped subscribes to native OS file drops landing on the composer (the
-// --wails-drop-target element); the callback gets the dropped files' absolute
-// paths. No-op in the browser dev mock, where the runtime is absent.
+// onFilesDropped subscribes to native OS file drops landing on the composer's
+// drop target; the callback gets the dropped files' absolute paths. No-op in
+// the browser dev mock.
 export function onFilesDropped(cb: (paths: string[]) => void): () => void {
-  const rt = typeof window !== "undefined" ? window.runtime : undefined;
-  if (!rt?.OnFileDrop) return () => {};
-
-  // Wails' internal ResolveFilePaths throws when a non-file object (e.g. the
-  // window icon) is dragged onto the webview. The error is uncaught and crashes
-  // the app. Intercept it here so only real file drops reach the callback.
-  const uninstallDragSuppression = installWailsNonFileDragErrorSuppression();
-
-  rt.OnFileDrop((_x, _y, paths) => {
-    if (Array.isArray(paths) && paths.length > 0) cb(paths);
-  }, true);
-  return () => {
-    rt.OnFileDropOff?.();
-    uninstallDragSuppression();
-  };
+  return desktopHost().native.onFilesDropped(cb);
 }
 
 // onReady subscribes to the agent:ready event fired when boot.Build completes.
@@ -998,42 +864,34 @@ export function onFilesDropped(cb: (paths: string[]) => void): () => void {
 // (model/effort/token-mode switch, clear-while-running). The rebuilt
 // controller restarts prompt ids, so per-tab id-keyed state must reset.
 export function onRuntimeRebuilt(cb: (tabId?: string, runtimeEpoch?: string) => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn("runtime:rebuilt", (tabId?: unknown, runtimeEpoch?: unknown) =>
-      cb(
-        typeof tabId === "string" ? tabId : undefined,
-        typeof runtimeEpoch === "string" ? runtimeEpoch : undefined,
-      )
-    );
-  }
-  return () => {};
+  return hostEvents("runtime:rebuilt", (tabId?: unknown, runtimeEpoch?: unknown) =>
+    cb(
+      typeof tabId === "string" ? tabId : undefined,
+      typeof runtimeEpoch === "string" ? runtimeEpoch : undefined,
+    )
+  ) ?? (() => {});
 }
 
 export function onReady(cb: (tabId?: string) => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn("agent:ready", (tabId?: unknown) => cb(typeof tabId === "string" ? tabId : undefined));
-  }
+  const off = hostEvents("agent:ready", (tabId?: unknown) => cb(typeof tabId === "string" ? tabId : undefined));
+  if (off) return off;
   // In dev mock, fire immediately since there's no real boot sequence.
   cb();
   return () => {};
 }
 
 export function onProjectTreeChanged(cb: () => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn("project-tree:changed", (payload?: unknown) => (payload as { reason?: unknown } | undefined)?.reason !== "runtime" && (payload as { reason?: unknown } | undefined)?.reason !== "catalog-v2" && cb());
-  }
-  return () => {};
+  return hostEvents("project-tree:changed", (payload?: unknown) => (payload as { reason?: unknown } | undefined)?.reason !== "runtime" && (payload as { reason?: unknown } | undefined)?.reason !== "catalog-v2" && cb()) ?? (() => {});
 }
 
 // onTopicActivation subscribes to the "topic:activation" channel carrying the
 // lifecycle of ticketed StartTopicActivation requests (starting/ready/failed/
 // cancelled). Returns an unsubscribe.
 export function onTopicActivation(cb: (event: TopicActivationEvent) => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn("topic:activation", (payload?: unknown) => {
-      if (payload && typeof payload === "object") cb(payload as TopicActivationEvent);
-    });
-  }
+  const off = hostEvents("topic:activation", (payload?: unknown) => {
+    if (payload && typeof payload === "object") cb(payload as TopicActivationEvent);
+  });
+  if (off) return off;
   mockTopicActivationListeners.add(cb);
   return () => mockTopicActivationListeners.delete(cb);
 }
@@ -1042,11 +900,10 @@ export function onTopicActivation(cb: (event: TopicActivationEvent) => void): ()
 // after the backend recomputes the expensive MetaForTab fields (git branch,
 // image-input capability) in the background.
 export function onTabMeta(cb: (event: TabMetaRefreshEvent) => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn("tab:meta", (payload?: unknown) => {
-      if (payload && typeof payload === "object") cb(payload as TabMetaRefreshEvent);
-    });
-  }
+  const off = hostEvents("tab:meta", (payload?: unknown) => {
+    if (payload && typeof payload === "object") cb(payload as TabMetaRefreshEvent);
+  });
+  if (off) return off;
   mockTabMetaListeners.add(cb);
   return () => mockTabMetaListeners.delete(cb);
 }
@@ -1063,43 +920,30 @@ export function __emitMockTabMeta(event: TabMetaRefreshEvent): void {
 }
 
 export function onSessionRecovered(cb: (payload: SessionRecoveryEvent) => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn("session:recovered", (payload?: unknown) => cb((payload ?? {}) as SessionRecoveryEvent));
-  }
-  return () => {};
+  return hostEvents("session:recovered", (payload?: unknown) => cb((payload ?? {}) as SessionRecoveryEvent)) ?? (() => {});
 }
 
 export function onSessionActiveVersionChanged(cb: (payload: SessionRecoveryEvent) => void): () => void {
-  if (typeof window === "undefined" || !window.runtime?.EventsOn) return () => {};
-  return window.runtime.EventsOn("session:active-version-changed", (payload?: unknown) => cb((payload ?? {}) as SessionRecoveryEvent));
+  return hostEvents("session:active-version-changed", (payload?: unknown) => cb((payload ?? {}) as SessionRecoveryEvent)) ?? (() => {});
 }
 
 export function onSessionRecoveryFailed(cb: (payload: SessionRecoveryFailedEvent) => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn("session:recovery-failed", (payload?: unknown) => cb((payload ?? {}) as SessionRecoveryFailedEvent));
-  }
-  return () => {};
+  return hostEvents("session:recovery-failed", (payload?: unknown) => cb((payload ?? {}) as SessionRecoveryFailedEvent)) ?? (() => {});
 }
 
 export function onRemoteStatus(cb: (s: RemoteConnectionStatus) => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn("remote:status", (payload?: unknown) => cb((payload ?? {}) as RemoteConnectionStatus));
-  }
-  return registerMockRemoteListener("status", cb as (v: unknown) => void);
+  return hostEvents("remote:status", (payload?: unknown) => cb((payload ?? {}) as RemoteConnectionStatus))
+    ?? registerMockRemoteListener("status", cb as (v: unknown) => void);
 }
 
 export function onRemoteForwards(cb: (e: RemoteForwardsEvent) => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn("remote:forwards", (payload?: unknown) => cb((payload ?? {}) as RemoteForwardsEvent));
-  }
-  return registerMockRemoteListener("forwards", cb as (v: unknown) => void);
+  return hostEvents("remote:forwards", (payload?: unknown) => cb((payload ?? {}) as RemoteForwardsEvent))
+    ?? registerMockRemoteListener("forwards", cb as (v: unknown) => void);
 }
 
 export function onRemoteServer(cb: (s: RemoteServerView) => void): () => void {
-  if (realApp() && typeof window !== "undefined" && window.runtime) {
-    return window.runtime.EventsOn("remote:server", (payload?: unknown) => cb((payload ?? {}) as RemoteServerView));
-  }
-  return registerMockRemoteListener("server", cb as (v: unknown) => void);
+  return hostEvents("remote:server", (payload?: unknown) => cb((payload ?? {}) as RemoteServerView))
+    ?? registerMockRemoteListener("server", cb as (v: unknown) => void);
 }
 
 // Mock event fan-out so browser-dev and tsx tests can drive remote:* events
@@ -1148,7 +992,7 @@ function elapsedMs(startedAt: number): number {
 
 export const app: AppBindings = new Proxy({} as AppBindings, {
   get(_t, prop) {
-    const target = realApp() ?? getMock();
+    const target = desktopHost().app ?? getMock();
     const v = (target as unknown as Record<string, unknown>)[String(prop)];
     if (typeof v !== "function") return v;
     return (...args: unknown[]) => {
@@ -1183,11 +1027,7 @@ export const app: AppBindings = new Proxy({} as AppBindings, {
 // don't navigate the webview away from the app). Falls back to window.open in the
 // browser dev mock.
 export function openExternal(url: string): void {
-  if (typeof window !== "undefined" && window.runtime?.BrowserOpenURL) {
-    window.runtime.BrowserOpenURL(url);
-  } else if (typeof window !== "undefined") {
-    window.open(url, "_blank", "noopener");
-  }
+  desktopHost().native.openExternal(url);
 }
 
 // --- browser dev mock --------------------------------------------------------
@@ -1248,13 +1088,13 @@ function baseName(path: string): string {
 }
 
 function browserPlatformOverride(): "darwin" | "windows" | "linux" | "" {
-  if (typeof window === "undefined" || window.runtime) return "";
+  if (typeof window === "undefined" || desktopHost().kind !== "none") return "";
   const value = new URLSearchParams(window.location.search).get("platform");
   return value === "darwin" || value === "windows" || value === "linux" ? value : "";
 }
 
 function browserMockDesktopLayoutStyle(): "classic" | "workbench" | "creation" {
-  if (typeof window === "undefined" || window.go?.main?.App) return "workbench";
+  if (typeof window === "undefined" || desktopHost().app) return "workbench";
   const value = new URLSearchParams(window.location.search).get("layout");
   return value === "classic" || value === "creation" ? value : "workbench";
 }

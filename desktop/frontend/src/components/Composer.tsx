@@ -7,6 +7,7 @@ import { asArray } from "../lib/array";
 import { filterAtMatches } from "../lib/atMatches";
 import { DedupIndex, sha256 } from "../lib/attachDedup";
 import { app, onFilesDropped } from "../lib/bridge";
+import { desktopHost } from "../lib/desktopHost";
 import { enqueueInboxGuidanceForActiveTurn, steerInboxItemForActiveTurn } from "../lib/inboxSubmit";
 import { formatInboxError, isInboxItemMissing } from "../lib/inboxError";
 import { inboxScopeKey } from "../lib/composerInboxQueue";
@@ -2572,9 +2573,9 @@ export function Composer({
     try {
       await navigator.clipboard.writeText(selection.selected);
     } catch {
-      // Fall back to Wails desktop runtime, then execCommand
+      // Fall back to the desktop host clipboard, then execCommand
       try {
-        if (typeof window !== "undefined" && (await window.runtime?.ClipboardSetText?.(selection.selected))) {
+        if (await desktopHost().native.clipboardWriteText(selection.selected)) {
           /* ok */
         } else if (!fallbackCopyText(selection.selected)) {
           // Every clipboard path failed. Cutting now would delete text that
@@ -3864,6 +3865,7 @@ export function Composer({
         heroMode ? "composer-wrap--hero" : "",
       ].filter(Boolean).join(" ")}
       style={attachmentInputEnabled ? { "--wails-drop-target": "drop" } as CSSProperties : undefined}
+      data-native-drop-target={attachmentInputEnabled ? "" : undefined}
       onDropCapture={onFileDropCapture}
     >
       <input

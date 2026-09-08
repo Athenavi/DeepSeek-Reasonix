@@ -3,6 +3,7 @@
 
 import { addBreadcrumb, dumpBreadcrumbs, snapshotBreadcrumbs, type Breadcrumb } from "./breadcrumbs";
 import { writeClipboardText } from "./clipboard";
+import { desktopHost } from "./desktopHost";
 import { t } from "./i18n";
 import { sessionPipelineDiagnostics, type SessionPipelineDiagnostics } from "./sessionDiagnostics";
 import { isWailsRuntimeOnlyCrashEvent } from "./wailsRuntimeCrash";
@@ -673,9 +674,9 @@ function sendButton(
   className = "crash-overlay__send",
   onSent?: () => void,
 ): HTMLButtonElement | null {
-  // Resolved at click time via window.go, not the bridge module: this overlay must
-  // stay usable even when the rest of the app (and its imports) is broken.
-  const report = window.go?.main?.App?.ReportCrash;
+  // Resolved at click time through the host adapter, not the bridge module: this
+  // overlay must stay usable even when the rest of the app (and its imports) is broken.
+  const report = desktopHost().app?.ReportCrash;
   if (!report) return null;
   const send = document.createElement("button");
   send.className = className;
@@ -905,7 +906,7 @@ function maybePromptForHeapPressure(): void {
 
 export function installPerformancePressureMonitor() {
   if (performanceMonitorInstalled || typeof window === "undefined" || typeof performance === "undefined") return;
-  if (!window.runtime) return;
+  if (desktopHost().kind === "none") return;
   performanceMonitorInstalled = true;
   const startedAt = performance.now();
   const graceUntil = startedAt + STARTUP_GRACE_MS;

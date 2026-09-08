@@ -334,6 +334,7 @@ eq(shouldPromptForPerformanceLabel(false, 11 * 60_000, false, false), false, "ne
   // the field reports #6419/#5909).
   (globalThis as any).window = {
     runtime: {},
+    go: { main: { App: {} } },
     location: { protocol: "app:", host: "test", pathname: "/", hash: "" },
     addEventListener: () => {},
     setInterval: (cb: () => void) => {
@@ -470,6 +471,7 @@ eq([...parseReportedPerf("{not json", "abc123")], [], "tolerates corrupt storage
         return value.length > 0;
       },
     },
+    go: { main: { App: {} } },
   };
   eq(await writeClipboardText("report"), true, "copy falls back to the Wails native clipboard bridge when the clipboard API rejects");
   eq(bridgeCalls, 1, "the rejected clipboard write goes through the native bridge exactly once");

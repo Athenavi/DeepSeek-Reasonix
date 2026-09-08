@@ -1,4 +1,5 @@
 import { ModelSettingHelp } from "./ModelSettingHelp";
+import { desktopHost } from "../lib/desktopHost";
 import { SettingsOptions } from "./SettingsOptions";
 import { SettingsSelect } from "./SettingsSelect";
 import { providerProtocolLabel, providerProtocolChoices } from "../lib/providerProtocol";
@@ -2221,7 +2222,7 @@ function BotsSection({ s, busy, apply, initialFocus }: BotsSectionProps) {
   const qqCanEnableAccess = botAccessReady(draft.qq.access);
   const qqCanSaveAndEnable = Boolean(draft.qq.appId.trim() && qqSecretEnv && (draft.qq.secretSet || qqSecretValue.trim()) && qqCanEnableAccess);
   const qqAdded = qqBotAdded(draft.qq);
-  const nativeRuntimeAvailable = typeof window !== "undefined" && Boolean(window.runtime);
+  const nativeRuntimeAvailable = desktopHost().kind !== "none";
   const browserPreviewBotConfigured = !nativeRuntimeAvailable && (qqAdded || draft.connections.length > 0);
   const qqOnline = qqConfigured && nativeRuntimeAvailable;
   const dingtalkSecretEnv = draft.dingtalk.clientSecretEnv.trim() || "DINGTALK_CLIENT_SECRET";

@@ -5,6 +5,7 @@ import { execSync } from "node:child_process";
 import { mkdir, readdir, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { rewriteDragRegions, shellFromEnv } from "./scripts/shell-css.mjs";
 
 const devPort = Number(process.env.REASONIX_DESKTOP_VITE_PORT || "5173");
 const configDir = dirname(fileURLToPath(import.meta.url));
@@ -71,6 +72,26 @@ function archiveHiddenSourcemaps(commit: string): Plugin {
   };
 }
 
+// One stylesheet serves both shells: the Electron build rewrites the Wails
+// drag-region property to -webkit-app-region at bundle time (scripts/shell-css.mjs),
+// so the Wails bundle stays byte-identical and no rule is declared twice.
+function shellDragRegions(): Plugin {
+  const shell = shellFromEnv();
+  return {
+    name: "shell-drag-regions",
+    apply: "build",
+    enforce: "post",
+    generateBundle(_options, bundle) {
+      if (shell !== "electron") return;
+      for (const asset of Object.values(bundle)) {
+        if (asset.type === "asset" && asset.fileName.endsWith(".css") && typeof asset.source === "string") {
+          asset.source = rewriteDragRegions(asset.source, shell);
+        }
+      }
+    },
+  };
+}
+
 // Vite must empty dist before production builds so stale hashed assets disappear.
 // Recreate the tracked placeholder afterwards so git status stays clean and
 // Go's //go:embed all:frontend/dist still works on a fresh checkout.
@@ -105,7 +126,7 @@ export default defineConfig({
   css: {
     lightningcss: { errorRecovery: true },
   },
-  plugins: [react(), stripCrossorigin(), archiveHiddenSourcemaps(commit), keepDistPlaceholder()],
+  plugins: [react(), stripCrossorigin(), shellDragRegions(), archiveHiddenSourcemaps(commit), keepDistPlaceholder()],
   base: "./",
   define: { __BUILD_COMMIT__: JSON.stringify(commit), __BUILD_CHANNEL__: JSON.stringify(channel) },
   resolve: {

@@ -480,6 +480,7 @@ console.log("\nmermaid rendering");
 {
   const dom = installDom();
   Object.defineProperty(dom.window, "runtime", { configurable: true, value: {} });
+  Object.defineProperty(dom.window, "go", { configurable: true, value: { main: { App: {} } } });
   const dirtySvg = `
     <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" onload="steal()">
       <script>alert(1)</script>

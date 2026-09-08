@@ -1034,7 +1034,7 @@ export class TranscriptStore {
   }
 }
 
-// Bridge-backed singleton: resolves window.go.main.App at call time through
+// Bridge-backed singleton: resolves the host bindings at call time through
 // the app proxy, so test/dev mocks install whenever they appear.
 let singleton: TranscriptStore | undefined;
 

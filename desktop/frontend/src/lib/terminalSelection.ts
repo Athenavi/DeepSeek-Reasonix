@@ -1,3 +1,5 @@
+import { desktopHost } from "./desktopHost";
+
 export type TerminalSelectionPoint = { left: number; top: number };
 
 export type TerminalSelectionOperation<T> = {
@@ -146,9 +148,8 @@ export async function readTerminalClipboardText(): Promise<string> {
     // Permission denied or unavailable — try the bridge.
   }
   try {
-    if (typeof window !== "undefined" && window.runtime?.ClipboardGetText) {
-      return await window.runtime.ClipboardGetText();
-    }
+    const host = desktopHost();
+    if (host.kind !== "none") return await host.native.clipboardReadText();
   } catch {
     // Bridge missing or failed.
   }

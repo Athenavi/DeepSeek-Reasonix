@@ -118,6 +118,7 @@ console.log("\ntranscript selection menu");
       return true;
     },
   };
+  (window as unknown as { go?: unknown }).go = { main: { App: {} } };
 
   document.body.insertAdjacentHTML(
     "beforeend",
@@ -454,6 +455,7 @@ console.log("\ntranscript selection menu");
       return true;
     },
   };
+  (window as unknown as { go?: unknown }).go = { main: { App: {} } };
   document.body.insertAdjacentHTML(
     "beforeend",
     '<div class="transcript__row" data-row-key="row-a"><div class="msg__body" data-transcript-selectable="message">alpha</div></div>' +

@@ -168,12 +168,14 @@ function keyEvent(overrides: Partial<ConstructorParameters<typeof KeyboardEvent>
       configurable: true,
       value: { readText: async () => { throw new Error("denied"); } },
     });
-    (globalThis.window as unknown as { runtime?: unknown }).runtime = {
+    (globalThis.window as unknown as { runtime?: unknown; go?: unknown }).runtime = {
       ClipboardGetText: async () => "from-runtime",
     };
+    (globalThis.window as unknown as { go?: unknown }).go = { main: { App: {} } };
     assert.equal(await readTerminalClipboardText(), "from-runtime", "bridge is the permission fallback");
 
     (globalThis.window as unknown as { runtime?: unknown }).runtime = undefined;
+    delete (globalThis.window as unknown as { go?: unknown }).go;
     assert.equal(await readTerminalClipboardText(), "", "no clipboard source returns empty");
   } finally {
     if (originalClipboard) Object.defineProperty(globalThis.navigator, "clipboard", originalClipboard);
