@@ -231,7 +231,11 @@ if (initialCSS.length > 0) {
 // 116.9 KiB gzip while reusing existing layout primitives. Retain a bounded
 // 0.1 KiB headroom ratchet.
 // Mainline provider/settings and recovery styles measure 119.435 KiB gzip.
-assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 119.5 * 1024);
+// Workbench's column-responsive welcome adds 291 bytes over the 119.479 KiB
+// toolbar-refresh base; round the measured 119.763 KiB to the next tenth.
+// Shared recovery banner and disabled-send states measure 119.989 KiB;
+// +231 gzip bytes over the prior welcome head, retaining the next tenth.
+assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 120.0 * 1024);
 if (localeChunks.length !== 2) {
   throw new Error(`expected 2 on-demand Chinese locale chunks, found ${localeChunks.length}`);
 }
@@ -298,7 +302,10 @@ for (const path of localeChunks) {
   // Measured result: 63386 / 64151 B; retain bounded cross-platform headroom.
   // Saved/pending/apply-failure guidance adds 233 / 245 B: 63619 / 64396 B
   // with gzip level 9. Keep the next decimal ceiling for these four keys.
-  const budget = name.startsWith("zh-TW-") ? 62.9 * 1024 : 62.2 * 1024;
+  // Session recovery guidance adds 173 / 156 B over main-v2, measuring
+  // 62.173 / 62.887 KiB. Keep only the next one-decimal ceiling.
+  // Combined recovery and model-application copy measures 63791 / 64557 B.
+  const budget = name.startsWith("zh-TW-") ? 63.1 * 1024 : 62.3 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -413,8 +420,12 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2399.2 KiB; retain the same bounded 0.2 KiB build headroom.
 // Search-assignment bridge and metadata add 1.0 KiB over the measured
 // main-v2 baseline (2399.3 KiB); result 2400.3 KiB plus 0.2 KiB headroom.
-// Structured settings bridge, bounded mock receipts, and receipt lookup measure
-// 2401.5 KiB; preserve 0.2 KiB of build headroom for this 1.2 KiB addition.
-const rawInitialBudgetKiB = 2_401.7;
+// Workbench welcome plus toolbar-refresh integration measures 2401.108 KiB
+// against the 2398.0 KiB base; retain only the next one-decimal ceiling.
+// Shared availability, visible recovery and retry controls measure 2407.215 KiB
+// (+6.107 KiB, 0.25% over the prior welcome head). Retain the next tenth.
+// Integrated model settings and bounded receipt mock measure 2468523 B
+// (2410.667 KiB); retain 0.2 KiB headroom on the combined startup payload.
+const rawInitialBudgetKiB = 2_410.9;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
