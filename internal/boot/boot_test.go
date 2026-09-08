@@ -2311,6 +2311,7 @@ func unifiedBootToolNames() []string {
 		"todo_write",
 		"update_goal",
 		"use_capability",
+		"view_image",
 		"wait",
 		"write_file",
 	}

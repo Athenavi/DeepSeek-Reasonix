@@ -42,6 +42,7 @@ import (
 	"reasonix/internal/guardian"
 	"reasonix/internal/history"
 	"reasonix/internal/hook"
+	"reasonix/internal/imageinput"
 	"reasonix/internal/installsource"
 	"reasonix/internal/instruction"
 	"reasonix/internal/jobs"
@@ -1059,8 +1060,47 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 	// capRuntime is assigned after MCP specs load; closures capture the variable
 	// so task tools created later still receive the session-shared substrate.
 	var capRuntime *agent.MCPCapabilityRuntime
+	visionProviderResolver := func(ref string) (provider.Provider, error) {
+		ve, ok := resolveOptionalEntry(effectiveResolver, cfg, strings.TrimSpace(ref))
+		if !ok || ve == nil || strings.TrimSpace(ve.Model) == "" {
+			return nil, fmt.Errorf("unknown vision model %q", ref)
+		}
+		return resolveProvider(effectiveResolver, cfg, proxySpec, provider.Selection{Ref: modelRefFromEntry(ve)})
+	}
+	visionModelSelector := func(currentRef, _ string) (string, bool) {
+		current, ok := resolveOptionalEntry(effectiveResolver, cfg, strings.TrimSpace(currentRef))
+		if !ok || current == nil {
+			return "", false
+		}
+		for i := range cfg.Providers {
+			p := &cfg.Providers[i]
+			if p.Name != current.Name || !p.Configured() {
+				continue
+			}
+			models := p.ModelList()
+			ordered := make([]string, 0, len(models))
+			if d := p.DefaultModel(); d != "" {
+				ordered = append(ordered, d)
+			}
+			for _, model := range models {
+				if model != "" && model != p.DefaultModel() {
+					ordered = append(ordered, model)
+				}
+			}
+			for _, model := range ordered {
+				candidate, found := cfg.ResolveModel(p.Name + "/" + model)
+				if found && candidate.Configured() && modelCapabilities.Resolve(candidate).State == config.CapabilitySupported {
+					return candidate.Name + "/" + candidate.Model, true
+				}
+			}
+		}
+		return "", false
+	}
+
+	imageConfig := &imageinput.Config{Model: cfg.Agent.VisionModel, Resolve: visionProviderResolver, Select: visionModelSelector}
 	newTaskTool := func() *agent.TaskTool {
 		return agent.NewTaskToolWithOptions(agent.TaskToolOptions{
+			ImageInput:          imageConfig,
 			Provider:            execProv,
 			Pricing:             entry.Price,
 			QuoteContext:        quoteCtx,
@@ -1620,6 +1660,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 
 	execSess := newObservedSession(sysPrompt)
 	executor := agent.New(execProv, reg, execSess, agent.Options{
+		ImageInput:   imageConfig,
 		MaxSteps:     maxSteps,
 		MaxStepsKey:  opts.MaxStepsKey,
 		Temperature:  cfg.Agent.Temperature,
@@ -1697,6 +1738,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 			plannerTools.Add(capRuntime.NewFrontend(plannerLedger, plannerAudit))
 		}
 		plannerOpts := agent.Options{
+			ImageInput:                   imageConfig,
 			MaxSteps:                     0,
 			Gate:                         headlessGate,
 			ModelRef:                     modelRefFromEntry(pe),
@@ -1721,42 +1763,6 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 		}
 		runner = agent.NewCoordinatorWithPlannerPolicy(plannerProv, plannerSess, pe.Price, plannerTools, plannerOpts, executor, cfg.Agent.Temperature, sink, control.NewPlannerPolicy())
 		label = entry.Model + " + planner " + pe.Model
-	}
-	visionProviderResolver := func(ref string) (provider.Provider, error) {
-		ve, ok := resolveOptionalEntry(effectiveResolver, cfg, strings.TrimSpace(ref))
-		if !ok || ve == nil || strings.TrimSpace(ve.Model) == "" {
-			return nil, fmt.Errorf("unknown vision model %q", ref)
-		}
-		return resolveProvider(effectiveResolver, cfg, proxySpec, provider.Selection{Ref: modelRefFromEntry(ve)})
-	}
-	visionModelSelector := func(currentRef, _ string) (string, bool) {
-		current, ok := resolveOptionalEntry(effectiveResolver, cfg, strings.TrimSpace(currentRef))
-		if !ok || current == nil {
-			return "", false
-		}
-		for i := range cfg.Providers {
-			p := &cfg.Providers[i]
-			if p.Name != current.Name || !p.Configured() {
-				continue
-			}
-			models := p.ModelList()
-			ordered := make([]string, 0, len(models))
-			if d := p.DefaultModel(); d != "" {
-				ordered = append(ordered, d)
-			}
-			for _, model := range models {
-				if model != "" && model != p.DefaultModel() {
-					ordered = append(ordered, model)
-				}
-			}
-			for _, model := range ordered {
-				candidate, found := cfg.ResolveModel(p.Name + "/" + model)
-				if found && candidate.Configured() && modelCapabilities.Resolve(candidate).State == config.CapabilitySupported {
-					return candidate.Name + "/" + candidate.Model, true
-				}
-			}
-		}
-		return "", false
 	}
 	imageEnabled := modelCapabilities.Resolve(entry).State == config.CapabilitySupported
 	if infoProvider, ok := execProv.(provider.ModelInfoProvider); ok {

@@ -770,7 +770,7 @@ func (c *client) buildRequest(req provider.Request) chatRequest {
 			cm.Content = m.Content
 		}
 		msgs = append(msgs, cm)
-		if c.vision && m.Role == provider.RoleTool && !IsDeepSeek(c.baseURL) {
+		if c.vision && m.Role == provider.RoleTool {
 			pendingToolImages = append(pendingToolImages, m.Images...)
 		}
 	}
