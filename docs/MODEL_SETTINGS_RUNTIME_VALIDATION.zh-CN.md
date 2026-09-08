@@ -16,6 +16,11 @@
 | 远端项目配置继续优先 | `internal/config/model_runtime_settings.go` | `TestManagedModelSnapshotPreservesProjectProviderAndAssignments` |
 | 架构状态不进入模型前缀 | 仅传输层使用快照元数据，保留序列化行为 | `TestRemoteModelSnapshotPreservesWirePrefixAndKeepsKeysLocal` 比较 OpenAI、Anthropic、Responses 请求字节 |
 | 已保存、待应用、失败状态及草稿竞态 | 结构化桥接结果、请求回执和读写代次 | `model-settings-receipt.test.ts`、`provider-editor-save-races.test.tsx`、设置回读快照测试 |
+| 保存后创建的子代理及审批续轮保持已接受的快照 | Boot 子代理工厂和控制器审批恢复 | `TestModelSettingsChildCreatedAfterSaveInheritsAcceptedRunSnapshot`、`TestModelSettingsApprovalResumeKeepsAcceptedCredential` 验证真实 HTTP 请求 |
+| 连续保存超过构建进度及完成响应丢失 | 共享运行时所有者刷新、源版本校验和候选保留 | `TestModelSettingsSourceFencesOvertakenBuildAndUncertainFinish` |
+| 远程后台分离工作保留自己的接纳边界 | `internal/serve/model_settings_detached.go` | `TestDetachedModelSettingsRefreshTargetsItsOwnerAndPreservesFailure`、`TestDetachedModelSettingsKeepsQueuedOwnerUntilAdmission` |
+| 远程所有权达到容量上限时不清理已接受路由 | 代理范围内的候选接纳 | `TestRemoteModelOfferCapacityPreservesOwnedRoutes` |
+| 保存后的 HTTP 重试保持已接受的凭据 | 传输重试复用不可变服务凭据 | `TestModelSettingsHTTPRetryKeepsAcceptedCredential` 返回真实 503，验证重试和下一运行 |
 
 ## 确定性验证
 

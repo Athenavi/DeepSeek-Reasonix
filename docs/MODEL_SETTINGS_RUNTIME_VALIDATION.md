@@ -16,6 +16,11 @@ This record distinguishes implemented behavior from release qualification. The c
 | Remote project configuration remains authoritative | `internal/config/model_runtime_settings.go` | `TestManagedModelSnapshotPreservesProjectProviderAndAssignments` |
 | No architecture metadata in model prefixes | Transport-only snapshot metadata and unchanged serializers | `TestRemoteModelSnapshotPreservesWirePrefixAndKeepsKeysLocal` compares OpenAI, Anthropic and Responses request bytes |
 | Saved/pending/failed states and draft races | Structured bridge result, request receipts, read/apply generations | `model-settings-receipt.test.ts`, `provider-editor-save-races.test.tsx`, settings refresh snapshot tests |
+| Children created after a save and approval continuations retain the accepted snapshot | Boot-created child factories and controller approval resume | `TestModelSettingsChildCreatedAfterSaveInheritsAcceptedRunSnapshot`, `TestModelSettingsApprovalResumeKeepsAcceptedCredential` exercise actual HTTP requests |
+| Source refresh supersession and uncertain completion | Shared runtime-owner refresh, source revision fencing and retained offers | `TestModelSettingsSourceFencesOvertakenBuildAndUncertainFinish` |
+| Detached remote work retains its own admission boundary | `internal/serve/model_settings_detached.go` | `TestDetachedModelSettingsRefreshTargetsItsOwnerAndPreservesFailure`, `TestDetachedModelSettingsKeepsQueuedOwnerUntilAdmission` |
+| Bounded remote ownership does not evict accepted routes | Proxy-scoped offer admission | `TestRemoteModelOfferCapacityPreservesOwnedRoutes` |
+| HTTP retry retains accepted credentials after a save | Immutable provider credentials across transport retries | `TestModelSettingsHTTPRetryKeepsAcceptedCredential` returns an actual 503, then checks the retry and next runtime |
 
 ## Deterministic qualification
 
