@@ -155,6 +155,7 @@ type SessionHistory interface {
 	Branch(name string) (string, error)
 	Branches() ([]agent.BranchInfo, error)
 	BranchTreeText() string
+	CurrentBranchID() string
 	SwitchBranch(ref string) (agent.BranchInfo, error)
 	Compact(ctx context.Context, instructions string) error
 	CompactRatio() float64
