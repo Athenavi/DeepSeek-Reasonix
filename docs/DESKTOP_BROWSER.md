@@ -132,6 +132,22 @@ them. Browser grants and provider-proxy credentials are separate; no shared
 token. Older remote Serve builds negotiate capabilities and simply do not
 advertise the browser, keeping every existing remote feature.
 
+The wire shape is one loopback HTTP broker per desktop. The bootstrap of a
+fresh Serve injects `REASONIX_BROWSER_BROKER` / `REASONIX_BROWSER_TOKEN`
+(process environment only) pointing at the reverse-forwarded broker; a reused
+Serve is re-pointed through `POST /browser/broker` after the desktop rotates
+the route. The broker mints one random bearer token per host connection
+generation — registering a new generation replaces the host's old token — and
+authenticates before dispatching to `browser.Executor` over
+`/v1/browser/<method>`. Every request carries `X-Reasonix-Browser-Session`;
+the broker resolves it to the one desktop tab that shows that session and
+refuses anything else with `no_grant`. Screenshots and downloads the shell
+writes on the desktop are staged onto the remote host through the existing
+SFTP channel into a per-workspace scratch directory
+(`~/.reasonix/browser-relay/<workspace>/`), so the serve's tools only ever
+read paths local to them. A Serve started with a broker advertises `browser`
+in the `X-Reasonix-Serve-Capabilities` header of the `/auth/token` handshake.
+
 ## Acceptance
 
 Iframes, dynamic DOM, controlled inputs, popups, upload and download,
