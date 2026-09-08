@@ -14,7 +14,7 @@ import (
 )
 
 func TestGetRecoveryLineageIncludesOriginalAndUserFacingMetadata(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	catalog, err := sessioncatalog.Open(context.Background(), sessioncatalog.Options{InMemory: true, DisableRepair: true})
 	if err != nil {
 		t.Fatal(err)
@@ -88,7 +88,7 @@ func TestGetRecoveryLineageEmptyMembersEncodeAsArray(t *testing.T) {
 
 func TestGetRecoveryLineageBindsRequestedPhysicalGroup(t *testing.T) {
 	ctx := context.Background()
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	catalog, err := sessioncatalog.Open(ctx, sessioncatalog.Options{InMemory: true, DisableRepair: true})
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +165,7 @@ func TestGetRecoveryLineageBindsRequestedPhysicalGroup(t *testing.T) {
 func TestChooseRecoveryBranchPersistsPreferenceAndRefreshesOffBarrier(t *testing.T) {
 	isolateDesktopUserDirs(t)
 	ctx := context.Background()
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	catalog, err := sessioncatalog.Open(ctx, sessioncatalog.Options{InMemory: true, DisableRepair: true})
 	if err != nil {
 		t.Fatal(err)

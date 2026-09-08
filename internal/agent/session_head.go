@@ -142,15 +142,26 @@ func (st *sessionDAGState) headRecord(id string, selected string) SessionHead {
 	}
 }
 
-// headList lists every head in declaration order with the selected one marked.
+// headList lists every head in declaration order with the selected one marked
+// and covered heads flagged: retiring one of those loses no message.
 func (st *sessionDAGState) headList() []SessionHead {
 	selected := st.selectedHead()
+	onChain := map[string]struct{}{}
+	for _, id := range st.chainIDs(selected) {
+		onChain[id] = struct{}{}
+	}
 	out := make([]SessionHead, 0, len(st.headOrder))
 	for _, id := range st.headOrder {
-		if st.heads[id] == nil {
+		h := st.heads[id]
+		if h == nil {
 			continue
 		}
-		out = append(out, st.headRecord(id, selected))
+		rec := st.headRecord(id, selected)
+		if id != selected && !h.retired {
+			_, rec.Covered = onChain[h.leaf]
+			rec.Covered = rec.Covered || h.leaf == ""
+		}
+		out = append(out, rec)
 	}
 	return out
 }

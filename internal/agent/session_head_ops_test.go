@@ -153,3 +153,40 @@ func TestHeadOperationsRefuseSchemaOneSessions(t *testing.T) {
 		t.Fatalf("SelectSessionHead on schema 1 err = %v", err)
 	}
 }
+
+func TestHeadListMarksCoveredHeads(t *testing.T) {
+	path := dagTestSession(t)
+	s := dagSavedSession(t, path, "q1", "a1")
+	fork, err := s.ForkHead(path, s.Snapshot()[2].ID, HeadKindFork, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	covered := func() map[string]bool {
+		t.Helper()
+		heads, err := ListSessionHeads(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]bool{}
+		for _, h := range heads {
+			out[h.ID] = h.Covered
+		}
+		return out
+	}
+	if got := covered(); !got[SessionMainHead] || got[fork] {
+		t.Fatalf("tip fork selected: covered = %v, want the parent covered and the selection never flagged", got)
+	}
+	s.Add(provider.Message{Role: provider.RoleUser, Content: "q2-alt"})
+	if err := s.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	if got := covered(); !got[SessionMainHead] || got[fork] {
+		t.Fatalf("after the fork grew: covered = %v", got)
+	}
+	if err := SelectSessionHead(path, SessionMainHead); err != nil {
+		t.Fatal(err)
+	}
+	if got := covered(); got[SessionMainHead] || got[fork] {
+		t.Fatalf("main selected: covered = %v, want the diverged fork kept", got)
+	}
+}

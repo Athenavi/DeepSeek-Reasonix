@@ -384,6 +384,8 @@ export interface MemoryCitation {
 
 export interface WireEvent extends RecoveryEventFields {
   kind: EventKind;
+  /** session_changed: the transcript was replaced under the same path (head switch, clear). */
+  sessionReset?: boolean;
   promptId?: string;
   promptKind?: "ask" | "approval" | "plan" | "recovery" | "mcp" | string;
   promptLegacy?: boolean;
@@ -640,6 +642,8 @@ export interface RecoveryPreferenceRequest {
   workspaceRoot?: string;
   topicId: string;
   path: string;
+  /** Head inside a schema-2 log; empty for file-based recovery versions. */
+  headId?: string;
 }
 
 export interface RecoveryCleanupItem {
