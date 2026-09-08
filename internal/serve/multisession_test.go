@@ -199,7 +199,6 @@ func TestCapturedRecoveryCallbackFollowsDetachedKeeper(t *testing.T) {
 	}
 }
 
-
 func TestBusyNewRejectsUntaggedLegacyController(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "legacy.jsonl")
@@ -399,7 +398,6 @@ func TestProviderHealSynchronouslyRetiresDetachedControllers(t *testing.T) {
 	}
 }
 
-
 func TestBuildTaggedInheritsWorkspacePlacement(t *testing.T) {
 	root := t.TempDir()
 	sessionDir := filepath.Join(root, "sessions")
@@ -521,8 +519,6 @@ func TestStatusRuntimeQuerySkipsBalance(t *testing.T) {
 		}
 	}
 }
-
-
 
 func TestBusyResumeDetachesAndReattachesRunningController(t *testing.T) {
 	dir := t.TempDir()

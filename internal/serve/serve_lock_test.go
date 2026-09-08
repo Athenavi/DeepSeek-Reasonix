@@ -411,8 +411,6 @@ func TestSubmitWaitsForExtensionReloadAndTargetsReplacement(t *testing.T) {
 	waitNotRunning(t, replacement)
 }
 
-
-
 // blockingRunner keeps a turn "running" until its context is cancelled, so tests
 // can observe Running() == true deterministically.
 type blockingRunner struct{}

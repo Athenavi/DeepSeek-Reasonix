@@ -642,7 +642,6 @@ func TestServeExtensionReloadPublishesOnlySuccessfulReplacement(t *testing.T) {
 	}
 }
 
-
 func writeServeModelConfig(t *testing.T) {
 	t.Helper()
 	home := t.TempDir()
