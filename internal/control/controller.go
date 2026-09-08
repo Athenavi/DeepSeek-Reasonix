@@ -95,6 +95,7 @@ var errNoSessionPath = errors.New("session has content but no session path; conv
 // Controller drives one chat session. Construct with New; drive with the command
 // methods; observe through the Sink passed in Options.
 type Controller struct {
+	runtimeState controllerRuntimeState
 	// promptResolveMu serializes exact prompt decisions on one controller. It
 	// prevents two UI submissions from racing through separate prompt managers.
 	promptResolveMu    sync.Mutex
@@ -790,18 +791,21 @@ func New(opts Options) *Controller {
 	// state/event evidence. The recorder swallows its own failures — monitoring
 	// must never affect the agent pipeline. The session id is resolved lazily
 	// because the session path is only fixed once the first turn begins.
-	if c.jobs != nil && c.workspaceRoot != "" {
-		taskStore := opts.TaskStore
-		if taskStore == nil {
-			taskStore = taskmonitor.NewFileStore(filepath.Join(".reasonix", "tasks"))
-		}
-		c.jobs.SetTaskRecorder(taskmonitor.NewTaskRecorder(
-			taskStore,
-			c.workspaceRoot,
-			func() string { return c.parentSessionID() },
-		))
-	}
+	c.initializeTaskRecorder(opts.TaskStore)
+	c.initializeRuntimeState()
 	return c
+}
+
+func (c *Controller) initializeTaskRecorder(store taskmonitor.WriteStore) {
+	if c.jobs == nil || c.workspaceRoot == "" {
+		return
+	}
+	if store == nil {
+		store = taskmonitor.NewFileStore(filepath.Join(".reasonix", "tasks"))
+	}
+	c.jobs.SetTaskRecorder(taskmonitor.NewTaskRecorder(
+		store, c.workspaceRoot, func() string { return c.parentSessionID() },
+	))
 }
 
 // SetDisplayRecorder installs an optional hook used by frontends that persist a
@@ -1077,6 +1081,7 @@ func (c *Controller) finishGuardedTurn(err error, completion *guardedTurnComplet
 	}
 	c.mu.Unlock()
 
+	c.refreshRuntimeState(event.Event{})
 	defer func() {
 		c.mu.Lock()
 		c.finishing = false
@@ -1084,12 +1089,14 @@ func (c *Controller) finishGuardedTurn(err error, completion *guardedTurnComplet
 		c.finishingBoundary.end()
 		if c.closed {
 			c.mu.Unlock()
+			c.refreshRuntimeState(event.Event{})
 			return
 		}
 		if len(c.parkedTurns) == 0 {
 			c.mu.Unlock()
 			// No parked compatibility body: admit the next durable inbox item.
 			c.maybeDispatchInbox()
+			c.refreshRuntimeState(event.Event{})
 			return
 		}
 		next := c.parkedTurns[0]
@@ -1100,6 +1107,7 @@ func (c *Controller) finishGuardedTurn(err error, completion *guardedTurnComplet
 		c.canceling = false
 		c.mu.Unlock()
 		c.spawnGuardedTurn(ctx, cancel, next)
+		c.refreshRuntimeState(event.Event{})
 	}()
 	c.inbox.mu.Lock()
 	// Prefer a single representative id for the wire event (first active).
@@ -2593,6 +2601,7 @@ func (c *Controller) AnswerQuestion(id string, answers []event.AskAnswer) {
 // AnswerQuestionChecked persists the prompt transition before releasing the
 // agent loop. A failed ledger write leaves the prompt pending and retryable.
 func (c *Controller) AnswerQuestionChecked(id string, answers []event.AskAnswer) error {
+	defer c.refreshRuntimeState(event.Event{})
 	c.promptResolveMu.Lock()
 	defer c.promptResolveMu.Unlock()
 	return c.answerQuestionCheckedLocked(id, answers)
@@ -4242,6 +4251,7 @@ func (c *Controller) SetFreshSessionPath(p string) {
 }
 
 func (c *Controller) setSessionPath(p string, fresh bool) {
+	defer c.refreshRuntimeState(event.Event{})
 	// See snapshotMu: the swap must not interleave with an in-flight save.
 	c.snapshotMu.Lock()
 	c.mu.Lock()
@@ -5036,6 +5046,7 @@ const (
 )
 
 func (c *Controller) close(fireSessionEnd bool, jobsMode closeJobsMode) {
+	defer c.refreshRuntimeState(event.Event{})
 	// Desktop tab lifecycles can race a rebind/model-switch/close on the same
 	// controller; make teardown idempotent so a duplicate Close cannot re-fire
 	// SessionEnd hooks or re-run cleanup. The first caller's jobsMode wins.
@@ -5179,6 +5190,7 @@ func (c *Controller) SetToolApprovalMode(mode string) {
 // and config writes never drain; Auto keeps explicit memory asks but drains
 // fallback ones; YOLO drains both. Frontends must keep the rest (#6432).
 func (c *Controller) ApplyToolApprovalMode(mode string) []string {
+	defer c.refreshRuntimeState(event.Event{})
 	mode = normalizeToolApprovalMode(mode)
 	// Capture mode-change recovery dismissals before approval drain so a
 	// same-value hydrate/reconcile never rotates Episode state, while a real

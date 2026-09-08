@@ -14,6 +14,14 @@ import (
 
 const modelSettingsProtocolVersion = 1
 
+func currentModelRef(c control.SessionAPI) string {
+	ref := strings.TrimSpace(c.ModelRef())
+	if ref != "" {
+		return ref
+	}
+	return strings.TrimSpace(c.Label())
+}
+
 type modelSettingsStatusView struct {
 	config.ModelSettingsOwnership
 	Version           int      `json:"version"`

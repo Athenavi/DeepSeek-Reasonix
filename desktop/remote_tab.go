@@ -390,6 +390,10 @@ func (a *App) remoteTabPump(ctx context.Context, tabID string, gen uint64, opene
 			return
 		}
 		kind, framePath, current, reset := probeRemoteTabFrame(frame)
+		if kind == "runtime_state" {
+			a.acceptRemoteRuntimeFrame(tabID, gen, framePath, json.RawMessage(frame))
+			continue
+		}
 		// A takeover notice for the session this tab is viewing flips the
 		// spectator pin live: the entry-time probe only runs when the tab
 		// enters a session, so a mid-view takeover (or its reversal) would

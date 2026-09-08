@@ -305,7 +305,11 @@ for (const path of localeChunks) {
   // Turn result copy adds 554 / 566 B to the latest-base chunks, measuring
   // 64219 / 64964 B with recovery guidance included. Round to the next tenth.
   // Combined turn-result and model-application copy measures 64342 / 65119 B.
-  const budget = name.startsWith("zh-TW-") ? 63.6 * 1024 : 62.9 * 1024;
+  // Runtime/receipt confirmation copy adds 89 / 99 B to the integrated
+  // turn-result base (64219 / 64964 B). Measured: 64308 / 65063 B.
+  // Combined runtime confirmation and model-application copy measures
+  // 64438 / 65215 B; keep only the next one-decimal ceiling.
+  const budget = name.startsWith("zh-TW-") ? 63.7 * 1024 : 63.0 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -430,6 +434,14 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // projection, status presentation and view bindings. Result: 2477508 B.
 // Combined turn-result and model-settings startup payload is 2481108 B
 // (2422.957 KiB), retaining the same bounded 0.2 KiB build headroom.
-const rawInitialBudgetKiB = 2_423.2;
+// The integrated turn-result base measures 2477492 B. Runtime state and
+// session-bound receipt confirmation and its mock session contract add
+// 5944 B (0.240%): 2483436 B total.
+// Durable session isolation and missed-completion reconciliation add 1232 B
+// (0.050% over that head), measuring 2484668 B total.
+// Keep the next tenth; gzip, CSS, and individual chunk limits stay unchanged.
+// Combined model-settings and runtime-state integration measures 2488334 B,
+// 3666 B (0.148%) over main-v2. Retain less than 0.2 KiB build headroom.
+const rawInitialBudgetKiB = 2_430.2;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"reasonix/internal/agent"
 	"reasonix/internal/event"
 	"reasonix/internal/sessioninbox"
 )
@@ -30,15 +31,16 @@ const (
 
 // InboxRequest is the frontend-facing enqueue payload.
 type InboxRequest struct {
-	Intent      sessioninbox.InboxIntent
-	Display     string
-	Raw         string
-	Submit      string
-	Format      string
-	Source      string
-	Idempotency string
-	Invocations []InvocationRequest
-	Extra       map[string]string
+	ExpectedSessionPath string // optional exact-session fence; never persisted
+	Intent              sessioninbox.InboxIntent
+	Display             string
+	Raw                 string
+	Submit              string
+	Format              string
+	Source              string
+	Idempotency         string
+	Invocations         []InvocationRequest
+	Extra               map[string]string
 	// FreezeRefs lists workspace-relative paths to freeze at enqueue time.
 	FreezeRefs []string
 }
@@ -289,6 +291,9 @@ func (c *Controller) EnqueueInbox(req InboxRequest) (sessioninbox.InboxReceipt, 
 	if err != nil {
 		return sessioninbox.InboxReceipt{}, err
 	}
+	if req.ExpectedSessionPath != "" && st.SessionPath() != req.ExpectedSessionPath {
+		return sessioninbox.InboxReceipt{}, ErrInboxSessionChanged
+	}
 	submit := strings.TrimSpace(firstNonEmptyStr(req.Submit, req.Raw))
 	if submit == "" && len(req.Invocations) == 0 {
 		submit = strings.TrimSpace(req.Display)
@@ -319,7 +324,7 @@ func (c *Controller) EnqueueInbox(req InboxRequest) (sessioninbox.InboxReceipt, 
 		Envelope:    env,
 		Source:      req.Source,
 		Idempotency: req.Idempotency,
-		SessionID:   c.parentSessionID(),
+		SessionID:   agent.BranchID(st.SessionPath()),
 	})
 	if err != nil {
 		if errors.Is(err, sessioninbox.ErrCapacityItems) || errors.Is(err, sessioninbox.ErrCapacityBytes) || errors.Is(err, sessioninbox.ErrItemTooLarge) {
