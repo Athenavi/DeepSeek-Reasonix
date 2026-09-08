@@ -113,7 +113,6 @@ func (a *Agent) beginRunTurn(ctx context.Context, input string, pinned pinnedRev
 		a.turn.constraints = constraints
 	} else {
 		a.turn.constraints = runtimepolicy.ParseConstraints(runtimepolicy.StripQuotedConstraints(a.turn.turnInput))
-		a.recordRebuildAuthorization()
 		if a.planMode.Load() {
 			a.turn.constraints.PlanModeReadOnly = true
 			a.turn.constraints.ForbidMutation = true
@@ -132,6 +131,7 @@ func (a *Agent) beginRunTurn(ctx context.Context, input string, pinned pinnedRev
 			a.turn.constraints.ForbidMutation = true
 		}
 	}
+	a.recordRebuildAuthorization()
 	a.turn.engine = runtimepolicy.NewEngine(a.turn.constraints)
 	a.rebuildTurnContract()
 	// A cancelled/error turn leaves a provider-excluded recovery record at the

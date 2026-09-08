@@ -307,3 +307,32 @@ func TestBackgroundJobInheritsHostConstraints(t *testing.T) {
 		t.Fatalf("background job lost host constraints: %+v ok=%v", got, ok)
 	}
 }
+
+// TestRebuildAuthorizationRecordsFromHostConstraints pins the controller path:
+// the host publishes constraints parsed from the user's text, so the turn must
+// still record the authorized paths from its own instruction.
+func TestRebuildAuthorizationRecordsFromHostConstraints(t *testing.T) {
+	a, _ := newEvidenceAgent(t, evidenceWriter{target: tool.EvidenceTargetInfo{Path: "/w/notes.md"}}, true)
+	a.writeWorkspaceRoot = "/w"
+	ctx := runtimepolicy.WithContext(context.Background(), runtimepolicy.Constraints{AllowRebuild: true})
+	a.beginRunTurn(ctx, "please rewrite notes.md from scratch", pinnedRevisionPlan{})
+	if !a.rebuildAuthorized("/w/notes.md") {
+		t.Fatal("host-published constraints must still record the user's rebuild paths")
+	}
+	if a.rebuildAuthorized("/w/other.md") {
+		t.Fatal("the waiver must not cover a file the instruction did not name")
+	}
+}
+
+// TestSubagentPromptCannotRecordRebuildPaths proves a sub-agent's model-authored
+// prompt never records a host authorization, even when it parses as a rebuild.
+func TestSubagentPromptCannotRecordRebuildPaths(t *testing.T) {
+	a, _ := newEvidenceAgent(t, evidenceWriter{target: tool.EvidenceTargetInfo{Path: "/w/secret.go"}}, true)
+	a.writeWorkspaceRoot = "/w"
+	a.classifierTaskText = "rewrite the file completely: secret.go"
+	ctx := runtimepolicy.WithContext(context.Background(), runtimepolicy.Constraints{AllowRebuild: true})
+	a.beginRunTurn(ctx, a.classifierTaskText, pinnedRevisionPlan{})
+	if a.rebuildAuthorized("/w/secret.go") {
+		t.Fatal("a sub-agent prompt must not authorize a rebuild")
+	}
+}

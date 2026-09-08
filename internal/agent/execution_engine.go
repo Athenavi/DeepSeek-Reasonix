@@ -47,6 +47,9 @@ func mergeInheritedConstraints(child, parent runtimepolicy.Constraints) runtimep
 	if len(parent.AllowedChecks) > 0 && len(child.AllowedChecks) == 0 {
 		child.AllowedChecks = append([]string(nil), parent.AllowedChecks...)
 	}
+	if len(parent.RebuildPaths) > 0 && len(child.RebuildPaths) == 0 {
+		child.RebuildPaths = append([]string(nil), parent.RebuildPaths...)
+	}
 	return child
 }
 

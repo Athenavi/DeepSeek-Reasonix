@@ -332,10 +332,13 @@ func (a *Agent) applyEvidenceGates(ctx context.Context, plan *toolCallPlan) (too
 
 // recordRebuildAuthorization captures the files an AllowRebuild instruction
 // named, so later writes authorize by membership instead of re-parsing text.
-// Only the turn that owns the user's instruction calls it; sub-agents inherit
-// the resulting set through their host constraints.
+// Only the turn that owns the user's instruction records it; a sub-agent's
+// input is the model's own task prompt, so it may only inherit a host set.
 func (a *Agent) recordRebuildAuthorization() {
-	if a == nil || !a.turn.constraints.AllowRebuild {
+	if a == nil || !a.turn.constraints.AllowRebuild || len(a.turn.constraints.RebuildPaths) > 0 {
+		return
+	}
+	if a.classifierTaskText != "" {
 		return
 	}
 	a.turn.constraints.RebuildPaths = runtimepolicy.ParseRebuildPaths(a.turn.turnInput, a.writeWorkspaceRoot)
