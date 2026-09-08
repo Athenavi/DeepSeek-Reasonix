@@ -32,9 +32,14 @@ func (w evidenceWriter) DeclareEvidenceTarget(context.Context, json.RawMessage) 
 	return w.target, w.err
 }
 
-type undeclaredWriter struct{}
+type undeclaredWriter struct{ name string }
 
-func (undeclaredWriter) Name() string            { return "write_file" }
+func (w undeclaredWriter) Name() string {
+	if w.name != "" {
+		return w.name
+	}
+	return "write_file"
+}
 func (undeclaredWriter) Description() string     { return "writer without a declaration" }
 func (undeclaredWriter) Schema() json.RawMessage { return json.RawMessage(`{"type":"object"}`) }
 func (undeclaredWriter) ReadOnly() bool          { return false }
@@ -182,5 +187,28 @@ func TestEvidenceGateReportsAnInvalidTarget(t *testing.T) {
 	out, blocked := runEvidenceGate(a, "/w/a.go")
 	if !blocked || !strings.Contains(out.output, "anchor not found") {
 		t.Fatalf("an invalid target must surface the writer's own error: %+v (blocked=%v)", out, blocked)
+	}
+}
+
+// TestEvidenceGateBlocksUnknownScopeWriterAfterABlock pins the conservative
+// rule: a writer that cannot declare its target never becomes the way around an
+// outstanding evidence requirement.
+func TestEvidenceGateBlocksUnknownScopeWriterAfterABlock(t *testing.T) {
+	reg := tool.NewRegistry()
+	reg.Add(evidenceWriter{target: tool.EvidenceTargetInfo{
+		Path: "/w/a.go", WholeFile: true, Hashes: hashesFor("alpha"),
+	}})
+	reg.Add(undeclaredWriter{name: "bash"})
+	a := New(&userInputCaptureProvider{}, reg, NewSession("system"), Options{ReadPipeline: ReadPipelineOptions{EvidenceGates: true}}, event.Discard)
+	a.task.ledger = evidence.NewLedger()
+	a.turn.evidenceBlocked = map[string]struct{}{}
+
+	if out, blocked := runEvidenceGate(a, "/w/a.go"); !blocked {
+		t.Fatalf("the declarer must be blocked first: %+v", out)
+	}
+	plan := &toolCallPlan{call: provider.ToolCall{Name: "bash", Arguments: `{"command":"echo x > /w/a.go"}`}}
+	out, blocked := a.applyEvidenceGates(context.Background(), plan)
+	if !blocked || !strings.Contains(out.output, "cannot declare which files it changes") {
+		t.Fatalf("an unknown-scope writer must not route around the block: %+v (blocked=%v)", out, blocked)
 	}
 }

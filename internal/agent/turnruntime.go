@@ -105,8 +105,13 @@ type turnRuntime struct {
 	incompleteReads incompleteReadState
 
 	// readShadow is the host-only shadow of the read coordinator; it is inert
-	// unless Options.ReadCoordinatorShadow is set for this run.
+	// unless Options.ReadPipeline.CoordinatorShadow is set for this run.
 	readShadow readShadowState
+
+	// evidenceBlocked records paths whose writer was blocked for missing
+	// evidence this turn. While it is non-empty an unknown-scope writer may not
+	// route around the block.
+	evidenceBlocked map[string]struct{}
 
 	phase phaseClock
 

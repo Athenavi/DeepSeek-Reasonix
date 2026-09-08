@@ -265,9 +265,33 @@ func (a *Agent) applyEvidenceGates(ctx context.Context, plan *toolCallPlan) (too
 	}
 	boundary := observationBoundary(ctx, a.task.ledger.ObservationBoundary())
 	check := a.checkOperationEvidence(ctx, plan.call, resolved, boundary)
-	if !check.Supported || check.Satisfied {
-		return toolOutcome{}, false
+	if a.turn.evidenceBlocked == nil {
+		a.turn.evidenceBlocked = map[string]struct{}{}
 	}
+	switch {
+	case check.Satisfied:
+		return toolOutcome{}, false
+	case !check.Supported:
+		// A writer that cannot declare its target is never granted a pass. While
+		// another writer is blocked for missing evidence, it must not become the
+		// way around that block.
+		if len(a.turn.evidenceBlocked) == 0 || resolved.ReadOnly() {
+			return toolOutcome{}, false
+		}
+		msg := fmt.Sprintf("blocked: [evidence required] %s cannot declare which files it changes while a read-evidence requirement is outstanding (%s); use the exact file tool for those paths",
+			plan.call.Name, strings.Join(sortedPaths(a.turn.evidenceBlocked), ", "))
+		return toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg)}, true
+	}
+	a.turn.evidenceBlocked[check.Path] = struct{}{}
 	msg := describeEvidence(check, plan.call.Name)
 	return toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg)}, true
+}
+
+func sortedPaths(paths map[string]struct{}) []string {
+	out := make([]string, 0, len(paths))
+	for path := range paths {
+		out = append(out, path)
+	}
+	slices.Sort(out)
+	return out
 }
