@@ -150,10 +150,10 @@
       "file-size": 264
     },
     "desktop/frontend/src/lib/types.ts": {
-      "file-size": 1628
+      "file-size": 1634
     },
     "desktop/frontend/src/lib/useController.ts": {
-      "file-size": 4263
+      "file-size": 4264
     },
     "desktop/heartbeat.go": {
       "essay": 7
