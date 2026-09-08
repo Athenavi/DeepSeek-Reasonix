@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 
 	"reasonix/internal/event"
@@ -121,16 +122,21 @@ func TestStoreBatchToolResultOmitsEnvelopeForPlainReaders(t *testing.T) {
 
 func TestReadContinuationCursorJoinsTheLogicalRead(t *testing.T) {
 	a, _ := newEnvelopeTestAgent(t, envelopeReader{})
+	path := filepath.Join(t.TempDir(), "a.go")
 	a.reads.tasks.remember("ir-1", tool.ReadResultEnvelope{
-		Source: tool.ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:abc"},
+		Source: tool.ReadResultSource{CanonicalPath: path, Snapshot: "ss2:abc"},
 	})
 	cursor := tool.EncodeReadCursor(tool.ReadCursor{
-		Path: "/w/a.go", ReadID: "ir-1", Snapshot: "ss2:abc",
+		Path: path, ReadID: "ir-1", Snapshot: "ss2:abc",
 		NextStart: 5, RequestEnd: 10, SessionID: "test-session", RunGen: 1,
 		Binding: a.reads.tasks.binding,
 	})
-	a.reads.tasks.remember("ir-1", tool.ReadResultEnvelope{Source: tool.ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:abc"}, NextCursor: cursor})
-	plan := &toolCallPlan{execArgs: json.RawMessage(`{"path":"/w/a.go","cursor":"` + cursor + `"}`)}
+	a.reads.tasks.remember("ir-1", tool.ReadResultEnvelope{Source: tool.ReadResultSource{CanonicalPath: path, Snapshot: "ss2:abc"}, NextCursor: cursor})
+	argsJSON, err := json.Marshal(map[string]string{"path": path, "cursor": cursor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := &toolCallPlan{execArgs: argsJSON}
 
 	if out, blocked := a.resolveReadCursor(plan); blocked {
 		t.Fatalf("a valid continuation cursor was rejected: %+v", out)
@@ -153,25 +159,42 @@ func TestReadContinuationCursorJoinsTheLogicalRead(t *testing.T) {
 func TestReadContinuationCursorRejections(t *testing.T) {
 	cases := []struct {
 		name   string
-		cursor string
+		change func(*tool.ReadCursor)
 	}{
-		{"malformed", "rc2:!!!"},
-		{"unknown read task", tool.EncodeReadCursor(tool.ReadCursor{Path: "/w/a.go", ReadID: "ir-other", Snapshot: "ss2:abc", NextStart: 5})},
-		{"other session", tool.EncodeReadCursor(tool.ReadCursor{Path: "/w/a.go", ReadID: "ir-1", Snapshot: "ss2:abc", NextStart: 5, SessionID: "someone-else"})},
-		{"earlier run", tool.EncodeReadCursor(tool.ReadCursor{Path: "/w/a.go", ReadID: "ir-1", Snapshot: "ss2:abc", NextStart: 5, RunGen: 99})},
-		{"other file", tool.EncodeReadCursor(tool.ReadCursor{Path: "/w/b.go", ReadID: "ir-1", Snapshot: "ss2:abc", NextStart: 5})},
-		{"changed content", tool.EncodeReadCursor(tool.ReadCursor{Path: "/w/a.go", ReadID: "ir-1", Snapshot: "ss2:zzz", NextStart: 5})},
+		{"malformed", nil},
+		{"unknown read task", func(c *tool.ReadCursor) { c.ReadID = "ir-other" }},
+		{"other session", func(c *tool.ReadCursor) { c.SessionID = "someone-else" }},
+		{"earlier run", func(c *tool.ReadCursor) { c.RunGen = 99 }},
+		{"other file", func(c *tool.ReadCursor) { c.Path = filepath.Join(filepath.Dir(c.Path), "b.go") }},
+		{"changed content", func(c *tool.ReadCursor) { c.Snapshot = "ss2:zzz" }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			a, _ := newEnvelopeTestAgent(t, envelopeReader{})
+			path := filepath.Join(t.TempDir(), "a.go")
+			cursor := tool.ReadCursor{Path: path, ReadID: "ir-1", Snapshot: "ss2:abc", NextStart: 5, RequestEnd: 10, SessionID: "test-session", RunGen: 1, Binding: a.reads.tasks.binding}
 			a.reads.tasks.remember("ir-1", tool.ReadResultEnvelope{
-				Source: tool.ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:abc"},
+				Source: tool.ReadResultSource{CanonicalPath: path, Snapshot: "ss2:abc"}, NextCursor: tool.EncodeReadCursor(cursor),
 			})
-			plan := &toolCallPlan{execArgs: json.RawMessage(`{"path":"/w/a.go","cursor":"` + tc.cursor + `"}`)}
+			newPlan := func(token string) *toolCallPlan {
+				args, err := json.Marshal(map[string]string{"path": path, "cursor": token})
+				if err != nil {
+					t.Fatal(err)
+				}
+				return &toolCallPlan{execArgs: args}
+			}
+			if out, blocked := a.resolveReadCursor(newPlan(tool.EncodeReadCursor(cursor))); blocked {
+				t.Fatalf("unmodified cursor must be accepted before testing rejection: %+v", out)
+			}
+			token := "rc2:!!!"
+			if tc.change != nil {
+				tc.change(&cursor)
+				token = tool.EncodeReadCursor(cursor)
+			}
+			plan := newPlan(token)
 			out, blocked := a.resolveReadCursor(plan)
 			if !blocked || !out.blocked {
-				t.Fatalf("cursor %q must be rejected, got %+v (blocked=%v)", tc.cursor, out, blocked)
+				t.Fatalf("cursor %q must be rejected, got %+v (blocked=%v)", token, out, blocked)
 			}
 			if plan.readTaskID != "" {
 				t.Fatalf("a rejected cursor must not select a read task, got %q", plan.readTaskID)
