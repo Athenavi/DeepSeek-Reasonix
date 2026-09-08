@@ -1,3 +1,5 @@
+import { SettingsOptions } from "./SettingsOptions";
+import { SettingsSelect } from "./SettingsSelect";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, ChevronRight, CircleAlert, Folder, Plus, RefreshCw, Search, Server as ServerIcon } from "lucide-react";
 import { asArray } from "../lib/array";
@@ -1184,11 +1186,11 @@ function EditServerForm({
         </div>
         <label className="cap-detail cap-detail--select">
           <span className="cap-detail__label">{t("caps.transport")}</span>
-          <select className="mem-select" value={transport} disabled={busy} onChange={(e) => setTransport(e.target.value)}>
+          <SettingsSelect className="mem-select" value={transport} disabled={busy} onValueChange={(value) => setTransport(value)}>
             <option value="stdio">stdio</option>
             <option value="http">http</option>
             <option value="sse">sse</option>
-          </select>
+          </SettingsSelect>
         </label>
         {isStdio ? (
           <label className="cap-detail cap-detail--wide">
@@ -2935,7 +2937,7 @@ function MCPServerSettingsEditor({
 
 	return (
 		<div className="cap-mcp-editor">
-			<div className="cap-mcp-editor__mode set-seg" role="tablist" aria-label={t("caps.editorMode")}>
+			<SettingsOptions className="cap-mcp-editor__mode set-seg" role="tablist" aria-label={t("caps.editorMode")}>
 				{!server && (
 					<button className={`set-seg__btn${mode === "quick" ? " set-seg__btn--on" : ""}`} type="button" role="tab" aria-selected={mode === "quick"} onClick={() => switchMode("quick")}>
 						{t("caps.quickMode")}
@@ -2947,7 +2949,7 @@ function MCPServerSettingsEditor({
 				<button className={`set-seg__btn${mode === "json" ? " set-seg__btn--on" : ""}`} type="button" role="tab" aria-selected={mode === "json"} onClick={() => switchMode("json")}>
 					{t("caps.jsonMode")}
 				</button>
-			</div>
+			</SettingsOptions>
 			{mode === "quick" ? (
 				<div className="cap-mcp-quick">
 					<label className="cap-mcp-field">
@@ -2977,11 +2979,11 @@ function MCPServerSettingsEditor({
 					</label>
 					<label className="cap-mcp-field cap-mcp-field--transport">
 						<span>{t("caps.transport")}</span>
-						<select className="mem-select" value={draft.transport} disabled={busy} onChange={(event) => updateDraft({ transport: normalizeTransportValue(event.target.value) })}>
+						<SettingsSelect className="mem-select" value={draft.transport} disabled={busy} onValueChange={(value) => updateDraft({ transport: normalizeTransportValue(value) })}>
 							<option value="stdio">stdio</option>
 							<option value="http">http</option>
 							<option value="sse">sse</option>
-						</select>
+						</SettingsSelect>
 					</label>
 					{isStdio ? (
 						<label className="cap-mcp-field cap-mcp-field--wide">

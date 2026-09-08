@@ -1,3 +1,4 @@
+import { SettingsSelect } from "./SettingsSelect";
 import { protocolsForCatalog } from "../lib/providerCatalog";
 import { RotateCcw } from "lucide-react";
 import { providerProtocolLabel } from "../lib/providerProtocol";
@@ -78,13 +79,13 @@ export function ProviderCatalogPicker({ choices, busy, onConnect, onView, onRese
     const values = [...new Set(candidates.map(c => c.catalog[dimension]))];
     return <div className="provider-catalog__field">
       <label className="set-label" htmlFor={`${uid}-${dimension}`}>{t(label)}</label>
-      <select id={`${uid}-${dimension}`} className="mem-select" disabled={busy || values.length < 2}
-        value={selected.catalog[dimension]} onChange={e => chooseDimension(dimension, e.target.value)}>
+      <SettingsSelect id={`${uid}-${dimension}`} className="mem-select" disabled={busy || values.length < 2}
+        value={selected.catalog[dimension]} onValueChange={value => chooseDimension(dimension, value)}>
         {values.map(value => <option key={value} value={value}>{dimension === "format"
           ? value === "bundle" ? t("settings.catalog.formatBundle") : apiFormatLabel(value)
           : (dimension === "region" ? regionKeys[value] : productKeys[value])
             ? t((dimension === "region" ? regionKeys[value] : productKeys[value])) : value}</option>)}
-      </select>
+      </SettingsSelect>
     </div>;
   };
   return <div className="provider-catalog">
@@ -109,9 +110,9 @@ export function ProviderCatalogPicker({ choices, busy, onConnect, onView, onRese
       </div>}
       <div className="provider-catalog__field">
         <label className="set-label" htmlFor={`${uid}-format`}>{t("settings.providerProtocol")}</label>
-        <select id={`${uid}-format`} className="mem-select" disabled={busy} value={format}
-          onChange={e => {
-            const next = e.target.value;
+        <SettingsSelect id={`${uid}-format`} className="mem-select" disabled={busy} value={format}
+          onValueChange={value => {
+            const next = value;
             const match = formatChoices.find(c => genericFormat(c.catalog.format) === next);
             if (match) {
               if (Object.prototype.hasOwnProperty.call(urlDrafts, selected.id)) setUrlDrafts(prev => ({...prev, [match.id]: baseURL}));
@@ -123,14 +124,14 @@ export function ProviderCatalogPicker({ choices, busy, onConnect, onView, onRese
           }}>
           {["openai", "responses", "anthropic"].map(value => <option key={value} value={value}>{apiFormatLabel(value)}</option>)}
           {selected.catalog.format === "bundle" && <option value="bundle">{t("settings.catalog.formatBundle")}</option>}
-        </select>
+        </SettingsSelect>
         {!protocols[format] && !formatChoices.some(c => genericFormat(c.catalog.format) === format) && <div className="mem-hint">{t("settings.catalog.verifyFormat")}</div>}
       </div>
       {formatChoices.filter(c => c.catalog.format === selected.catalog.format).length > 1 && <div className="provider-catalog__field">
         <label className="set-label" htmlFor={`${uid}-variant`}>{t("settings.catalog.variant")}</label>
-        <select id={`${uid}-variant`} className="mem-select" value={selected.id} disabled={busy} onChange={e => pick(choices.find(c => c.id === e.target.value))}>
+        <SettingsSelect id={`${uid}-variant`} className="mem-select" value={selected.id} disabled={busy} onValueChange={value => pick(choices.find(c => c.id === value))}>
           {formatChoices.filter(c => c.catalog.format === selected.catalog.format).map(c => <option key={c.id} value={c.id}>{c.label || c.id}</option>)}
-        </select>
+        </SettingsSelect>
       </div>}
       {selected.catalog.brandId === "anthropic" && <div className="mem-hint">{t("settings.catalog.anthropicHint")}</div>}
       {selected.catalog.region === "local" && <div className="mem-hint">{t("settings.catalog.localHint")}</div>}

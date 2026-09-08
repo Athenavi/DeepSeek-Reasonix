@@ -24,7 +24,7 @@ await act(async()=>save.click());
 assert.equal(saved?.name,'stable-id');assert.equal(saved?.displayName,'个人账号');
 assert.equal(providerAccessGroups([provider],((key:string)=>key) as any)[0].label,'工作账号');
 await act(async()=>root.render(<LocaleProvider><ProviderEditor key="builtin" initial={{...provider,builtIn:true}} kinds={['openai','anthropic','responses']} busy={false} onCancel={()=>{}} onSave={p=>{saved=p;}} /></LocaleProvider>));
-assert.equal((document.querySelector('select') as HTMLSelectElement).disabled,false);
+assert.equal((document.querySelector('button[aria-label="API format"]') as HTMLButtonElement).disabled,false);
 assert.ok(document.querySelector('.provider-model-toolbar'));
 assert.equal(document.querySelector('.provider-editor--key-only'),null);
 assert.ok(document.querySelector('.provider-name-input'));

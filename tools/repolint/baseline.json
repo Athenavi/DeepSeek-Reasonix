@@ -87,7 +87,7 @@
       "test-file-size": 352
     },
     "desktop/frontend/src/__tests__/settings-refresh-snapshot.test.tsx": {
-      "test-file-size": 228
+      "test-file-size": 229
     },
     "desktop/frontend/src/__tests__/tab-switch-hydration.test.tsx": {
       "test-file-size": 162
@@ -96,7 +96,7 @@
       "file-size": 235
     },
     "desktop/frontend/src/components/CapabilitiesPanel.tsx": {
-      "file-size": 2641
+      "file-size": 2643
     },
     "desktop/frontend/src/components/Composer.tsx": {
       "file-size": 4002
@@ -108,7 +108,7 @@
       "file-size": 7
     },
     "desktop/frontend/src/components/MemoryPanel.tsx": {
-      "file-size": 1088
+      "file-size": 1089
     },
     "desktop/frontend/src/components/Message.tsx": {
       "file-size": 29
@@ -126,13 +126,13 @@
       "file-size": 43
     },
     "desktop/frontend/src/components/ThemeGallery.tsx": {
-      "file-size": 489
+      "file-size": 490
     },
     "desktop/frontend/src/components/ThemeLibrary.tsx": {
-      "file-size": 158
+      "file-size": 159
     },
     "desktop/frontend/src/components/UsageStatsPanel.tsx": {
-      "file-size": 276
+      "file-size": 277
     },
     "desktop/frontend/src/components/WorkspacePanel.tsx": {
       "file-size": 1346
