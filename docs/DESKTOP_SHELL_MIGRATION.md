@@ -164,6 +164,27 @@ execution and report executed / not executed / unknown; remote agents reach
 the same executor through the SSH-carried host RPC with generation-bound
 grants.
 
+Status: implemented, locally tested on macOS arm64. The Electron browser
+surface (`desktop/electron/src/main/browser/`: WebContentsView surfaces,
+snapshot/refs, trusted actions, generation-bound grants with the
+stale/taken-over/no-grant error codes, downloads, screenshots) passes 81/81
+unit tests and the shell smoke now opens example.com and verifies the tab
+title end to end (15/15). The renderer browser API is fixed at
+`window.reasonixDesktop.browser`. The frontend browser panel
+(`BrowserPanel`, dock tab, address bar, zoom, DevTools, downloads,
+take-over banner, overlay gating) ships as one lazy chunk with the initial
+bundle budget ratcheted by measurement (2408.2 → 2408.8 KiB raw, zero
+initial-chunk leakage proven by token-level diff). Remote agents reach the
+same executor through a 127.0.0.1 loopback broker
+(`desktop/browser_broker.go`): per-host generation tokens that die on
+reconnect, session-scoped routing with cross-session `no_grant` rejection,
+screenshot/download relay over SFTP, and serve capability negotiation so
+older remotes keep working; covered by `-race` tests including a real SFTP
+round trip. Open items: the remote end-to-end run against a real SSH host,
+`browser_upload` reverse staging (the wire passes `files` through; the
+broker does not stage remote-to-desktop uploads yet), and the remote
+browser acceptance rows in the gate table.
+
 Exit condition: local and remote agents complete real web tasks through the
 same tools with identical take-over, approval, file ownership and recovery
 behaviour.
@@ -178,6 +199,24 @@ coordinator keeps version resolution, signature checks, layout and recovery
 with Electron providing prepare-quit and restart; one version unit for shell,
 service, assets and helpers; macOS universal, notarised; Linux Chromium
 sandbox without `--no-sandbox`; minisign and digest checks unchanged.
+
+Status: implemented, locally tested where the development machine allows.
+The install layout members, payload schema 2, shell bootstrap and macOS
+hand-off below are on the branch with the desktop module suite green and
+Windows/Linux cross-builds passing. The release pipeline now packages the
+Electron shell end to end: `desktop/packaging/` assembles the `app/` tree
+with @electron/packager (+ universal on macOS), `scripts/desktop-build.sh`
+runs the contract drift check and drives packaging without `wails build`,
+NSIS installs the tree via `File /r`, the deb ships `/usr/lib/reasonix/app`
+with a root-owned 4755 `chrome-sandbox`, the SignPath configurations cover
+the tree's PE set with two-stage installer signing kept, and the CI/release
+workflows run `packaging/smoke.mjs` against the packaged shell (the
+`desktop-linux-webkit41` job is removed; the pinned contract tests were
+rewritten to the new entry points with negative guards against
+`wails build`). Open items: the four-platform install/upgrade matrix,
+real-code-signing and notarisation runs, the SignPath preflight
+re-attestation (the artifact-configuration fingerprint changed), and
+Windows/Linux runner verification.
 
 Exit condition: all four artifacts install, start and uninstall, and the
 Wails→Electron upgrade, Electron→Electron upgrade and failed-install recovery

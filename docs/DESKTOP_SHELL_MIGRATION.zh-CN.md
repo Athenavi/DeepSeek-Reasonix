@@ -125,6 +125,21 @@ DevTools），由 `BrowserSurfaceManager` 管理；Agent 能力（结构快照�
 撤销待执行动作；写操作先记录操作身份再执行，结果区分已执行/未执行/未知；远程
 Agent 通过 SSH 承载的 Host RPC 使用同一执行器，授权绑定世代。
 
+状态：已实现，并在 macOS arm64 上完成本地验证。Electron 浏览器表面
+（`desktop/electron/src/main/browser/`：WebContentsView 表面、快照/引用、可信
+输入动作、绑定世代的授权与 stale/taken-over/no-grant 错误码、下载、截图）
+单测 81/81 通过，壳冒烟真实打开 example.com 并端到端校验标签标题（15/15）；
+渲染端 API 固定在 `window.reasonixDesktop.browser`。前端浏览器面板
+（`BrowserPanel`、dock 标签、地址栏、缩放、DevTools、下载、接管横幅、覆盖层
+门控）整体收进单个 lazy chunk，initial 预算按实测 ratchet（raw 2408.2 →
+2408.8 KiB，token 级 diff 证明 initial chunk 零泄漏）。远程 Agent 经
+127.0.0.1 loopback broker（`desktop/browser_broker.go`）使用同一执行器：
+按主机连接世代铸造、重连即失效的 token，会话作用域路由与跨会话 `no_grant`
+拒绝，截图/下载经 SFTP 中转回流，serve 能力协商保证旧远程端继续可用；以上由
+`-race` 测试覆盖，含真实 SFTP 往返。未闭合项：真实 SSH 主机的远程端到端
+验收、`browser_upload` 的远程→桌面反向 staging（wire 已透传 `files`，broker
+尚未实现中转），以及验收门槛表中的远程浏览器各行。
+
 退出条件：本地与远程 Agent 通过相同工具完成真实网页任务，接管、审批、文件归属与
 恢复行为一致。
 
@@ -135,6 +150,19 @@ Electron 菜单、托盘、通知、文件关联、窗口恢复、单实例呈�
 签名步骤；Go 更新协调器继续负责版本解析、签名校验、布局与恢复，Electron 提供准备
 退出与重启；壳、服务、资源与辅助程序为同一版本单元；macOS Universal 并公证；Linux
 Chromium sandbox 不使用 `--no-sandbox`；minisign 与摘要校验不变。
+
+状态：已实现，并在开发机允许的范围内完成本地验证。下文所述安装布局成员、
+payload schema 2、shell bootstrap 与 macOS 交接均已合入分支，desktop 模块测试
+全绿、Windows/Linux 交叉编译通过。发布管线现已端到端打包 Electron 壳：
+`desktop/packaging/` 用 @electron/packager（macOS 走 universal）组装 `app/` 树；
+`scripts/desktop-build.sh` 先做契约漂移核对再驱动打包，不再调用 `wails build`；
+NSIS 以 `File /r` 安装 `app/` 树；deb 安装到 `/usr/lib/reasonix/app` 并在
+postinstall 置 `chrome-sandbox` 为 root 4755；SignPath 配置覆盖树内 PE 集合，
+保留安装器二阶段签名；CI/release workflow 对打包产物运行
+`packaging/smoke.mjs`（`desktop-linux-webkit41` job 已删除；钉住旧流程的契约
+测试已改写为新入口并加入 `wails build` 负向守卫）。未闭合项：四平台安装/升级
+矩阵、真实签名与公证流程、SignPath preflight 重新 attestation（artifact
+configuration 指纹已变化），以及 Windows/Linux runner 验证。
 
 退出条件：四类产物均可安装、启动、卸载，并通过 Wails→Electron 升级、Electron→Electron
 升级和安装失败恢复测试。
