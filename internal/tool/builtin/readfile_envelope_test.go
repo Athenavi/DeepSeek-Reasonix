@@ -28,12 +28,11 @@ func writeEnvelopeFixture(t *testing.T, name string, lines int) (dir, path strin
 
 func readEnvelope(t *testing.T, r readFile, args string) (tool.ReadResultEnvelope, string, bool) {
 	t.Helper()
-	out, err := r.Execute(context.Background(), json.RawMessage(args))
+	out, env, err := r.ExecuteRead(context.Background(), json.RawMessage(args))
 	if err != nil {
 		t.Fatalf("Execute(%s): %v", args, err)
 	}
-	env, ok := r.ReadEnvelope(context.Background(), json.RawMessage(args), out)
-	return env, out, ok
+	return env, out, true
 }
 
 func TestReadEnvelopeInspectDefaultsToOneBoundedPage(t *testing.T) {

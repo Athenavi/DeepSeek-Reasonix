@@ -107,8 +107,7 @@ type turnRuntime struct {
 	// or finish from a silent partial read.
 	incompleteReads incompleteReadState
 
-	// readShadow is the host-only shadow of the read coordinator; it is inert
-	// unless Options.ReadPipeline.CoordinatorShadow is set for this run.
+	// readShadow owns read obligations unless the legacy rollback is selected.
 	readShadow readShadowState
 
 	// evidenceBlocked records paths whose writer was blocked for missing
@@ -128,15 +127,22 @@ type turnRuntime struct {
 type evidenceBlockState struct {
 	mu    sync.Mutex
 	paths map[string]struct{}
+	calls map[string]provider.ToolCall
 }
 
-func (s *evidenceBlockState) record(path string) {
+func (s *evidenceBlockState) record(path string, calls ...provider.ToolCall) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.paths == nil {
 		s.paths = map[string]struct{}{}
 	}
 	s.paths[path] = struct{}{}
+	if len(calls) > 0 {
+		if s.calls == nil {
+			s.calls = map[string]provider.ToolCall{}
+		}
+		s.calls[path] = calls[0]
+	}
 }
 
 func (s *evidenceBlockState) snapshot() []string {

@@ -65,10 +65,30 @@ func (w writeFile) DeclareEvidenceTarget(ctx context.Context, args json.RawMessa
 		return tool.EvidenceTargetInfo{}, fmt.Errorf("path is required")
 	}
 	path := resolveIn(w.workDir, p.Path)
-	if info, err := os.Stat(path); err != nil || info.IsDir() {
+	if err := confinePreview(effectiveWriteRoots(ctx, w.rootSet, w.roots), w.guard, w.managed, path); err != nil {
+		return tool.EvidenceTargetInfo{}, err
+	}
+	src, err := readEditSource(ctx, w.overlay, path)
+	if os.IsNotExist(err) {
 		return tool.EvidenceTargetInfo{Path: path}, nil
 	}
-	return tool.EvidenceTargetInfo{Path: path, WholeFile: true}, nil
+	if err != nil {
+		return tool.EvidenceTargetInfo{}, err
+	}
+	if err := src.assertUnchanged(ctx, w.overlay, path); err != nil {
+		return tool.EvidenceTargetInfo{}, err
+	}
+	info := tool.EvidenceTargetInfo{Path: path, WholeFile: true, Snapshot: src.readSnapshot(path), SourceTextDigest: digestText(src.content)}
+	if src.content == "" {
+		info.WholeFile = false
+		return info, nil
+	}
+	lines := strings.Split(strings.TrimSuffix(strings.ReplaceAll(src.content, "\r\n", "\n"), "\n"), "\n")
+	info.Ranges = []tool.ReadRange{{Start: 0, End: len(lines)}}
+	for _, line := range lines {
+		info.Hashes = append(info.Hashes, digestText(line))
+	}
+	return info, nil
 }
 
 func (w writeFile) Execute(ctx context.Context, args json.RawMessage) (string, error) {

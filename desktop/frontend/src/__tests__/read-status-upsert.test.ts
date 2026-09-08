@@ -1,4 +1,5 @@
 import { initialState, reducer } from "../lib/useController";
+import { applyReadStatusFrame, readStatusLabel } from "../lib/readStatus";
 
 function equal(actual: unknown, expected: unknown, message: string) {
   if (actual !== expected) throw new Error(`${message}: got ${String(actual)}, want ${String(expected)}`);
@@ -41,3 +42,19 @@ equal(Object.keys(many.readStatuses ?? {}).length, 1, "a hundred pages still ren
 equal(many.readStatuses?.["ir-1"]?.seq, 100, "the latest page wins");
 
 console.log("read status upsert tests passed");
+
+const current = { readId: "r", generation: 2, seq: 1, path: "a.go", state: "needs_more", active: true };
+const scoped = { readStatuses: { r: current } };
+equal(applyReadStatusFrame(scoped, { ...current, generation: 1, seq: 99 }).readStatuses.r.generation, 2, "old generation cannot overwrite new state");
+equal(applyReadStatusFrame(scoped, { ...current, generation: 3, seq: 0 }).readStatuses.r.generation, 3, "new generation may restart its sequence");
+const label = readStatusLabel({ r: { ...current, hasMore: true, covered: [[0, 10], [100, 110]] } }, (_key, vars) => String(vars?.range));
+equal(label, "1–10, 101–110", "coverage gaps are not displayed as read");
+const paused = readStatusLabel({ r: { ...current, state: "blocked", reason: "no_progress" } }, (key) => key);
+equal(paused.includes("composer.readStatusStalled"), true, "pause explains the cause");
+equal(paused.includes("composer.readStatusRecovery"), true, "pause gives an action");
+const started = reducer(initialState, { type: "event", e: { kind: "turn_started", turnId: "current", status: "in_progress" } });
+const live = reducer(started, { type: "event", e: { ...frame(1, "needs_more"), turnId: "current" } });
+equal(reducer(live, { type: "event", e: { ...frame(99, "blocked"), turnId: "old" } }).readStatuses?.["ir-1"].seq, 1, "another turn cannot update read status");
+const done = reducer(live, { type: "event", e: { kind: "turn_done", turnId: "current" } });
+equal(done.readStatuses, undefined, "completion clears live status");
+equal(reducer(done, { type: "event", e: { ...frame(99, "blocked"), turnId: "current" } }).readStatuses, undefined, "late result cannot revive a completed turn");

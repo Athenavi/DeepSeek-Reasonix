@@ -102,9 +102,7 @@ type chatTUI struct {
 	recovery     *event.RecoveryStatus
 	// Host turn phase, cleared on TurnDone.
 	turnPhase string
-	// readStatusLabel is the host's structured read progress, shown in place of
-	// the turn phase while a read is active.
-	readStatusLabel string
+	readStatusState
 	// turnTokens accumulates this turn's output tokens (summed from per-step Usage
 	// events) for the live "↓N" readout in the running status line.
 	turnTokens int

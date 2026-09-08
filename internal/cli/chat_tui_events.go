@@ -182,7 +182,7 @@ func (m *chatTUI) ingestUsage(e event.Event) {
 }
 
 func (m *chatTUI) ingestReadStatus(e event.Event) {
-	m.readStatusLabel = readStatusLabelText(e.ReadStatus)
+	m.ingest(e.ReadStatus)
 }
 
 func (m *chatTUI) ingestTurnPhase(e event.Event) {
@@ -319,6 +319,7 @@ func (m *chatTUI) ingestMCPSurfaceReady(e event.Event) {
 }
 
 func (m *chatTUI) ingestTurnDone(e event.Event) {
+	m.readStatusState = readStatusState{}
 	m.clearElicitCard()
 	// The turn settled — freeze anything still streaming, surface a real error,
 	// and gate a plan-mode proposal on the user's approval. Autosave already

@@ -127,7 +127,9 @@ func TestReadContinuationCursorJoinsTheLogicalRead(t *testing.T) {
 	cursor := tool.EncodeReadCursor(tool.ReadCursor{
 		Path: "/w/a.go", ReadID: "ir-1", Snapshot: "ss2:abc",
 		NextStart: 5, RequestEnd: 10, SessionID: "test-session", RunGen: 1,
+		Binding: a.reads.tasks.binding,
 	})
+	a.reads.tasks.remember("ir-1", tool.ReadResultEnvelope{Source: tool.ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:abc"}, NextCursor: cursor})
 	plan := &toolCallPlan{execArgs: json.RawMessage(`{"path":"/w/a.go","cursor":"` + cursor + `"}`)}
 
 	if out, blocked := a.resolveReadCursor(plan); blocked {

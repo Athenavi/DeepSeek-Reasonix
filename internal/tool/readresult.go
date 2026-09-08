@@ -72,13 +72,12 @@ type ReadResultSource struct {
 	WorkspaceID   string         `json:"workspace_id,omitempty"`
 	CanonicalPath string         `json:"canonical_path"`
 	Kind          ReadSourceKind `json:"kind,omitempty"`
-	// Identity names the underlying store at read time — a disk stat identity
-	// or an overlay buffer identity. It is a cheap change detector, never a
-	// content proof.
+	// Identity binds captured disk bytes or the exact serving overlay buffer.
+	// Empty means the bounded reader did not capture a versionable source.
 	Identity string `json:"identity,omitempty"`
 	// Snapshot is the content version of this logical read. It stays constant
 	// across the pages of one read and changes when the source content changes.
-	// It is not a whole-file digest for partial reads.
+	// An unversioned partial read cannot be stitched into whole-file evidence.
 	Snapshot string `json:"snapshot,omitempty"`
 }
 
@@ -108,6 +107,28 @@ type ReadResultEnvelope struct {
 	SourceCut  ReadCutReason `json:"source_cut_reason,omitempty"`
 	// TransportCut names a provider-visible truncation on top of the source cut.
 	TransportCut ReadCutReason `json:"transport_cut_reason,omitempty"`
+}
+
+// ReadExecutor returns metadata from the same immutable source as the output.
+// Consumers must not reconstruct source identity by probing the file later.
+type ReadExecutor interface {
+	ExecuteRead(context.Context, json.RawMessage) (string, ReadResultEnvelope, error)
+}
+
+// ReadPathResolver uses the reader's own workspace/alias routing.
+type ReadPathResolver interface {
+	ResolveReadPath(json.RawMessage) (string, error)
+}
+
+type fullReadSnapshotKey struct{}
+
+// WithFullReadSnapshot is host-only intent for a full task's continuation.
+func WithFullReadSnapshot(ctx context.Context) context.Context {
+	return context.WithValue(ctx, fullReadSnapshotKey{}, true)
+}
+func FullReadSnapshotRequested(ctx context.Context) bool {
+	requested, _ := ctx.Value(fullReadSnapshotKey{}).(bool)
+	return requested
 }
 
 // ReadWindow is the contiguous numbered window a reader rendered.
@@ -273,6 +294,7 @@ func (e ReadResultEnvelope) ClipTo(visible string) ReadResultEnvelope {
 // decoding it is not the same as accepting it.
 type ReadCursor struct {
 	Version    int    `json:"v"`
+	Binding    string `json:"b,omitempty"`
 	SessionID  string `json:"s,omitempty"`
 	RunGen     uint64 `json:"g,omitempty"`
 	ReadID     string `json:"r"`

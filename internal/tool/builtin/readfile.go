@@ -43,7 +43,9 @@ type readFile struct {
 	// overlay, when non-nil, serves content from the host transport (unsaved
 	// editor buffers) before falling back to disk. Consulted only after path
 	// resolution and read confinement, and never for external alias paths.
-	overlay FileOverlay
+	overlay     FileOverlay
+	captured    *tool.ReadResultSource
+	rawSnapshot []byte
 }
 
 const (
@@ -178,24 +180,7 @@ func (r readFile) ObserveModelText(args json.RawMessage, output string) (tool.Mo
 		StartLine:  window.StartLine,
 		LineHashes: hashes,
 		Version:    tool.WindowDigest(rp.Path, window),
-		Snapshot:   r.sourceSnapshot(rp),
 	}, true
-}
-
-// sourceSnapshot names the content version this reader can vouch for. An
-// overlay-capable reader leaves it empty because the observation interface
-// carries no context to probe the buffer; such windows are matched on their own
-// instead of being stitched across pages.
-func (r readFile) sourceSnapshot(rp ResolvedPath) string {
-	if r.overlay != nil && !rp.External && filepath.IsAbs(rp.Path) {
-		return ""
-	}
-	info, err := os.Stat(rp.Path)
-	if err != nil {
-		return ""
-	}
-	identity := diskSourceIdentity(info)
-	return tool.SourceSnapshot(tool.ReadSourceDisk, rp.Path, identity)
 }
 
 // ReadEnvelope reports what one read_file call delivered. The source identity
@@ -221,12 +206,8 @@ func (r readFile) ReadEnvelope(ctx context.Context, args json.RawMessage, output
 
 	// The store that served the content owns the identity: an unsaved editor
 	// buffer must never be proven by the disk file's identity.
-	if content, ok := r.overlayText(ctx, rp); ok {
-		env.Source.Kind = tool.ReadSourceOverlay
-		env.Source.Identity = "overlay:" + digestText(content)
-	} else if info, statErr := os.Stat(rp.Path); statErr == nil {
-		env.Source.Kind = tool.ReadSourceDisk
-		env.Source.Identity = diskSourceIdentity(info)
+	if r.captured != nil {
+		env.Source = *r.captured
 	}
 	env.Source.Snapshot = tool.SourceSnapshot(env.Source.Kind, rp.Path, env.Source.Identity)
 
@@ -273,12 +254,6 @@ func digestText(content string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// diskSourceIdentity is a cheap change detector over the file's metadata. It is
-// never a content proof: the authoritative check re-reads the delivered lines.
-func diskSourceIdentity(info os.FileInfo) string {
-	return fmt.Sprintf("disk:%d:%d:%d", info.Size(), info.ModTime().UnixNano(), info.Mode())
-}
-
 // readSourceEnd recovers the source's zero-based end line index from the
 // reader's own result text: a complete window ends at its last line, and the
 // empty-file / past-EOF markers state the count directly.
@@ -321,13 +296,16 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 		}
 		return "", err
 	}
+	if r.rawSnapshot != nil {
+		return r.scanEncoded(readContextReader{ctx, bytes.NewReader(r.rawSnapshot)}, p.Offset, p.Limit)
+	}
 
 	// The host overlay (unsaved editor buffers) wins over the disk when it can
 	// serve the path. Content arrives already decoded as text, so the encoding
 	// and binary-detection pipeline below applies to the disk fallback only.
 	if r.overlay != nil && !rp.External && filepath.IsAbs(p.Path) {
 		if content, ok := r.overlay.ReadTextFile(ctx, p.Path); ok {
-			return r.scan(strings.NewReader(content), p.Offset, p.Limit)
+			return r.scan(readContextReader{ctx, strings.NewReader(content)}, p.Offset, p.Limit)
 		}
 	}
 
@@ -346,6 +324,10 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 		return "", fmt.Errorf("read %s: %w", displayPath, err)
 	}
 	defer f.Close()
+	return r.scanEncoded(readContextReader{ctx, f}, p.Offset, p.Limit)
+}
+
+func (r readFile) scanEncoded(f io.Reader, offset, limit int) (string, error) {
 
 	// Peek the first 8 KiB to reject binary files cheaply (a NUL byte) before
 	// reading further — keeps a multi-GB archive from being slurped just to be
@@ -360,28 +342,25 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 	switch fileenc.DetectQuick(peek) {
 	case fileenc.UTF16LE, fileenc.UTF16BE:
 		enc := fileenc.DetectQuick(peek)
-		return r.scan(transform.NewReader(io.MultiReader(bytes.NewReader(peek), f), fileenc.Decoder(enc)), p.Offset, p.Limit)
+		return r.scan(transform.NewReader(io.MultiReader(bytes.NewReader(peek), f), fileenc.Decoder(enc)), offset, limit)
 	case fileenc.UTF8BOM:
 		// Strip the 3-byte BOM; the content is valid UTF-8 and streams directly.
 		body := peek
 		if len(body) >= 3 {
 			body = body[3:]
 		}
-		return r.scan(io.MultiReader(bytes.NewReader(body), f), p.Offset, p.Limit)
+		return r.scan(io.MultiReader(bytes.NewReader(body), f), offset, limit)
 	}
 
 	// BOM-less UTF-16 (Windows source files) has a NUL for every ASCII char but
 	// no BOM, so it reaches here; recognise it by its NUL pattern and decode it
 	// rather than rejecting it as binary.
 	if k, ok := fileenc.DetectUTF16NoBOM(peek); ok {
-		return r.scan(transform.NewReader(io.MultiReader(bytes.NewReader(peek), f), fileenc.Decoder(k)), p.Offset, p.Limit)
+		return r.scan(transform.NewReader(io.MultiReader(bytes.NewReader(peek), f), fileenc.Decoder(k)), offset, limit)
 	}
 
 	if bytes.IndexByte(peek, 0) >= 0 {
-		if rp.External {
-			return "", fmt.Errorf("binary file %s (NUL byte detected); not shown by read_file", displayPath)
-		}
-		return "", fmt.Errorf("binary file %s (NUL byte detected); use `bash hexdump` or another tool", displayPath)
+		return "", fmt.Errorf("binary file (NUL byte detected); use a binary inspection tool")
 	}
 
 	// Read up to a bounded sample for encoding detection, then stream the rest —
@@ -407,9 +386,9 @@ func (r readFile) Execute(ctx context.Context, args json.RawMessage) (string, er
 
 	src := io.MultiReader(bytes.NewReader(head), f)
 	if dec := fileenc.Decoder(enc); dec != nil {
-		return r.scan(transform.NewReader(src, dec), p.Offset, p.Limit)
+		return r.scan(transform.NewReader(src, dec), offset, limit)
 	}
-	return r.scan(src, p.Offset, p.Limit)
+	return r.scan(src, offset, limit)
 }
 
 // scan reads lines from src and returns the formatted output with line numbers.

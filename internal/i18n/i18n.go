@@ -108,6 +108,7 @@ type Messages struct {
 	ReadStatusCoveredFmt                   string // read status: covered lines
 	ReadStatusDoneFmt                      string // read status: finished a window
 	ReadStatusPausedFmt                    string // read status: paused, needs attention
+	ReadStatusRecovery                     string // next step after a bounded read stops
 	TurnPhaseChecking                      string // host turn_phase label: checking
 	TurnPhaseVerifying                     string // host turn_phase label: verifying
 	TurnPhaseReviewing                     string // host turn_phase label: reviewing

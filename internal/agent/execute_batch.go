@@ -75,6 +75,8 @@ type toolOutcome struct {
 	recoveryStopTurn   bool
 	recoveryStopReason string
 	readTaskID         string
+	readEnvelope       *tool.ReadResultEnvelope
+	readActiveMillis   int64
 	incompleteRead     *incompleteReadDeferred
 	subagentOutcome    *SubagentOutcome
 }

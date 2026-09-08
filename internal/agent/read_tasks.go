@@ -1,8 +1,10 @@
 package agent
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"sync"
 
@@ -25,17 +27,21 @@ type readTasks struct {
 	mu         sync.Mutex
 	sessionID  string
 	generation uint64
+	binding    string
 	byID       map[string]readTask
 }
 
 type readTask struct {
-	path       string
-	snapshot   string
-	requestEnd int
+	path         string
+	argumentPath string
+	snapshot     string
+	requestEnd   int
+	cursor       tool.ReadCursor
+	issued       bool
 }
 
 func newReadTasks(sessionID string, generation uint64) *readTasks {
-	return &readTasks{sessionID: sessionID, generation: generation, byID: map[string]readTask{}}
+	return &readTasks{sessionID: sessionID, generation: generation, binding: rand.Text(), byID: map[string]readTask{}}
 }
 
 // accept reports whether the cursor may continue a live read task.
@@ -50,20 +56,24 @@ func (r *readTasks) accept(cursor tool.ReadCursor, path string) bool {
 	switch {
 	case !known:
 		return false
-	case cursor.SessionID != "" && r.sessionID != "" && cursor.SessionID != r.sessionID:
+	case cursor.Binding != r.binding:
 		return false
-	case cursor.RunGen != 0 && cursor.RunGen != r.generation:
+	case cursor.SessionID != r.sessionID:
+		return false
+	case cursor.RunGen != r.generation:
 		return false
 	case cursor.Path != path || cursor.Path != task.path:
 		return false
-	case cursor.Snapshot != "" && task.snapshot != "" && cursor.Snapshot != task.snapshot:
+	case cursor.Snapshot == "" || cursor.Snapshot != task.snapshot:
+		return false
+	case !task.issued || cursor != task.cursor:
 		return false
 	}
 	return true
 }
 
 // remember records the task's latest snapshot and requested window.
-func (r *readTasks) remember(readID string, env tool.ReadResultEnvelope) {
+func (r *readTasks) remember(readID string, env tool.ReadResultEnvelope, paths ...string) {
 	if r == nil || readID == "" {
 		return
 	}
@@ -73,7 +83,12 @@ func (r *readTasks) remember(readID string, env tool.ReadResultEnvelope) {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.byID[readID] = readTask{path: env.Source.CanonicalPath, snapshot: env.Source.Snapshot, requestEnd: requestEnd}
+	cursor, issued := tool.DecodeReadCursor(env.NextCursor)
+	argumentPath := r.byID[readID].argumentPath
+	if len(paths) > 0 && paths[0] != "" {
+		argumentPath = paths[0]
+	}
+	r.byID[readID] = readTask{path: env.Source.CanonicalPath, argumentPath: argumentPath, snapshot: env.Source.Snapshot, requestEnd: requestEnd, cursor: cursor, issued: issued}
 }
 
 // resolveReadCursor rewrites a continuation call into the explicit window its
@@ -88,7 +103,19 @@ func (a *Agent) resolveReadCursor(plan *toolCallPlan) (toolOutcome, bool) {
 	if !ok {
 		return readCursorRejected("the read continuation cursor is malformed; re-read the file with read_file")
 	}
-	if !a.reads.tasks.accept(cursor, readPathArg(plan.execArgs)) {
+	path := readPathArg(plan.execArgs)
+	if resolver, ok := plan.execTool.(tool.ReadPathResolver); ok {
+		resolved, err := resolver.ResolveReadPath(plan.execArgs)
+		if err != nil {
+			return readCursorRejected(err.Error())
+		}
+		path = resolved
+	}
+	if !filepath.IsAbs(path) && a.writeWorkspaceRoot != "" {
+		path = filepath.Join(a.writeWorkspaceRoot, path)
+	}
+	path = filepath.Clean(path)
+	if !a.reads.tasks.accept(cursor, path) {
 		return readCursorRejected("the read continuation cursor is not valid for this file or session; re-read the file with read_file")
 	}
 	rewritten, err := withResolvedReadWindow(plan.execArgs, cursor)
@@ -99,6 +126,7 @@ func (a *Agent) resolveReadCursor(plan *toolCallPlan) (toolOutcome, bool) {
 	plan.permArgs = rewritten
 	plan.evidenceArgs = rewritten
 	plan.readTaskID = cursor.ReadID
+	plan.readSnapshot = cursor.Snapshot
 	return toolOutcome{}, false
 }
 
@@ -134,6 +162,9 @@ func withResolvedReadWindow(args json.RawMessage, cursor tool.ReadCursor) (json.
 		return nil, fmt.Errorf("invalid args: %w", err)
 	}
 	delete(fields, "cursor")
+	delete(fields, "intent")
+	delete(fields, "offset")
+	delete(fields, "limit")
 	fields["offset"] = json.RawMessage(strconv.Itoa(cursor.NextStart))
 	if cursor.RequestEnd > cursor.NextStart {
 		fields["limit"] = json.RawMessage(strconv.Itoa(cursor.RequestEnd - cursor.NextStart))

@@ -171,6 +171,7 @@ func (a *Agent) beginRunTurn(ctx context.Context, input string, pinned pinnedRev
 // runToolLoop owns the main tool-round budget and dispatches each streamed
 // assistant turn into final-response or tool-round handling.
 func (a *Agent) runToolLoop(ctx context.Context, state *turnRuntime) (runErr error) {
+	defer a.closeReadStatuses()
 	releaseMCPListObserver := a.activateMCPListObserver()
 	defer func() {
 		a.recordReadonlySoftBudgetSample(state, runErr)
@@ -349,10 +350,20 @@ func sleepRecovery(ctx context.Context, delay time.Duration) bool {
 // and final compaction. cont=true continues the tool loop; cont=false returns
 // err from Run (err may be nil for a clean final answer).
 func (a *Agent) handleFinalResponse(ctx context.Context, state *turnRuntime, text, reasoning string, usage *provider.Usage) (cont bool, err error) {
+	if a.readPipelineActive() {
+		instruction, pause := a.readContinuation(true)
+		if pause != nil {
+			return false, pause
+		}
+		if instruction != "" {
+			a.sess.conversation.Add(HostGeneratedUserMessage(a.withTurnPreferences(instruction)))
+			return true, nil
+		}
+	}
 	// A partial read is a host-owned protocol state, not advisory prose. Refuse
 	// a candidate final before every ordinary readiness/validator path so a
 	// model cannot silently answer from the visible prefix alone.
-	if instruction, pause := state.incompleteReads.blockFinal(); pause != nil {
+	if instruction, pause := a.legacyReadFinal(state); pause != nil {
 		a.contextManager().ObserveUsage(usage)
 		return false, pause
 	} else if instruction != "" {

@@ -11,12 +11,26 @@ import (
 // SHA-256 digests for Ranges, concatenated in range order; they contain no
 // source text.
 type EvidenceTargetInfo struct {
-	Path string
+	Path             string
+	Snapshot         string
+	SourceTextDigest string
 	// WholeFile marks a requirement that covers the file's entire current
 	// content, so paged evidence may be stitched only within one snapshot.
 	WholeFile bool
 	Ranges    []ReadRange
 	Hashes    []string
+}
+
+type expectedWriteSourceKey struct{}
+
+// WithExpectedWriteSource carries the preflight source to the actual writer.
+// The writer checks it after opening its source, closing the gate/execute gap.
+func WithExpectedWriteSource(ctx context.Context, source EvidenceTargetInfo) context.Context {
+	return context.WithValue(ctx, expectedWriteSourceKey{}, source)
+}
+func ExpectedWriteSource(ctx context.Context) (EvidenceTargetInfo, bool) {
+	info, ok := ctx.Value(expectedWriteSourceKey{}).(EvidenceTargetInfo)
+	return info, ok
 }
 
 // EvidenceDeclarer is an optional writer capability. The host asks the real

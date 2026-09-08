@@ -18,7 +18,13 @@ export interface WireReadStatus {
   active?: boolean;
 }
 
-type ReadStatusHost = { readStatuses?: Record<string, WireReadStatus> };
+export type ReadStatusHost = { readStatuses?: Record<string, WireReadStatus>; readStatusClosed?: boolean };
+
+export function applyReadStatusEvent<T extends ReadStatusHost & { activeTurnId?: string; turnActive: boolean }>(state: T, event: { turnId?: string; readStatus?: WireReadStatus }): T {
+  if (state.readStatusClosed || (state.activeTurnId && !state.turnActive)) return state;
+  if (event.turnId && state.activeTurnId && event.turnId !== state.activeTurnId) return state;
+  return applyReadStatusFrame(state, event.readStatus);
+}
 
 /**
  * applyReadStatusFrame upserts one frame. A re-ordered frame never moves a read
@@ -27,8 +33,11 @@ type ReadStatusHost = { readStatuses?: Record<string, WireReadStatus> };
 export function applyReadStatusFrame<T extends ReadStatusHost>(state: T, incoming: WireReadStatus | undefined): T {
   if (!incoming?.readId) return state;
   const previous = state.readStatuses?.[incoming.readId];
-  if (previous && incoming.seq !== undefined && previous.seq !== undefined && incoming.seq < previous.seq) {
-    return state;
+  if (previous) {
+    const oldGeneration = previous.generation ?? 0;
+    const generation = incoming.generation ?? 0;
+    if (generation < oldGeneration) return state;
+    if (generation === oldGeneration && (incoming.seq ?? 0) <= (previous.seq ?? 0)) return state;
   }
   return { ...state, readStatuses: { ...(state.readStatuses ?? {}), [incoming.readId]: incoming } };
 }
@@ -38,7 +47,11 @@ export type ReadStatusKey =
   | "composer.readStatusReading"
   | "composer.readStatusCovered"
   | "composer.readStatusDone"
-  | "composer.readStatusPaused";
+  | "composer.readStatusPaused"
+  | "composer.readStatusBudget"
+  | "composer.readStatusSource"
+  | "composer.readStatusStalled"
+  | "composer.readStatusRecovery";
 
 /** readStatusLabel renders the single active read as one short status line. */
 export function readStatusLabel(
@@ -46,14 +59,19 @@ export function readStatusLabel(
   t: (key: ReadStatusKey, vars?: Record<string, string | number>) => string,
 ): string {
   const active = Object.values(statuses ?? {}).filter((status) => status.active);
-  if (active.length === 0) return "";
-  const first = active[0];
+  return active.map((status) => readStatusItemLabel(status, t)).join(" · ");
+}
+
+function readStatusItemLabel(first: WireReadStatus, t: (key: ReadStatusKey, vars?: Record<string, string | number>) => string): string {
   const file = first.path.split(/[\\/]/).pop() || first.path;
   const covered = first.covered?.length
-    ? `${first.covered[0][0]}–${first.covered[first.covered.length - 1][1]}`
+    ? first.covered.map(([start, end]) => `${start + 1}–${end}`).join(", ")
     : "";
   if (first.state === "blocked" || first.state === "needs_scope") {
-    return t("composer.readStatusPaused", { file });
+    const reason = first.reason === "no_progress" ? "composer.readStatusStalled"
+      : ["page_budget", "time_budget", "no_headroom", "unknown_window"].includes(first.reason ?? "") ? "composer.readStatusBudget"
+      : "composer.readStatusSource";
+    return [t("composer.readStatusPaused", { file }), t(reason), t("composer.readStatusRecovery")].join(" · ");
   }
   if (first.hasMore) {
     return covered ? t("composer.readStatusCovered", { file, range: covered }) : t("composer.readStatusReading", { file });

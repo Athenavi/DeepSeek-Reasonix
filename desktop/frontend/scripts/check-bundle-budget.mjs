@@ -296,7 +296,9 @@ for (const path of localeChunks) {
   // ceiling for cross-platform CI.
   // Search assignment copy adds 239 / 231 B over main-v2 (63147 / 63920 B).
   // Measured result: 63386 / 64151 B; retain bounded cross-platform headroom.
-  const budget = name.startsWith("zh-TW-") ? 62.8 * 1024 : 62.1 * 1024;
+  // Read pause reasons and recovery guidance measure 63682 / 64421 B.
+  // Keep less than 0.2 KiB headroom per locale for Node/zlib variation.
+  const budget = name.startsWith("zh-TW-") ? 63.0 * 1024 : 62.3 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 

@@ -97,7 +97,23 @@ func (a *Agent) storeBatchToolResult(ctx context.Context, call provider.ToolCall
 		if raw, err := json.Marshal(env); err == nil {
 			msg.ReadResult = raw
 		}
-		a.observeReadShadow(env)
+		a.observeReadShadow(env, o.readActiveMillis)
+		if a.readPipelineActive() {
+			if observer, ok := tReadObserver(a, call); ok {
+				if observed, ok := observer.ObserveModelText(json.RawMessage(call.Arguments), o.output); ok {
+					if len(env.DeliveredRanges) == 0 {
+						observed.LineHashes = nil
+					} else {
+						count := env.DeliveredRanges[0].Lines()
+						observed.LineHashes = observed.LineHashes[:min(count, len(observed.LineHashes))]
+					}
+					observed.Snapshot = env.Source.Snapshot
+					a.recordModelTextObservationValue(observed)
+				}
+			}
+		}
+	} else if a.readPipelineActive() && (o.errMsg != "" || o.blocked) {
+		a.observeFailedRead(call, o)
 	}
 	a.sess.conversation.Add(msg)
 }

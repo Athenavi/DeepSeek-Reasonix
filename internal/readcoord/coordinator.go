@@ -125,16 +125,14 @@ func (c *Coordinator) Observe(env tool.ReadResultEnvelope, activeMillis int64) (
 
 	// Fragments of two content versions must never be stitched into one
 	// coverage claim, so a version change discards what was accumulated.
-	if ob.Version != "" && env.Source.Snapshot != "" && env.Source.Snapshot != ob.Version {
+	if (ob.Version != "" && env.Source.Snapshot != ob.Version) || (env.Source.Snapshot == "" && ob.Pages > 0) {
 		ob.Covered = nil
 		ob.SawEOF = false
 		ob.SourceEnd = nil
 		ob.Generation++
 		tr.Stale = true
 	}
-	if env.Source.Snapshot != "" {
-		ob.Version = env.Source.Snapshot
-	}
+	ob.Version = env.Source.Snapshot
 	ob.SawEOF = ob.SawEOF || env.EOF
 	if env.SourceEnd != nil {
 		end := *env.SourceEnd
@@ -176,7 +174,7 @@ func (c *Coordinator) enforcePolicy(ob *Obligation, tr Transition) Advice {
 		return ""
 	}
 	switch {
-	case c.policy.MaxPages > 0 && ob.Pages > c.policy.MaxPages:
+	case c.policy.MaxPages > 0 && ob.Pages >= c.policy.MaxPages:
 		ob.State = StateBlocked
 		ob.Stop = &Block{
 			Code:     "page_budget",
@@ -184,7 +182,7 @@ func (c *Coordinator) enforcePolicy(ob *Obligation, tr Transition) Advice {
 			Recovery: "read the remaining lines explicitly, or work on an independent item",
 		}
 		return ""
-	case c.policy.MaxActiveTime > 0 && ob.ActiveTime > c.policy.MaxActiveTime:
+	case c.policy.MaxActiveTime > 0 && ob.ActiveTime >= c.policy.MaxActiveTime:
 		ob.State = StateBlocked
 		ob.Stop = &Block{
 			Code:     "time_budget",
@@ -233,6 +231,11 @@ func (c *Coordinator) stop(key string, state State, block Block) (Transition, bo
 	ob.Stop = &block
 	tr.Stop = ob.Stop
 	tr.Missing = missingFor(ob)
+	tr.Covered = append([]tool.ReadRange(nil), ob.Covered...)
+	if ob.SourceEnd != nil {
+		end := *ob.SourceEnd
+		tr.SourceEnd = &end
+	}
 	return tr, true
 }
 
@@ -307,8 +310,16 @@ func evaluate(ob *Obligation, env tool.ReadResultEnvelope) State {
 		}
 		// Reaching EOF satisfies a range only when the reader vouched for where
 		// the source ends and that end is inside the requested window.
-		if ob.SawEOF && ob.SourceEnd != nil && *ob.SourceEnd <= maxRangeEnd(ob.Requirement.Ranges) {
-			return StateSatisfied
+		if ob.SawEOF && ob.SourceEnd != nil {
+			var required []tool.ReadRange
+			for _, r := range ob.Requirement.Ranges {
+				if end := min(r.End, *ob.SourceEnd); r.Start < end {
+					required = append(required, tool.ReadRange{Start: r.Start, End: end})
+				}
+			}
+			if Covers(ob.Covered, required) {
+				return StateSatisfied
+			}
 		}
 		return StateNeedsMore
 	case tool.ReadIntentFull:
@@ -331,14 +342,6 @@ func evaluateWholeFile(ob *Obligation, _ tool.ReadResultEnvelope) State {
 		return StateSatisfied
 	}
 	return StateNeedsMore
-}
-
-func maxRangeEnd(ranges []tool.ReadRange) int {
-	end := 0
-	for _, r := range ranges {
-		end = max(end, r.End)
-	}
-	return end
 }
 
 func missingFor(ob *Obligation) []tool.ReadRange {

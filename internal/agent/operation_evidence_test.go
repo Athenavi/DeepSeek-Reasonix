@@ -187,12 +187,12 @@ func TestEvidenceGateIsOffByDefault(t *testing.T) {
 	}
 }
 
-func TestEvidenceGateReportsAnInvalidTarget(t *testing.T) {
+func TestEvidenceGateLeavesInvalidTargetToNativeValidation(t *testing.T) {
 	writer := evidenceWriter{err: errors.New("anchor not found")}
 	a, _ := newEvidenceAgent(t, writer, true)
 	out, blocked := runEvidenceGate(a, "/w/a.go")
-	if !blocked || !strings.Contains(out.output, "anchor not found") {
-		t.Fatalf("an invalid target must surface the writer's own error: %+v (blocked=%v)", out, blocked)
+	if blocked || len(a.turn.evidenceBlocked.snapshot()) != 0 {
+		t.Fatalf("an invalid target must reach native validation without creating an empty-path obligation: %+v", out)
 	}
 }
 
@@ -226,6 +226,7 @@ func TestEvidenceGateHonorsAnExplicitRebuildInstruction(t *testing.T) {
 	writer := evidenceWriter{target: tool.EvidenceTargetInfo{Path: "/w/notes.md", WholeFile: true}}
 	a, _ := newEvidenceAgent(t, writer, true)
 	a.turn.turnInput = "Please rewrite notes.md from scratch."
+	a.writeWorkspaceRoot = "/w"
 	a.turn.constraints = runtimepolicy.ParseConstraints(a.turn.turnInput)
 	if out, blocked := runEvidenceGate(a, "/w/notes.md"); blocked {
 		t.Fatalf("an explicit rebuild instruction must waive the read: %+v", out)
@@ -234,6 +235,7 @@ func TestEvidenceGateHonorsAnExplicitRebuildInstruction(t *testing.T) {
 	other := evidenceWriter{target: tool.EvidenceTargetInfo{Path: "/w/other.md", WholeFile: true}}
 	b, _ := newEvidenceAgent(t, other, true)
 	b.turn.turnInput = a.turn.turnInput
+	b.writeWorkspaceRoot = "/w"
 	b.turn.constraints = runtimepolicy.ParseConstraints(b.turn.turnInput)
 	if out, blocked := runEvidenceGate(b, "/w/other.md"); !blocked {
 		t.Fatalf("a file the instruction does not name must still require evidence: %+v", out)

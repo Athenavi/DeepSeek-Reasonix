@@ -8,15 +8,15 @@ import (
 	"reasonix/internal/tool"
 )
 
-// readShadowState is the host-only shadow of the read coordinator. It folds the
-// same deliveries the legacy incomplete-read state sees and records where the
-// obligation model would decide differently; it changes no request.
+// readShadowState retains its rollout name but owns default read execution.
+// Legacy comparisons remain diagnostic; read_pipeline consumes its decisions.
 type readShadowState struct {
 	enabled       bool
 	coord         *readcoord.Coordinator
 	observed      int
 	disagreements int
 	byState       map[readcoord.State]int
+	pivot         string
 }
 
 func newReadShadowState(enabled bool) readShadowState {
@@ -28,11 +28,9 @@ func newReadShadowState(enabled bool) readShadowState {
 	return s
 }
 
-// observeReadShadow folds one delivered envelope and compares the coordinator's
-// verdict with the legacy incomplete-read state. The legacy model treats any
-// file with content left as an outstanding read; the obligation model treats a
-// bounded inspect page as finished, and that difference is what this measures.
-func (a *Agent) observeReadShadow(env tool.ReadResultEnvelope) {
+// observeReadShadow commits one delivered envelope in provider order. The
+// execution loop and status projections consume the same coordinator verdict.
+func (a *Agent) observeReadShadow(env tool.ReadResultEnvelope, elapsed ...int64) {
 	if a == nil {
 		return
 	}
@@ -40,7 +38,11 @@ func (a *Agent) observeReadShadow(env tool.ReadResultEnvelope) {
 	if !s.enabled || s.coord == nil {
 		return
 	}
-	tr, ok := s.coord.Observe(env, 0)
+	var active int64
+	if len(elapsed) > 0 {
+		active = elapsed[0]
+	}
+	tr, ok := s.coord.Observe(env, active)
 	if !ok {
 		return
 	}
@@ -48,11 +50,20 @@ func (a *Agent) observeReadShadow(env tool.ReadResultEnvelope) {
 	// host can bound it: an unknown context window or an exhausted budget turns
 	// the obligation into needs_scope instead of guessing how much is safe.
 	if tr.To == readcoord.StateNeedsMore {
+		if env.Source.Snapshot == "" && a.readPipelineActive() {
+			tr, _ = s.coord.Narrow(env.ReadID, readcoord.Block{Code: "unversioned_source", Detail: "the bounded reader cannot establish one source version", Recovery: "inspect explicit ranges; a full-file review is not yet proven"})
+		}
 		if block, bounded := a.readBudgetStop(); bounded {
 			if narrowed, ok := s.coord.Narrow(env.ReadID, block); ok {
 				tr = narrowed
 			}
 		}
+	}
+	if tr.Advice == readcoord.AdvicePivot {
+		s.pivot = tr.Key
+	}
+	if a.readPipelineActive() && tr.To == readcoord.StateNeedsMore {
+		a.issueReadContinuation(tr, env)
 	}
 	s.observed++
 	s.byState[tr.To]++

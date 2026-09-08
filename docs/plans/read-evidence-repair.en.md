@@ -1,0 +1,46 @@
+# Read evidence repair and verification
+
+This completes the execution wiring of the existing single-PR read redesign.
+The coordinator owns continuation and final-answer decisions in the default
+pipeline; the legacy incomplete-read machine is used only for rollback.
+
+The actual reader produces output and source identity from the same captured
+bytes or overlay buffer. Disk inspect/range calls capture identity only up to 256 KiB;
+larger local reads remain bounded streaming reads. Explicit full reads and
+their host continuations capture at most 64 MiB. Unversioned windows cannot be stitched into a full-file
+claim; an incomplete full requirement becomes `needs_scope`. These are internal
+resource bounds, not new user settings. Read tokens are clipped to live context
+headroom for full reads and automatic continuation, including an ordered batch
+finalization check; ordinary previews retain normal context compaction.
+
+Continuation must match the complete last-issued cursor. Reader-owned path
+resolution preserves relative paths and aliases. The executed source must still
+match the cursor snapshot. Page and measured active-time bounds stop dispatch;
+no-progress advice changes the requested strategy, and repeated stalls pause.
+
+Writers declare original ranges through their real preview/validation path.
+`multi_edit` computes all changes against the original source for preflight.
+An overwrite requires full evidence for the current raw version, including an
+unsaved new buffer. The writer verifies the preflight source again at execution.
+Same-batch reads never supply write evidence. Historical evidence failures are
+re-evaluated against the frozen provider-round boundary and can be cleared.
+Rebuild waivers require an exact path in the same affirmative rewrite clause.
+Moves preserve content and reject existing destinations, so they require no
+full-text evidence; anchored deletion retains its existing owner.
+
+Desktop and CLI display disjoint one-based coverage and recovery guidance.
+Generation and sequence fence stale frames; independent reads retain their
+own entries and completion clears live status.
+
+Regression coverage lives in `internal/agent/read_pipeline_regression_test.go`,
+`internal/tool/builtin/read_evidence_regression_test.go`,
+`internal/cli/read_status_test.go`, and the frontend read-status tests. Legacy
+protocol and dependent-edit tests explicitly select rollback mode. The golden
+provider request is updated for the intent/cursor schema already added by this
+PR. This intentional schema change may rebuild the prompt cache on first use;
+host envelopes and write-source checks remain outside provider-visible bytes.
+There is no session-store migration. Old cursors must be re-read after a new run.
+
+Local deterministic tests are distinct from native WebView2/WKWebView checks,
+real-provider success/token measurements, exact-head remote CI, and release
+availability. Those results must be reported separately.

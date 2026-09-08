@@ -25,6 +25,16 @@ func (a *Agent) emitIncompleteReadNotice(code, text, detail string) {
 // resolveIncompleteReadToolRoundBoundary runs after every tool result is stored,
 // commits validated receipts, and counts at most one violation per model round.
 func (a *Agent) resolveIncompleteReadToolRoundBoundary(ctx context.Context, state *turnRuntime, usage *provider.Usage) (cont bool, err error, handled bool) {
+	if a.readPipelineActive() {
+		instruction, err := a.readContinuation(false)
+		if instruction != "" {
+			a.sess.conversation.Add(HostGeneratedUserMessage(a.withTurnPreferences(instruction)))
+		}
+		if ctx.Err() != nil {
+			return false, ctx.Err(), true
+		}
+		return instruction != "", err, instruction != "" || err != nil
+	}
 	round := state.incompleteReads.finishToolRound()
 	for _, observed := range round.record {
 		a.recordModelTextObservationValue(observed)
@@ -70,6 +80,29 @@ func (a *Agent) boundIncompleteReadAwareResult(plan *toolCallPlan, result string
 		}
 	}
 	body, truncMsg, original = a.boundProviderVisibleResult(result, plan.call.Name, plan.call.ID)
+	readArgs, _ := parseReadFileArgs(plan.execArgs)
+	if a.readPipelineActive() && plan.evidenceName == "read_file" && (plan.readTaskID != "" || readArgs.fullRead()) {
+		budget := a.readAutoRecoveryBudgetFor()
+		if budget.known && a.estimatedReadResultTokens(body) > budget.maxTokens {
+			lo, hi := 0, len(body)
+			for lo < hi {
+				mid := lo + (hi-lo+1)/2
+				if a.estimatedReadResultTokens(body[:mid]) <= budget.maxTokens {
+					lo = mid
+				} else {
+					hi = mid - 1
+				}
+			}
+			end := strings.LastIndexByte(body[:lo], '\n')
+			if end < 0 {
+				body = ""
+			} else {
+				body = body[:end+1]
+			}
+			original = result
+			truncMsg = ""
+		}
+	}
 	return body, truncMsg, original, readObserver
 }
 
@@ -93,6 +126,16 @@ func readStrategyPreview(raw, readID string, totalTokens, limitTokens int) strin
 // finalizeIncompleteReadOutcome is called by executeBatch.finalize in provider
 // order, never from parallel execution goroutines.
 func (a *Agent) finalizeIncompleteReadOutcome(deferred *incompleteReadDeferred, out *toolOutcome) {
+	if a.readPipelineActive() {
+		if deferred != nil && deferred.plan != nil && out != nil && deferred.plan.evidenceName == "read_file" {
+			// Parallel readers are clipped again in the ordered finalizer, after
+			// earlier deliveries consume their share of the common context.
+			body, _, original, _ := a.boundIncompleteReadAwareResult(deferred.plan, deferred.rawOutput)
+			out.output, out.rawOutput = body, original
+			out.truncated, out.truncMsg = original != "", ""
+		}
+		return
+	}
 	if a == nil || deferred == nil || deferred.plan == nil || out == nil {
 		return
 	}

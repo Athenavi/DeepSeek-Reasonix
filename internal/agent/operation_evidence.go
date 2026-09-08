@@ -7,11 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
 	"reasonix/internal/evidence"
 	"reasonix/internal/provider"
+	"reasonix/internal/runtimepolicy"
 	"reasonix/internal/tool"
 )
 
@@ -20,6 +22,7 @@ import (
 // permission: authorization, sandbox, uniqueness, and atomic replace stay
 // independent.
 type evidenceCheck struct {
+	Target    tool.EvidenceTargetInfo
 	Satisfied bool
 	// Supported is false when the writer cannot declare what it replaces; the
 	// caller then keeps the existing boundary rather than assuming safety.
@@ -51,12 +54,14 @@ func (a *Agent) checkOperationEvidence(ctx context.Context, call provider.ToolCa
 	}
 	info, err := declarer.DeclareEvidenceTarget(ctx, json.RawMessage(call.Arguments))
 	if err != nil {
-		return evidenceCheck{Supported: true, Reason: "target_invalid", Recovery: err.Error()}
+		// No valid target was declared. Let the writer's own validation report
+		// the error; do not create an unresolvable obligation for an empty path.
+		return evidenceCheck{Supported: true, Satisfied: true, Reason: "target_invalid", Recovery: err.Error()}
 	}
 	if info.Path == "" {
 		return evidenceCheck{Satisfied: true, Supported: true}
 	}
-	check := evidenceCheck{Supported: true, Path: info.Path}
+	check := evidenceCheck{Supported: true, Path: info.Path, Target: info}
 	if info.WholeFile && a.rebuildAuthorized(info.Path) {
 		// The user explicitly asked to rebuild this file; the model cannot grant
 		// this to itself, and the instruction must name the file.
@@ -84,6 +89,9 @@ func (a *Agent) checkOperationEvidence(ctx context.Context, call provider.ToolCa
 	}
 
 	observations := a.eligibleObservations(info.Path, boundary)
+	if info.WholeFile && info.Snapshot != "" {
+		observations = slices.DeleteFunc(observations, func(o evidence.TextObservation) bool { return o.Snapshot != info.Snapshot })
+	}
 	if len(observations) == 0 {
 		check.Reason = "no_eligible_read"
 		check.Missing = info.Ranges
@@ -98,6 +106,9 @@ func (a *Agent) checkOperationEvidence(ctx context.Context, call provider.ToolCa
 	}
 	check.Reason = "stale_or_partial_evidence"
 	check.Recovery = fmt.Sprintf("re-read the missing lines of %s, then retry", info.Path)
+	if info.WholeFile {
+		check.Recovery = "use read_file with intent=full and complete its pages before retrying the overwrite"
+	}
 	return check
 }
 
@@ -127,18 +138,28 @@ func evidenceCoversTarget(observations []evidence.TextObservation, target tool.E
 	if len(target.Hashes) == 0 {
 		return false, target.Ranges
 	}
-	for _, window := range stitchBySnapshot(observations) {
-		offset, matches := findHashSequence(window.hashes, target.Hashes)
-		if matches != 1 {
-			continue
+	windows := stitchBySnapshot(observations)
+	index := 0
+	var missing []tool.ReadRange
+	for _, r := range target.Ranges {
+		end := index + r.Lines()
+		if end > len(target.Hashes) {
+			return false, target.Ranges
 		}
-		start := window.startLine - 1 + offset
-		covered := tool.ReadRange{Start: start, End: start + len(target.Hashes)}
-		if rangesWithin(target.Ranges, covered) {
-			return true, nil
+		covered := false
+		for _, w := range windows {
+			start := r.Start - (w.startLine - 1)
+			if start >= 0 && start+r.Lines() <= len(w.hashes) && slices.Equal(w.hashes[start:start+r.Lines()], target.Hashes[index:end]) {
+				covered = true
+				break
+			}
 		}
+		if !covered {
+			missing = append(missing, r)
+		}
+		index = end
 	}
-	return false, target.Ranges
+	return len(missing) == 0 && index == len(target.Hashes), missing
 }
 
 type hashWindow struct {
@@ -179,18 +200,6 @@ func stitchBySnapshot(observations []evidence.TextObservation) []hashWindow {
 		out = append(out, merged)
 	}
 	return out
-}
-
-func rangesWithin(required []tool.ReadRange, covered tool.ReadRange) bool {
-	for _, r := range required {
-		if r.Empty() {
-			continue
-		}
-		if r.Start < covered.Start || r.End > covered.End {
-			return false
-		}
-	}
-	return true
 }
 
 // currentFileHashes reads the file through the real reader so encoding, overlay
@@ -266,34 +275,45 @@ func (a *Agent) applyEvidenceGates(ctx context.Context, plan *toolCallPlan) (too
 	if a == nil || !a.reads.gates || a.task.ledger == nil || a.svc.tools == nil {
 		return toolOutcome{}, false
 	}
-	resolved, _, ambiguous := a.svc.tools.ResolveCall(plan.call.Name)
-	if resolved == nil || len(ambiguous) > 0 {
+	resolved := plan.execTool
+	if resolved == nil {
+		resolved, _, _ = a.svc.tools.ResolveCall(plan.call.Name)
+	}
+	if resolved == nil {
 		return toolOutcome{}, false
 	}
-	if _, anchored := resolved.(tool.AnchoredTextTarget); anchored {
+	if ownsAnchoredEvidence(resolved) {
 		// An anchor-based writer is already checked by the anchor safety audit,
 		// which re-resolves the target through the writer and verifies line
 		// hashes. Two gates must never enforce the same write.
 		return toolOutcome{}, false
 	}
 	boundary := observationBoundary(ctx, a.task.ledger.ObservationBoundary())
-	check := a.checkOperationEvidence(ctx, plan.call, resolved, boundary)
+	call := plan.call
+	if plan.evidenceName != "" {
+		call.Name, call.Arguments = plan.evidenceName, string(plan.evidenceArgs)
+	}
+	check := a.checkOperationEvidence(ctx, call, resolved, boundary)
 	switch {
 	case check.Satisfied:
+		plan.expectedWriteSource = check.Target
 		return toolOutcome{}, false
 	case !check.Supported:
+		if !evidence.ClassifyToolCall(call.Name, json.RawMessage(call.Arguments), plan.readOnly || resolved.ReadOnly()).StateMutation {
+			return toolOutcome{}, false
+		}
 		// A writer that cannot declare its target is never granted a pass. While
 		// another writer is blocked for missing evidence, it must not become the
 		// way around that block.
-		outstanding := a.turn.evidenceBlocked.snapshot()
-		if len(outstanding) == 0 || resolved.ReadOnly() {
+		outstanding := a.outstandingReadEvidence(ctx, boundary)
+		if len(outstanding) == 0 || plan.readOnly {
 			return toolOutcome{}, false
 		}
 		msg := fmt.Sprintf("blocked: [evidence required] %s cannot declare which files it changes while a read-evidence requirement is outstanding (%s); use the exact file tool for those paths",
 			plan.call.Name, strings.Join(outstanding, ", "))
 		return toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg)}, true
 	}
-	a.turn.evidenceBlocked.record(check.Path)
+	a.turn.evidenceBlocked.record(check.Path, call)
 	msg := describeEvidence(check, plan.call.Name)
 	return toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg)}, true
 }
@@ -304,10 +324,28 @@ func (a *Agent) rebuildAuthorized(path string) bool {
 	if a == nil || !a.turn.constraints.AllowRebuild {
 		return false
 	}
-	text := strings.ToLower(a.turn.turnInput)
-	base := strings.ToLower(filepath.Base(path))
-	return text != "" && base != "" && strings.Contains(text, base)
+	for _, clause := range strings.FieldsFunc(a.turn.turnInput, func(r rune) bool { return strings.ContainsRune("\n;；。!?！？", r) }) {
+		if !runtimepolicy.ParseConstraints(clause).AllowRebuild {
+			continue
+		}
+		lower := strings.ToLower(clause)
+		if strings.Contains(lower, "不要") || strings.Contains(lower, "别") || strings.Contains(lower, "not ") || strings.Contains(lower, "don't") || strings.Contains(lower, "禁止") {
+			continue
+		}
+		for _, token := range rebuildPathPattern.FindAllString(clause, -1) {
+			token = strings.Trim(token, "`\"'")
+			if !filepath.IsAbs(token) {
+				token = filepath.Join(a.writeWorkspaceRoot, token)
+			}
+			if filepath.Clean(token) == filepath.Clean(path) {
+				return true
+			}
+		}
+	}
+	return false
 }
+
+var rebuildPathPattern = regexp.MustCompile("`[^`]+`|\"[^\"]+\"|'[^']+'|[A-Za-z0-9_./\\\\:-]+")
 
 // preflightEvidenceBatch evaluates every writer's declared evidence once for
 // the batch. A blocked call is reported without ever starting, so a batch that
@@ -323,7 +361,7 @@ func (a *Agent) preflightEvidenceBatch(ctx context.Context, calls []provider.Too
 		if resolved == nil || len(ambiguous) > 0 || resolved.ReadOnly() {
 			continue
 		}
-		if _, anchored := resolved.(tool.AnchoredTextTarget); anchored {
+		if ownsAnchoredEvidence(resolved) {
 			// The anchor safety audit owns this writer.
 			continue
 		}
@@ -331,9 +369,17 @@ func (a *Agent) preflightEvidenceBatch(ctx context.Context, calls []provider.Too
 		if !check.Supported || check.Satisfied {
 			continue
 		}
-		a.turn.evidenceBlocked.record(check.Path)
+		a.turn.evidenceBlocked.record(check.Path, call)
 		msg := describeEvidence(check, call.Name)
 		blocked[i] = toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg)}
 	}
 	return blocked
+}
+
+func ownsAnchoredEvidence(target tool.Tool) bool {
+	if wrapped, ok := target.(pathBoundWriter); ok {
+		return ownsAnchoredEvidence(wrapped.inner)
+	}
+	_, ok := target.(tool.AnchoredTextTarget)
+	return ok
 }

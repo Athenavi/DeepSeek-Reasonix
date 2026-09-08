@@ -33,8 +33,12 @@ type toolCallPlan struct {
 	runArgs                         json.RawMessage
 	// readTaskID is the logical read a continuation call joined, empty for a
 	// fresh read.
-	readTaskID string
-	cctx       context.Context
+	readTaskID          string
+	readEnvelope        *tool.ReadResultEnvelope
+	readActiveMillis    int64
+	readSnapshot        string
+	expectedWriteSource tool.EvidenceTargetInfo
+	cctx                context.Context
 	// mcpApp collects the call's Apps presentation from the executing tool.
 	mcpApp                                                 *tool.MCPAppResult
 	releaseParentWrite, releaseMutationWrite, releaseLease func()

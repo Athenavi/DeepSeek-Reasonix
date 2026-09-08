@@ -44,7 +44,7 @@ type agentConfig struct {
 // new behavior is the default; each switch exists so an operator can fall back
 // for diagnosis, is host-local, and is fixed for the whole run.
 type ReadPipelineOptions struct {
-	// LegacyCoordinator turns the host-only read coordinator shadow off.
+	// LegacyCoordinator restores the legacy incomplete-read execution owner.
 	LegacyCoordinator bool
 	// LegacyEvidenceGates turns the writer-declared evidence check off.
 	LegacyEvidenceGates bool

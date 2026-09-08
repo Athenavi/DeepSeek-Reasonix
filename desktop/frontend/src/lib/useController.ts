@@ -54,7 +54,7 @@ import { useNavigationIntentFence } from "./useNavigationIntentFence";
 import type { SearchSource } from "./searchSources";
 import { attachWebSearchOutput, historySearchAndAnswer } from "./searchTranscript";
 import { fileDiffFromWire, parseTodos, summarize, summarizeFileDiff, type ToolFileDiff } from "./tools";
-import { applyReadStatusFrame } from "./readStatus";
+import { applyReadStatusEvent, type ReadStatusHost } from "./readStatus";
 import { modeHasAutoApproveTools, normalizeMode, normalizeToolApprovalMode, type QualityFloor } from "./types";
 import type {
   BalanceInfo,
@@ -81,7 +81,6 @@ import type {
   WireAsk,
   WireMCPInteraction,
   WireCompletionSummary,
-  WireReadStatus,
   WireDecisionReceipt,
   WireEvent,
   WireExtensionCard,
@@ -376,7 +375,7 @@ function handlePromptFailure(dispatchTo: (tabId: string, action: Action) => void
 export function isSteerNoticeText(text: string): boolean {
   return text.startsWith(STEER_NOTICE_PREFIX);
 }
-export interface State {
+export interface State extends ReadStatusHost {
   items: Item[];
   /** Exact backend-owned turn targeted by Stop/Ask. */
   activeTurnId?: string;
@@ -388,8 +387,6 @@ export interface State {
   cancellable: boolean;
   /** Host turn phase from turn_phase events (working|checking|verifying|reviewing). */
   turnPhase?: TurnPhaseName;
-  /** Live read progress keyed by read id: upserted, never appended per page. */
-  readStatuses?: Record<string, WireReadStatus>;
   /** Latest content-free turn quality summary, shown on demand in the change panel. */
   completionSummary?: WireCompletionSummary;
   approval?: WireApproval;
@@ -1514,6 +1511,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
         // A new turn starts from no live read status: the previous turn's
         // progress is history, not this turn's state.
         readStatuses: undefined,
+        readStatusClosed: false,
         activeTurnId: e.turnId ?? s.activeTurnId,
         assistantSegmentOrdinal: startsNewTurn ? 0 : s.assistantSegmentOrdinal,
         pendingSearchSources: undefined,
@@ -1827,7 +1825,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       return { ...settled, usage, context: { ...settled.context, used, sessionTokens }, turnTokens, turnOutputTokens, turnOutputCharsAtUsage, turnOutputEstimated, turnTotalTokens, turnCost, turnRateBand, turnArgChars: updateContextGauge ? 0 : settled.turnArgChars, sessionTokens, sessionCost, sessionCurrency, usageSeq: settled.usageSeq + 1, lastRequestTps, pendingRequestModelMs: updateContextGauge ? undefined : settled.pendingRequestModelMs };
     }
     case "read_status":
-      return applyReadStatusFrame(s, e.readStatus);
+      return applyReadStatusEvent(s, e);
     case "notice": {
       const next = appendNoticeToState(s, e.level ?? "info", e.text ?? "", e.detail, e.code, e.decisionReceipt);
       return e.code?.startsWith("stream_interrupted_") ? { ...next, streamInterruptNoticeShown: true } : next;
@@ -1916,6 +1914,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
     }
     case "turn_done": {
       if (e.turnId && s.activeTurnId && e.turnId !== s.activeTurnId) return s;
+      s = { ...s, readStatuses: undefined, readStatusClosed: true };
       const now = Date.now();
       s = snapshotCompletedTurnTelemetry(s, now);
       const workDurationMs = currentTurnDurationMs(s, now);
@@ -2092,6 +2091,8 @@ export function reducer(s: State, a: Action): State {
     case "cancel_requested": {
       return endPromptWait({
         ...s,
+        readStatuses: undefined,
+        readStatusClosed: true,
         pendingPrompt: false,
         cancelRequested: true,
         approval: undefined,
