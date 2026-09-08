@@ -373,6 +373,10 @@ type App struct {
 	// credProxy is the lazy app-wide key holder for local-proxy mode.
 	credProxyMu sync.Mutex
 	credProxy   *credentialProxy
+	// browserBroker is the lazy app-wide loopback broker remote serves reach
+	// through SSH reverse tunnels; per-generation tokens isolate hosts.
+	browserBrokerMu sync.Mutex
+	browserBroker   *browserBroker
 	// remoteWindowTicket/remoteWindowHostKey are set from argv before Wails
 	// starts in a child process. They gate the blank-shell middleware and the
 	// startup branches so the child never initializes local runtimes.

@@ -217,7 +217,7 @@ func (a *App) stopRemoteRuntime() {
 	if rt != nil {
 		_ = rt.Close()
 	}
-	a.closeCredentialProxy()
+	a.closeRemoteBrokers()
 }
 
 // emitRemoteEvent bridges a kernel callback to the frontend through the async

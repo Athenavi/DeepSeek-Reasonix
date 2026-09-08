@@ -104,6 +104,17 @@ Go 通过现有通道把文件转成图像或文件结果。上传只读取任�
 即撤销。浏览器授权与 provider 代理凭据分开；没有共享 token。旧的远程 Serve 构建通过
 能力协商不宣告浏览器，保留全部现有远程功能。
 
+线上形态是每台桌面一个 loopback HTTP broker。全新 Serve 的 bootstrap 把
+`REASONIX_BROWSER_BROKER` / `REASONIX_BROWSER_TOKEN`（仅进程环境）指向经反向转发的
+broker；被复用的 Serve 在桌面轮换路由后通过 `POST /browser/broker` 重新指向。broker 为
+每个主机连接世代铸一个随机 bearer token——注册新世代即替换主机旧 token——鉴权后才把
+`/v1/browser/<method>` 派发给 `browser.Executor`。每个请求携带
+`X-Reasonix-Browser-Session`；broker 把它解析到唯一展示该会话的桌面标签，其余一律以
+`no_grant` 拒绝。壳在桌面写出的截图与下载经现有 SFTP 通道中转进远程主机的每工作区
+暂存目录（`~/.reasonix/browser-relay/<workspace>/`），serve 侧工具只读对它们而言是
+本机的路径。带 broker 启动的 Serve 在 `/auth/token` 握手的
+`X-Reasonix-Serve-Capabilities` 响应头中宣告 `browser`。
+
 ## 验收
 
 iframe、动态 DOM、受控输入、弹窗、上传与下载、导航历史、临时分区、共享与隔离登录；

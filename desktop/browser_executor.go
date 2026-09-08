@@ -42,9 +42,12 @@ type hostBrowserExecutor struct {
 	host    hostRequester
 	tabID   string
 	grantID string
-	granted atomic.Bool
-	revoked atomic.Bool
-	grantMu sync.Mutex
+	// sessionKey overrides the grant's session binding when set; remote
+	// broker executors use it because their tabs are not workspace tabs.
+	sessionKey string
+	granted    atomic.Bool
+	revoked    atomic.Bool
+	grantMu    sync.Mutex
 }
 
 type hostBrowserTab struct {
@@ -94,6 +97,12 @@ func (a *App) forgetBrowserExecutorLocked(tabID string) {
 	})
 }
 
+// forgetRemoteBrowserExecutor drops the broker executor of a closed remote
+// tab; its grant ID is namespaced with the "remote/" prefix used at creation.
+func (a *App) forgetRemoteBrowserExecutor(remoteTabID string) {
+	a.forgetBrowserExecutorLocked("remote/" + remoteTabID)
+}
+
 func (a *App) browserLedger() (*browserops.Ledger, error) {
 	a.browserExecMu.Lock()
 	defer a.browserExecMu.Unlock()
@@ -112,6 +121,15 @@ func (e *hostBrowserExecutor) Available(context.Context) bool {
 	return !e.revoked.Load() && e.app.hostMode()
 }
 
+// browserSessionKey is the session identity the grant binds to: the explicit
+// override for broker-created executors, else the workspace tab's session.
+func (e *hostBrowserExecutor) browserSessionKey() string {
+	if e.sessionKey != "" {
+		return e.sessionKey
+	}
+	return e.app.tabSessionKeyForBrowser(e.tabID)
+}
+
 func (e *hostBrowserExecutor) ensureGrant(ctx context.Context) error {
 	if e.revoked.Load() {
 		return browser.ErrNoGrant
@@ -124,7 +142,7 @@ func (e *hostBrowserExecutor) ensureGrant(ctx context.Context) error {
 	if e.granted.Load() {
 		return nil
 	}
-	params := map[string]string{"grantId": e.grantID, "tabId": e.tabID, "sessionId": e.app.tabSessionKeyForBrowser(e.tabID)}
+	params := map[string]string{"grantId": e.grantID, "tabId": e.tabID, "sessionId": e.browserSessionKey()}
 	if err := e.host.Request(ctx, "host/browser.grant", params, nil); err != nil {
 		return mapHostBrowserError(err)
 	}
@@ -278,7 +296,7 @@ func (e *hostBrowserExecutor) Act(ctx context.Context, req browser.ActRequest) (
 	}
 	op := browserops.Operation{
 		ID:            req.OperationID,
-		SessionID:     e.app.tabSessionKeyForBrowser(e.tabID),
+		SessionID:     e.browserSessionKey(),
 		Generation:    e.grantID,
 		TabID:         req.TabID,
 		DocumentToken: req.DocumentToken,

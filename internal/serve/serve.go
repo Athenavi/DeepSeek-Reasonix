@@ -126,6 +126,7 @@ func New(ctrl control.SessionAPI, bc *Broadcaster, serveCfg config.ServeConfig) 
 	if cfg, err := config.Load(); err == nil {
 		bc.SetDisplayCurrency(cfg.ExplicitDisplayCurrency())
 	}
+	s.auth.capabilities = s.capabilities
 	s.initTitleProvider()
 	return s
 }
@@ -408,7 +409,7 @@ func (s *Server) rebuild(ctx context.Context, old *control.Controller, ref strin
 		SessionDir:      old.SessionDir(),
 		WorkspaceRoot:   old.WorkspaceRoot(),
 		MCPHostProfile:  plugin.HostProfileInteractive,
-		BrowserExecutor: s.buildOptions.BrowserExecutor,
+		BrowserExecutor: s.sessionBrowserExecutor(tag),
 	}
 	if s.rebuildControllerWithOptions != nil {
 		ctrl, err := s.rebuildControllerWithOptions(ctx, old, ref, opts)
@@ -432,7 +433,7 @@ func (s *Server) rebuild(ctx context.Context, old *control.Controller, ref strin
 		SessionDir:      old.SessionDir(),
 		WorkspaceRoot:   old.WorkspaceRoot(),
 		MCPHostProfile:  plugin.HostProfileInteractive,
-		BrowserExecutor: s.buildOptions.BrowserExecutor,
+		BrowserExecutor: s.sessionBrowserExecutor(tag),
 	})
 	if err != nil {
 		return nil, err
@@ -560,6 +561,7 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("POST /summarize", s.foregroundMutation(s.summarize))
 	mux.HandleFunc("POST /tool-approval-mode", s.foregroundMutation(s.toolApprovalMode))
 	mux.HandleFunc("POST /providers/reload", s.providersReload)
+	mux.HandleFunc("POST /browser/broker", s.browserBrokerRebind)
 	mux.HandleFunc("POST /auto-approve-tools", s.foregroundMutation(s.autoApproveTools))
 	mux.HandleFunc("POST /bypass", s.foregroundMutation(s.bypass))
 	mux.HandleFunc("POST /goal", s.foregroundMutation(s.goal))
