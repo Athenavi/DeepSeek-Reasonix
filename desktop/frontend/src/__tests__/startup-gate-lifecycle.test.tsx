@@ -28,7 +28,7 @@ try {
   assert.equal(useOverlayStore.getState().providerSetupNeeded, false, "retired StrictMode probe cannot publish");
   await act(async () => pending.shift()!(true));
   assert.deepEqual(useAppNavigationStore.getState().settingsFocus, { target: "model-access", onboarding: true });
-  assert.deepEqual(useAppNavigationStore.getState().page, { kind: "settings", tab: "models" });
+  assert.deepEqual(useAppNavigationStore.getState().page, { kind: "settings", tab: "providers" });
   await act(async () => root.unmount());
 
   root = await mount();
