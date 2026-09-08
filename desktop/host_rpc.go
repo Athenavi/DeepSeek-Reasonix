@@ -105,6 +105,11 @@ func runHostRPC(app *App, stdin io.Reader, stdout io.Writer) int {
 		slog.Error("desktop host: contract registry", "err", err)
 		return 2
 	}
+	// Lifecycle evidence and the probationary-update identity are claimed
+	// before any request, exactly as the Wails main did before wails.Run.
+	prepareDesktopDiagnostics(app)
+	capturePendingUpdateHealthIdentity(app)
+	defer app.releaseDesktopDiagnosticsOwnership()
 	generation, err := randomHex(8)
 	if err != nil {
 		slog.Error("desktop host: runtime generation", "err", err)

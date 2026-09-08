@@ -65,6 +65,25 @@ In a plain browser the native bindings are absent, so `bridge.ts` falls back to 
 exact same event contract — so layout, streaming, markdown, tool cards, and the
 diff seam can all be built without rebuilding Go.
 
+## Electron shell
+
+The migration branch hosts the same UI and Go layer in Electron. The Go
+binary runs as a service (`reasonix-desktop --host-rpc`) that the shell
+supervises over stdio; see [the host protocol](../docs/DESKTOP_HOST_PROTOCOL.md)
+and [the migration record](../docs/DESKTOP_SHELL_MIGRATION.md).
+
+```sh
+cd desktop
+pnpm install                                   # one workspace: frontend + electron
+go build -o build/bin/reasonix-desktop-service .
+pnpm --dir frontend build:electron             # rewrites drag regions for Chromium
+pnpm --dir electron start                      # launches the shell against the service
+pnpm --dir electron smoke                      # real-service end-to-end check
+```
+
+`go run . -emit-contract frontend/src/generated` regenerates the TypeScript
+contract; `go test -run HostContract .` fails when it drifts.
+
 ## Test
 
 The desktop package is a nested Go module, so parent `go test ./...` does not run
