@@ -112,6 +112,7 @@ func (a *Agent) beginRunTurn(ctx context.Context, input string, pinned pinnedRev
 		a.turn.constraints = constraints
 	} else {
 		a.turn.constraints = runtimepolicy.ParseConstraints(runtimepolicy.StripQuotedConstraints(a.turn.turnInput))
+		a.recordRebuildAuthorization()
 		if a.planMode.Load() {
 			a.turn.constraints.PlanModeReadOnly = true
 			a.turn.constraints.ForbidMutation = true
@@ -355,6 +356,9 @@ func (a *Agent) handleFinalResponse(ctx context.Context, state *turnRuntime, tex
 	if a.readPipelineActive() {
 		instruction, pause := a.readContinuation(true)
 		if pause != nil {
+			// The legacy twin observes the same usage before returning its
+			// pause; skipping it here would drop the final round's accounting.
+			a.contextManager().ObserveUsage(usage)
 			return false, pause
 		}
 		if instruction != "" {

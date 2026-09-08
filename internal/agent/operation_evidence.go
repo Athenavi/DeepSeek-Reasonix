@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -54,9 +53,10 @@ func (a *Agent) checkOperationEvidence(ctx context.Context, call provider.ToolCa
 	}
 	info, err := declarer.DeclareEvidenceTarget(ctx, json.RawMessage(call.Arguments))
 	if err != nil {
-		// No valid target was declared. Let the writer's own validation report
-		// the error; do not create an unresolvable obligation for an empty path.
-		return evidenceCheck{Supported: true, Satisfied: true, Reason: "target_invalid", Recovery: err.Error()}
+		// A writer that cannot name what it replaces is never granted a pass
+		// while a read requirement is outstanding; with nothing outstanding the
+		// writer's own validation still reports the concrete error.
+		return evidenceCheck{Reason: "target_invalid", Recovery: err.Error()}
 	}
 	if info.Path == "" {
 		return evidenceCheck{Satisfied: true, Supported: true}
@@ -283,9 +283,15 @@ func (a *Agent) applyEvidenceGates(ctx context.Context, plan *toolCallPlan) (too
 		return toolOutcome{}, false
 	}
 	if ownsAnchoredEvidence(resolved) {
-		// An anchor-based writer is already checked by the anchor safety audit,
-		// which re-resolves the target through the writer and verifies line
-		// hashes. Two gates must never enforce the same write.
+		// The anchor audit owns this writer, but it keys on the model-visible
+		// name: a proxy that reaches the writer under another name must be
+		// audited here or both gates skip it.
+		if plan.evidenceName != "" && plan.evidenceName != plan.call.Name {
+			call := provider.ToolCall{Name: plan.evidenceName, Arguments: string(plan.evidenceArgs)}
+			if out, blocked := a.staleAnchorEditBlock(ctx, call); blocked {
+				return toolOutcome{output: out, blocked: true, errMsg: "blocked: fresh read required"}, true
+			}
+		}
 		return toolOutcome{}, false
 	}
 	boundary := observationBoundary(ctx, a.task.ledger.ObservationBoundary())
@@ -293,7 +299,13 @@ func (a *Agent) applyEvidenceGates(ctx context.Context, plan *toolCallPlan) (too
 	if plan.evidenceName != "" {
 		call.Name, call.Arguments = plan.evidenceName, string(plan.evidenceArgs)
 	}
-	check := a.checkOperationEvidence(ctx, call, resolved, boundary)
+	check, memoized := a.turn.evidenceBlocked.memoizedCheck(plan.call.ID)
+	if !memoized || plan.evidenceName != plan.call.Name {
+		check = a.checkOperationEvidence(ctx, call, resolved, boundary)
+		if plan.evidenceName == plan.call.Name {
+			a.turn.evidenceBlocked.memoCheck(plan.call.ID, check)
+		}
+	}
 	switch {
 	case check.Satisfied:
 		plan.expectedWriteSource = check.Target
@@ -318,34 +330,26 @@ func (a *Agent) applyEvidenceGates(ctx context.Context, plan *toolCallPlan) (too
 	return toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg)}, true
 }
 
+// recordRebuildAuthorization captures the files an AllowRebuild instruction
+// named, so later writes authorize by membership instead of re-parsing text.
+// Only the turn that owns the user's instruction calls it; sub-agents inherit
+// the resulting set through their host constraints.
+func (a *Agent) recordRebuildAuthorization() {
+	if a == nil || !a.turn.constraints.AllowRebuild {
+		return
+	}
+	a.turn.constraints.RebuildPaths = runtimepolicy.ParseRebuildPaths(a.turn.turnInput, a.writeWorkspaceRoot)
+}
+
 // rebuildAuthorized reports whether the user's own instruction explicitly asked
-// to rewrite this file. It is a host-side authorization, never a model claim.
+// to rewrite this file. It is a membership test over the host-recorded set; the
+// model can never grant the waiver through prompt text.
 func (a *Agent) rebuildAuthorized(path string) bool {
 	if a == nil || !a.turn.constraints.AllowRebuild {
 		return false
 	}
-	for _, clause := range strings.FieldsFunc(a.turn.turnInput, func(r rune) bool { return strings.ContainsRune("\n;；。!?！？", r) }) {
-		if !runtimepolicy.ParseConstraints(clause).AllowRebuild {
-			continue
-		}
-		lower := strings.ToLower(clause)
-		if strings.Contains(lower, "不要") || strings.Contains(lower, "别") || strings.Contains(lower, "not ") || strings.Contains(lower, "don't") || strings.Contains(lower, "禁止") {
-			continue
-		}
-		for _, token := range rebuildPathPattern.FindAllString(clause, -1) {
-			token = strings.Trim(token, "`\"'")
-			if !filepath.IsAbs(token) {
-				token = filepath.Join(a.writeWorkspaceRoot, token)
-			}
-			if filepath.Clean(token) == filepath.Clean(path) {
-				return true
-			}
-		}
-	}
-	return false
+	return slices.Contains(a.turn.constraints.RebuildPaths, filepath.Clean(path))
 }
-
-var rebuildPathPattern = regexp.MustCompile("`[^`]+`|\"[^\"]+\"|'[^']+'|[A-Za-z0-9_./\\\\:-]+")
 
 // preflightEvidenceBatch evaluates every writer's declared evidence once for
 // the batch. A blocked call is reported without ever starting, so a batch that
@@ -366,6 +370,7 @@ func (a *Agent) preflightEvidenceBatch(ctx context.Context, calls []provider.Too
 			continue
 		}
 		check := a.checkOperationEvidence(ctx, call, resolved, boundary)
+		a.turn.evidenceBlocked.memoCheck(call.ID, check)
 		if !check.Supported || check.Satisfied {
 			continue
 		}

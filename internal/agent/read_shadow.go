@@ -16,7 +16,10 @@ type readShadowState struct {
 	observed      int
 	disagreements int
 	byState       map[readcoord.State]int
-	pivot         string
+	// pivots holds the reads whose strategy-change advice is still owed. A
+	// single slot would let one stalled read overwrite another's, and the
+	// coordinator only offers each read one pivot.
+	pivots map[string]struct{}
 }
 
 func newReadShadowState(enabled bool) readShadowState {
@@ -24,6 +27,7 @@ func newReadShadowState(enabled bool) readShadowState {
 	if enabled {
 		s.coord = readcoord.New()
 		s.byState = map[readcoord.State]int{}
+		s.pivots = map[string]struct{}{}
 	}
 	return s
 }
@@ -60,7 +64,7 @@ func (a *Agent) observeReadShadow(env tool.ReadResultEnvelope, elapsed ...int64)
 		}
 	}
 	if tr.Advice == readcoord.AdvicePivot {
-		s.pivot = tr.Key
+		s.pivots[tr.Key] = struct{}{}
 	}
 	if a.readPipelineActive() && tr.To == readcoord.StateNeedsMore {
 		a.issueReadContinuation(tr, env)

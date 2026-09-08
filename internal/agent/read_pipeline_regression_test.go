@@ -291,6 +291,7 @@ func TestRebuildAuthorizationIsPathAndClauseScoped(t *testing.T) {
 	} {
 		a.turn.turnInput = tc.text
 		a.turn.constraints = runtimepolicy.ParseConstraints(tc.text)
+		a.recordRebuildAuthorization()
 		if got := a.rebuildAuthorized(tc.path); got != tc.want {
 			t.Errorf("%q %s: %v", tc.text, tc.path, got)
 		}

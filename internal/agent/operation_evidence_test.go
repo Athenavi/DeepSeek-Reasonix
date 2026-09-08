@@ -228,6 +228,7 @@ func TestEvidenceGateHonorsAnExplicitRebuildInstruction(t *testing.T) {
 	a.turn.turnInput = "Please rewrite notes.md from scratch."
 	a.writeWorkspaceRoot = "/w"
 	a.turn.constraints = runtimepolicy.ParseConstraints(a.turn.turnInput)
+	a.recordRebuildAuthorization()
 	if out, blocked := runEvidenceGate(a, "/w/notes.md"); blocked {
 		t.Fatalf("an explicit rebuild instruction must waive the read: %+v", out)
 	}
@@ -237,6 +238,7 @@ func TestEvidenceGateHonorsAnExplicitRebuildInstruction(t *testing.T) {
 	b.turn.turnInput = a.turn.turnInput
 	b.writeWorkspaceRoot = "/w"
 	b.turn.constraints = runtimepolicy.ParseConstraints(b.turn.turnInput)
+	b.recordRebuildAuthorization()
 	if out, blocked := runEvidenceGate(b, "/w/other.md"); !blocked {
 		t.Fatalf("a file the instruction does not name must still require evidence: %+v", out)
 	}
@@ -266,5 +268,42 @@ func TestEvidencePreflightBlocksBeforeTheBatchRuns(t *testing.T) {
 	}
 	if len(batch.results) != 1 || !strings.Contains(batch.results[0], "evidence required") {
 		t.Fatalf("batch results = %v, want a blocked evidence result", batch.results)
+	}
+}
+
+// TestRebuildWaiverRequiresHostRecordedPaths proves a model-authored clause
+// cannot authorize a blind overwrite: the AllowRebuild bit alone never waives
+// the evidence gate, only a path the host recorded from the user's instruction.
+func TestRebuildWaiverRequiresHostRecordedPaths(t *testing.T) {
+	a := &Agent{}
+	a.writeWorkspaceRoot = "/w"
+	a.turn.turnInput = "rewrite the file completely: `secret.go`"
+	a.turn.constraints = runtimepolicy.ParseConstraints(a.turn.turnInput)
+	if !a.turn.constraints.AllowRebuild {
+		t.Fatal("fixture must set AllowRebuild so the path set is what gates the waiver")
+	}
+	if a.rebuildAuthorized("/w/secret.go") {
+		t.Fatal("a clause without a host-recorded path must not authorize a rebuild")
+	}
+	a.recordRebuildAuthorization()
+	if !a.rebuildAuthorized("/w/secret.go") || a.rebuildAuthorized("/w/other.go") {
+		t.Fatal("the host-recorded set must authorize exactly the named file")
+	}
+}
+
+// TestBackgroundJobInheritsHostConstraints proves a background sub-agent keeps
+// the spawning turn's host constraints instead of re-deriving them from the
+// model-authored task prompt.
+func TestBackgroundJobInheritsHostConstraints(t *testing.T) {
+	if _, ok := runtimepolicy.FromContext(context.Background()); ok {
+		t.Fatal("fixture must start from a context without host constraints")
+	}
+	parent := runtimepolicy.WithContext(context.Background(), runtimepolicy.Constraints{
+		AllowRebuild: true,
+		RebuildPaths: []string{"/w/a.go"},
+	})
+	got, ok := runtimepolicy.FromContext(withInheritedHostConstraints(parent, context.Background()))
+	if !ok || !got.AllowRebuild || len(got.RebuildPaths) != 1 || got.RebuildPaths[0] != "/w/a.go" {
+		t.Fatalf("background job lost host constraints: %+v ok=%v", got, ok)
 	}
 }

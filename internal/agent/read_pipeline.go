@@ -133,9 +133,9 @@ func (a *Agent) readContinuation(final bool) (string, error) {
 		}
 		args, _ := json.Marshal(map[string]any{"path": path, "cursor": tool.EncodeReadCursor(task.cursor)})
 		prefix := "Continue the outstanding read with read_file "
-		if a.turn.readShadow.pivot == ob.Key {
+		if _, owed := a.turn.readShadow.pivots[ob.Key]; owed {
 			prefix = "The last two pages added no content. Change strategy: use the host's exact next window instead of repeating the previous page. Call read_file "
-			a.turn.readShadow.pivot = ""
+			delete(a.turn.readShadow.pivots, ob.Key)
 		}
 		return prefix + string(args) + ". Independent work may continue. Do not claim a complete review until this requirement is satisfied.", nil
 	}

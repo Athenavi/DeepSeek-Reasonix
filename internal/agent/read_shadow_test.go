@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"reasonix/internal/event"
@@ -176,5 +177,41 @@ func TestReadShadowEmitsOneUpsertedStatusPerRead(t *testing.T) {
 	}
 	if statuses[0].Sequence >= statuses[2].Sequence {
 		t.Fatalf("sequences must advance: %+v", statuses)
+	}
+}
+
+// TestReadContinuationKeepsAPivotForEveryStalledRead pins the advice set: two
+// reads that stall in the same round must each receive their one strategy
+// change, because the coordinator never offers a second one.
+func TestReadContinuationKeepsAPivotForEveryStalledRead(t *testing.T) {
+	reg := tool.NewRegistry()
+	a := New(&userInputCaptureProvider{}, reg, NewSession("system"), Options{ContextWindow: 64_000}, event.Discard)
+	a.reads.tasks = newReadTasks("test-session", 1)
+	a.turn.readShadow = newReadShadowState(true)
+	for _, id := range []string{"ir-0", "ir-1"} {
+		env := tool.ReadResultEnvelope{
+			ReadID:          id,
+			Source:          tool.ReadResultSource{CanonicalPath: "/w/" + id + ".go", Snapshot: "ss2:v1"},
+			Intent:          tool.ReadIntentFull,
+			DeliveredRanges: []tool.ReadRange{{Start: 0, End: 10}},
+			HasMore:         true,
+			NextCursor: tool.EncodeReadCursor(tool.ReadCursor{
+				ReadID: id, Path: "/w/" + id + ".go", Snapshot: "ss2:v1", NextStart: 10,
+			}),
+		}
+		a.observeReadShadow(env, 0)
+		a.reads.tasks.remember(id, env)
+		a.observeReadShadow(env, 0)
+		a.observeReadShadow(env, 0)
+	}
+	first, err := a.readContinuation(false)
+	if err != nil {
+		t.Fatalf("continuation: %v", err)
+	}
+	if !strings.Contains(first, "Change strategy") || !strings.Contains(first, "/w/ir-0.go") {
+		t.Fatalf("the first stalled read lost its pivot advice: %q", first)
+	}
+	if _, owed := a.turn.readShadow.pivots["ir-1"]; !owed {
+		t.Fatal("the second stalled read lost its owed pivot advice")
 	}
 }

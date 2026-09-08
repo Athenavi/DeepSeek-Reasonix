@@ -135,7 +135,7 @@ func readStrategyPreview(raw, readID string, totalTokens, limitTokens int) strin
 
 // finalizeIncompleteReadOutcome is called by executeBatch.finalize in provider
 // order, never from parallel execution goroutines.
-func (a *Agent) finalizeIncompleteReadOutcome(deferred *incompleteReadDeferred, out *toolOutcome) {
+func (a *Agent) finalizeIncompleteReadOutcome(ctx context.Context, deferred *incompleteReadDeferred, out *toolOutcome) {
 	if a.readPipelineActive() {
 		if deferred != nil && deferred.plan != nil && out != nil && deferred.plan.evidenceName == "read_file" {
 			// Parallel readers are clipped again in the ordered finalizer, after
@@ -154,6 +154,14 @@ func (a *Agent) finalizeIncompleteReadOutcome(deferred *incompleteReadDeferred, 
 	switch plan.evidenceName {
 	case "read_file":
 		observed, ok := modelTextObservationFor(plan, deferred.rawOutput)
+		if ok && observed.Snapshot == "" {
+			// The legacy owner stamps the same source version the pipeline owner
+			// does, so the evidence gate never reads its windows as unversioned
+			// and blocks every later write to the file.
+			if env, valid := a.finalizedReadEnvelope(ctx, plan.call, *out); valid {
+				observed.Snapshot = env.Source.Snapshot
+			}
+		}
 		transition = a.turn.incompleteReads.observeReadFile(plan, deferred.rawOutput, out.output, observed, ok, a.estimatedReadResultTokens(deferred.rawOutput), a.readAutoRecoveryBudgetFor())
 	case "session_tool_result":
 		transition = a.turn.incompleteReads.observeResultPage(plan, deferred.rawOutput, a.retainedReadPageMatches(plan, deferred.rawOutput))

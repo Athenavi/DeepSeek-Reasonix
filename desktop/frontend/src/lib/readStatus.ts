@@ -53,7 +53,7 @@ export type ReadStatusKey =
   | "composer.readStatusStalled"
   | "composer.readStatusRecovery";
 
-/** readStatusLabel renders the single active read as one short status line. */
+/** readStatusLabel renders every active read as one short status line. */
 export function readStatusLabel(
   statuses: Record<string, WireReadStatus> | undefined,
   t: (key: ReadStatusKey, vars?: Record<string, string | number>) => string,
