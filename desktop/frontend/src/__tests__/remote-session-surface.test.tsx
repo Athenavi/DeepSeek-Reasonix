@@ -4,7 +4,6 @@ import { JSDOM } from "jsdom";
 import type { AppBindings } from "../lib/bridge";
 import type { TabMeta } from "../lib/types";
 import type { RemoteSessionApi } from "../lib/useRemoteSession";
-
 let passed = 0;
 let failed = 0;
 function ok(value: boolean, label: string) {
@@ -795,6 +794,7 @@ ok(replayProbe?.transcript.approval?.id === "replayed-approval", "a remote mode 
 await act(async () => { replayProbe?.drainApprovals(["replayed-approval"]); await flush(); });
 ok(replayProbe?.transcript.approval === undefined, "a remote mode transaction clears the exact approval it auto-allowed");
 await act(async () => replayRoot.unmount());
+await (await import("./helpers/remoteRuntimeReconciliationCases")).runRemoteRuntimeCases({ remoteTab, ok, tape, flush, setSnapshotHistory: value => { snapshotHistory = value; } });
 dom.window.close();
 process.stdout.write(`\n${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

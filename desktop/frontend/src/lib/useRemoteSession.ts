@@ -204,13 +204,13 @@ export function useActiveRemoteSession(
   showToast: (message: string, level: "error") => void,
 ) {
   const active = Boolean(activeTab?.remote);
-  const session = useRemoteSession(active && activeTab ? activeTab.id : undefined, activeTab?.remoteState);
+  const session = useRemoteSession(active && activeTab ? activeTab.id : undefined, activeTab?.remoteState, activeTab?.sessionPath);
   const composer = useRemoteComposer(session, showToast);
   return { active, session, ready: active && session.state === "ready" && session.hydrated && Boolean(session.composerProfile), ...composer };
 }
 
-export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabStateValue): RemoteSessionApi {
-  const runtimeState = useRuntimeSession(tabId);
+export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabStateValue, sessionPath?: string): RemoteSessionApi {
+  const runtimeState = useRuntimeSession(tabId, sessionPath);
   const [state, setState] = useState<RemoteTabStateValue>(initial === "disconnected" ? "connecting" : (initial ?? "connecting"));
   const [error, setError] = useState("");
   const [transcript, setTranscript] = useState<State>(initialState);
@@ -229,6 +229,11 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
   const bufferedEventsRef = useRef<WireEvent[]>([]);
   const hydrateRef = useRef<{ tabId: string; run: (force?: boolean) => Promise<void> } | null>(null);
   const refreshStatusRef = useRef<{ tabId: string; run: () => Promise<void> } | null>(null);
+  const reconcileHistoryRef = useRef<(() => Promise<void>) | null>(null);
+  const activityRevisionRef = useRef(0);
+  const eventTurnIdRef = useRef<string | undefined>(undefined);
+  const runtimeAtActivityRef = useRef(runtimeState.state);
+  const pendingTurnRef = useRef<{ previousTurnId?: string } | null>(null);
 
   useEffect(() => {
     transcriptRef.current = transcript;
@@ -270,6 +275,8 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
     setPromptError("");
     setTranscript(initialState);
     transcriptRef.current = initialState;
+    pendingTurnRef.current = null;
+    eventTurnIdRef.current = undefined;
     setModelLabel("");
     setCommands([]);
     setComposerProfile(undefined);
@@ -296,12 +303,13 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
         return historyReconcilePromise;
       }
       historyReconcilePromise = (async () => {
+        const requestedActivity = activityRevisionRef.current;
         const snap = await app.RemoteTabSnapshot(tabId);
         // Ready-to-ready state publications represent /new, /clear, or
         // saved-session adoption just as surely as reconnect publications do.
         // A durable-history read started for the previous session must never
         // replace the newly hydrated transcript.
-        if (cancelled || connectionGeneration !== requestedGeneration) return;
+        if (cancelled || connectionGeneration !== requestedGeneration || activityRevisionRef.current !== requestedActivity) return;
         const messages = Array.isArray(snap.history) ? (snap.history as HistoryMessage[]) : [];
         const checkpoints = remoteCheckpoints(snap.checkpoints);
         setCommands(Array.isArray(snap.commands) ? snap.commands as CommandInfo[] : []);
@@ -320,6 +328,7 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
         if (rerun && !cancelled) void reconcileHistory().catch(() => undefined);
       }
     };
+    reconcileHistoryRef.current = reconcileHistory;
 
     const replayMissingPrompt = async (status: unknown, promptPresent: boolean, expectedGeneration: number) => {
       if ((status as RemoteStatus | null)?.pendingPrompt !== true || promptPresent) return;
@@ -495,6 +504,11 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
     const offEvent = onRemoteTabEvent(tabId, (raw) => {
       if (cancelled) return;
       const event = (raw ?? {}) as WireEvent;
+      if (event.kind === "turn_started" || (event.turnId && event.turnId !== eventTurnIdRef.current)) {
+        activityRevisionRef.current += 1;
+        eventTurnIdRef.current = event.turnId;
+      }
+      if (event.kind === "turn_started") pendingTurnRef.current = null;
       if (hydratingRef.current) {
         bufferedEventsRef.current.push(event);
         return;
@@ -511,10 +525,29 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
       bufferedEventsRef.current = [];
       if (hydrateRef.current?.run === hydrate) hydrateRef.current = null;
       if (refreshStatusRef.current?.run === refreshStatus) refreshStatusRef.current = null;
+      if (reconcileHistoryRef.current === reconcileHistory) reconcileHistoryRef.current = null;
       offState();
       offEvent();
     };
   }, [applyRemoteStatus, tabId]);
+
+  // The runtime projection owns liveness. Feed a confirmed completion through
+  // the shared reducer so the transcript and live store settle together. A
+  // finishing/unknown snapshot is not completion, and an earlier turn cannot
+  // settle a newer stream or an optimistic submission.
+  useEffect(() => {
+    const observed = runtimeState.state;
+    const current = transcriptRef.current;
+    if (!hydrated || state !== "ready" || runtimeState.unknown || !runtimeState.known
+      || !observed || observed.phase !== "idle" || observed.running
+      || observed === runtimeAtActivityRef.current || !current.running
+      || (pendingTurnRef.current && (!observed.turnId || observed.turnId === pendingTurnRef.current.previousTurnId))
+      || (current.activeTurnId && observed.turnId !== current.activeTurnId)) return;
+    const next = reducer(current, remoteStatusToAction(observed, Date.now(), current.running));
+    if (next.running) return;
+    setTranscript(next);
+    void reconcileHistoryRef.current?.().catch(() => undefined);
+  }, [hydrated, state, runtimeState.state, runtimeState.unknown, runtimeState.known]);
 
   // Running-state watchdog: while the pill claims a turn is running, poll the
   // serve's /status and feed it through the shared backend_status reducer.
@@ -543,6 +576,9 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
     // Optimistic user bubble, exactly like the local send path. seq rides
     // the reducer's counter; the submission id only needs uniqueness.
     const submissionId = `remote-${Date.now()}`;
+    activityRevisionRef.current += 1;
+    runtimeAtActivityRef.current = runtimeState.state;
+    pendingTurnRef.current = { previousTurnId: runtimeState.state?.turnId };
     setTranscript((s) => reducer(s, { type: "user", text: trimmed, seq: s.seq, submissionId }));
     try {
       await app.SubmitRemoteTab(tabId, trimmed);
@@ -553,7 +589,7 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
       setTranscript((s) => reducer(s, { type: "send_failed", submissionId, error }));
       throw e;
     }
-  }, [tabId]);
+  }, [tabId, runtimeState.state]);
 
   const runManagementCommand = useCallback(async (text: string, rehydrate = false) => {
     if (!tabId) return;
@@ -722,7 +758,7 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
   }, []);
 
   return {
-    state, error, transcript, liveStore, hydrated, running: runtimeState.running ?? transcript.running, modelLabel, commands,
+    state, error, transcript, liveStore, hydrated, running: transcript.running, modelLabel, commands,
     composerProfile, goalRuntime, effort, surfaceGeneration, promptError, submit, runManagementCommand, compact, cancelTurn,
     approve, resolvePlanDecision, answer, clearExtensionForm, rewind, setModel, setEffort, setQualityFloor, pauseGoal, resumeGoal, steer, cancelJob,
     drainApprovals, retryHydration,

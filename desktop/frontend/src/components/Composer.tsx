@@ -1,6 +1,6 @@
 import { recoveryStatusText, type RecoveryRetry } from "../lib/recoveryStatus";
 import { useRuntimeSession } from "../lib/useRuntimeState";
-import { pendingFollowups, confirmFollowup, followupNotSubmitted, type PendingFollowup } from "../lib/pendingFollowup";
+import { pendingFollowups, confirmFollowup, followupNotSubmitted, followupSessionKey, type PendingFollowup } from "../lib/pendingFollowup";
 import { useAppNavigationStore } from "../store/appNavigation";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -603,6 +603,7 @@ export function Composer({
   sessionKey,
   inboxSessionPath,
   inboxHostId,
+  inboxWorkspace,
   workspaceScopeKey,
   fileRefRefreshKey,
   guidanceConsumedKey,
@@ -710,6 +711,7 @@ export function Composer({
   sessionKey?: string;
   inboxSessionPath?: string;
   inboxHostId?: string;
+  inboxWorkspace?: string;
   workspaceScopeKey?: string;
   fileRefRefreshKey?: number | string;
   guidanceConsumedKey?: string;
@@ -741,7 +743,9 @@ export function Composer({
   const finishing = runtimeState.finishing;
   if (runtimeState.known) running = runtimeState.running ?? running;
   if (runtimeState.unknown) disabled = true;
-  const pendingKey = inboxHostId ? `${inboxHostId}\u0000${draftKey}` : draftKey;
+  const pendingKey = followupSessionKey(inboxSessionPath, inboxHostId, inboxWorkspace);
+  const pendingKeyRef = useRef(pendingKey);
+  pendingKeyRef.current = pendingKey;
   const pendingFollowup = useSyncExternalStore(pendingFollowups.subscribe, () => pendingFollowups.get(pendingKey));
   const inboxSessionKey = inboxScopeKey(inboxSessionPath, workspaceScopeKey);
   const now = useTick(running);
@@ -2011,13 +2015,14 @@ export function Composer({
     const submitDraftKey = activeDraftKeyRef.current;
     const submitPendingKey = pendingKey;
     const submitTabId = tabId;
+    const ownsDraft = () => activeDraftKeyRef.current !== submitDraftKey || pendingKeyRef.current === submitPendingKey;
     if (draftIsSubmitting(submitDraftKey)) return;
     const unresolved = pendingFollowups.get(submitPendingKey);
     if (unresolved) {
       updateSubmittingForDraft(submitDraftKey, true);
       try {
         await confirmFollowup(app, unresolved);
-        if (pendingFollowups.get(submitPendingKey) === unresolved && followupDraftFingerprint(submitDraftKey) === unresolved.draft) clearSubmittedDraft(submitDraftKey);
+        if (ownsDraft() && pendingFollowups.get(submitPendingKey) === unresolved && followupDraftFingerprint(submitDraftKey) === unresolved.draft) clearSubmittedDraft(submitDraftKey);
         pendingFollowups.clear(submitPendingKey, unresolved);
         setGuidanceRetryNonce(value => value + 1);
       } catch {
@@ -2068,6 +2073,7 @@ export function Composer({
     const currentSelectedTextRefs = selectedTextRefsRef.current;
     const currentPastedBlocks = [...pastedBlocksRef.current];
     try {
+      if (finishing && !submitPendingKey) throw new Error("reasonix_error:inbox_not_submitted");
       const target = finishing && app.CaptureInboxTarget
         ? await app.CaptureInboxTarget(submitTabId || "", inboxSessionPath || "") : undefined;
       const orderedAttachments = sortComposerAttachments(currentAttachments);
@@ -2150,7 +2156,7 @@ export function Composer({
                 }];
               });
             }
-            if ((!finishing || pendingFollowups.get(submitPendingKey) === request) && followupDraftFingerprint(submitDraftKey) === submittedDraft) clearSubmittedDraft(submitDraftKey);
+            if (ownsDraft() && (!finishing || pendingFollowups.get(submitPendingKey) === request) && followupDraftFingerprint(submitDraftKey) === submittedDraft) clearSubmittedDraft(submitDraftKey);
             if (finishing) {
               pendingFollowups.clear(submitPendingKey, request);
               setGuidanceRetryNonce(value => value + 1);

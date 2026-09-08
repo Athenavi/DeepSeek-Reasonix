@@ -421,7 +421,9 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // The integrated turn-result base measures 2477492 B. Runtime state and
 // session-bound receipt confirmation and its mock session contract add
 // 5944 B (0.240%): 2483436 B total.
+// Durable session isolation and missed-completion reconciliation add 1232 B
+// (0.050% over that head), measuring 2484668 B total.
 // Keep the next tenth; gzip, CSS, and individual chunk limits stay unchanged.
-const rawInitialBudgetKiB = 2_425.3;
+const rawInitialBudgetKiB = 2_426.5;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

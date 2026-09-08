@@ -250,7 +250,7 @@ export type ComposerSurfaceInput = {
     submitDisabledReason?: string;
   };
   base: ComposerBase;
-  tab: { readOnly?: boolean; floorInferred?: boolean; sessionPath?: string; remote?: { hostId: string } } | undefined;
+  tab: { readOnly?: boolean; floorInferred?: boolean; sessionPath?: string; remote?: { hostId: string; workspace: string } } | undefined;
   tabId: string | undefined;
   profile: ReturnType<typeof useComposerProfileProjection>;
   router: { handleSend: ComposerProps["onSend"]; handleSteer: ComposerProps["onSteer"] };
@@ -323,6 +323,7 @@ export function buildComposerSurface(input: ComposerSurfaceInput): DecisionFoote
       sessionKey: input.sessionKey,
       inboxSessionPath: input.tab?.sessionPath,
       inboxHostId: input.tab?.remote?.hostId,
+      inboxWorkspace: input.tab?.remote?.workspace,
       workspaceScopeKey: input.workspaceScopeKey,
       fileRefRefreshKey: input.fileRefRefreshKey,
       guidanceConsumedKey: input.guidance?.key,

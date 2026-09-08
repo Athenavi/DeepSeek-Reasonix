@@ -93,15 +93,11 @@ func inboxNotSubmitted(err error) error {
 // or expired receipt. Position zero identifies an already removed item.
 func (a *App) LookupInboxFollowupForTarget(target InboxTargetView, key string) (InboxReceiptView, error) {
 	if target.Remote {
-		// Reconnection may replace the transport. Only a read can rebind, and
-		// only to the same host, workspace and selected durable session.
-		if target.HostID != "" {
-			current, err := a.CaptureInboxTarget(target.TabID, target.SessionPath)
-			if err != nil || !current.Remote || current.HostID != target.HostID || current.Workspace != target.Workspace {
-				return InboxReceiptView{}, fmt.Errorf("inbox receipt target changed")
-			}
-			target = current
+		current, err := a.remoteReceiptTarget(target)
+		if err != nil {
+			return InboxReceiptView{}, err
 		}
+		target = current
 		client, base, err := a.remoteInboxTarget(target)
 		if err != nil {
 			return InboxReceiptView{}, err
@@ -124,26 +120,25 @@ func (a *App) LookupInboxFollowupForTarget(target InboxTargetView, key string) (
 	}
 	a.runtimeAdmissionMu.RLock()
 	defer a.runtimeAdmissionMu.RUnlock()
-	current, err := a.captureInboxTarget(target.TabID, target.SessionPath)
-	if err != nil || current != target {
-		return InboxReceiptView{}, fmt.Errorf("inbox target changed")
-	}
-	ctrl, err := a.inboxCtrl(target.TabID)
+	owner, err := a.localReceiptTarget(target.SessionPath)
 	if err != nil {
 		return InboxReceiptView{}, err
 	}
-	reader, ok := ctrl.(interface {
+	reader, ok := owner.ctrl.(interface {
 		LookupInboxReceiptForSession(string, string) (sessioninbox.InboxReceipt, bool, error)
 	})
 	if !ok {
 		return InboxReceiptView{}, fmt.Errorf("inbox receipt lookup unavailable")
 	}
-	receipt, found, err := reader.LookupInboxReceiptForSession(target.SessionPath, key)
+	receipt, found, err := reader.LookupInboxReceiptForSession(owner.path, key)
 	if err != nil {
 		return InboxReceiptView{}, err
 	}
 	if !found {
 		return InboxReceiptView{}, fmt.Errorf("inbox receipt unconfirmed")
+	}
+	if !a.localReceiptOwnerCurrent(owner) {
+		return InboxReceiptView{}, fmt.Errorf("inbox receipt owner changed during read")
 	}
 	return InboxReceiptView{ItemID: receipt.ItemID, Disposition: string(receipt.Disposition), Position: receipt.Position, Paused: receipt.Paused, Idempotent: receipt.Idempotent}, nil
 }

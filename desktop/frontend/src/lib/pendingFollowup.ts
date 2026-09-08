@@ -15,6 +15,14 @@ export type PendingFollowup = {
   structured?: StructuredInvocationSubmit; draft: string;
 };
 
+// TabMeta supplies the backend's session path. UI topic/draft keys and tab
+// generations are deliberately excluded from this durable request identity.
+export function followupSessionKey(sessionPath?: string, hostId?: string, workspace?: string): string {
+  const path = sessionPath?.trim();
+  if (!path || (hostId && !workspace)) return "";
+  return JSON.stringify(hostId ? ["remote", hostId, workspace, path] : ["local", path]);
+}
+
 // Process-local draft ownership survives Composer remounts. Nothing here is
 // inferred from the currently executing turn, and unresolved entries never expire.
 const requests = new Map<string, PendingFollowup>();

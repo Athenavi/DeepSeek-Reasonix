@@ -90,6 +90,7 @@ export async function renderComposer(props: Partial<Parameters<typeof Composer>[
     modelLabel: "DeepSeek-R1",
     tabId: "tab-a",
     sessionKey: "session-a",
+    inboxSessionPath: "session-a",
     onSend: () => {},
     onCancel: async () => ({ discardedItemIds: [] }),
     onCycleMode: () => {},

@@ -130,8 +130,8 @@ func TestLocalInboxTargetRejectsReplacementAndPreservesReceipt(t *testing.T) {
 	if _, err := a.EnqueueInboxFollowupForTarget(target, "replacement", "replacement", nil, "replacement"); err == nil {
 		t.Fatal("replacement accepted old request")
 	}
-	if _, err := a.LookupInboxFollowupForTarget(target, "local-request"); err == nil {
-		t.Fatal("replacement accepted old lookup")
+	if got, err := a.LookupInboxFollowupForTarget(target, "local-request"); err != nil || got.ItemID != receipt.ItemID {
+		t.Fatalf("same-session read could not rebind: %+v %v", got, err)
 	}
 	if len(ctrl.InboxSnapshot().Items) != 1 {
 		t.Fatal("replacement created another item")

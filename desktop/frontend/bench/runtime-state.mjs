@@ -108,9 +108,19 @@ try {
   await publish("executing", {}, true);
   await page.locator(".composer__btn--stop").waitFor();
   check(!(await input.isDisabled()), "remote reconnect restores authoritative execution controls");
+  await page.evaluate(async () => {
+    const { __emitMockRemoteTab } = await import("/src/lib/bridge.ts");
+    const tabId = window.__runtimeFixture.tab.id;
+    __emitMockRemoteTab(tabId, "event", { kind: "turn_started", turnId: "fixture-turn" });
+    __emitMockRemoteTab(tabId, "event", { kind: "text", text: "runtime missing completion fixture" });
+  });
+  await page.locator(".remote-surface").getByText("runtime missing completion fixture", { exact: true }).waitFor();
   await publish("idle", {}, true);
   await page.locator(".composer-run-strip").waitFor({ state: "hidden" });
   check(await page.locator(".composer__btn--stop").count() === 0, "remote completion removes the run control");
+  await page.waitForFunction(() => !document.querySelector('.remote-surface [data-transcript-block-phase="active"]'));
+  check(await page.locator(".remote-surface").getByText("runtime missing completion fixture", { exact: true }).count() === 0,
+    "trusted idle without turn_done settles the real transcript and reconciles durable history");
   await page.locator('.project-tree__topic-main:has-text("bench:geometry")').click();
   await page.waitForFunction(() => document.querySelector(".transcript")?.textContent?.includes("Geometry contract fixture complete."));
   check(await page.locator(".remote-surface").count() === 0, "local switch retains ownership after remote runtime frames");
