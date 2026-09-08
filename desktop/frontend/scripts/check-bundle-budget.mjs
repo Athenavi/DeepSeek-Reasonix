@@ -230,12 +230,9 @@ if (initialCSS.length > 0) {
 // shared title-safe shell, and the shared harness decision surface measure
 // 116.9 KiB gzip while reusing existing layout primitives. Retain a bounded
 // 0.1 KiB headroom ratchet.
-// Mainline provider/settings and recovery styles measure 119.435 KiB gzip.
-// Workbench's column-responsive welcome adds 291 bytes over the 119.479 KiB
-// toolbar-refresh base; round the measured 119.763 KiB to the next tenth.
-// Shared recovery banner and disabled-send states measure 119.989 KiB;
-// +231 gzip bytes over the prior welcome head, retaining the next tenth.
-assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 120.0 * 1024);
+// Workbench welcome and recovery styles measure 122869 B gzip on main-v2.
+// Turn result styles add 388 B after removing obsolete metrics (123257 B).
+assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 120.4 * 1024);
 if (localeChunks.length !== 2) {
   throw new Error(`expected 2 on-demand Chinese locale chunks, found ${localeChunks.length}`);
 }
@@ -305,7 +302,10 @@ for (const path of localeChunks) {
   // Session recovery guidance adds 173 / 156 B over main-v2, measuring
   // 62.173 / 62.887 KiB. Keep only the next one-decimal ceiling.
   // Combined recovery and model-application copy measures 63791 / 64557 B.
-  const budget = name.startsWith("zh-TW-") ? 63.1 * 1024 : 62.3 * 1024;
+  // Turn result copy adds 554 / 566 B to the latest-base chunks, measuring
+  // 64219 / 64964 B with recovery guidance included. Round to the next tenth.
+  // Combined turn-result and model-application copy measures 64342 / 65119 B.
+  const budget = name.startsWith("zh-TW-") ? 63.6 * 1024 : 62.9 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -426,6 +426,10 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // (+6.107 KiB, 0.25% over the prior welcome head). Retain the next tenth.
 // Integrated model settings and bounded receipt mock measure 2468523 B
 // (2410.667 KiB); retain 0.2 KiB headroom on the combined startup payload.
-const rawInitialBudgetKiB = 2_410.9;
+// Turn results add 12585 B (0.51%) over main-v2's 2464923 B: bounded receipt
+// projection, status presentation and view bindings. Result: 2477508 B.
+// Combined turn-result and model-settings startup payload is 2481108 B
+// (2422.957 KiB), retaining the same bounded 0.2 KiB build headroom.
+const rawInitialBudgetKiB = 2_423.2;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
