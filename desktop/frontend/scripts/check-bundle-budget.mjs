@@ -416,8 +416,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2399.2 KiB; retain the same bounded 0.2 KiB build headroom.
 // Search-assignment bridge and metadata add 1.0 KiB over the measured
 // main-v2 baseline (2399.3 KiB); result 2400.3 KiB plus 0.2 KiB headroom.
-// Read-pause receipts and the merged composer measure 2401.8 KiB raw.
+// Read-pause receipts, paginated replay and visible reasons measure 2402.0 KiB raw.
 // Keep 0.2 KiB headroom; gzip and per-chunk limits remain independently checked.
-const rawInitialBudgetKiB = 2_402.0;
+const rawInitialBudgetKiB = 2_402.2;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
