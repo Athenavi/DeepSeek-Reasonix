@@ -37,18 +37,21 @@ try {
   assert.deepEqual(metrics(idle(waiting)), metrics(waiting));
 
   const planGate = done({ ...active, promptWaitStartedAt: 11_000,
-    approval: { id: "plan", tool: "exit_plan_mode" } });
+    approval: { id: "plan", tool: "exit_plan_mode", subject: "Plan ready" } });
   assert.equal(planGate.running, true, "plan approval remains actionable after turn_done");
   assert.equal(planGate.promptWaitStartedAt, 21_000);
   now = 90_000;
   const gateClosed = idle(planGate);
   assert.deepEqual(metrics(gateClosed), metrics(planGate), "later plan approval wait cannot rewrite the settled snapshot");
-  const lateUsage = reducer(completed, { type: "event", e: { kind: "usage", usage: { completionTokens: 30 } } });
+  const lateUsage = reducer(completed, { type: "event", e: { kind: "usage", usage: {
+    promptTokens: 100, completionTokens: 30, totalTokens: 130, cacheHitTokens: 0,
+    cacheMissTokens: 100, sessionCacheHitTokens: 0, sessionCacheMissTokens: 100,
+  } } });
   assert.equal(lateUsage.turnDoneAt, completed.turnDoneAt, "late usage cannot change the completion timestamp");
 
   now = 100_000;
   for (const next of [
-    reducer(completed, { type: "user", text: "next" }),
+    reducer(completed, { type: "user", text: "next", seq: 1, submissionId: "next-turn" }),
     reducer(completed, { type: "event", e: { kind: "turn_started", turnStartedAt: now } }),
     reducer(completed, { type: "backend_status", running: true, cancellable: true, turnStartedAt: now }),
   ]) {
