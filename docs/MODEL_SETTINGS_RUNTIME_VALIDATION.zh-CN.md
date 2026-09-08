@@ -25,6 +25,7 @@
 | 明确拒绝释放候选；结果未知时保留至确认 | 拒绝类型与正向所有权回读 | `TestRemoteInstallDistinguishesRejectionFromLostAcknowledgement`、`TestRemoteUnknownInstallRetainsOfferUntilOwned` |
 | 控制器关闭后不再创建 inbox 文件 | inbox 打开封锁和同步登记的发布通知 | `TestClosedControllerCannotOpenInboxFromLateDispatch`、`TestStaleRecoveryCannotOverwritePublishedForegroundRoute` |
 | 旧快照不能覆盖新选择的连接 | 列表投影提交期间保持当前租约代次，直到元数据写入完成 | `TestListingProjectionCannotOverwriteModelAfterAuthorityReplacement`、`TestListingAuthorityGuardRetainsGenerationThroughCommit`、`TestOwnedListingRejectsMissingAuthority`、`TestModelSettingsCredentialRefreshPersistsSelectedConnection` |
+| 恢复会话后无需打开选择器即可显示正确连接 | 目录随就绪状态、会话身份刷新，并拒绝过期响应 | `model-switcher-refresh.test.tsx`，同模型双连接的原生冷启动恢复 |
 | 保存后的 HTTP 重试保持已接受的凭据 | 传输重试复用不可变服务凭据 | `TestModelSettingsHTTPRetryKeepsAcceptedCredential` 返回真实 503，验证重试和下一运行 |
 
 ## 确定性验证
@@ -44,14 +45,14 @@ go run ./tools/repolint
 
 ## Windows 原生发布门槛
 
-记录最终候选 SHA、二进制架构和哈希、升级前产物身份及下列每项结果。原生编译或浏览器检查不能替代这一门槛。
+产品提交 `61114b005cfbb54fc09d85572ce6e1b1a6c52d92` 已完成 Windows 11 ARM64 原生验收，使用 Go 1.26.6、Wails 2.13.0、CGO 和生产前端资源。候选可执行文件 SHA-256 为 `7D7FD432EDE0DEE8005D22DE9AF980F78DE9D4A22A7A19EFCFF3D9A6389BA194`，官方 1.38.2 前序可执行文件为 `C20863C47A52B2D69F72E201D5FBAA3C57BC6132FF0AF69046FE0667D8E60B1D`。隔离的版本化安装沿用原启动器、配置目录和历史。请求使用本地 HTTP 夹具及一次性测试凭据，不代表真实供应商兼容性测试。
 
 | 原生场景 | 必须达到的结果 | 验收状态 |
 | --- | --- | --- |
-| 隔离的 1.38.2 原地升级到候选版本 | 沿用同一配置目录和会话，不要求重新输入凭据或删除配置 | 待最终候选 |
-| 无活动会话下的模型偏好、模型服务页面 | 保存并回读，不创建隐式标签页或模型请求 | 待原生交互 |
-| 空闲及运行中会话 | 已有会话默认模型不变；当前工作使用旧连接，下一次使用新连接 | 待原生交互 |
-| 重启与旧版本读取 | 候选和 1.38.2 均能读取保存后的设置与历史 | 待原生升级夹具 |
-| Desktop 凭据代理远程会话 | 同模型的密钥版本并存，当前和下一次请求分别使用对应密钥 | 待原生远程验收 |
+| 隔离的 1.38.2 原地升级到候选版本 | 沿用同一配置目录和会话，不要求重新输入凭据或删除配置 | 已通过原启动器恢复保存的连接及此前七条回复 |
+| 无活动会话下的模型偏好、模型服务页面 | 保存并回读，不创建隐式标签页或模型请求 | 已通过；注入控制器创建前的启动失败，默认模型和凭据保存成功，前后会话文件均为零，请求数不变 |
+| 空闲及运行中会话 | 已有会话默认模型不变；当前工作使用旧连接，下一次使用新连接 | 已通过挂起的 HTTP 请求验证；下一请求使用已保存的新凭据。已有 flash 会话不变，新建本地会话使用 vision-exp |
+| 重启与旧版本读取 | 候选和 1.38.2 均能读取保存后的设置与历史 | 已通过；两者均读取第二个连接及九条本地回复，1.38.2 读取修改后的默认选项 |
+| Desktop 凭据代理远程会话 | 同模型的密钥版本并存，当前和下一次请求分别使用对应密钥 | 已通过真实 SSH 连接及候选 Serve 验证，挂起请求和后续请求分别使用对应凭据版本 |
 
-任何必需的原生项目、最终 SHA 的 CI 或评审尚未完成时，发布结论仍为 NO-GO。较早候选的证据不能直接归到后续产品 SHA。持久化、降级和旧 Serve 行为见[模型设置](MODEL_SETTINGS.zh-CN.md)。
+两个 Go 模块的完整测试、所有权竞态测试、前端完整测试与生产构建、两个 Go lint 和仓库 lint 均已通过。发布仍要求最终 PR head 的 CI 全部结束并完成评审，随后通过发布候选门槛。仅文档的后续提交不改变已验收的产品二进制；任何后续产品修改均须重新评估。持久化、降级和旧 Serve 行为见[模型设置](MODEL_SETTINGS.zh-CN.md)。

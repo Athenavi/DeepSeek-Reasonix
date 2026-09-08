@@ -25,6 +25,7 @@ This record distinguishes implemented behavior from release qualification. The c
 | Rejected installs release reservations; unknown installs retain them until confirmed | Typed rejection and positive ownership readback | `TestRemoteInstallDistinguishesRejectionFromLostAcknowledgement`, `TestRemoteUnknownInstallRetainsOfferUntilOwned` |
 | Controller shutdown prevents late inbox sidecar creation | Inbox open seal and synchronously registered publication kick | `TestClosedControllerCannotOpenInboxFromLateDispatch`, `TestStaleRecoveryCannotOverwritePublishedForegroundRoute` |
 | Retired snapshots cannot overwrite the selected connection | Listing publication holds the current lease generation through metadata commit | `TestListingProjectionCannotOverwriteModelAfterAuthorityReplacement`, `TestListingAuthorityGuardRetainsGenerationThroughCommit`, `TestOwnedListingRejectsMissingAuthority`, `TestModelSettingsCredentialRefreshPersistsSelectedConnection` |
+| Restored sessions show the correct connection before opening the selector | Catalog refresh follows readiness and session identity with stale-response fencing | `model-switcher-refresh.test.tsx`, native cold restoration with two connections sharing a model |
 | HTTP retry retains accepted credentials after a save | Immutable provider credentials across transport retries | `TestModelSettingsHTTPRetryKeepsAcceptedCredential` returns an actual 503, then checks the retry and next runtime |
 
 ## Deterministic qualification
@@ -44,14 +45,14 @@ The frontend test set includes receipt recovery, delayed editor saves, remote be
 
 ## Native Windows release gate
 
-Record the final candidate SHA, binary architecture and hashes, predecessor artifact identity, and outcomes for each row. A native compilation or browser-only check does not satisfy this gate.
+Native qualification completed on product commit `61114b005cfbb54fc09d85572ce6e1b1a6c52d92` using Windows 11 ARM64, Go 1.26.6, Wails 2.13.0, CGO and production frontend assets. The candidate executable SHA-256 was `7D7FD432EDE0DEE8005D22DE9AF980F78DE9D4A22A7A19EFCFF3D9A6389BA194`; the official 1.38.2 predecessor executable was `C20863C47A52B2D69F72E201D5FBAA3C57BC6132FF0AF69046FE0667D8E60B1D`. The isolated versioned installation retained its launcher, configuration home and history. Requests used a local HTTP fixture with disposable credentials; this does not claim real-provider compatibility testing.
 
 | Native scenario | Required outcome | Qualification |
 | --- | --- | --- |
-| Isolated 1.38.2 installation → in-place candidate upgrade | Same home and session files; no credential re-entry or configuration deletion | Pending final candidate |
-| Model preferences and model services with no active session | Save and read back; no implicit tab or model request | Pending native interaction |
-| Idle and running sessions | Existing default unchanged; accepted work uses old connection; next run uses new connection | Pending native interaction |
-| Restart and older-version read | Saved settings/history readable by candidate and 1.38.2 | Pending native upgrade fixture |
-| Desktop-managed remote proxy | Same-model key versions coexist; current request and next request use their respective keys | Pending native remote acceptance |
+| Isolated 1.38.2 installation → in-place candidate upgrade | Same home and session files; no credential re-entry or configuration deletion | Passed through the existing launcher; saved connection and seven prior responses restored |
+| Model preferences and model services with no active session | Save and read back; no implicit tab or model request | Passed with an injected pre-controller startup failure; default and credential saved, zero session files before/after, request count unchanged |
+| Idle and running sessions | Existing default unchanged; accepted work uses old connection; next run uses new connection | Passed with a held HTTP request; next request used the saved credential. Existing flash session remained unchanged and a new local session used vision-exp |
+| Restart and older-version read | Saved settings/history readable by candidate and 1.38.2 | Passed; both read the selected second connection and nine local responses. 1.38.2 read the updated default selection |
+| Desktop-managed remote proxy | Same-model key versions coexist; current request and next request use their respective keys | Passed through a real SSH connection and the candidate Serve; held and subsequent requests used their respective credential versions |
 
-The release remains NO-GO while any required native row or final-SHA CI/review gate is pending. Do not transfer evidence from an earlier candidate to a later product SHA. See [model settings](MODEL_SETTINGS.md) for persistence, downgrade and old-Serve behavior.
+Both Go modules passed their full suites; ownership race tests, frontend full tests and production build, both Go linters and repository lint passed. Publication still requires terminal CI and review of the final PR head, followed by the release candidate gates. Documentation-only follow-ups do not change the qualified product binaries; any later product change requires reassessment. See [model settings](MODEL_SETTINGS.md) for persistence, downgrade and old-Serve behavior.
