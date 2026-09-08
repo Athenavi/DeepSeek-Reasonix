@@ -159,3 +159,34 @@ func TestFileBranchesOnlyKeepsFileBranchesForSchemaTwo(t *testing.T) {
 		t.Fatalf("file branch must not add heads to the source log: %+v", heads)
 	}
 }
+
+func TestCommitRewindInPlaceForksRewindHeadAndKeepsController(t *testing.T) {
+	c, sess, path := newSchemaTwoBranchController(t)
+	c.beginCheckpoint(t.Context(), "second prompt")
+	sess.Add(provider.Message{Role: provider.RoleUser, Content: "second prompt"})
+	sess.Add(provider.Message{Role: provider.RoleAssistant, Content: "second answer"})
+	if err := c.Snapshot(); err != nil {
+		t.Fatal(err)
+	}
+	turn := -1
+	for candidate := range 8 {
+		if c.CheckpointHasBoundary(candidate) {
+			turn = candidate
+		}
+	}
+	plan, err := c.PrepareRewind(turn, RewindConversation)
+	if err != nil || !plan.CanConversation {
+		t.Fatalf("PrepareRewind = %+v err=%v", plan, err)
+	}
+	result, err := c.CommitRewindInPlace(plan.PlanID)
+	if err != nil || !result.OK || !result.ConversationForked || result.Branch == "" || strings.HasSuffix(result.Branch, ".jsonl") {
+		t.Fatalf("CommitRewindInPlace = %+v err=%v", result, err)
+	}
+	if c.SessionPath() != path || len(sess.Snapshot()) != 3 {
+		t.Fatalf("controller after in-place rewind: path %q messages %d", c.SessionPath(), len(sess.Snapshot()))
+	}
+	heads, err := agent.ListSessionHeads(path)
+	if err != nil || len(heads) != 2 || heads[1].ID != result.Branch || heads[1].Kind != agent.HeadKindRewind || !heads[1].Selected || heads[0].MessageCount != 5 {
+		t.Fatalf("heads = %+v err=%v", heads, err)
+	}
+}

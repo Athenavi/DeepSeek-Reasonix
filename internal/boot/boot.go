@@ -124,7 +124,7 @@ type Options struct {
 	// Empty disables usage recording for this controller.
 	StatsSource string
 	// FileBranchesOnly keeps fork/branch/switch/rewind on separate session
-	// files; the desktop is treated as opted in until its tabs bind to heads.
+	// files instead of heads inside a schema-2 log.
 	FileBranchesOnly bool
 	TaskStore        taskmonitor.WriteStore // Authoritative store, never a SQLite catalog.
 	// OnConfigLoadWarnings accepts resilient-loader warnings. Returning true
@@ -1830,7 +1830,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 		ReasoningLanguage:      config.ReasoningLanguageForEntry(entry, cfg.ReasoningLanguage()),
 		SessionContextStatic:   sessionContextStatic,
 		DisableColdResumePrune: !cfg.ColdResumePruneEnabled(),
-		FileBranchesOnly:       opts.FileBranchesOnly || opts.StatsSource == "desktop",
+		FileBranchesOnly:       opts.FileBranchesOnly,
 		Shell:                  shell,
 		ApprovalTimeout:        opts.ApprovalTimeout,
 		Ablation:               opts.Ablation,

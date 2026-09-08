@@ -7580,7 +7580,7 @@ func (r *appendingDesktopRunner) Run(_ context.Context, input string) error {
 }
 
 func TestForkCreatesActiveTabWithoutSwitchingSourceController(t *testing.T) {
-	isolateDesktopUserDirs(t)
+	isolateDesktopUserDirsSchemaOne(t)
 
 	workspace := robustTempDir(t)
 	if err := os.WriteFile(filepath.Join(workspace, "reasonix.toml"), []byte(""), 0o644); err != nil {

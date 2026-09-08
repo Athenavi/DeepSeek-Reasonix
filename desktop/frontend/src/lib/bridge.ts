@@ -387,6 +387,7 @@ export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganiza
   PurgeTrashedSession(path: string): Promise<void>;
   PurgeRecoveryCopy(path: string): Promise<void>;
   RenameSession(path: string, title: string): Promise<void>;
+  RenameSessionHead(path: string, headId: string, name: string): Promise<void>;
   ScanPromptHistory(nonce: string): Promise<PromptHistoryResult>;
   ListWorkspaces(): Promise<WorkspaceView[]>;
   PickWorkspace(): Promise<string>;
@@ -3451,6 +3452,7 @@ function makeMockApp(): AppBindings {
     async RetrySessionRecovery() {},
     async ReconcileRecoveryVersions() {},
     async ChooseRecoveryBranch() {},
+    async RenameSessionHead() {},
     async CleanRecoveryLineage(request) {
       const topic = findMockTopic(request.topicId);
       const eligible = topic?.recoveryCleanupEligibleCount ?? 0;

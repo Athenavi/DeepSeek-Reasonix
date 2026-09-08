@@ -295,6 +295,8 @@ func resolveBranch(branches []agent.BranchInfo, ref string) (agent.BranchInfo, e
 		switch {
 		case b.ID == ref || strings.EqualFold(b.ID, ref):
 			return b, nil
+		case b.HeadID != "" && b.HeadID == ref:
+			return b, nil
 		case b.Name != "" && nameLower == refLower:
 			matches = append(matches, b)
 		case strings.HasPrefix(strings.ToLower(b.ID), refLower):
@@ -449,4 +451,13 @@ func (c *Controller) headBranchSession() *agent.Session {
 		return nil
 	}
 	return c.loggedTurnSession()
+}
+
+// SessionHead reports the schema-2 head the live session is on; ok is false
+// for schema-1 sessions, whose branches are still separate files.
+func (c *Controller) SessionHead() (agent.HeadRef, bool) {
+	if c == nil || c.executor == nil || c.executor.Session() == nil {
+		return agent.HeadRef{}, false
+	}
+	return c.executor.Session().Head()
 }

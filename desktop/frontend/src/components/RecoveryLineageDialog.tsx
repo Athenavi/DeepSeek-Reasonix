@@ -17,6 +17,11 @@ interface RecoveryLineageDialogProps {
   onOpenVersion?: (member: RecoveryLineageMember) => Promise<void> | void;
 }
 
+/** Heads of one log share a path, so the head id is the version identity. */
+function memberKey(member: RecoveryLineageMember): string {
+  return member.headId ? `${member.path}#${member.headId}` : member.path;
+}
+
 function versionActivityAt(member: RecoveryLineageMember): number {
   return member.lastActivityAt || member.createdAt || 0;
 }
@@ -43,11 +48,11 @@ export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOp
     return next;
   };
 
-  const choose = async (path: string) => {
+  const choose = async (member: RecoveryLineageMember) => {
     if (busy) return;
     setBusy(true);
     try {
-      await app.ChooseRecoveryBranch({ ...topic, path });
+      await app.ChooseRecoveryBranch({ ...topic, path: member.path, headId: member.headId });
       await refresh();
     } catch (error) {
       recordFrontendDiagnostic("app", "session.recovery-choose-failed", { status: "error" });
@@ -73,15 +78,16 @@ export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOp
 
   const startNoteEdit = (member: RecoveryLineageMember) => {
     if (busy) return;
-    setEditingPath(member.path);
+    setEditingPath(memberKey(member));
     setNoteDraft(member.versionNote || "");
   };
 
   const saveNote = async (member: RecoveryLineageMember) => {
-    if (busy || editingPath !== member.path) return;
+    if (busy || editingPath !== memberKey(member)) return;
     setBusy(true);
     try {
-      await app.RenameSession(member.path, noteDraft.trim());
+      if (member.headId) await app.RenameSessionHead(member.path, member.headId, noteDraft.trim());
+      else await app.RenameSession(member.path, noteDraft.trim());
       setEditingPath("");
       await refresh();
     } catch (error) {
@@ -108,12 +114,12 @@ export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOp
         <div className="recovery-lineage-dialog__body">
           {members.map((member) => {
             const activityAt = versionActivityAt(member);
-            const editing = editingPath === member.path;
+            const editing = editingPath === memberKey(member);
             return (
-              <article className="recovery-lineage-dialog__member" key={member.path}>
+              <article className="recovery-lineage-dialog__member" key={memberKey(member)}>
                 <div className="recovery-lineage-dialog__member-copy">
                   <div className="recovery-lineage-dialog__member-name">
-                    {t(member.canonical ? "recovery.defaultVersion" : "recovery.alternateVersion")}
+                    {member.headName?.trim() || t(member.canonical ? "recovery.defaultVersion" : "recovery.alternateVersion")}
                     {(member.open || member.running) && <span className="hist-item__badge hist-item__badge--open">{t("recovery.inUse")}</span>}
                   </div>
                   {editing ? (
@@ -150,7 +156,7 @@ export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOp
                     </button>
                   )}
                   {!member.canonical && (
-                    <button type="button" className="btn btn--small" disabled={busy} onClick={() => void choose(member.path)}>
+                    <button type="button" className="btn btn--small" disabled={busy} onClick={() => void choose(member)}>
                       {t("recovery.chooseBranch")}
                     </button>
                   )}

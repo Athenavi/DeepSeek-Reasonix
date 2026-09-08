@@ -67,6 +67,7 @@ type SessionHead struct {
 	LastActivity time.Time `json:"last_activity"`
 	Retired      bool      `json:"retired,omitempty"`
 	Selected     bool      `json:"selected,omitempty"`
+	Covered      bool      `json:"covered,omitempty"` // live, unselected, adds nothing beyond the selected chain
 	MessageCount int       `json:"message_count"`
 	Turns        int       `json:"turns,omitempty"`
 	Preview      string    `json:"preview,omitempty"`

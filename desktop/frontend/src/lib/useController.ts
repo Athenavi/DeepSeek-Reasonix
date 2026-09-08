@@ -238,7 +238,7 @@ export type ControllerLiveStore = {
 export type HistoryMutationKind = "replace" | "prepend" | "append" | "patch";
 export type HistoryMutation = { seq: number; kind: HistoryMutationKind };
 export type HistoryLoadTrigger = "viewport-user" | "question-jump" | "retry" | "auto-fill";
-export type HydrateReason = "switch-tab" | "new-session" | "resume-session" | "open-topic" | "startup" | "rewind";
+export type HydrateReason = "switch-tab" | "new-session" | "resume-session" | "open-topic" | "startup" | "rewind" | "session-changed";
 type SyncActiveTabOptions = { preserveCachedHistory?: boolean; navigationIntentSeq?: number; surfacePolicy?: HydrateSurfacePolicy; deferHydration?: boolean };
 // A ticketed StartTopicActivation in flight. Only the latest one is tracked:
 // superseded requests get "cancelled" from the backend and are ignored.
@@ -3557,6 +3557,11 @@ export function useController() {
       }
       if (e.kind === "turn_done" || e.kind === "notice") {
         app.JobsForTab(targetTabId).then((jobs) => dispatchTo(targetTabId, { type: "jobs", jobs: asArray(jobs) })).catch(() => {});
+      }
+      if (e.kind === "session_changed" && e.sessionReset) {
+        // The controller replaced the transcript under the same path (a head
+        // switch from /switch, /branch, or /rewind); reload rather than patch.
+        void loadSessionDataForTab(targetTabId, true, "session-changed");
       }
     };
     turnEventProjector.bind(handleWireEvent);
