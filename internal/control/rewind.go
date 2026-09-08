@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"sync/atomic"
 
+	"reasonix/internal/agent"
 	"reasonix/internal/checkpoint"
 	"reasonix/internal/diff"
 	"reasonix/internal/event"
@@ -217,7 +218,7 @@ func (c *Controller) commitRewindReady(store *checkpoint.Store, planID string, f
 	wantConv := !filesOnly && (plan.Scope == checkpoint.RewindConversation || plan.Scope == checkpoint.RewindBoth)
 	wantFiles := plan.Scope == checkpoint.RewindCode || plan.Scope == checkpoint.RewindBoth
 	if wantConv {
-		path, err := c.forkNamedReady(plan.Turn, "", switchToFork)
+		path, err := c.forkNamedReady(plan.Turn, "", switchToFork, agent.HeadKindRewind)
 		if err != nil {
 			return result, err
 		}

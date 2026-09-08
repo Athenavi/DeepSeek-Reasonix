@@ -15,7 +15,7 @@ import (
 )
 
 func TestBranchAndSwitch(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	exec := agent.New(nil, nil, agent.NewSession("sys"), agent.Options{}, event.Discard)
 	exec.Session().Add(provider.Message{Role: provider.RoleUser, Content: "root prompt"})
 	c := New(Options{Executor: exec, SessionDir: dir, Label: "test"})
@@ -95,7 +95,7 @@ func TestSnapshotExternalRemovalMovesOnceToStableRecovery(t *testing.T) {
 }
 
 func TestSwitchBranchRejectsCleanupPending(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	exec := agent.New(nil, nil, agent.NewSession("sys"), agent.Options{}, event.Discard)
 	exec.Session().Add(provider.Message{Role: provider.RoleUser, Content: "root prompt"})
 	c := New(Options{Executor: exec, SessionDir: dir, Label: "test"})
@@ -219,7 +219,7 @@ func TestSwitchBranchResetsTwoModelPlannerContext(t *testing.T) {
 }
 
 func TestSubmitBranchHonorsNumericTurnTarget(t *testing.T) {
-	dir := t.TempDir()
+	dir := schemaOneTempDir(t)
 	sess := agent.NewSession("sys")
 	sess.Add(provider.Message{Role: provider.RoleUser, Content: "first prompt"})
 	sess.Add(provider.Message{Role: provider.RoleAssistant, Content: "first answer"})

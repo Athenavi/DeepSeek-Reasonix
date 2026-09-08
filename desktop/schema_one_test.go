@@ -13,3 +13,11 @@ func isolateDesktopUserDirsSchemaOne(t *testing.T) {
 	t.Setenv(agent.SessionLogSchemaEnv, "v1")
 	isolateDesktopUserDirs(t)
 }
+
+// schemaOneTempDir pins a test to the schema-1 session writer and returns a
+// temp dir for its session files.
+func schemaOneTempDir(t *testing.T) string {
+	t.Helper()
+	t.Setenv(agent.SessionLogSchemaEnv, "v1")
+	return t.TempDir()
+}

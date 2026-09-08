@@ -177,6 +177,10 @@ type BranchInfo struct {
 	ModTime time.Time
 	Preview string
 	Turns   int
+	// HeadID and HeadKind are set for a head inside a schema-2 log; Path is
+	// then the log the head lives in and ID is the head id.
+	HeadID   string
+	HeadKind string
 }
 
 func BranchID(path string) string {
