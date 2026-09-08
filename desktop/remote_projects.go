@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"reasonix/internal/config"
+	"reasonix/internal/event"
 )
 
 // remoteTabModelSeq stamps every remote-tab model assignment; the credential
@@ -90,7 +91,10 @@ type remoteTab struct {
 
 	// Transient runtime state is projected into TabMeta even while this tab is
 	// inactive, matching the local tab strip's running/prompt/job indicators.
-	runtime remoteTabRuntimeState
+	runtime          remoteTabRuntimeState
+	runtimeStates    map[string]event.RuntimeStateSnapshot
+	runtimeUnknown   map[string]uint64
+	runtimeConflicts map[string]event.RuntimeStateSnapshot
 	// routing fences all-session SSE and retains background project-tree state.
 	routing remoteTabSessionRouting
 	// selectionRevision fences async OpenRemoteProjectTab resumes so an older
@@ -100,6 +104,8 @@ type remoteTab struct {
 }
 
 type remoteTabRuntimeState struct {
+	syncFailed bool
+	snapshot   event.RuntimeStateSnapshot
 	// revision orders asynchronous /status snapshots against newer requests
 	// and SSE-derived runtime mutations within the same connection generation.
 	revision        uint64

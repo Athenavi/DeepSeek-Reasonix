@@ -187,10 +187,10 @@ func TestCancelJobCannotCrossSessionBoundary(t *testing.T) {
 	t.Cleanup(manager.Close)
 	pathA := filepath.Join(t.TempDir(), "session-a.jsonl")
 	pathB := filepath.Join(t.TempDir(), "session-b.jsonl")
-	controllerA := New(Options{Jobs: manager})
-	controllerB := New(Options{Jobs: manager})
-	controllerA.sessionPath = pathA
-	controllerB.sessionPath = pathB
+	controllerA := New(Options{Jobs: manager, SessionPath: pathA})
+	controllerB := New(Options{Jobs: manager, SessionPath: pathB})
+	t.Cleanup(controllerA.Close)
+	t.Cleanup(controllerB.Close)
 
 	jobA := manager.StartForSession(agent.BranchID(pathA), "bash", "a", func(ctx context.Context, _ io.Writer) (string, error) {
 		<-ctx.Done()

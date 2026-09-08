@@ -297,9 +297,9 @@ for (const path of localeChunks) {
   // ceiling for cross-platform CI.
   // Search assignment copy adds 239 / 231 B over main-v2 (63147 / 63920 B).
   // Measured result: 63386 / 64151 B; retain bounded cross-platform headroom.
-  // Turn result copy adds 554 / 566 B to the latest-base chunks, measuring
-  // 64219 / 64964 B with recovery guidance included. Round to the next tenth.
-  const budget = name.startsWith("zh-TW-") ? 63.5 * 1024 : 62.8 * 1024;
+  // Runtime/receipt confirmation copy adds 89 / 99 B to the integrated
+  // turn-result base (64219 / 64964 B). Measured: 64308 / 65063 B.
+  const budget = name.startsWith("zh-TW-") ? 63.6 * 1024 : 62.9 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -418,8 +418,12 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // against the 2398.0 KiB base; retain only the next one-decimal ceiling.
 // Shared availability, visible recovery and retry controls measure 2407.215 KiB
 // (+6.107 KiB, 0.25% over the prior welcome head). Retain the next tenth.
-// Turn results add 12585 B (0.51%) over main-v2's 2464923 B: bounded receipt
-// projection, status presentation and view bindings. Result: 2477508 B.
-const rawInitialBudgetKiB = 2_419.6;
+// The integrated turn-result base measures 2477492 B. Runtime state and
+// session-bound receipt confirmation and its mock session contract add
+// 5944 B (0.240%): 2483436 B total.
+// Durable session isolation and missed-completion reconciliation add 1232 B
+// (0.050% over that head), measuring 2484668 B total.
+// Keep the next tenth; gzip, CSS, and individual chunk limits stay unchanged.
+const rawInitialBudgetKiB = 2_426.5;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
