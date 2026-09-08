@@ -231,7 +231,11 @@ if (initialCSS.length > 0) {
 // 116.9 KiB gzip while reusing existing layout primitives. Retain a bounded
 // 0.1 KiB headroom ratchet.
 // Mainline provider/settings and recovery styles measure 119.435 KiB gzip.
-assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 119.5 * 1024);
+// Workbench's column-responsive welcome adds 291 bytes over the 119.479 KiB
+// toolbar-refresh base; round the measured 119.763 KiB to the next tenth.
+// Shared recovery banner and disabled-send states measure 119.989 KiB;
+// +231 gzip bytes over the prior welcome head, retaining the next tenth.
+assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 120.0 * 1024);
 if (localeChunks.length !== 2) {
   throw new Error(`expected 2 on-demand Chinese locale chunks, found ${localeChunks.length}`);
 }
@@ -296,7 +300,11 @@ for (const path of localeChunks) {
   // ceiling for cross-platform CI.
   // Search assignment copy adds 239 / 231 B over main-v2 (63147 / 63920 B).
   // Measured result: 63386 / 64151 B; retain bounded cross-platform headroom.
-  const budget = name.startsWith("zh-TW-") ? 62.8 * 1024 : 62.1 * 1024;
+  // Session recovery guidance adds 173 / 156 B over main-v2, measuring
+  // 62.173 / 62.887 KiB. Keep only the next one-decimal ceiling.
+  // Runtime finishing/unknown/job-count/queue copy adds 55 / 66 gzip bytes
+  // over current main-v2 (63665 / 64396 B): 63720 / 64462 B measured.
+  const budget = name.startsWith("zh-TW-") ? 63.0 * 1024 : 62.3 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -411,9 +419,13 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2399.2 KiB; retain the same bounded 0.2 KiB build headroom.
 // Search-assignment bridge and metadata add 1.0 KiB over the measured
 // main-v2 baseline (2399.3 KiB); result 2400.3 KiB plus 0.2 KiB headroom.
-// Shared local/remote runtime selectors and finishing controls measure
-// 2401.017 KiB after deferring reconciliation, folder details and enqueue code.
-// Retain the next one-decimal ceiling; gzip/chunk/CSS budgets are unchanged.
-const rawInitialBudgetKiB = 2_401.1;
+// Workbench welcome plus toolbar-refresh integration measures 2401.108 KiB
+// against the 2398.0 KiB base; retain only the next one-decimal ceiling.
+// Shared availability, visible recovery and retry controls measure 2407.215 KiB
+// (+6.107 KiB, 0.25% over the prior welcome head). Retain the next tenth.
+// Shared runtime state on the recovery/welcome base measures 2467966 B
+// versus 2464907 B on main-v2 (+3059 B, 0.124%). Keep the next tenth;
+// initial gzip, deferred CSS and independent chunk budgets are unchanged.
+const rawInitialBudgetKiB = 2_410.2;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

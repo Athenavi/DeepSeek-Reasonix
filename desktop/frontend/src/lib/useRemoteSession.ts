@@ -482,13 +482,9 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
       }
       if (s.state === "ready") {
         void hydrate(true);
-      } else {
-        // Leaving ready can only mean the serve connection dropped. A turn
-        // that was running is now unobservable — stop the pill instead of
-        // spinning forever on a turn_done that can never arrive.
-        // Keep the last observed runtime. Disconnection is uncertainty,
-        // not a terminal outcome of the model turn.
       }
+      // Disconnection preserves the observed transcript and runtime; it does
+      // not imply a terminal outcome for the model turn.
     });
     // Subscribe before activating a restored shell. SetActiveTab republishes
     // terminal bootstrap states, while the snapshot loop covers a ready event

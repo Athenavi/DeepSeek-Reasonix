@@ -32,7 +32,7 @@ export default function ProjectTreeFolderActivity({ folder }: { folder: ProjectN
       return `${topic?.label || session.tabId}: ${labels.join(" · ")}`;
     }).join("; ");
     const spinning = active.some(session => selectRuntime(session, failed).spinning);
-    return <span className={`project-tree__folder-active-indicator${spinning ? "" : " project-tree__folder-active-indicator--static"}`} role="status" aria-label={details} title={details} />;
+    return <span className={`project-tree__folder-active-indicator${spinning ? "" : " project-tree__folder-active-indicator--static"}`} style={spinning ? undefined : { animation: "none" }} role="status" aria-label={details} title={details} />;
   }
   if (!projectTreeFolderHasActiveRuntime(folder)) return null;
   return <span className="project-tree__folder-active-indicator" role="status" aria-label={t("projectTree.status.thinking")} />;
