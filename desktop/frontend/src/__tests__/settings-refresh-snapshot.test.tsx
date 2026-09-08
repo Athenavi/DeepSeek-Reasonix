@@ -1,3 +1,4 @@
+import { selectSettingsValue } from "./settingsSelectTestUtils";
 // Run: tsx src/__tests__/settings-refresh-snapshot.test.tsx
 
 import { JSDOM } from "jsdom";
@@ -67,6 +68,7 @@ globalThis.KeyboardEvent = dom.window.KeyboardEvent;
 globalThis.MouseEvent = dom.window.MouseEvent;
 globalThis.localStorage = dom.window.localStorage;
 globalThis.sessionStorage = dom.window.sessionStorage;
+window.matchMedia = (() => ({matches: true, addEventListener(){}, removeEventListener(){}})) as any;
 globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
 globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
 window.scrollTo = () => {};
@@ -230,31 +232,22 @@ await act(async () => {
 });
 ok(compactRootEl.textContent?.includes("Advanced context management") === false, "compaction preference has no redundant advanced disclosure");
 ok(compactRootEl.textContent?.includes("Automatic compaction threshold") === true, "compaction preference is visible without expanding a disclosure");
-ok(compactRootEl.textContent?.includes("80,000 tokens") === true, "compact ratio shows the default model token threshold");
-ok(compactRootEl.textContent?.includes("Current threshold: 80% · Recommended") === true, "compact ratio summarizes the saved preset separately");
+ok(compactRootEl.textContent?.includes("80,000 tokens") === false, "compact ratio avoids a redundant token estimate under the selected row");
+ok(compactRootEl.textContent?.includes("Balance continuity and cache reuse") === true, "compact ratio explains the recommended preset consequence");
 ok(compactRootEl.textContent?.includes("effective threshold is 75%") === true, "project override shows the active effective threshold");
-ok(compactRootEl.querySelector('input[aria-label="Custom compaction threshold percentage"]') === null, "custom compact ratio editor stays hidden on the default path");
-const recommendedCompactButton = compactRootEl.querySelector('button[aria-label="80% · Recommended"]') as HTMLButtonElement | null;
+const recommendedCompactButton = compactRootEl.querySelector('input[type="radio"][aria-label="80% · Recommended"]') as HTMLInputElement | null;
 if (!recommendedCompactButton) throw new Error("recommended compaction preset did not render");
-ok(recommendedCompactButton.getAttribute("aria-pressed") === "true", "saved compact ratio starts selected");
-const customCompactButton = Array.from(compactRootEl.querySelectorAll("button")).find((button) => button.textContent?.includes("Custom threshold…")) as HTMLButtonElement | undefined;
+ok(recommendedCompactButton.checked, "saved compact ratio starts selected");
+const customCompactButton = compactRootEl.querySelector('input[type="radio"][aria-label="Custom threshold…"]') as HTMLInputElement | null;
 if (!customCompactButton) throw new Error("custom compaction threshold option did not render");
-ok(customCompactButton.closest(".compact-ratio-presets") === null, "custom compaction is a separate disclosure rather than a preset value");
-ok(customCompactButton.hasAttribute("aria-pressed") === false, "custom disclosure does not announce a saved selection state");
-await act(async () => {
-  customCompactButton.click();
-  await flushPromises();
-});
-let customCompactInput = compactRootEl.querySelector('input[aria-label="Custom compaction threshold percentage"]') as HTMLInputElement | null;
-if (!customCompactInput) throw new Error("custom compaction threshold input did not open");
-eq(customCompactInput.value, "80", "custom compaction threshold defaults older backends to 80 percent");
-ok(compactRootEl.textContent?.includes("30%") === true, "custom compact ratio explains the lower guard rail");
-ok(compactRootEl.textContent?.includes("85%") === true, "custom compact ratio explains the upper guard rail");
-ok(document.activeElement === customCompactInput, "opening the custom compact ratio moves focus to its input");
-ok(customCompactButton.getAttribute("aria-expanded") === "true", "custom compact ratio exposes its expanded state");
-ok(recommendedCompactButton.getAttribute("aria-pressed") === "true", "opening custom editing preserves the saved preset selection");
-const customCompactApply = Array.from(customCompactInput.closest(".compact-ratio-custom")?.querySelectorAll("button") ?? []).find((button) => button.textContent === "Apply") as HTMLButtonElement | undefined;
-if (!customCompactApply) throw new Error("custom compaction threshold apply action did not render");
+ok(customCompactButton.closest(".compact-ratio-choice-list") !== null, "custom compaction is the fourth choice in the shared radio group");
+ok(!customCompactButton.checked, "custom choice does not replace the saved preset before editing");
+const customCompactInput = compactRootEl.querySelector('input[aria-label="Custom compaction threshold percentage"]') as HTMLInputElement | null;
+if (!customCompactInput) throw new Error("inline custom compaction threshold input did not render");
+eq(customCompactInput.value, "", "preset selection leaves the inline custom input empty");
+eq(customCompactInput.placeholder, "Enter percentage", "inline custom input carries the requested percentage prompt");
+ok(customCompactInput.closest(".compact-ratio-choice") !== null, "custom input stays inside the fourth choice row");
+ok(customCompactInput.closest(".compact-ratio-choice")?.querySelectorAll("button").length === 0, "custom row has no secondary apply or cancel actions");
 const inputValueSetter = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, "value")?.set;
 const setCustomCompactInput = (input: HTMLInputElement, value: string) => {
   const previous = input.value;
@@ -264,53 +257,40 @@ const setCustomCompactInput = (input: HTMLInputElement, value: string) => {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 };
 await act(async () => {
+  customCompactInput.focus();
+  await flushPromises();
+});
+ok(recommendedCompactButton.checked, "focusing an empty custom input preserves the saved preset");
+ok(!customCompactButton.checked, "an empty custom draft is not announced as the saved selection");
+await act(async () => {
+  customCompactInput.focus();
   setCustomCompactInput(customCompactInput, "29");
+  customCompactInput.blur();
   await flushPromises();
 });
-ok(customCompactApply.disabled, "out-of-range custom compact ratio cannot be applied");
-eq(compactRatioCalls.length, 0, "editing a custom compact ratio does not save eagerly");
+eq(compactRatioCalls.length, 0, "out-of-range inline compact ratio is not saved");
+eq(customCompactInput.value, "29", "invalid inline value stays available for correction");
+eq(customCompactInput.getAttribute("aria-invalid"), "true", "invalid inline value is exposed to assistive technology");
 await act(async () => {
+  customCompactInput.focus();
   setCustomCompactInput(customCompactInput, "75");
+  customCompactInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   await flushPromises();
 });
-ok(!customCompactApply.disabled, "valid custom compact ratio enables explicit apply");
-await act(async () => {
-  customCompactApply.click();
-  await flushPromises();
-});
-eq(compactRatioCalls.length, 1, "custom compact ratio mutation is invoked once after apply");
+eq(compactRatioCalls.length, 1, "Enter saves the inline custom compact ratio once");
 eq(compactRatioCalls[0], 0.75, "custom compact ratio converts percentage to fraction");
-ok(compactRootEl.querySelector('input[aria-label="Custom compaction threshold percentage"]') === null, "successful custom compact ratio apply collapses the editor");
-ok(compactRootEl.textContent?.includes("Current threshold: 75% · Custom") === true, "saved custom compact ratio is summarized independently from the disclosure");
-ok(customCompactButton.textContent?.includes("Custom threshold…") === true, "custom disclosure keeps an action label after saving");
+eq(customCompactInput.value, "75", "saved custom compact ratio stays visible in the inline input");
+ok(customCompactButton.checked, "saved custom ratio selects the custom choice");
+ok(customCompactButton.getAttribute("aria-label") === "Custom threshold…", "custom choice keeps a stable accessible label after saving");
 await act(async () => {
-  customCompactButton.click();
-  await flushPromises();
-});
-customCompactInput = compactRootEl.querySelector('input[aria-label="Custom compaction threshold percentage"]') as HTMLInputElement | null;
-if (!customCompactInput) throw new Error("saved custom compaction threshold did not reopen");
-await act(async () => {
+  customCompactInput.focus();
   setCustomCompactInput(customCompactInput, "74");
   customCompactInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   await flushPromises();
 });
 eq(compactRatioCalls.length, 1, "Escape cancels a custom compact ratio without saving");
-ok(compactRootEl.querySelector('input[aria-label="Custom compaction threshold percentage"]') === null, "Escape collapses the custom compact ratio editor");
-await act(async () => {
-  customCompactButton.click();
-  await flushPromises();
-});
-customCompactInput = compactRootEl.querySelector('input[aria-label="Custom compaction threshold percentage"]') as HTMLInputElement | null;
-if (!customCompactInput) throw new Error("custom compaction threshold did not reopen for cancel");
-const customCompactCancel = Array.from(customCompactInput.closest(".compact-ratio-custom")?.querySelectorAll("button") ?? []).find((button) => button.textContent === "Cancel") as HTMLButtonElement | undefined;
-if (!customCompactCancel) throw new Error("custom compaction threshold cancel action did not render");
-await act(async () => {
-  customCompactCancel.click();
-  await flushPromises();
-});
-eq(compactRatioCalls.length, 1, "Cancel closes a custom compact ratio without saving");
-ok(compactRootEl.querySelector('input[aria-label="Custom compaction threshold percentage"]') === null, "Cancel collapses the custom compact ratio editor");
-const activeCompactButton = compactRootEl.querySelector('button[aria-label="70% · Active"]') as HTMLButtonElement | null;
+eq(customCompactInput.value, "75", "Escape restores the saved inline custom ratio");
+const activeCompactButton = compactRootEl.querySelector('input[type="radio"][aria-label="70% · Active"]') as HTMLInputElement | null;
 if (!activeCompactButton) throw new Error("active compaction preset did not render");
 await act(async () => {
   activeCompactButton.click();
@@ -318,7 +298,47 @@ await act(async () => {
 });
 eq(compactRatioCalls.length, 2, "compact ratio preset adds one mutation");
 eq(compactRatioCalls[1], 0.7, "compact ratio preset sends the expected fraction");
-ok(activeCompactButton.getAttribute("aria-pressed") === "true", "saved compact ratio is selected after Settings reload");
+ok(activeCompactButton.checked, "saved compact ratio is selected after Settings reload");
+
+// Model native mousedown -> blur -> click with a deliberately slow bridge.
+let finishCompactSave: (() => void) | undefined;
+window.go.main.App.SetCompactRatio = async (ratio: number) => {
+  compactRatioCalls.push(ratio);
+  await new Promise<void>((resolve) => { finishCompactSave = resolve; });
+  compactSettings = { ...compactSettings, agent: { ...compactSettings.agent, compactRatio: ratio } };
+};
+await act(async () => { customCompactInput.focus(); });
+await act(async () => { setCustomCompactInput(customCompactInput, "74"); });
+const recommendedLabel = recommendedCompactButton.closest("label")!;
+const presetDown = new dom.window.MouseEvent("mousedown", { button: 0, bubbles: true, cancelable: true });
+await act(async () => {
+  recommendedLabel.dispatchEvent(presetDown);
+  if (!presetDown.defaultPrevented) customCompactInput.blur();
+});
+ok(!recommendedCompactButton.disabled, "draft editing does not disable the preset before its click");
+await act(async () => { recommendedLabel.click(); });
+eq(compactRatioCalls.length, 3, "preset click sends only one mutation while bridge is pending");
+eq(compactRatioCalls[2], 0.8, "explicit preset wins over an unsaved custom draft");
+await act(async () => { finishCompactSave?.(); await flushPromises(); });
+ok(recommendedCompactButton.checked, "clicked preset remains selected after the slow save");
+eq(customCompactInput.value, "", "preset click clears the replaced custom draft");
+await act(async () => { customCompactInput.focus(); });
+await act(async () => { setCustomCompactInput(customCompactInput, "73"); });
+await act(async () => {
+  const down = new dom.window.MouseEvent("mousedown", { button: 0, bubbles: true, cancelable: true });
+  recommendedCompactButton.dispatchEvent(down);
+  if (!down.defaultPrevented) customCompactInput.blur();
+});
+await act(async () => { recommendedCompactButton.click(); });
+eq(compactRatioCalls.length, 3, "clicking the current preset cancels editing without saving the draft");
+eq(customCompactInput.value, "", "current preset click clears the draft");
+await act(async () => { customCompactInput.focus(); });
+await act(async () => { setCustomCompactInput(customCompactInput, "72"); });
+await act(async () => { customCompactInput.blur(); });
+eq(compactRatioCalls.length, 4, "ordinary blur still saves once");
+eq(compactRatioCalls[3], 0.72, "ordinary blur persists the draft");
+await act(async () => { finishCompactSave?.(); await flushPromises(); });
+ok(customCompactButton.checked, "ordinary blur selects the saved custom threshold");
 
 await act(async () => {
   compactRoot.unmount();
@@ -406,13 +426,11 @@ await act(async () => {
 });
 await waitFor("Windows Bash sandbox control", () => document.body.textContent?.includes("This setting is fixed to off.") === true);
 
-const windowsBashSelect = Array.from(windowsSandboxRootEl.querySelectorAll("select")).find((select) =>
-  Array.from(select.options).some((option) => option.value === "off"),
-);
+const windowsBashSelect = Array.from(windowsSandboxRootEl.querySelectorAll<HTMLButtonElement>("button.settings-select")).find(select => select.value === "off");
 if (!windowsBashSelect) throw new Error("Windows Bash sandbox select did not render");
 ok(windowsBashSelect.disabled, "Windows Bash sandbox selector is disabled");
 eq(windowsBashSelect.value, "off", "Windows Bash sandbox selector is fixed to off");
-ok(!Array.from(windowsBashSelect.options).some((option) => option.value === "enforce"), "Windows Bash sandbox selector omits enforce");
+ok(windowsBashSelect.getAttribute("aria-expanded") === "false", "Windows Bash sandbox selector cannot open");
 eq(windowsSetSandboxCalls, 0, "Windows immutable Bash sandbox state does not save enforce");
 
 await act(async () => {
@@ -453,13 +471,9 @@ await act(async () => {
 });
 await waitFor("persisted display zoom sync", () => document.querySelector(".zoom-slider__value")?.textContent?.trim() === "50%");
 
-const monoFontSelect = zoomRootEl.querySelector("select[aria-labelledby='appearance-mono-font-family-label']") as HTMLSelectElement | null;
+const monoFontSelect = zoomRootEl.querySelector("button.settings-select[aria-labelledby='appearance-mono-font-family-label']") as HTMLButtonElement | null;
 if (!monoFontSelect) throw new Error("monospace font selector did not render");
-await act(async () => {
-  monoFontSelect.value = "custom";
-  monoFontSelect.dispatchEvent(new Event("change", { bubbles: true }));
-  await flushPromises();
-});
+await selectSettingsValue(monoFontSelect, "custom");
 
 const preservedTypography = getTypographyPreferences();
 eq(preservedTypography.code.followGlobal, false, "global monospace changes preserve an explicit code-region override");

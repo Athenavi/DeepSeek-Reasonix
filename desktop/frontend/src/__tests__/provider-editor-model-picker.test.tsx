@@ -1,3 +1,4 @@
+import { settingsOptionValues } from "./settingsSelectTestUtils";
 // Run: tsx src/__tests__/provider-editor-model-picker.test.tsx
 
 import { JSDOM } from "jsdom";
@@ -41,6 +42,7 @@ globalThis.sessionStorage = dom.window.sessionStorage;
 globalThis.requestAnimationFrame = dom.window.requestAnimationFrame.bind(dom.window);
 globalThis.cancelAnimationFrame = dom.window.cancelAnimationFrame.bind(dom.window);
 window.scrollTo = () => {};
+window.matchMedia = (() => ({matches: true, addEventListener(){}, removeEventListener(){}})) as any;
 const { createRoot } = await import("react-dom/client");
 const { LocaleProvider } = await import("../lib/i18n");
 const { ProviderEditor, ProviderEditorModelPicker, providerSupportsServerWebSearch, providerSupportsServerWebSearchForView, providerVisionCapabilityForView } = await import("../components/SettingsPanel");
@@ -311,7 +313,7 @@ try {
 
 ok(!editorThrew, "provider editor can switch from built-in to custom without changing hook order");
 ok(rootEl.textContent?.includes("Chat Completions (/chat/completions)") === true, "provider editor renders the custom provider fields after the switch");
-ok(rootEl.textContent?.includes("Kimi K3 reasoning (low / high / max)") === true, "custom provider editor exposes the explicit Kimi K3 reasoning protocol");
+ok((await settingsOptionValues(rootEl.querySelector<HTMLButtonElement>('button[aria-label="Model capability mode"]')!)).includes("kimi-k3"), "custom provider editor exposes the explicit Kimi K3 reasoning protocol");
 const providerUrlInput = rootEl.querySelector<HTMLInputElement>(".provider-url-input");
 ok(rootEl.querySelectorAll('input[type="radio"]:not(.sr-only)').length === 0, "custom provider editor exposes only one API address input");
 ok(providerUrlInput?.value === "", "new custom providers start with an empty exact request address");

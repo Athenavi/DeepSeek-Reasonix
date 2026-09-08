@@ -1,3 +1,4 @@
+import { SettingsOptions } from "./SettingsOptions";
 import { useEffect, useState } from "react";
 import { PanelBottom } from "lucide-react";
 import { app } from "../lib/bridge";
@@ -31,13 +32,13 @@ export function SessionExperienceSettings({ snapshot, busy, apply }: Props) {
   });
   return <SettingsSection title={t("settings.general.sectionConversation")} description={t("settings.sessionExperienceHint")}>
     <SettingsField label={t("settings.sessionExperience")} hint={mode === "deep" ? t("settings.sessionExperience.deepHint") : t("settings.sessionExperience.standardHint")} icon={<PanelBottom size={18} />}>
-      <div className="set-seg" role="radiogroup" aria-label={t("settings.sessionExperience")}>
+      <SettingsOptions layout="field" className="set-seg" role="radiogroup" aria-label={t("settings.sessionExperience")}>
         {(["standard", "deep"] as const).map(value => <button key={value} type="button"
           className={`set-seg__btn${mode === value ? " set-seg__btn--on" : ""}`} role="radio"
           aria-checked={mode === value} disabled={busy} onClick={() => void save(value)}>
           {t(`settings.sessionExperience.${value}`)}
         </button>)}
-      </div>
+      </SettingsOptions>
     </SettingsField>
   </SettingsSection>;
 }

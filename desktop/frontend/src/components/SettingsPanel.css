@@ -699,18 +699,12 @@
   :root .settings-center > .settings-center__content { padding: 16px; }
 }
 
-.settings-model-picker__group .settings-model-picker__option { min-height: 38px; padding: 8px 10px; }
-.settings-model-picker__option--pinned { position: sticky; top: 0; z-index: var(--z-local-raised); background: var(--bg-elev); }
-.settings-model-picker__group-title { padding: 10px 10px 5px; }
-.settings-model-picker__option:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.settings-subagent-advanced > summary { cursor: pointer; color: var(--fg-dim); padding: 12px 0; }
-
 /* Settings templates: geometry is shared; only task layout varies. */
 /* Defaults must yield to component layouts and named page containers. */
 :where(.settings-center .settings-page[data-layout]) { container: settings-page / inline-size; }
 :root .settings-center .settings-page[data-layout] {
   --settings-space: 24px;
-  --settings-control-height: 40px;
+  --settings-control-height: 36px;
   max-width: none;
   color: var(--fg);
 }
@@ -766,11 +760,7 @@
   background-image: none;
   padding-inline-end: 28px;
 }
-:root .settings-center .settings-page[data-layout] select.mem-select {
-  /* Native popup retained; border and height match adjacent fields. */
-  appearance: auto;
-  background-color: var(--bg);
-}
+
 :root .settings-center .settings-page[data-layout] :is(input, select, textarea, button, summary):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -830,36 +820,37 @@
 :root .settings-center .settings-page[data-layout] .settings-path-value { display: flex; align-items: center; gap: 8px; min-width: 0; }
 :root .settings-center .settings-page[data-layout] .settings-path-value input { flex: 1; min-width: 0; }
 
-/* Model preferences: one assignment matrix, then compact runtime controls. */
-.model-preferences { container: model-preferences / inline-size; --model-assignment-columns: minmax(140px, 1fr) minmax(220px, 1.5fr) minmax(140px, .8fr); width: 100%; max-width: 1120px; margin: 0 auto; }
-.model-preferences .settings-section { background: transparent; border: 0; box-shadow: none; padding: 0; margin: 0; border-radius: 0; }
-.model-preferences .settings-section + .settings-section { margin-top: 20px; }
-.model-preferences .settings-section__head { padding: 0 0 16px; margin: 0; }
-.model-preferences .settings-section__title { font-size: 16px; }
-.model-preferences .settings-section__body { padding: 0; }
-.model-preferences .settings-field { padding: 16px 0; min-height: 0; gap: 24px; }
-.model-assignment-head, .model-preferences .model-assignment-row { display: grid; grid-template-columns: var(--model-assignment-columns); gap: 24px; align-items: center; border-bottom: 1px solid var(--border); }
-.model-assignment-head { padding: 12px 0; font-size: 13px; color: var(--fg-dim); }
+/* Model preferences owns its nested sections across every theme and layout. */
+.model-preferences { container: model-preferences / inline-size; --model-assignment-columns: minmax(140px, 1fr) minmax(220px, 1.5fr) minmax(120px, .75fr); width: 100%; max-width: 1120px; margin: 0 auto; }
+:root .settings-center .model-preferences > .settings-section { background: transparent; border: 0; box-shadow: none; padding: 0; margin: 0; border-radius: 0; }
+:root .settings-center .model-preferences > .settings-section + .settings-section { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border); }
+:root .settings-center .model-preferences .settings-section__body { padding: 0; }
+:root .settings-center .model-preferences .settings-field { padding: 12px 0; min-height: 0; gap: 20px; }
+.model-assignment-head, .model-preferences .model-assignment-row, .model-preferences .model-assignment-effort { display: grid; grid-template-columns: var(--model-assignment-columns); gap: 20px; align-items: center; }
+.model-assignment-head { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--fg-dim); }
 .model-preferences .model-assignment-row .settings-field__control { display: contents; }
 .model-assignment-row .settings-model-picker { min-width: 0; width: 100%; }
-.model-assignment-row .settings-model-picker__selected small { display: none; }
-.model-preferences .settings-model-picker__trigger { min-height: 44px; padding: 10px 14px; }
 .model-assignment-connection { font-size: 13px; overflow-wrap: anywhere; color: var(--fg-dim); }
-.model-preferences .mem-select { appearance: none; min-height: 44px; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; background: var(--bg-elev); color: var(--text); }
-.model-preferences .settings-subagent-advanced { margin: 12px 0 24px; }
-.model-preferences .settings-subagent-advanced summary { cursor: pointer; padding: 8px 0; }
-.model-preferences .settings-section:last-child { border-top: 1px solid var(--border); padding-top: 24px; }
-.model-preferences .compact-ratio-controls { gap: 8px; }
-.model-preferences .compact-ratio-preset__caption, .model-preferences .compact-ratio-current { display: none; }
-.model-preferences .compact-ratio-presets .set-seg__btn { min-height: 40px; padding: 8px 16px; }
-.model-preferences .compact-ratio-summary { justify-content: flex-end; }
+:root .settings-center .model-preferences .model-assignment-effort { border-top: 0; padding-top: 0; }
+.model-assignment-effort .settings-field__copy { padding-left: 20px; border-left: 1px solid var(--border); margin-left: 8px; }
+.model-preferences .settings-subagent-advanced { margin-top: 12px; border-top: 1px solid var(--border); }
+.model-preferences .settings-subagent-advanced summary { cursor: pointer; padding: 14px 0; color: var(--fg-dim); }
+.model-runtime-preferences > .settings-section__body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
+:root .model-runtime-preferences .settings-field { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; border: 0; gap: 12px; padding: 0; }
+.model-runtime-preferences .settings-field__control { justify-content: flex-start; }
+.model-preferences .compact-ratio-controls { width: 424px; max-width: 100%; gap: 8px; }
 @container model-preferences (max-width: 780px) {
  .model-assignment-head { display: none; }
- .model-preferences .model-assignment-row { grid-template-columns: minmax(120px, .7fr) minmax(160px, 1fr); gap: 8px 16px; }
+ .model-preferences .model-assignment-row, .model-preferences .model-assignment-effort { grid-template-columns: minmax(120px, .7fr) minmax(160px, 1fr); }
  .model-assignment-connection { grid-column: 2; }
 }
-
 @container model-preferences (max-width: 440px) {
- .model-preferences .model-assignment-row { grid-template-columns: minmax(0, 1fr); }
+ .model-preferences .model-assignment-row, .model-preferences .model-assignment-effort { grid-template-columns: minmax(0, 1fr); }
  .model-assignment-connection { grid-column: 1; }
+ .model-assignment-effort .settings-field__copy { padding-left: 0; border-left: 0; margin-left: 0; }
 }
+
+:root .settings-center .settings-page .model-assignment-section > .settings-section__head .settings-section__title { font-size: 24px; line-height: 1.3; }
+:root .settings-center .model-preferences .settings-field__label { font-size: 14px; }
+
+:root .settings-center .settings-page .model-preferences .settings-section__head { flex-direction: row; justify-content: flex-start; text-align: left; }

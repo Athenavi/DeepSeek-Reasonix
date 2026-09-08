@@ -1,3 +1,4 @@
+import { selectSettingsValue, settingsOptionValues } from "./settingsSelectTestUtils";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
@@ -6,8 +7,9 @@ import { ProviderCatalogPicker, type CatalogChoice } from "../components/Provide
 import { LocaleProvider } from "../lib/i18n";
 import data from "../lib/providerCatalog.generated.json";
 const dom = new JSDOM('<div id="root"></div>', {url: "http://localhost/", pretendToBeVisual: true});
-Object.assign(globalThis, {window: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement, Event: dom.window.Event, localStorage: dom.window.localStorage, IS_REACT_ACT_ENVIRONMENT: true});
+Object.assign(globalThis, {window: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement, Node: dom.window.Node, Event: dom.window.Event, localStorage: dom.window.localStorage, IS_REACT_ACT_ENVIRONMENT: true});
 Object.defineProperty(globalThis, "navigator", {configurable: true, value: dom.window.navigator});
+window.matchMedia = (() => ({matches: true, addEventListener(){}, removeEventListener(){}})) as any;
 const rootEl = document.getElementById("root")!;
 const root = createRoot(rootEl);
 const choices: CatalogChoice[] = Object.entries(data.catalogs).map(([id, catalog]) => ({
@@ -17,9 +19,9 @@ let installed = "";
 let submittedFormat: string | undefined;
 const render = (busy = false, rows = choices) => root.render(<LocaleProvider><ProviderCatalogPicker choices={rows} busy={busy} onConnect={(id, _key, _url, format) => {installed = id; submittedFormat = format;}} onView={() => {}} onReset={() => {throw new Error("unexpected reset");}} /></LocaleProvider>);
 await act(async () => {render();});
-const select = (dimension: string) => rootEl.querySelector<HTMLSelectElement>(`select[id$="-${dimension}"]`)!;
+const select = (dimension: string) => rootEl.querySelector<HTMLButtonElement>(`button.settings-select[id$="-${dimension}"]`)!;
 async function change(dimension: string, value: string) {
- await act(async () => { const el=select(dimension); el.value=value; el.dispatchEvent(new dom.window.Event("change",{bubbles:true})); });
+ await selectSettingsValue(select(dimension), value);
 }
 async function brand(name: string) {
  await act(async () => {Array.from(rootEl.querySelectorAll<HTMLButtonElement>(".provider-catalog__brand")).find(el=>el.textContent===name)!.click();});
@@ -34,7 +36,7 @@ await act(async () => { rootEl.querySelector<HTMLButtonElement>(".btn--primary")
 assert.equal(installed,"glm-coding-plan-cn-anthropic");
 await change("product","api");
 assert.equal(select("format").value,"openai");
-assert.equal(select("format").options.length,3,"all common protocols are offered");
+assert.equal((await settingsOptionValues(select("format"))).length,3,"all common protocols are offered");
 assert.equal(select("format").disabled,false);
 await change("format","responses");
 await act(async () => { rootEl.querySelector<HTMLButtonElement>(".btn--primary")!.click(); });
@@ -55,9 +57,9 @@ assert.equal(rootEl.querySelector<HTMLButtonElement>(".btn--primary")!.disabled,
 await brand("OpenCode");
 await change("product","go");
 await change("format","anthropic");
-assert.ok(select("variant").options.length>1,"model-scoped routes stay reachable without duplicating brands");
+assert.ok((await settingsOptionValues(select("variant"))).length>1,"model-scoped routes stay reachable without duplicating brands");
 await brand("LM Studio");
-assert.equal(rootEl.querySelector('select[id$="-region"]'),null,"single-platform providers avoid unnecessary choices");
+assert.equal(rootEl.querySelector('button.settings-select[id$="-region"]'),null,"single-platform providers avoid unnecessary choices");
 assert.match(rootEl.textContent!,/local installation/);
 await change("format","responses");
 assert.equal(rootEl.querySelector<HTMLInputElement>('input[id$="-url"]')!.value,"http://localhost:1234/v1");
