@@ -1,6 +1,6 @@
 import { JSDOM } from "jsdom";
 import type { AppBindings } from "../lib/bridge";
-import type { RecoveryLineageView, RecoveryPreferenceRequest } from "../lib/types";
+import type { RecoveryCleanupRequest, RecoveryLineageView, RecoveryPreferenceRequest } from "../lib/types";
 
 const dom = new JSDOM("<!doctype html><html><body><div id=\"root\"></div></body></html>", { pretendToBeVisual: true, url: "http://localhost/" });
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -21,6 +21,7 @@ globalThis.localStorage = dom.window.localStorage;
 const chosen: RecoveryPreferenceRequest[] = [];
 const renamed: Array<{ path: string; headId: string; name: string }> = [];
 const sessionRenames: string[] = [];
+const cleanups: RecoveryCleanupRequest[] = [];
 
 // Two heads of one log share the physical path; only the head id tells them apart.
 const heads: RecoveryLineageView = {
@@ -28,7 +29,7 @@ const heads: RecoveryLineageView = {
   state: "heads",
   branchCount: 2,
   unresolved: 0,
-  cleanupEligible: 0,
+  cleanupEligible: 1,
   members: [
     { path: "/private/log.jsonl", headId: "main", headKind: "main", selected: false, role: "normal", versionKind: "head", canonical: false, turns: 2, open: false, running: false, preview: "shared question", versionNote: "log note", lastActivityAt: 100 },
     { path: "/private/log.jsonl", headId: "01HEADFORK", headKind: "fork", headName: "alt", selected: true, role: "normal", versionKind: "head", canonical: true, turns: 3, open: true, running: false, preview: "alt question", versionNote: "alt", lastActivityAt: 200 },
@@ -42,6 +43,10 @@ window.go = {
       GetRecoveryLineage: async () => heads,
       RenameSessionHead: async (path: string, headId: string, name: string) => { renamed.push({ path, headId, name }); },
       RenameSession: async (path: string) => { sessionRenames.push(path); },
+      CleanRecoveryLineage: async (request: RecoveryCleanupRequest) => {
+        cleanups.push(request);
+        return { eligible: 1, moved: 1, busy: 0, kept: 0, dryRun: false, items: [{ path: "/private/log.jsonl", headId: "main", status: "retired" }] };
+      },
     } as Partial<AppBindings> as AppBindings,
   },
 };
@@ -70,9 +75,13 @@ if (articles.length !== 2) throw new Error(`expected both heads rendered despite
 const body = document.body.textContent || "";
 if (!body.includes("alt question") || !body.includes("shared question")) throw new Error("head previews missing");
 if (body.includes("/private/") || body.includes("01HEADFORK")) throw new Error("head identity leaked into the dialog");
+if (!body.includes("2 versions of this conversation")) throw new Error(`heads summary missing: ${body}`);
+if (!body.includes("original line") || !body.includes("forked here")) throw new Error("head kind labels missing");
+if (!body.includes("Another version") || !body.includes("alt")) throw new Error("unnamed heads fall back to the version title and named heads show their name");
+if (body.includes("unique content") || body.includes("Default version")) throw new Error("file-lineage wording leaked into the heads dialog");
 
 const buttons = () => Array.from(document.querySelectorAll<HTMLButtonElement>("button"));
-const chooseButtons = buttons().filter((button) => button.textContent?.trim() === "Set as default version");
+const chooseButtons = buttons().filter((button) => button.textContent?.trim() === "Make this the current version");
 if (chooseButtons.length !== 1) throw new Error(`only the unselected head may offer the choice, got ${chooseButtons.length}`);
 await act(async () => { chooseButtons[0].click(); });
 await act(async () => { await Promise.resolve(); });
@@ -99,6 +108,16 @@ if (renamed.length !== 1 || renamed[0].headId !== "01HEADFORK" || renamed[0].pat
   throw new Error(`head note did not rename the head: ${JSON.stringify(renamed)}`);
 }
 if (sessionRenames.length !== 0) throw new Error("head note must not rename the whole session");
+
+const retire = buttons().find((button) => button.textContent?.trim() === "Remove covered versions (1)");
+if (!retire) throw new Error("covered-head cleanup button missing");
+await act(async () => { retire.click(); });
+await act(async () => { await Promise.resolve(); });
+if (cleanups.length !== 1 || !cleanups[0].apply || cleanups[0].topicId !== "topic" || cleanups[0].scope !== "global") {
+  throw new Error(`cleanup did not apply to the topic: ${JSON.stringify(cleanups)}`);
+}
+const toasts = Array.from(document.querySelectorAll(".toast__text")).map((node) => node.textContent);
+if (!toasts.includes("1 covered version(s) removed · 0 still in use")) throw new Error(`cleanup outcome not toasted: ${JSON.stringify(toasts)}`);
 
 await act(async () => root.unmount());
 console.log("  PASS  session version dialog lists log heads by head id");
