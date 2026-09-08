@@ -230,8 +230,10 @@ if (initialCSS.length > 0) {
 // shared title-safe shell, and the shared harness decision surface measure
 // 116.9 KiB gzip while reusing existing layout primitives. Retain a bounded
 // 0.1 KiB headroom ratchet.
-// Mainline provider/settings and recovery styles measure 119.435 KiB gzip.
-assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 119.5 * 1024);
+// Mainline CSS measured 122346 bytes gzip with this toolchain. Turn result
+// summaries, frozen diffs and check logs add 391 bytes after removing obsolete
+// metrics styles (122737 total). Keep the allowance bounded at 119.9 KiB.
+assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 119.9 * 1024);
 if (localeChunks.length !== 2) {
   throw new Error(`expected 2 on-demand Chinese locale chunks, found ${localeChunks.length}`);
 }
@@ -296,7 +298,10 @@ for (const path of localeChunks) {
   // ceiling for cross-platform CI.
   // Search assignment copy adds 239 / 231 B over main-v2 (63147 / 63920 B).
   // Measured result: 63386 / 64151 B; retain bounded cross-platform headroom.
-  const budget = name.startsWith("zh-TW-") ? 62.8 * 1024 : 62.1 * 1024;
+  // Turn result coverage/status/log copy adds 382 / 407 B in an isolated
+  // same-toolchain comparison. Built chunks measure 64047 / 64805 B; retain
+  // narrow rounding headroom without changing the initial JavaScript gate.
+  const budget = name.startsWith("zh-TW-") ? 63.4 * 1024 : 62.6 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 

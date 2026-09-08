@@ -345,7 +345,7 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
               onPrompt: session.transcript.handleTranscriptPrompt,
               onDeliveryContinue: () => void session.delivery.handleDeliveryContinue(),
               onAcceptDelivery: session.controlCommands.handleAcceptDelivery,
-              onOpenChanges: () => session.workspacePanelCommands.openRightDockMode("changed"),
+              onOpenChanges: session.turnVerificationCommands.openTurnChanges,
               onOpenVerification: session.turnVerificationCommands.openTurnVerification,
               onEditPrompt: session.sessionUndo.handleEditPrompt,
               onRewind: session.sessionUndo.handleMessageAction,

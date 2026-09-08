@@ -1110,6 +1110,20 @@ func (c *Controller) finishGuardedTurn(err error, completion *guardedTurnComplet
 		Receipt:        c.executor.CompletionReceipt(),
 		ItemID:         activeInboxID,
 	}
+	if done.CheckpointTurn != nil {
+		changes := completion.checkpoint.store.FreezeTurnChanges(*done.CheckpointTurn)
+		if done.Receipt == nil && (len(changes.Files) > 0 || len(changes.Reasons) > 0) {
+			done.Receipt = &event.CompletionReceipt{Verdict: "unknown"}
+		}
+		if done.Receipt != nil {
+			// Detach the executor's receipt before adding host-owned file facts.
+			receipt := *done.Receipt
+			receipt.Diff = changes.Summary()
+			receipt.Interrupted = cancelRequested
+			done.Receipt = &receipt
+		}
+	}
+	done.Receipt = bindCompletionLogSources(done.Receipt, c.History())
 	done = c.applyTurnDoneProtocol(done, cancelRequested)
 	done.Diagnostic = provider.DiagnoseFailure(err)
 	done.Detail = provider.FailureDiagnosticDetail(done.Diagnostic)
