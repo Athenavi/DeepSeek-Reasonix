@@ -192,6 +192,11 @@ func (s *turnEventSink) persistAndPublish(e event.Event) error {
 			} else {
 				ledger.SetTranscriptSnapshot(int64(session.TranscriptVersion()), digest)
 			}
+			if ref, ok := session.Head(); ok {
+				ledger.SetTranscriptHead(ref.HeadID, session.LeafID())
+			} else {
+				ledger.SetTranscriptHead("", "")
+			}
 		}
 	case event.TurnStatusChanged:
 		// The emitter supplied the exact transition in e.Status.
