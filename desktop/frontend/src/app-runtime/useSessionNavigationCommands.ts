@@ -48,14 +48,15 @@ export function useSessionNavigationCommands(input: SessionNavigationCommandsInp
   const { activeTab, running, singleSurface, t, showToast, navigation, ports } = input;
 
   const blankSessionTarget = useCommittedCommand(() => {
-    const activeWorkspaceRoot = activeTab?.scope === "project" ? activeTab.workspaceRoot || "" : "";
-    const scope = activeWorkspaceRoot ? "project" : "global";
-    return { scope, workspaceRoot: activeWorkspaceRoot };
+    const workspaceRoot = activeTab?.workspaceRoot || "";
+    const scope = activeTab?.scope === "project" && workspaceRoot ? "project" : "global";
+    return { scope, workspaceRoot };
   });
 
   const openBlankSession = useCommittedCommand((scope: string, workspaceRoot: string): Promise<void> => {
     const targetRoot = scope === "project" ? workspaceRoot : "";
-    input.prepareBlankWorkspace(targetRoot);
+    // UI preferences use the actual directory; global navigation uses an empty wire root.
+    input.prepareBlankWorkspace(workspaceRoot);
     return navigation.enqueueNavigation({ kind: "blank", scope, workspaceRoot: targetRoot });
   });
 
