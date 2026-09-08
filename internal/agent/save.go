@@ -1997,6 +1997,7 @@ func ListSessionOrderWithRecoveryPreferenceResolver(dir string, resolve Recovery
 		versionKind := VersionNormal
 		versionState := VersionActive
 		parentConversationID := ""
+		var headMirror BranchMeta
 		parentVersionID := ""
 		recoveryPreferred := false
 		turns := 0
@@ -2034,6 +2035,7 @@ func ListSessionOrderWithRecoveryPreferenceResolver(dir string, resolve Recovery
 			contentDigest = meta.ContentDigest
 			listingRevision = meta.ListingRevision
 			listingContentDigest = meta.ListingContentDigest
+			headMirror = meta
 		}
 		// Old recovery files may lack Recovered meta; filename still proves
 		// automatic recovery lineage for catalog folding.
@@ -2072,6 +2074,9 @@ func ListSessionOrderWithRecoveryPreferenceResolver(dir string, resolve Recovery
 			ContentDigest:        contentDigest,
 			ListingRevision:      listingRevision,
 			ListingContentDigest: listingContentDigest,
+			HeadID:               headMirror.HeadID,
+			HeadCount:            headMirror.HeadCount,
+			LogSchema:            headMirror.LogSchema,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {

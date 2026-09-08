@@ -3,7 +3,7 @@
 Reasonix keeps session transcripts, event logs, metadata sidecars, and
 `desktop-projects.json` as the only authoritative session data. The desktop
 project tree reads a disposable SQLite projection from
-`<cache root>/session-catalog/v6.sqlite`; deleting that database never deletes
+`<cache root>/session-catalog/v8.sqlite`; deleting that database never deletes
 or changes a conversation. The earlier `v1.sqlite` through `v5.sqlite` caches
 are left in place so a concurrent or downgraded process cannot cross-write the
 projection. v6 introduces filesystem-aware path identity and is rebuilt from
@@ -60,7 +60,10 @@ The catalog stores only query projections:
 - topic ordering, aggregate counts, activity, recovery, health state, and
   workspace-root identity key; and
 - session access path plus path, directory, and workspace-root identity keys,
-  preview, counts, fingerprints, recovery, and health state.
+  preview, counts, fingerprints, recovery, and health state; and
+- for schema-2 event logs, the log format, the selected head, and one
+  `catalog_heads` row per head, taken from the kernel's head index sidecar and
+  the `BranchMeta` mirror rather than from replaying the log.
 
 Topic pages use a `(pinned, last_activity_at, topic_id)` keyset cursor. The
 default page size is 50 and the maximum is 200. Directory reconciliation commits
