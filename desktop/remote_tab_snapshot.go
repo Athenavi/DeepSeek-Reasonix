@@ -166,6 +166,7 @@ func (a *App) RemoteTabStatus(tabID string) (json.RawMessage, error) {
 		if !a.recordRemoteTabSessionStatus(tabID, client, gen, statusSeq, status) {
 			return nil, fmt.Errorf("remote tab %q %w", tabID, errRemoteTabStatusSuperseded)
 		}
+		a.refreshRemoteModelOwnership(ctx, tabID, client, gen)
 	}
 	return status, err
 }

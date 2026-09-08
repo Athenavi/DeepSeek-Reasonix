@@ -134,6 +134,7 @@ type Controller struct {
 	modelCapabilityResolver func(*config.ProviderEntry) config.ResolvedModelCapability
 	frozenImageInput        *bool
 	imageCapabilityChanged  func() bool
+	modelSettings           controllerModelSettings
 	prompt                  controllerPromptState
 	pinnedContextLoader     PinnedContextLoader
 	sessionContextStatic    sessioncontext.Sections
@@ -507,9 +508,16 @@ type Options struct {
 	// the exact active model. Nil keeps the legacy config-only behavior.
 	ModelCapabilityResolver func(*config.ProviderEntry) config.ResolvedModelCapability
 	// FrozenImageInput belongs to the provider instance built for this runtime.
-	FrozenImageInput       *bool
-	ImageCapabilityChanged func() bool
-	SystemPrompt           string
+	FrozenImageInput            *bool
+	ImageCapabilityChanged      func() bool
+	ModelSettingsRevision       string
+	ModelSettingsSourceRevision string
+	ModelSettingsCurrent        func() (string, error)
+	// BeforeInboxDispatch lets the owner reserve runtime admission before a
+	// queued message becomes a new turn. The returned release runs after claim
+	// and synchronous turn admission, outside every controller lock.
+	BeforeInboxDispatch func(*Controller) (func(), error)
+	SystemPrompt        string
 	// PinnedContextLoader snapshots the current session sidecar at turn
 	// admission. The Agent persists changes as append-only user-role revisions.
 	PinnedContextLoader PinnedContextLoader
@@ -699,6 +707,7 @@ func New(opts Options) *Controller {
 		modelCapabilityResolver:           opts.ModelCapabilityResolver,
 		frozenImageInput:                  opts.FrozenImageInput,
 		imageCapabilityChanged:            opts.ImageCapabilityChanged,
+		modelSettings:                     newControllerModelSettings(opts),
 		prompt:                            newControllerPromptState(opts.SystemPrompt, opts.Executor),
 		pinnedContextLoader:               opts.PinnedContextLoader,
 		sessionContextStatic:              opts.SessionContextStatic,
@@ -4924,6 +4933,20 @@ func (c *Controller) ImageInputSnapshot() (enabled, fallback, available bool) {
 func (c *Controller) ImageCapabilityChanged() bool {
 	return c.imageCapabilityChanged != nil && c.imageCapabilityChanged()
 }
+
+// ModelSettingsState compares this immutable runtime with current disk config.
+// It is intentionally separate from provider-visible messages and metadata.
+func (c *Controller) ModelSettingsState() (applied, desired string, err error) {
+	if c.modelSettings.current == nil {
+		return "", "", nil
+	}
+	desired, err = c.modelSettings.current()
+	return c.modelSettings.revision, desired, err
+}
+
+// ModelSettingsSourceRevision identifies an immutable Desktop resolver bundle.
+// It is transport bookkeeping only, never part of the conversation.
+func (c *Controller) ModelSettingsSourceRevision() string { return c.modelSettings.sourceRevision }
 
 // InheritLifecycleFrom carries same-session lifecycle state across controller
 // rebuilds, such as model switches that preserve the conversation.

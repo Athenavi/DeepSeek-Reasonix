@@ -554,6 +554,18 @@ func (c *Controller) RefreshInboxReferences(id string) error {
 
 // TrySubmitInboxItem admits a queued item as a new turn when the session is idle.
 func (c *Controller) TrySubmitInboxItem(id string) (sessioninbox.InboxReceipt, error) {
+	c.mu.Lock()
+	beforeDispatch := c.modelSettings.beforeInboxDispatch
+	c.mu.Unlock()
+	if beforeDispatch != nil {
+		release, err := beforeDispatch(c)
+		if err != nil {
+			return sessioninbox.InboxReceipt{}, err
+		}
+		if release != nil {
+			defer release()
+		}
+	}
 	c.inbox.admissionMu.Lock()
 	defer c.inbox.admissionMu.Unlock()
 	st, err := c.ensureInbox()

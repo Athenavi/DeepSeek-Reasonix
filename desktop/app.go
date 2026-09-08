@@ -367,7 +367,10 @@ type App struct {
 	// remoteTabModelMu makes the caller's current-model snapshot, the remote
 	// Serve rebuild, and the tab metadata commit one transaction. Without it,
 	// overlapping switches could roll remote config back to a stale model.
-	remoteTabModelMu sync.Mutex
+	remoteTabModelMu          sync.Mutex
+	modelSettingsSubmitMu     sync.Mutex
+	modelSettingsReceipts     map[string]modelSettingsReceipt
+	modelSettingsReceiptOrder []string
 	// remoteEventHook observes remote events in tests; production leaves it nil.
 	remoteEventHook func(name string, payload any)
 	// credProxy is the lazy app-wide key holder for local-proxy mode.
@@ -1371,7 +1374,7 @@ func (a *App) tabAndCtrlByID(tabID string) (*WorkspaceTab, control.SessionAPI) {
 		return nil, nil
 	}
 	ctrl := tab.Ctrl
-	retryStartup := ctrl == nil && tab.StartupErrLeaseHeld
+	retryStartup := ctrl == nil && (tab.StartupErrLeaseHeld || tab.modelApplication.startupRetry)
 	a.mu.RUnlock()
 	if retryStartup && a.tryRecoverStartupLeaseHeldTab(tab) {
 		a.mu.RLock()
@@ -1421,7 +1424,7 @@ func (a *App) controllerForTab(tab *WorkspaceTab) control.SessionAPI {
 	}
 	a.mu.RLock()
 	defer a.mu.RUnlock()
-	if tab.ID != "" && a.tabs[tab.ID] != tab {
+	if tab.ID != "" && !a.ownsRuntimeTabLocked(tab) {
 		return nil
 	}
 	return tab.Ctrl
@@ -2204,6 +2207,7 @@ func (a *App) clearActiveSessionRuntime(tab *WorkspaceTab, oldCtrl control.Sessi
 		PinnedContextLoader:      pinnedContextLoader(snap.workspaceRoot),
 		OnSessionRecovered:       a.handleTabSessionRecovered(tab),
 		OnSessionTransition:      a.handleTabSessionTransition(tab),
+		BeforeInboxDispatch:      a.beforeInboxDispatch,
 		OnSessionTitleChanged:    a.onSessionTitleChanged,
 	})
 	if err != nil {
@@ -3699,6 +3703,7 @@ func (a *App) rebindTabToLoadedSessionPath(tab *WorkspaceTab, sessionPath string
 	if tab == nil {
 		return fmt.Errorf("tab is not ready")
 	}
+	pendingSequence := a.deferredRebuildSequence(tab.ID)
 	sessionPath = canonicalTabSessionPath(sessionPath)
 	if sessionPath == "" {
 		return fmt.Errorf("session path is required")
@@ -3818,7 +3823,7 @@ func (a *App) rebindTabToLoadedSessionPath(tab *WorkspaceTab, sessionPath string
 			oldLease.Release()
 		}
 
-		a.clearDeferredRebuild(tab.ID)
+		a.clearDeferredRebuildVersion(tab.ID, pendingSequence)
 		a.emitReady(a.ctx, tab.ID)
 
 		tab.turnStartMu.Unlock()
@@ -3978,7 +3983,7 @@ func (a *App) rebindTabToLoadedSessionPath(tab *WorkspaceTab, sessionPath string
 		}
 	}
 	a.persistTabSessionPath(tab, sessionPath)
-	a.clearDeferredRebuild(tab.ID)
+	a.clearDeferredRebuildVersion(tab.ID, pendingSequence)
 	a.notifyTabRuntimeRebuiltAtEpoch(tab, newEpoch)
 	a.emitReady(a.ctx, tab.ID)
 	return nil
@@ -4165,6 +4170,7 @@ func (a *App) buildSessionRebindCandidate(
 		PinnedContextLoader:      pinnedContextLoader(root),
 		OnSessionRecovered:       a.handleTabSessionRecovered(tab),
 		OnSessionTransition:      a.handleTabSessionTransition(tab),
+		BeforeInboxDispatch:      a.beforeInboxDispatch,
 		OnSessionTitleChanged:    a.onSessionTitleChanged,
 	})
 	if err != nil {
@@ -9578,6 +9584,7 @@ func (a *App) SetModelForTab(tabID, name string) (retErr error) {
 	if tab == nil {
 		return nil
 	}
+	pendingSequence := a.deferredRebuildSequence(tab.ID)
 	a.mu.RLock()
 	currentModel := tab.model
 	a.mu.RUnlock()
@@ -9597,10 +9604,7 @@ func (a *App) SetModelForTab(tabID, name string) (retErr error) {
 	stageStarted = time.Now()
 	tab.turnStartMu.Lock()
 	defer tab.turnStartMu.Unlock()
-	prevPath := a.reconciledSessionPathForTab(tab)
-	if prevPath == "" {
-		prevPath = a.currentSessionPathFor(tab)
-	}
+	prevPath := a.sessionPathForSettingsRebuild(tab)
 	if a.controllerForTab(tab) == nil && prevPath != "" {
 		a.attachExistingSessionRuntime(tab, prevPath, a.ctx)
 	}
@@ -9610,10 +9614,7 @@ func (a *App) SetModelForTab(tabID, name string) (retErr error) {
 	if err := a.ensureTabControllerWorkspace(tab); err != nil {
 		return err
 	}
-	prevPath = a.reconciledSessionPathForTab(tab)
-	if prevPath == "" {
-		prevPath = a.currentSessionPathFor(tab)
-	}
+	prevPath = a.sessionPathForSettingsRebuild(tab)
 	if a.controllerForTab(tab) == nil && prevPath != "" && a.attachExistingSessionRuntime(tab, prevPath, a.ctx) {
 		prevPath = a.reconciledSessionPathForTab(tab)
 		if prevPath == "" {
@@ -9706,6 +9707,7 @@ func (a *App) SetModelForTab(tabID, name string) (retErr error) {
 		PinnedContextLoader:      pinnedContextLoader(snap.workspaceRoot),
 		OnSessionRecovered:       a.handleTabSessionRecovered(tab),
 		OnSessionTransition:      a.handleTabSessionTransition(tab),
+		BeforeInboxDispatch:      a.beforeInboxDispatch,
 		OnSessionTitleChanged:    a.onSessionTitleChanged,
 		// Keep the private temporary directory across model switches (#7575).
 		SessionTemp: sessionTempFromController(oldCtrl),
@@ -9753,8 +9755,8 @@ func (a *App) SetModelForTab(tabID, name string) (retErr error) {
 	if oldCtrl != nil {
 		oldCtrl.Close()
 	}
-	// The runtime now reflects the on-disk config; drop any deferred refresh.
-	a.clearDeferredRebuild(tab.ID)
+	// A refresh queued during this build still owns its newer sequence.
+	a.clearDeferredRebuildVersion(tab.ID, pendingSequence)
 	a.persistTabSessionPath(tab, path)
 	// Keep the provider identity in the session sidecar inside the same
 	// runtimeRebuildMu transaction as the controller swap. Empty sessions do
@@ -9818,6 +9820,7 @@ func (a *App) SetEffortForTab(tabID, level string) error {
 	// Build+swap path; serialize with the other rebuild paths (see
 	// runtimeRebuildMu). The tab==nil branch above goes through
 	// applyProviderEffortConfig → rebuildSetting, which takes the lock itself.
+	pendingSequence := a.deferredRebuildSequence(tab.ID)
 	a.runtimeRebuildMu.Lock()
 	defer a.runtimeRebuildMu.Unlock()
 	tab.turnStartMu.Lock()
@@ -9895,6 +9898,7 @@ func (a *App) SetEffortForTab(tabID, level string) error {
 		PinnedContextLoader:      pinnedContextLoader(snap.workspaceRoot),
 		OnSessionRecovered:       a.handleTabSessionRecovered(tab),
 		OnSessionTransition:      a.handleTabSessionTransition(tab),
+		BeforeInboxDispatch:      a.beforeInboxDispatch,
 		OnSessionTitleChanged:    a.onSessionTitleChanged,
 		// Keep the private temporary directory across effort switches (#7575).
 		SessionTemp: sessionTempFromController(oldCtrl),
@@ -9934,8 +9938,7 @@ func (a *App) SetEffortForTab(tabID, level string) error {
 	if oldCtrl != nil {
 		oldCtrl.Close()
 	}
-	// The rebuilt runtime reflects the on-disk config; drop any deferred refresh.
-	a.clearDeferredRebuild(tab.ID)
+	a.clearDeferredRebuildVersion(tab.ID, pendingSequence)
 	a.persistTabSessionPath(tab, path)
 	a.notifyTabRuntimeRebuilt(tab)
 	return nil
@@ -11772,29 +11775,10 @@ func (a *App) ConnectKey(apiKey string) (string, error) {
 	if apiKey == "" {
 		return "", fmt.Errorf("key is required")
 	}
-	if tab := a.activeTab(); tab != nil {
-		if err := rebuildControllerActiveWorkErrorFor(tab.Ctrl, "provider key"); err != nil {
-			return "", err
-		}
-	}
-	ctx, cancel := context.WithTimeout(a.ctx, 8*time.Second)
+	ctx, cancel := context.WithTimeout(a.reqCtx(), 8*time.Second)
 	defer cancel()
 	if _, err := connectKeyBalanceFetch(ctx, nil, onboardingBalanceURL, apiKey); err != nil {
 		return "", fmt.Errorf("validate: %w", err)
 	}
-	warning, err := a.saveProviderCredential(onboardingKeyEnv, apiKey)
-	if err != nil {
-		return "", fmt.Errorf("save: %w", err)
-	}
-	if err := a.ensureProviderAccessForKey(onboardingKeyEnv); err != nil {
-		return "", fmt.Errorf("enable provider: %w", err)
-	}
-	if err := a.rebuildSetting("provider key"); err != nil {
-		if rebuildWarning, ok := a.deferredRebuildWarning("provider key", err); ok {
-			warning = appendSettingsWarning(warning, rebuildWarning)
-		} else {
-			return "", err
-		}
-	}
-	return warning, nil
+	return a.AddOfficialProviderAccess("deepseek", apiKey)
 }

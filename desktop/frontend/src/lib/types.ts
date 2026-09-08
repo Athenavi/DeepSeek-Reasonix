@@ -2245,6 +2245,7 @@ export interface BotConnectionDiagnostic {
 }
 
 export interface SettingsView {
+	modelSettingsFingerprint?: string;
   defaultModel: string;
   plannerModel: string;
   visionModel: string;
@@ -2287,6 +2288,8 @@ export interface SettingsView {
   bypass: boolean; // legacy JSON key for live YOLO/full-access tool auto-approval
   conversationWidth?: string; // "standard" | "full"; absent from older Wails payloads
 }
+
+export type { ModelSettingsChange, ModelSettingsResult } from "./modelSettingsTypes";
 
 export interface DesktopStartupSettingsView {
   bot: BotSettingsView;

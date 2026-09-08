@@ -1147,6 +1147,19 @@ func migrateLegacyMCPTiersFile(path string) error {
 	return err
 }
 
+// MigrateLegacyMCPTiersForRoot keeps boot's historical on-disk migration
+// separate from immutable snapshots, whose freshness checks must be read-only.
+func MigrateLegacyMCPTiersForRoot(root string) {
+	for _, path := range []string{userConfigLoadPath(), filepath.Join(resolveRoot(root), "reasonix.toml")} {
+		if path == "" {
+			continue
+		}
+		if err := migrateLegacyMCPTiersFile(path); err != nil {
+			slog.Warn("config: legacy mcp tier migration failed", "path", path, "err", err)
+		}
+	}
+}
+
 func stripLegacyMCPTierLines(raw string) (string, bool) {
 	return stripTOMLKeyLines(raw, "plugins", "tier")
 }

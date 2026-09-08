@@ -73,6 +73,7 @@ type remoteTab struct {
 	// modelSeq orders concurrent writes for deterministic proxy registration.
 	model    string
 	modelSeq uint64
+	settings remoteModelApplicationState // guarded by remoteTabMu
 
 	// Bridge fields are protected by App.remoteTabMu. gen fences old pumps;
 	// client preserves cookies and token permits a new handshake.

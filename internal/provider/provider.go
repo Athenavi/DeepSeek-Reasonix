@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"slices"
 	"sort"
 	"strings"
@@ -1022,6 +1023,9 @@ func MissingToolCallReasoningWarningFingerprint(p Provider) string {
 
 // Config is a resolved provider instance configuration.
 type Config struct {
+	// HTTPClient is an optional immutable transport supplied by a runtime
+	// credential proxy. It does not alter request serialization or vendor identity.
+	HTTPClient  *http.Client
 	Name        string         // stable instance id, e.g. "deepseek-anthropic"
 	DisplayName string         // user-editable label; empty falls back to Name
 	Protocol    string         // configured wire adapter id

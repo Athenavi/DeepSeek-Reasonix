@@ -12,6 +12,7 @@ import (
 
 	"reasonix/internal/agent"
 	"reasonix/internal/boot"
+	"reasonix/internal/config"
 	"reasonix/internal/control"
 	"reasonix/internal/event"
 	"reasonix/internal/plugin"
@@ -113,14 +114,18 @@ func (s *sessionTagSink) Emit(e event.Event) {
 }
 
 type detachedSession struct {
-	path     string
-	ctrl     control.SessionAPI
-	keeper   *control.SessionLeaseKeeper
-	tag      *sessionTagSink
-	retiring bool // guarded by Server.detachedMu; blocks reattach during Close
-	force    chan struct{}
-	reattach chan struct{}
-	done     chan struct{}
+	admissionMu          sync.Mutex // new-run refresh and close-on-idle ownership
+	modelSettings        *config.ModelRuntimeSettings
+	modelSettingsOfferID string
+	buildOptions         boot.Options
+	path                 string
+	ctrl                 control.SessionAPI
+	keeper               *control.SessionLeaseKeeper
+	tag                  *sessionTagSink
+	retiring             bool // guarded by Server.detachedMu; blocks reattach during Close
+	force                chan struct{}
+	reattach             chan struct{}
+	done                 chan struct{}
 }
 
 // RegisterSessionTag associates a controller built outside Server with its
@@ -180,7 +185,11 @@ func (s *Server) setControllerPath(ctrl *control.Controller, path string) {
 func (s *Server) buildTagged(ctx context.Context, ref string, inheritTemp bool) (*control.Controller, *sessionTagSink, error) {
 	tag := newSessionTagSink(s.bc)
 	opts := s.buildOptions
+	if s.managedModels != nil {
+		opts.ModelSettings = s.managedModels
+	}
 	opts.Model = ref
+	opts.BeforeInboxDispatch = s.beforeInboxDispatch
 	opts.Sink = tag
 	if opts.Stderr == nil {
 		opts.Stderr = os.Stderr
@@ -266,6 +275,7 @@ func (s *Server) registerDetached(ctrl control.SessionAPI, keeper *control.Sessi
 	}
 	d := &detachedSession{
 		ctrl: ctrl, keeper: keeper, tag: tag,
+		modelSettings: s.managedModels, modelSettingsOfferID: s.modelSettingsOfferID, buildOptions: s.buildOptions,
 		force: make(chan struct{}), reattach: make(chan struct{}), done: make(chan struct{}),
 	}
 	s.detachedMu.Lock()
@@ -286,13 +296,16 @@ func (s *Server) registerDetached(ctrl control.SessionAPI, keeper *control.Sessi
 	s.detachedMu.Unlock()
 	slog.Info("serve: session detached", "session", path, "running", controllerHasActiveRuntimeWork(ctrl))
 	go s.watchDetached(d)
+	if concrete, ok := ctrl.(*control.Controller); ok {
+		go concrete.NotifyInboxRuntimeReady()
+	}
 	return d, nil
 }
 
 func (s *Server) watchDetached(d *detachedSession) {
 	interval := 200 * time.Millisecond
 	forced := false
-	for controllerHasActiveRuntimeWork(d.ctrl) && !forced {
+	for s.detachedHasPendingWork(d) && !forced {
 		timer := time.NewTimer(interval)
 		select {
 		case <-d.reattach:
@@ -316,12 +329,14 @@ func (s *Server) watchDetached(d *detachedSession) {
 	// Claim close ownership only while the registry still points at d. Keep the
 	// retiring entry visible until Close and lease release finish so deletion
 	// cannot race final controller writes. takeDetached refuses retiring entries.
+	d.admissionMu.Lock()
 	s.detachedMu.Lock()
 	owns := s.detached[d.path] == d
 	if owns {
 		d.retiring = true
 	}
 	s.detachedMu.Unlock()
+	d.admissionMu.Unlock()
 	if !owns {
 		close(d.done)
 		return
@@ -556,6 +571,8 @@ func (s *Server) reattachDetached(cur control.SessionAPI, detached *detachedSess
 			demoted.Release()
 		}
 	}
+	s.managedModels, s.modelSettingsOfferID = detached.modelSettings, detached.modelSettingsOfferID
+	s.buildOptions = detached.buildOptions
 	slog.Info("serve: background session re-attached", "session", detached.path, "running", controllerHasActiveRuntimeWork(detached.ctrl))
 	return nil
 }
@@ -581,6 +598,10 @@ func (s *Server) publishControllerSwap(expect, next control.SessionAPI, path str
 	}
 	s.ctrl = next
 	s.bc.SetCurrentSession(path)
+	if ctrl, ok := next.(*control.Controller); ok {
+		ctrl.SetBeforeInboxDispatch(s.beforeInboxDispatch)
+		go ctrl.NotifyInboxRuntimeReady()
+	}
 	return true
 }
 

@@ -323,6 +323,7 @@ type BotSettingsView struct {
 
 // SettingsView is the whole Settings panel payload.
 type SettingsView struct {
+	ModelSettingsFingerprint     string               `json:"modelSettingsFingerprint"`
 	DefaultModel                 string               `json:"defaultModel"`
 	PlannerModel                 string               `json:"plannerModel"`
 	VisionModel                  string               `json:"visionModel"`
@@ -789,6 +790,9 @@ func officialProviderViewsForRootWithResolver(added map[string]bool, pricingLang
 }
 
 func providerPresetViewsForRootWithResolver(cfg *config.Config, root string, resolver *config.CredentialResolver) []ProviderPresetView {
+	if cfg == nil {
+		cfg = &config.Config{}
+	}
 	if resolver == nil {
 		resolver = config.NewCredentialResolverForRoot(root)
 	}
@@ -800,7 +804,12 @@ func providerPresetViewsForRootWithResolver(cfg *config.Config, root string, res
 		models := make([]string, 0)
 		modelSeen := map[string]bool{}
 		requiresKey := false
+		credentialRefs := map[string]bool{}
 		for _, entry := range preset.Entries {
+			if existing, ok := cfg.Provider(entry.Name); ok && (providerEntryCoreMatches(*existing, entry) || providerEntryBelongsToPreset(*existing, preset, entry)) {
+				entry.APIKeyEnv = existing.APIKeyEnv
+			}
+			credentialRefs[entry.APIKeyEnv] = entry.RequiresAPIKey()
 			if keyEnv == "" {
 				keyEnv = strings.TrimSpace(entry.APIKeyEnv)
 			}
@@ -820,8 +829,20 @@ func providerPresetViewsForRootWithResolver(cfg *config.Config, root string, res
 			}
 		}
 		key := config.CredentialResolution{}
+		keysSet, configured := true, true
+		for _, entry := range preset.Entries {
+			if existing, ok := cfg.Provider(entry.Name); ok && (providerEntryCoreMatches(*existing, entry) || providerEntryBelongsToPreset(*existing, preset, entry)) {
+				keyEnv = existing.APIKeyEnv
+				break
+			}
+		}
 		if keyEnv != "" {
 			key = resolver.ResolveGlobalFirst(keyEnv)
+		}
+		for env, required := range credentialRefs {
+			resolution := resolver.ResolveGlobalFirst(env)
+			keysSet = keysSet && resolution.Set
+			configured = configured && (!required || resolution.Set)
 		}
 		status, statusNames, missingNames := classifyProviderPresetStatus(cfg, preset)
 		added := status == providerPresetStatusInstalled || status == providerPresetStatusInstalledModified || status == providerPresetStatusNameConflict
@@ -845,9 +866,9 @@ func providerPresetViewsForRootWithResolver(cfg *config.Config, root string, res
 			Status:               status,
 			StatusProviderNames:  nonNil(statusNames),
 			MissingProviderNames: nonNil(missingNames),
-			KeySet:               key.Set,
+			KeySet:               keysSet,
 			RequiresKey:          requiresKey,
-			Configured:           !requiresKey || key.Set,
+			Configured:           configured,
 			KeySource:            key.Source.Label,
 			KeySourcePath:        key.Source.Path,
 		})
@@ -945,7 +966,6 @@ func providerEntryCoreMatches(existing, preset config.ProviderEntry) bool {
 		normalizeProviderURL(existing.BaseURL) == normalizeProviderURL(preset.BaseURL) &&
 		strings.TrimSpace(existing.ChatURL) == strings.TrimSpace(preset.ChatURL) &&
 		strings.TrimSpace(existing.RequestURL) == strings.TrimSpace(preset.RequestURL) &&
-		strings.TrimSpace(existing.APIKeyEnv) == strings.TrimSpace(preset.APIKeyEnv) &&
 		existing.AuthHeader == preset.AuthHeader
 }
 
@@ -1061,17 +1081,18 @@ func (a *App) Settings() SettingsView {
 	}
 	ctrl := a.activeCtrl()
 	v := SettingsView{
-		DefaultModel:      cfg.DefaultModel,
-		PlannerModel:      cfg.Agent.PlannerModel,
-		VisionModel:       cfg.Agent.VisionModel,
-		WebSearchModel:    cfg.Agent.WebSearchModel,
-		WebSearchModels:   []string{},
-		SubagentModel:     cfg.Agent.SubagentModel,
-		SubagentEffort:    cfg.Agent.SubagentEffort,
-		AutoPlan:          "off", // deprecated JSON compatibility for older frontends
-		Providers:         []ProviderView{},
-		OfficialProviders: []ProviderView{},
-		ProviderPresets:   []ProviderPresetView{},
+		ModelSettingsFingerprint: modelSettingsEditFingerprint(cfg),
+		DefaultModel:             cfg.DefaultModel,
+		PlannerModel:             cfg.Agent.PlannerModel,
+		VisionModel:              cfg.Agent.VisionModel,
+		WebSearchModel:           cfg.Agent.WebSearchModel,
+		WebSearchModels:          []string{},
+		SubagentModel:            cfg.Agent.SubagentModel,
+		SubagentEffort:           cfg.Agent.SubagentEffort,
+		AutoPlan:                 "off", // deprecated JSON compatibility for older frontends
+		Providers:                []ProviderView{},
+		OfficialProviders:        []ProviderView{},
+		ProviderPresets:          []ProviderPresetView{},
 		Permissions: PermissionsView{
 			Mode:  orDefault(cfg.Permissions.Mode, "ask"),
 			Allow: nonNil(cfg.Permissions.Allow),
@@ -1448,51 +1469,11 @@ func (a *App) refreshActiveTabMetaExtras() {
 	}
 }
 
-// applyGlobalProviderConfigChange persists a provider-wide setting and refreshes
-// every visible runtime while runtime admission and all turn gates are frozen.
-// Detached runtimes cannot participate in the failure-atomic build-and-swap, so
-// reject before writing instead of leaving one session on stale provider state.
+// applyGlobalProviderConfigChange commits globally; affected runtimes observe
+// it at their next run boundary, including detached runtimes.
 func (a *App) applyGlobalProviderConfigChange(setting, operation, detachedAction string, mutate func(*config.Config) error) error {
-	defer a.lockRuntimeMutation(operation)()
-	releaseGates, err := a.lockRuntimeTurnGates(setting, nil)
-	if err != nil {
-		return err
-	}
-	defer releaseGates()
-	tabs, err := a.visibleTabsForGlobalRuntimeMutation(detachedAction)
-	if err != nil {
-		return err
-	}
-	if err := func() error {
-		unlock := config.LockUserConfigEdits()
-		defer unlock()
-		cfg, path, err := a.loadDesktopUserConfigForEdit()
-		if err != nil {
-			return err
-		}
-		if err := mutate(cfg); err != nil {
-			return err
-		}
-		return cfg.SaveTo(path)
-	}(); err != nil {
-		return err
-	}
-
-	var rebuildErrs []error
-	for _, tab := range tabs {
-		if a.controllerForTab(tab) == nil {
-			// A startup placeholder has no stale provider runtime. Its eventual
-			// build reads the just-persisted config.
-			continue
-		}
-		if err := a.rebuildSettingTurnLocked(setting, tab, true, false); err != nil {
-			if _, ok := a.deferredRebuildWarningForTab(setting, err, tab); ok {
-				continue
-			}
-			rebuildErrs = append(rebuildErrs, err)
-		}
-	}
-	return errors.Join(rebuildErrs...)
+	_, err := a.applyModelConfigChangeWithWarning(setting, mutate)
+	return err
 }
 
 func (a *App) applyConfigOnly(mutate func(*config.Config) error) error {
@@ -1950,6 +1931,7 @@ func (a *App) rebuildSettingTurnLockedWithModel(setting string, tab *WorkspaceTa
 	if a.ctx == nil {
 		return nil
 	}
+	pendingSequence := a.deferredRebuildSequence(tab.ID)
 	if err := rebuildControllerActiveWorkErrorFor(a.controllerForTab(tab), setting); err != nil {
 		return err
 	}
@@ -1994,11 +1976,18 @@ func (a *App) rebuildSettingTurnLockedWithModel(setting string, tab *WorkspaceTa
 		model = override
 	}
 	if cfg, err := config.LoadForRoot(snap.workspaceRoot); err == nil {
-		if resolved, fallback, ok := cfg.ResolveModelWithFallback(model); ok {
-			if fallback && strings.TrimSpace(model) != "" {
-				a.noticeForTab(tab.ID, fmt.Sprintf("model %q is no longer available; switched to %s", model, resolved))
+		if setting == "saved model settings" {
+			model, err = resolveModelSettingsRuntime(cfg, model)
+			if err != nil {
+				return err
 			}
-			model = resolved
+		} else {
+			if resolved, fallback, ok := cfg.ResolveModelWithFallback(model); ok {
+				if fallback && strings.TrimSpace(model) != "" {
+					a.noticeForTab(tab.ID, fmt.Sprintf("model %q is no longer available; switched to %s", model, resolved))
+				}
+				model = resolved
+			}
 		}
 	}
 	ctrl, restoredRuntime, path, err := a.buildSettingReplacementController(tab, snap, runtime, model, prevPath, setting, oldCtrl, carried, reload)
@@ -2015,6 +2004,9 @@ func (a *App) rebuildSettingTurnLockedWithModel(setting string, tab *WorkspaceTa
 		}
 		return err
 	}
+	if err := validateModelSettingsReplacement(ctrl, oldCtrl); err != nil {
+		return err
+	}
 	a.mu.Lock()
 	if err := a.authorizeTabReplacementLocked(tab, ctrl, "rebuilding settings", "rebuilt"); err != nil {
 		a.mu.Unlock()
@@ -2023,6 +2015,7 @@ func (a *App) rebuildSettingTurnLockedWithModel(setting string, tab *WorkspaceTa
 		return err
 	}
 	tab.Ctrl = ctrl
+	tab.modelApplication.failure = nil
 	tab.model = model
 	tab.Label = ctrl.Label()
 	applyNormalizedRuntimeToTabLocked(tab, restoredRuntime)
@@ -2038,7 +2031,7 @@ func (a *App) rebuildSettingTurnLockedWithModel(setting string, tab *WorkspaceTa
 		oldCtrl.Close()
 	}
 	a.persistTabSessionPath(tab, path)
-	a.clearDeferredRebuild(tab.ID)
+	a.clearDeferredRebuildVersion(tab.ID, pendingSequence)
 	a.notifyTabRuntimeRebuilt(tab)
 	a.emitReady(a.ctx)
 	return nil
@@ -2069,6 +2062,7 @@ func (a *App) buildSettingReplacementController(tab *WorkspaceTab, snap tabRunti
 		PinnedContextLoader:      pinnedContextLoader(snap.workspaceRoot),
 		OnSessionRecovered:       a.handleTabSessionRecovered(tab),
 		OnSessionTransition:      a.handleTabSessionTransition(tab),
+		BeforeInboxDispatch:      a.beforeInboxDispatch,
 		OnSessionTitleChanged:    a.onSessionTitleChanged,
 	}
 	if reload && oldCtrl != nil {
@@ -2177,84 +2171,24 @@ func (a *App) reloadRuntimeTurnLocked(tab *WorkspaceTab) error {
 	return a.rebuildSettingTurnLocked(runtimeReloadSettingLabel, tab, false, true)
 }
 
-// SetDefaultModel sets the config default and switches the live model to it.
+// SetDefaultModel changes the default for NEW sessions only.
 func (a *App) SetDefaultModel(ref string) error {
-	tab := a.activeTab()
-	if tab == nil {
-		return fmt.Errorf("no active tab")
-	}
-	// applyConfigChange ends in rebuild(), which reads tab.model to pick the
-	// runtime model — the new ref must be visible on the tab before that runs.
-	a.mu.Lock()
-	prev := tab.model
-	tab.model = ref
-	a.mu.Unlock()
-	if err := a.applyConfigChange(func(c *config.Config) error {
-		resolved, err := selectableDesktopModelRef(c, ref)
-		if err != nil {
-			return err
-		}
-		ref = resolved
-		c.DefaultModel = ref
-		a.mu.Lock()
-		tab.model = ref
-		a.mu.Unlock()
-		return nil
-	}); err != nil {
-		a.mu.Lock()
-		tab.model = prev
-		a.mu.Unlock()
-		return err
-	}
-	return a.persistTabModelIfCurrent(tab, ref)
+	return a.applyModelConfigChange(func(c *config.Config) error { return setDefaultModelConfig(c, ref) })
 }
 
 // SetPlannerModel sets (or, with "", clears) the two-model planner.
 func (a *App) SetPlannerModel(ref string) error {
-	return a.applyConfigChange(func(c *config.Config) error {
-		if ref != "" {
-			resolved, err := selectableDesktopModelRef(c, ref)
-			if err != nil {
-				return err
-			}
-			ref = resolved
-		}
-		c.Agent.PlannerModel = ref
-		return nil
-	})
+	return a.applyModelConfigChange(func(c *config.Config) error { return setPlannerModelConfig(c, ref) })
 }
 
 // SetVisionModel sets (or clears) the optional image-understanding fallback.
 func (a *App) SetVisionModel(ref string) error {
-	return a.applyConfigChange(func(c *config.Config) error {
-		ref = strings.TrimSpace(ref)
-		if ref == "" || strings.EqualFold(ref, "auto") {
-			c.Agent.VisionModel = strings.ToLower(ref)
-			return nil
-		}
-		resolved, err := selectableDesktopVisionModelRef(c, ref)
-		if err != nil {
-			return err
-		}
-		c.Agent.VisionModel = resolved
-		return nil
-	})
+	return a.applyModelConfigChange(func(c *config.Config) error { return setVisionModelConfig(c, ref) })
 }
 
 // SetSubagentModel sets (or clears) the default model used by subagent entry points.
 func (a *App) SetSubagentModel(ref string) error {
-	return a.applyConfigChange(func(c *config.Config) error {
-		ref = strings.TrimSpace(ref)
-		if ref != "" {
-			resolved, err := selectableDesktopModelRef(c, ref)
-			if err != nil {
-				return err
-			}
-			ref = resolved
-		}
-		c.Agent.SubagentModel = ref
-		return nil
-	})
+	return a.applyModelConfigChange(func(c *config.Config) error { return setSubagentModelConfig(c, ref) })
 }
 
 func selectableDesktopModelRef(c *config.Config, ref string) (string, error) {
@@ -2290,27 +2224,7 @@ func selectableDesktopVisionModelRef(c *config.Config, ref string) (string, erro
 
 // SetSubagentEffort sets (or clears) the default effort used by subagent entry points.
 func (a *App) SetSubagentEffort(level string) error {
-	return a.applyConfigChange(func(c *config.Config) error {
-		level = strings.TrimSpace(level)
-		if level == "" || level == "auto" {
-			c.Agent.SubagentEffort = ""
-			return nil
-		}
-		model := strings.TrimSpace(c.Agent.SubagentModel)
-		if model == "" {
-			model = c.DefaultModel
-		}
-		entry, ok := c.ResolveModel(model)
-		if !ok {
-			return fmt.Errorf("unknown subagent model %q", model)
-		}
-		effort, err := config.NormalizeEffort(entry, level)
-		if err != nil {
-			return err
-		}
-		c.Agent.SubagentEffort = effort
-		return nil
-	})
+	return a.applyModelConfigChange(func(c *config.Config) error { return setSubagentEffortConfig(c, level) })
 }
 
 // deleteSubagentOverrideAliases removes every underscore/hyphen alias entry
@@ -2331,67 +2245,13 @@ func deleteSubagentOverrideAliases(overrides map[string]string, name string) {
 // clear both sweep the underscore/hyphen alias keys so a legacy alias entry
 // can neither shadow the new value nor survive a clear.
 func (a *App) SetSubagentProfileModel(name, ref string) error {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return fmt.Errorf("name is required")
-	}
-	return a.applyConfigChange(func(c *config.Config) error {
-		ref = strings.TrimSpace(ref)
-		if ref == "" {
-			deleteSubagentOverrideAliases(c.Agent.SubagentModels, name)
-			return nil
-		}
-		resolved, err := selectableDesktopModelRef(c, ref)
-		if err != nil {
-			return err
-		}
-		if c.Agent.SubagentModels == nil {
-			c.Agent.SubagentModels = map[string]string{}
-		}
-		deleteSubagentOverrideAliases(c.Agent.SubagentModels, name)
-		c.Agent.SubagentModels[name] = resolved
-		return nil
-	})
+	return a.applyModelConfigChange(func(c *config.Config) error { return setSubagentProfileModelConfig(c, name, ref) })
 }
 
 // SetSubagentProfileEffort sets (or clears) a per-name effort override. See
 // SetSubagentProfileModel.
 func (a *App) SetSubagentProfileEffort(name, level string) error {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return fmt.Errorf("name is required")
-	}
-	return a.applyConfigChange(func(c *config.Config) error {
-		level = strings.TrimSpace(level)
-		if level == "" || level == "auto" {
-			deleteSubagentOverrideAliases(c.Agent.SubagentEfforts, name)
-			return nil
-		}
-		// Validate against the model the override will actually apply to:
-		// the alias-aware per-name model override first, then the global
-		// subagent default, then the session default.
-		model := subagentOverrideFor(c.Agent.SubagentModels, name)
-		if model == "" {
-			model = strings.TrimSpace(c.Agent.SubagentModel)
-		}
-		if model == "" {
-			model = c.DefaultModel
-		}
-		entry, ok := c.ResolveModel(model)
-		if !ok {
-			return fmt.Errorf("unknown subagent model %q", model)
-		}
-		effort, err := config.NormalizeEffort(entry, level)
-		if err != nil {
-			return err
-		}
-		if c.Agent.SubagentEfforts == nil {
-			c.Agent.SubagentEfforts = map[string]string{}
-		}
-		deleteSubagentOverrideAliases(c.Agent.SubagentEfforts, name)
-		c.Agent.SubagentEfforts[name] = effort
-		return nil
-	})
+	return a.applyModelConfigChange(func(c *config.Config) error { return setSubagentProfileEffortConfig(c, name, level) })
 }
 
 func desktopMaxSubagentDepth(depth int) int {
@@ -2406,10 +2266,7 @@ func desktopMaxSubagentDepth(depth int) int {
 
 // SetMaxSubagentDepth controls whether first-layer subagents may delegate once more.
 func (a *App) SetMaxSubagentDepth(depth int) error {
-	return a.applyConfigChange(func(c *config.Config) error {
-		c.Agent.MaxSubagentDepth = desktopMaxSubagentDepth(depth)
-		return nil
-	})
+	return a.applyModelConfigChange(func(c *config.Config) error { return setMaxSubagentDepthConfig(c, depth) })
 }
 
 func desktopSubagentConcurrency(n int) int {
@@ -2424,22 +2281,12 @@ func desktopParallelWriters(writers, total int) int {
 
 // SetMaxSubagentConcurrency sets the session-wide sub-agent concurrency cap (1–32).
 func (a *App) SetMaxSubagentConcurrency(n int) error {
-	return a.applyConfigChange(func(c *config.Config) error {
-		total, writers := agent.NormalizeConcurrencyLimits(n, c.Agent.MaxParallelWriters)
-		c.Agent.MaxSubagentConcurrency = total
-		c.Agent.MaxParallelWriters = writers
-		return nil
-	})
+	return a.applyModelConfigChange(func(c *config.Config) error { return setMaxSubagentConcurrencyConfig(c, n) })
 }
 
 // SetMaxParallelWriters sets the concurrent writer cap (1–32, ≤ total concurrency).
 func (a *App) SetMaxParallelWriters(n int) error {
-	return a.applyConfigChange(func(c *config.Config) error {
-		total, writers := agent.NormalizeConcurrencyLimits(c.Agent.MaxSubagentConcurrency, n)
-		c.Agent.MaxSubagentConcurrency = total
-		c.Agent.MaxParallelWriters = writers
-		return nil
-	})
+	return a.applyModelConfigChange(func(c *config.Config) error { return setMaxParallelWritersConfig(c, n) })
 }
 
 // SetAutoPlan is retained for older frontend bundles. Automatic plan mode is
@@ -2612,7 +2459,7 @@ func saveProviderConfig(c *config.Config, p ProviderView) error {
 // RenameProviderConnections updates display metadata only; route identities and
 // other settings are read from the latest configuration under the edit lock.
 func (a *App) RenameProviderConnections(names []string, displayName string) error {
-	return a.applyConfigChange(func(c *config.Config) error { return renameProviderConnections(c, names, displayName) })
+	return a.applyModelConfigChange(func(c *config.Config) error { return renameProviderConnections(c, names, displayName) })
 }
 
 func renameProviderConnections(c *config.Config, names []string, displayName string) error {
@@ -2632,7 +2479,7 @@ func renameProviderConnections(c *config.Config, names []string, displayName str
 // `models` even when only one model is selected, while `model` remains populated
 // in-memory for validation/back-compat. The shared key/endpoint live on the entry.
 func (a *App) SaveProvider(p ProviderView) error {
-	return a.applyConfigChange(func(c *config.Config) error {
+	return a.applyModelConfigChange(func(c *config.Config) error {
 		return saveProviderConfig(c, p)
 	})
 }
@@ -2642,37 +2489,37 @@ func (a *App) SaveProvider(p ProviderView) error {
 // remain separate when their custom transport fields differ, so changing only
 // the first profile would leave the grouped control in a contradictory state.
 func (a *App) SetProviderWebSearch(names []string, enabled bool) error {
-	return a.applyGlobalProviderConfigChange(
-		"DeepSeek server-side web search",
-		"set-provider-web-search",
-		"changing DeepSeek server-side web search",
-		func(c *config.Config) error {
-			seen := make(map[string]bool, len(names))
-			providers := make([]*config.ProviderEntry, 0, len(names))
-			for _, rawName := range names {
-				name := strings.TrimSpace(rawName)
-				if name == "" || seen[name] {
-					continue
-				}
-				seen[name] = true
-				entry, ok := c.Provider(name)
-				if !ok {
-					return fmt.Errorf("provider %q not found", name)
-				}
-				if !config.IsOfficialDeepSeekSearchEndpoint(entry) {
-					return fmt.Errorf("provider %q does not support configurable server-side web search", name)
-				}
-				providers = append(providers, entry)
-			}
-			if len(providers) == 0 {
-				return fmt.Errorf("provider list is empty")
-			}
-			for _, entry := range providers {
-				value := enabled
-				entry.WebSearch = &value
-			}
-			return nil
-		})
+	return a.applyModelConfigChange(func(c *config.Config) error {
+		return setProviderWebSearchConfig(c, names, enabled)
+	})
+}
+
+func setProviderWebSearchConfig(c *config.Config, names []string, enabled bool) error {
+	seen := make(map[string]bool, len(names))
+	providers := make([]*config.ProviderEntry, 0, len(names))
+	for _, rawName := range names {
+		name := strings.TrimSpace(rawName)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		entry, ok := c.Provider(name)
+		if !ok {
+			return fmt.Errorf("provider %q not found", name)
+		}
+		if !config.IsOfficialDeepSeekSearchEndpoint(entry) {
+			return fmt.Errorf("provider %q does not support configurable server-side web search", name)
+		}
+		providers = append(providers, entry)
+	}
+	if len(providers) == 0 {
+		return fmt.Errorf("provider list is empty")
+	}
+	for _, entry := range providers {
+		value := enabled
+		entry.WebSearch = &value
+	}
+	return nil
 }
 
 func providerModelOverridesForCatalog(overrides map[string]config.ProviderModelOverride, models []string) map[string]config.ProviderModelOverride {
@@ -2741,9 +2588,6 @@ func (a *App) SaveProviderModelCatalogs(updates []ProviderModelCatalogUpdate) ([
 	if len(updates) == 0 {
 		return []string{}, nil
 	}
-	if err := a.ensureActiveTabRebuildAllowed("provider model catalogs"); err != nil {
-		return []string{}, err
-	}
 	applied := make([]string, 0, len(updates))
 	if err := func() error {
 		unlock := config.LockUserConfigEdits()
@@ -2765,6 +2609,7 @@ func (a *App) SaveProviderModelCatalogs(updates []ProviderModelCatalogUpdate) ([
 		// writer, then keep that lock through the config commit. A rotation that
 		// won the race therefore invalidates the request fingerprint.
 		credentialsRevision := providerCredentialsRevision()
+		baseline := cfg.ModelSettingsBaseline()
 		for _, update := range updates {
 			changed, err := applyProviderModelCatalogUpdate(cfg, update, credentialsRevision)
 			if err != nil {
@@ -2777,75 +2622,41 @@ func (a *App) SaveProviderModelCatalogs(updates []ProviderModelCatalogUpdate) ([
 		if len(applied) == 0 {
 			return nil
 		}
-		return cfg.SaveTo(path)
+		return cfg.SaveModelSettingsTo(path, baseline)
 	}(); err != nil {
 		return []string{}, err
 	}
 	if len(applied) == 0 {
 		return applied, nil
 	}
-	if err := a.rebuildSetting("provider model catalogs"); err != nil {
-		if _, ok := a.deferredRebuildWarning("provider model catalogs", err); ok {
-			return applied, nil
-		}
-		return []string{}, err
-	}
+	a.modelSettingsSaved("provider model catalogs")
 	return applied, nil
 }
 
 // SaveProviderWithKey saves a custom provider and its credential as one settings
 // transaction, then rebuilds once after both are visible to the runtime.
 func (a *App) SaveProviderWithKey(p ProviderView, key string) (string, error) {
-	apiKeyEnv := strings.TrimSpace(p.APIKeyEnv)
-	if apiKeyEnv == "" {
-		return "", fmt.Errorf("this provider has no api_key_env set")
-	}
-	if err := a.ensureActiveTabRebuildAllowed("provider"); err != nil {
-		return "", err
-	}
-	warning, err := a.saveProviderCredential(apiKeyEnv, key)
-	if err != nil {
-		return "", err
-	}
-	if err := func() error {
-		unlock := config.LockUserConfigEdits()
-		defer unlock()
-		cfg, path, err := a.loadDesktopUserConfigForEdit()
+	return a.applyModelConfigChangeWithWarning("provider", func(c *config.Config) error {
+		if err := saveProviderConfig(c, p); err != nil {
+			return err
+		}
+		env, err := c.StageModelCredentialLocked(key)
 		if err != nil {
 			return err
 		}
-		if err := saveProviderConfig(cfg, p); err != nil {
-			return err
+		for i := range c.Providers {
+			if c.Providers[i].Name == p.Name {
+				c.Providers[i].APIKeyEnv = env
+			}
 		}
-		return cfg.SaveTo(path)
-	}(); err != nil {
-		return "", err
-	}
-	if err := a.rebuildSetting("provider"); err != nil {
-		if rebuildWarning, ok := a.deferredRebuildWarning("provider", err); ok {
-			return appendSettingsWarning(warning, rebuildWarning), nil
-		}
-		return "", err
-	}
-	return warning, nil
+		return nil
+	})
 }
 
 // UpgradeDeepSeekProviderAccess applies the explicit Settings action for an
 // official legacy OpenAI entry. The config package performs a narrow raw-TOML
 // edit so unrelated and future fields are not lost to a full config render.
 func (a *App) UpgradeDeepSeekProviderAccess(name string) (string, error) {
-	const setting = "DeepSeek provider protocol"
-	defer a.lockRuntimeMutation("upgrade-deepseek-provider")()
-	releaseGates, err := a.lockRuntimeTurnGates(setting, nil)
-	if err != nil {
-		return "", err
-	}
-	defer releaseGates()
-	visibleTabs, err := a.visibleTabsForGlobalRuntimeMutation("upgrading the DeepSeek provider protocol")
-	if err != nil {
-		return "", err
-	}
-
 	changed, err := config.UpgradeDeepSeekProviderProtocolUserConfig(name)
 	if err != nil {
 		return "", err
@@ -2853,28 +2664,8 @@ func (a *App) UpgradeDeepSeekProviderAccess(name string) (string, error) {
 	if !changed {
 		return "", fmt.Errorf("DeepSeek provider %q is not eligible for the recommended protocol upgrade", name)
 	}
-	warning := ""
-	var rebuildErrs []error
-	for _, tab := range visibleTabs {
-		if a.controllerForTab(tab) == nil {
-			// A visible startup placeholder has no stale provider runtime. Its
-			// eventual build will read the upgraded config directly.
-			continue
-		}
-		if err := a.rebuildSettingTurnLocked(setting, tab, true, false); err != nil {
-			if deferred, ok := a.deferredRebuildWarningForTab(setting, err, tab); ok {
-				if warning == "" {
-					warning = deferred
-				}
-				continue
-			}
-			// The protocol is user-global and already persisted. Keep refreshing
-			// sibling tabs so one workspace-specific boot failure cannot leave
-			// every later runtime pinned to the old protocol.
-			rebuildErrs = append(rebuildErrs, err)
-		}
-	}
-	return warning, errors.Join(rebuildErrs...)
+	a.modelSettingsSaved("DeepSeek provider protocol")
+	return "", nil
 }
 
 // visibleTabsForGlobalRuntimeUpgrade returns every visible runtime that must
@@ -2904,28 +2695,16 @@ func (a *App) visibleTabsForGlobalRuntimeMutation(detachedAction string) ([]*Wor
 // tweak endpoints, model lists, and capability overrides after the one-click
 // setup path.
 func (a *App) AddProviderPresetAccess(id, key string) (string, error) {
+	return a.applyModelConfigChangeWithWarning("provider access", func(c *config.Config) error { return addProviderPresetConfig(c, id, key) })
+}
+
+func addProviderPresetConfig(c *config.Config, id, key string) error {
 	preset, ok := config.CuratedProviderPreset(id)
 	if !ok {
-		return "", fmt.Errorf("unknown provider preset %q", id)
+		return fmt.Errorf("unknown provider preset %q", id)
 	}
 	if len(preset.Entries) == 0 {
-		return "", fmt.Errorf("provider preset %q has no provider entries", id)
-	}
-	if err := a.ensureActiveTabRebuildAllowed("provider access"); err != nil {
-		return "", err
-	}
-	// Read-only duplicate-name pre-check; applyConfigChange re-checks under the
-	// config edit lock before writing.
-	cfg, _, err := a.loadDesktopUserConfigForView()
-	if err != nil {
-		return "", err
-	}
-	missing, _, conflicts := providerPresetInstallPlan(cfg, preset)
-	if len(conflicts) > 0 {
-		return "", providerPresetAlreadyAddedError(preset.ID, conflicts)
-	}
-	if len(missing) == 0 {
-		return "", nil
+		return fmt.Errorf("provider preset %q has no provider entries", id)
 	}
 	keyEnv := strings.TrimSpace(preset.KeyEnv)
 	if keyEnv == "" {
@@ -2935,44 +2714,44 @@ func (a *App) AddProviderPresetAccess(id, key string) (string, error) {
 			}
 		}
 	}
-	keyWarning := ""
-	rebuildWarning, err := a.applyConfigChangeWithWarning("provider access", func(c *config.Config) error {
-		missing, _, conflicts := providerPresetInstallPlan(c, preset)
-		if len(conflicts) > 0 {
-			return providerPresetAlreadyAddedError(preset.ID, conflicts)
-		}
-		if len(missing) == 0 {
-			return nil
-		}
-		if strings.TrimSpace(key) != "" && keyEnv != "" {
-			var err error
-			keyWarning, err = a.saveProviderCredential(keyEnv, key)
-			if err != nil {
-				return err
-			}
-		}
-		names := make([]string, 0, len(missing))
-		for _, e := range missing {
-			if e.DisplayName == "" {
-				e.DisplayName = preset.Label
-			}
-			if err := c.UpsertProvider(e); err != nil {
-				return err
-			}
-			names = append(names, e.Name)
-		}
-		addProviderAccess(c, names...)
-		if preset.ID == "opencode-go-recommended" && providerDefaultNeedsReplacement(c) {
-			if err := c.SetDefaultModel("opencode-go/glm-5.3"); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return "", err
+	missing, _, conflicts := providerPresetInstallPlan(c, preset)
+	if len(conflicts) > 0 {
+		return providerPresetAlreadyAddedError(preset.ID, conflicts)
 	}
-	return appendSettingsWarning(keyWarning, rebuildWarning), nil
+	if len(missing) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(missing))
+	for _, e := range missing {
+		if strings.TrimSpace(key) != "" {
+			e.APIKeyEnv = keyEnv
+		}
+		if e.DisplayName == "" {
+			e.DisplayName = preset.Label
+		}
+		if err := c.UpsertProvider(e); err != nil {
+			return err
+		}
+		names = append(names, e.Name)
+	}
+	addProviderAccess(c, names...)
+	if preset.ID == "opencode-go-recommended" && providerDefaultNeedsReplacement(c) {
+		if err := c.SetDefaultModel("opencode-go/glm-5.3"); err != nil {
+			return err
+		}
+	}
+	if strings.TrimSpace(key) != "" {
+		env, err := c.StageModelCredentialLocked(key)
+		if err != nil {
+			return err
+		}
+		for _, route := range preset.Entries {
+			if entry, ok := c.Provider(route.Name); ok {
+				entry.APIKeyEnv = env
+			}
+		}
+	}
+	return nil
 }
 
 func providerDefaultNeedsReplacement(c *config.Config) bool {
@@ -2987,6 +2766,10 @@ func providerDefaultNeedsReplacement(c *config.Config) bool {
 // with the curated preset template. It only mutates config; provider secrets stay
 // in Reasonix home .env under whichever api_key_env the resulting preset uses.
 func (a *App) ResetProviderPresetAccess(id string) error {
+	return a.applyModelConfigChange(func(c *config.Config) error { return resetProviderPresetConfig(c, id) })
+}
+
+func resetProviderPresetConfig(c *config.Config, id string) error {
 	preset, ok := config.CuratedProviderPreset(id)
 	if !ok {
 		return fmt.Errorf("unknown provider preset %q", id)
@@ -2994,32 +2777,21 @@ func (a *App) ResetProviderPresetAccess(id string) error {
 	if len(preset.Entries) == 0 {
 		return fmt.Errorf("provider preset %q has no provider entries", id)
 	}
-	if err := a.ensureActiveTabRebuildAllowed("provider access"); err != nil {
-		return err
-	}
-	// Read-only existence pre-check; applyConfigChange re-checks under the
-	// config edit lock before writing.
-	cfg, _, err := a.loadDesktopUserConfigForView()
-	if err != nil {
-		return err
-	}
-	if existing := existingProviderNames(cfg, preset.Entries); len(existing) == 0 {
+	if existing := existingProviderNames(c, preset.Entries); len(existing) == 0 {
 		return providerPresetNoExistingProviderError(preset.ID)
 	}
-	return a.applyConfigChange(func(c *config.Config) error {
-		if existing := existingProviderNames(c, preset.Entries); len(existing) == 0 {
-			return providerPresetNoExistingProviderError(preset.ID)
+	names := make([]string, 0, len(preset.Entries))
+	for _, e := range preset.Entries {
+		if existing, ok := c.Provider(e.Name); ok {
+			e.APIKeyEnv = existing.APIKeyEnv
 		}
-		names := make([]string, 0, len(preset.Entries))
-		for _, e := range preset.Entries {
-			if err := c.UpsertProvider(e); err != nil {
-				return err
-			}
-			names = append(names, e.Name)
+		if err := c.UpsertProvider(e); err != nil {
+			return err
 		}
-		addProviderAccess(c, names...)
-		return nil
-	})
+		names = append(names, e.Name)
+	}
+	addProviderAccess(c, names...)
+	return nil
 }
 
 func existingProviderNames(c *config.Config, entries []config.ProviderEntry) []string {
@@ -3224,26 +2996,32 @@ func (a *App) rebuildActiveSettingRuntimeMutationLocked(setting string) error {
 // env-var name (the one a provider's api_key_env points at) and rebuilds so it
 // resolves immediately.
 func (a *App) SetProviderKey(apiKeyEnv, value string) (string, error) {
-	if strings.TrimSpace(apiKeyEnv) == "" {
+	apiKeyEnv = strings.TrimSpace(apiKeyEnv)
+	if apiKeyEnv == "" {
 		return "", fmt.Errorf("this provider has no api_key_env set")
 	}
-	if err := a.ensureActiveTabRebuildAllowed("provider key"); err != nil {
-		return "", err
-	}
-	warning, err := a.saveProviderCredential(apiKeyEnv, value)
-	if err != nil {
-		return "", err
-	}
-	if err := a.ensureProviderAccessForKey(apiKeyEnv); err != nil {
-		return "", err
-	}
-	if err := a.rebuildSetting("provider key"); err != nil {
-		if rebuildWarning, ok := a.deferredRebuildWarning("provider key", err); ok {
-			return appendSettingsWarning(warning, rebuildWarning), nil
+	return a.applyModelConfigChangeWithWarning("provider key", func(c *config.Config) error {
+		names := []string{}
+		for _, p := range c.Providers {
+			if p.APIKeyEnv == apiKeyEnv {
+				names = append(names, p.Name)
+			}
 		}
-		return "", err
-	}
-	return warning, nil
+		if len(names) == 0 {
+			return fmt.Errorf("no connection uses this credential; edit the connection instead")
+		}
+		env, err := c.StageModelCredentialLocked(value)
+		if err != nil {
+			return err
+		}
+		for i := range c.Providers {
+			if c.Providers[i].APIKeyEnv == apiKeyEnv {
+				c.Providers[i].APIKeyEnv = env
+				addProviderAccess(c, c.Providers[i].Name)
+			}
+		}
+		return nil
+	})
 }
 
 // SaveProviderKey writes a provider secret without rebuilding the chat runtime.
@@ -3253,7 +3031,7 @@ func (a *App) SaveProviderKey(apiKeyEnv, value string) (string, error) {
 	if strings.TrimSpace(apiKeyEnv) == "" {
 		return "", fmt.Errorf("this provider has no api_key_env set")
 	}
-	return a.saveProviderCredential(apiKeyEnv, value)
+	return a.SetProviderKey(apiKeyEnv, value)
 }
 
 func (a *App) ensureProviderAccessForKey(apiKeyEnv string) error {
@@ -3314,24 +3092,8 @@ func (a *App) ensureProviderAccessForKey(apiKeyEnv string) error {
 // ClearProviderKey removes a provider secret from Reasonix's global .env
 // and rebuilds so the provider immediately becomes unauthenticated.
 func (a *App) ClearProviderKey(apiKeyEnv string) error {
-	apiKeyEnv = strings.TrimSpace(apiKeyEnv)
-	if apiKeyEnv == "" {
-		return fmt.Errorf("this provider has no api_key_env set")
-	}
-	if err := a.ensureActiveTabRebuildAllowed("provider key"); err != nil {
-		return err
-	}
-	if err := removeDotEnv(apiKeyEnv); err != nil {
-		return err
-	}
-	a.revokeCredentialProxyRoutesByCredential(apiKeyEnv)
-	if err := a.rebuildSetting("provider key"); err != nil {
-		if _, ok := a.deferredRebuildWarning("provider key", err); ok {
-			return nil
-		}
-		return err
-	}
-	return nil
+	_, err := a.SetProviderKey(apiKeyEnv, "")
+	return err
 }
 
 // SetPermissionMode sets the writer-fallback mode (ask|allow|deny).
@@ -3669,40 +3431,7 @@ func trimList(in []string) []string {
 // SetConnectionKey detaches a legacy shared credential before updating this connection.
 // Empty values disable authentication for this connection without deleting another key.
 func (a *App) SetConnectionKey(name, value string) (string, error) {
-	var secretID [16]byte
-	if _, err := rand.Read(secretID[:]); err != nil {
-		return "", err
-	}
-	warning := ""
-	result, err := a.applyConfigChangeWithWarning("provider key", func(c *config.Config) error {
-		for i := range c.Providers {
-			if c.Providers[i].Name != name {
-				continue
-			}
-			env := fmt.Sprintf("REASONIX_CONNECTION_%X_KEY", secretID)
-			var err error
-			warning, err = a.saveProviderCredential(env, value)
-			if err != nil {
-				return err
-			}
-			c.Providers[i].APIKeyEnv = env
-			return nil
-		}
-		for _, p := range config.Default().Providers {
-			if p.Name != name {
-				continue
-			}
-			p.APIKeyEnv = fmt.Sprintf("REASONIX_CONNECTION_%X_KEY", secretID)
-			var err error
-			warning, err = a.saveProviderCredential(p.APIKeyEnv, value)
-			if err != nil {
-				return err
-			}
-			return c.UpsertProvider(p)
-		}
-		return fmt.Errorf("unknown provider %q", name)
-	})
-	return appendSettingsWarning(warning, result), err
+	return a.applyModelConfigChangeWithWarning("provider key", func(c *config.Config) error { return setConnectionCredentialConfig(c, name, value) })
 }
 
 // AddProviderConnection copies a preset or existing connection without sharing its credential.
@@ -3736,88 +3465,70 @@ func (a *App) AddProviderConnectionWithOptions(presetID, sourceName, key, baseUR
 }
 
 func (a *App) addProviderConnection(presetID, sourceName, key, baseURL, kind string) (string, error) {
+	return a.applyModelConfigChangeWithWarning("provider access", func(c *config.Config) error {
+		return addProviderConnectionConfig(c, presetID, sourceName, key, baseURL, kind)
+	})
+}
+
+func addProviderConnectionConfig(c *config.Config, presetID, sourceName, key, baseURL, kind string) error {
+	if kind != "" && kind != "openai" && kind != "responses" && kind != "anthropic" {
+		return fmt.Errorf("invalid provider protocol")
+	}
+	if baseURL != "" {
+		u, err := url.Parse(baseURL)
+		if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") || u.User != nil || u.Fragment != "" {
+			return fmt.Errorf("invalid provider base URL")
+		}
+	}
 	var connectionID [16]byte
 	if _, err := rand.Read(connectionID[:]); err != nil {
-		return "", err
+		return err
 	}
-	warning := ""
-	result, err := a.applyConfigChangeWithWarning("provider access", func(c *config.Config) error {
-		var entries []config.ProviderEntry
-		var catalog config.ProviderCatalog
-		if presetID != "" {
-			preset, ok := config.CuratedProviderPreset(presetID)
-			if !ok {
-				return fmt.Errorf("unknown preset %q", presetID)
+	entries, catalog, err := providerConnectionTemplate(c, presetID, sourceName)
+	if err != nil {
+		return err
+	}
+	endpoints := config.ProtocolEndpointsForCatalog(catalog)
+	var prepared []config.ProviderEntry
+	for _, entry := range entries {
+		applyConnectionOverrides(&entry, kind, baseURL, endpoints)
+		originalName := entry.Name
+		entry.Name = fmt.Sprintf("%s-%x", originalName, connectionID)
+		if entry.DisplayName == "" {
+			entry.DisplayName = originalName
+		}
+		count := 1
+		for _, existing := range c.Providers {
+			if existing.DisplayName == entry.DisplayName || strings.HasPrefix(existing.DisplayName, entry.DisplayName+" · ") {
+				count++
 			}
-			catalog = config.CatalogForProviderPreset(preset)
-			entries = append(entries, preset.Entries...)
-			for i := range entries {
-				if entries[i].DisplayName == "" {
-					entries[i].DisplayName = preset.Label
-				}
-			}
-		} else {
-			for _, p := range c.Providers {
-				if p.Name == sourceName {
-					entries = append(entries, p)
-					break
-				}
+			if existing.Name == entry.Name {
+				return fmt.Errorf("connection identifier collision")
 			}
 		}
-		if len(entries) == 0 && presetID == "" {
-			for _, p := range config.Default().Providers {
-				if p.Name == sourceName {
-					entries = append(entries, p)
-					break
-				}
-			}
+		if sourceName != "" || count > 1 {
+			entry.DisplayName = fmt.Sprintf("%s · %d", entry.DisplayName, count)
 		}
-		if len(entries) == 0 {
-			return fmt.Errorf("connection template not found")
+		if sourceName != "" {
+			entry.Headers = nil
+		} // Custom headers may contain credentials.
+		entry.APIKeyEnv = fmt.Sprintf("REASONIX_CONNECTION_%X_%X_KEY", connectionID, []byte(originalName))
+		if err := c.UpsertProvider(entry); err != nil {
+			return err
 		}
-		if presetID == "" {
-			// The built-in official connection is the DeepSeek catalog.
-			if sourceName == "deepseek-flash" || sourceName == "deepseek-pro" {
-				catalog = config.ProviderCatalog{BrandID: "deepseek", Region: "global", Product: "api"}
-			}
+		addProviderAccess(c, entry.Name)
+		prepared = append(prepared, entry)
+	}
+	// Validate every entry before the first credential write.
+	for _, entry := range prepared {
+		env, err := c.StageModelCredentialLocked(key)
+		if err != nil {
+			return err
 		}
-		endpoints := config.ProtocolEndpointsForCatalog(catalog)
-		for _, entry := range entries {
-			applyConnectionOverrides(&entry, kind, baseURL, endpoints)
-			originalName := entry.Name
-			entry.Name = fmt.Sprintf("%s-%x", originalName, connectionID)
-			if entry.DisplayName == "" {
-				entry.DisplayName = originalName
-			}
-			count := 1
-			for _, existing := range c.Providers {
-				if existing.DisplayName == entry.DisplayName || strings.HasPrefix(existing.DisplayName, entry.DisplayName+" · ") {
-					count++
-				}
-				if existing.Name == entry.Name {
-					return fmt.Errorf("connection identifier collision")
-				}
-			}
-			if sourceName != "" || count > 1 {
-				entry.DisplayName = fmt.Sprintf("%s · %d", entry.DisplayName, count)
-			}
-			if sourceName != "" {
-				entry.Headers = nil
-			} // Custom headers may contain credentials.
-			entry.APIKeyEnv = fmt.Sprintf("REASONIX_CONNECTION_%X_%X_KEY", connectionID, []byte(originalName))
-			var err error
-			warning, err = a.saveProviderCredential(entry.APIKeyEnv, key)
-			if err != nil {
-				return err
-			}
-			if err := c.UpsertProvider(entry); err != nil {
-				return err
-			}
-			addProviderAccess(c, entry.Name)
-		}
-		return nil
-	})
-	return appendSettingsWarning(warning, result), err
+		p, _ := c.Provider(entry.Name)
+		p.APIKeyEnv = env
+	}
+	return nil
 }
 
 func applyConnectionOverrides(entry *config.ProviderEntry, kind, baseURL string, endpoints map[string]config.ProviderProtocolEndpoint) {
@@ -3848,4 +3559,47 @@ func applyConnectionOverrides(entry *config.ProviderEntry, kind, baseURL string,
 			entry.ResponsesMode = endpoint.ResponsesMode
 		}
 	}
+}
+
+func providerConnectionTemplate(c *config.Config, presetID, sourceName string) ([]config.ProviderEntry, config.ProviderCatalog, error) {
+	var entries []config.ProviderEntry
+	var catalog config.ProviderCatalog
+	if presetID != "" {
+		preset, ok := config.CuratedProviderPreset(presetID)
+		if !ok {
+			return nil, catalog, fmt.Errorf("unknown preset %q", presetID)
+		}
+		catalog = config.CatalogForProviderPreset(preset)
+		entries = append(entries, preset.Entries...)
+		for i := range entries {
+			if entries[i].DisplayName == "" {
+				entries[i].DisplayName = preset.Label
+			}
+		}
+	} else {
+		for _, p := range c.Providers {
+			if p.Name == sourceName {
+				entries = append(entries, p)
+				break
+			}
+		}
+	}
+	if len(entries) == 0 && presetID == "" {
+		for _, p := range config.Default().Providers {
+			if p.Name == sourceName {
+				entries = append(entries, p)
+				break
+			}
+		}
+	}
+	if len(entries) == 0 {
+		return nil, catalog, fmt.Errorf("connection template not found")
+	}
+	if presetID == "" {
+		// The built-in official connection is the DeepSeek catalog.
+		if sourceName == "deepseek-flash" || sourceName == "deepseek-pro" {
+			catalog = config.ProviderCatalog{BrandID: "deepseek", Region: "global", Product: "api"}
+		}
+	}
+	return entries, catalog, nil
 }
