@@ -1,11 +1,39 @@
 package readcoord
 
 import (
+	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"reasonix/internal/tool"
 )
+
+// Advice is a non-blocking steering signal for a stalled read.
+type Advice string
+
+const (
+	// AdvicePivot tells the caller to change approach once before pausing.
+	AdvicePivot Advice = "pivot"
+)
+
+// Policy bounds automatic continuation of one logical read. The zero value
+// imposes no bound.
+type Policy struct {
+	MaxPages      int
+	MaxActiveTime time.Duration
+	// PivotAfter is the consecutive no-progress count that triggers one
+	// strategy change; PauseAfter more stops the read.
+	PivotAfter int
+	PauseAfter int
+}
+
+// DefaultPolicy is the internal continuation bound: 64 pages or 120 seconds of
+// active reading per logical read, with a single strategy change after two
+// stalled pages and a pause two stalled pages later.
+func DefaultPolicy() Policy {
+	return Policy{MaxPages: 64, MaxActiveTime: 120 * time.Second, PivotAfter: 2, PauseAfter: 2}
+}
 
 // Transition reports what one observation changed. Callers commit progress
 // from it; nothing else mutates an obligation.
@@ -19,10 +47,14 @@ type Transition struct {
 	// known for the current version.
 	Added []tool.ReadRange
 	// Missing is what the requirement still lacks after the delivery.
-	Missing  []tool.ReadRange
-	Stale    bool
-	Progress bool
-	Stop     *Block
+	Missing []tool.ReadRange
+	// Covered is the accumulated coverage on the current content version.
+	Covered   []tool.ReadRange
+	SourceEnd *int
+	Stale     bool
+	Progress  bool
+	Advice    Advice
+	Stop      *Block
 }
 
 // Coordinator owns every obligation. It is safe for concurrent use, but the
@@ -32,11 +64,15 @@ type Coordinator struct {
 	mu       sync.Mutex
 	byKey    map[string]*Obligation
 	sequence uint64
+	policy   Policy
 }
 
-// New returns an empty coordinator.
-func New() *Coordinator {
-	return &Coordinator{byKey: map[string]*Obligation{}}
+// New returns an empty coordinator with the default continuation bound.
+func New() *Coordinator { return NewWithPolicy(DefaultPolicy()) }
+
+// NewWithPolicy returns a coordinator bounded by policy.
+func NewWithPolicy(policy Policy) *Coordinator {
+	return &Coordinator{byKey: map[string]*Obligation{}, policy: policy}
 }
 
 // Begin registers a requirement before its first call runs. Re-registering a
@@ -63,7 +99,7 @@ func (c *Coordinator) Begin(key string, scope Scope, req Requirement) Obligation
 // Observe folds one delivered envelope into its obligation. ok=false means the
 // envelope carried no identity or the obligation was already terminal, so a
 // cancelled or satisfied read is never resurrected by a late delivery.
-func (c *Coordinator) Observe(env tool.ReadResultEnvelope) (Transition, bool) {
+func (c *Coordinator) Observe(env tool.ReadResultEnvelope, activeMillis int64) (Transition, bool) {
 	if env.ReadID == "" || env.Source.CanonicalPath == "" {
 		return Transition{}, false
 	}
@@ -118,12 +154,56 @@ func (c *Coordinator) Observe(env tool.ReadResultEnvelope) (Transition, bool) {
 		ob.Stagnant++
 	}
 
+	ob.ActiveTime += time.Duration(activeMillis) * time.Millisecond
 	ob.State = evaluate(ob, env)
+	tr.Advice = c.enforcePolicy(ob, tr)
 	tr.To = ob.State
 	tr.Generation = ob.Generation
 	tr.Missing = missingFor(ob)
+	tr.Covered = append([]tool.ReadRange(nil), ob.Covered...)
+	if ob.SourceEnd != nil {
+		end := *ob.SourceEnd
+		tr.SourceEnd = &end
+	}
 	tr.Stop = ob.Stop
 	return tr, true
+}
+
+// enforcePolicy applies the hard budget and the no-progress ladder. A content
+// change never resets the budget: only satisfied or cancelled ends it.
+func (c *Coordinator) enforcePolicy(ob *Obligation, tr Transition) Advice {
+	if ob.State.Terminal() || ob.Stop != nil {
+		return ""
+	}
+	switch {
+	case c.policy.MaxPages > 0 && ob.Pages > c.policy.MaxPages:
+		ob.State = StateBlocked
+		ob.Stop = &Block{
+			Code:     "page_budget",
+			Detail:   fmt.Sprintf("automatic continuation stopped after %d pages", ob.Pages),
+			Recovery: "read the remaining lines explicitly, or work on an independent item",
+		}
+		return ""
+	case c.policy.MaxActiveTime > 0 && ob.ActiveTime > c.policy.MaxActiveTime:
+		ob.State = StateBlocked
+		ob.Stop = &Block{
+			Code:     "time_budget",
+			Detail:   fmt.Sprintf("automatic continuation used %s of active read time", ob.ActiveTime.Round(time.Second)),
+			Recovery: "read the remaining lines explicitly, or work on an independent item",
+		}
+		return ""
+	case !tr.Progress && c.policy.PivotAfter > 0 && ob.Stagnant >= c.policy.PivotAfter && !ob.Pivoted:
+		ob.Pivoted = true
+		return AdvicePivot
+	case ob.Pivoted && c.policy.PauseAfter > 0 && ob.Stagnant >= c.policy.PivotAfter+c.policy.PauseAfter:
+		ob.State = StateBlocked
+		ob.Stop = &Block{
+			Code:     "no_progress",
+			Detail:   fmt.Sprintf("%d consecutive pages added no new content", ob.Stagnant),
+			Recovery: "change approach or read a narrower window; the read stays paused until new content arrives",
+		}
+	}
+	return ""
 }
 
 // Fail records a read that could not deliver at all.

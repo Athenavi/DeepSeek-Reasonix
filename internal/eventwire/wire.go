@@ -27,6 +27,7 @@ type Event struct {
 	MemoryCitations  []MemoryCitation                 `json:"memoryCitations,omitempty"`
 	Level            string                           `json:"level,omitempty"`
 	Tool             *Tool                            `json:"tool,omitempty"`
+	ReadStatus       *ReadStatus                      `json:"readStatus,omitempty"`
 	Usage            *Usage                           `json:"usage,omitempty"`
 	Approval         *Approval                        `json:"approval,omitempty"`
 	Ask              *Ask                             `json:"ask,omitempty"`
@@ -165,27 +166,10 @@ func ToWire(e event.Event) Event {
 	switch e.Kind {
 	case event.Notice:
 		w.applyNotice(e)
+	case event.ReadStatus:
+		w.ReadStatus = toWireReadStatus(e.ReadStatus)
 	case event.ToolDispatch, event.ToolResult, event.ToolProgress, event.ToolResultPreview:
-		wt := &Tool{
-			ID: e.Tool.ID, Name: e.Tool.Name, Args: e.Tool.Args,
-			ResolvedName: e.Tool.ResolvedName, CapabilityID: e.Tool.CapabilityID,
-			Output: e.Tool.Output, Err: e.Tool.Err,
-			ReadOnly: e.Tool.ReadOnly, Truncated: e.Tool.Truncated,
-			DurationMs: e.Tool.DurationMs, Partial: e.Tool.Partial,
-			StartedAt: e.Tool.StartedAt, EndedAt: e.Tool.EndedAt,
-			ArgChars: e.Tool.ArgChars, Refreshed: e.Tool.Refreshed,
-			ParentID: e.Tool.ParentID, AttemptID: e.Tool.AttemptID,
-			Diff: e.Tool.Diff, Added: e.Tool.Added, Removed: e.Tool.Removed,
-			SubagentRef: e.Tool.SubagentRef, SubagentStatus: e.Tool.SubagentStatus,
-			SubagentErrorCode: e.Tool.SubagentErrorCode, SubagentRetryable: e.Tool.SubagentRetryable,
-		}
-		if e.Tool.Profile != nil {
-			wt.Profile = &Profile{Model: e.Tool.Profile.Model, Effort: e.Tool.Profile.Effort}
-		}
-		if e.Tool.Execution != nil {
-			wt.Execution = toWireShellExecution(e.Tool.Execution)
-		}
-		w.Tool = wt
+		w.Tool = toWireTool(e.Tool)
 	case event.WorkspaceChanged:
 		ws := e.Workspace
 		if ws == nil {
@@ -683,6 +667,7 @@ var kindNames = map[event.Kind]string{
 	event.MCPInteractionRequest:   "mcp_interaction",
 	event.PromptAnswered:          "prompt_answered",
 	event.SessionChanged:          "session_changed",
+	event.ReadStatus:              "read_status",
 }
 
 // ContextMaintenance is the JSON form of event.ContextMaintenance.

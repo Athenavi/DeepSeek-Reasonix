@@ -136,6 +136,8 @@ const (
 	MCPInteractionRequest
 	// SessionChanged is a content-free Serve routing barrier for all-session clients.
 	SessionChanged
+	// ReadStatus upserts one logical read's delivery state instead of per page.
+	ReadStatus
 	// KindCount is a sentinel one past the last real Kind. New event kinds must
 	// be inserted above it so completeness tests cover them automatically.
 	KindCount
@@ -556,6 +558,7 @@ type Event struct {
 	RetryMax           int                       // Retrying: total attempts before giving up
 	RetryScope         RetryScope                // Retrying: optional "headers" | "stream"; empty for older emitters
 	StreamAttempt      StreamAttemptInfo         // StreamAttempt lifecycle
+	ReadStatus         *ReadStatusPayload        // ReadStatus: one logical read's delivery state
 	ItemID             string                    // correlates durable inbox events
 	SessionPath        string                    // routes Serve frames
 	SessionReset       bool                      // SessionChanged came from /new or /clear, not resume/recovery

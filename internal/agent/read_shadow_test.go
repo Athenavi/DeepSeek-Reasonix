@@ -72,3 +72,91 @@ func TestReadShadowDoesNotChangeStoredContent(t *testing.T) {
 		t.Fatalf("shadow must not rewrite the provider-visible result: %+v", stored)
 	}
 }
+
+// TestReadShadowNarrowsAnUnboundedFullRead pins the budget coupling: when the
+// host cannot size a safe automatic read, a whole-file obligation becomes
+// needs_scope instead of continuing on a guess.
+func TestReadShadowNarrowsAnUnboundedFullRead(t *testing.T) {
+	reg := tool.NewRegistry()
+	reg.Add(envelopeReader{env: tool.ReadResultEnvelope{
+		ProtocolVersion: tool.ReadResultProtocolVersion,
+		Source:          tool.ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:v1"},
+		Intent:          tool.ReadIntentFull,
+		DeliveredRanges: []tool.ReadRange{{Start: 0, End: 10}},
+		HasMore:         true,
+	}})
+	a := New(&userInputCaptureProvider{}, reg, NewSession("system"), Options{}, event.Discard)
+	a.reads.tasks = newReadTasks("test-session", 1)
+	a.turn.readShadow = newReadShadowState(true)
+	a.storeBatchToolResult(context.Background(),
+		provider.ToolCall{ID: "c1", Name: "read_file", Arguments: `{"path":"a.go","intent":"full"}`},
+		toolOutcome{output: "  1→a\n"},
+	)
+
+	snapshot := a.turn.readShadow.coord.Snapshot()
+	if len(snapshot) != 1 {
+		t.Fatalf("obligations = %+v, want one", snapshot)
+	}
+	if snapshot[0].State != readcoord.StateNeedsScope {
+		t.Fatalf("state = %s, want needs_scope without a known budget", snapshot[0].State)
+	}
+	if snapshot[0].Stop == nil || snapshot[0].Stop.Code != "unknown_window" {
+		t.Fatalf("stop reason = %+v, want unknown_window", snapshot[0].Stop)
+	}
+}
+
+type recordingSink struct{ events []event.Event }
+
+func (s *recordingSink) Emit(e event.Event) { s.events = append(s.events, e) }
+
+func (s *recordingSink) readStatuses() []*event.ReadStatusPayload {
+	var out []*event.ReadStatusPayload
+	for _, e := range s.events {
+		if e.Kind == event.ReadStatus && e.ReadStatus != nil {
+			out = append(out, e.ReadStatus)
+		}
+	}
+	return out
+}
+
+// TestReadShadowEmitsOneUpsertedStatusPerRead pins the UI contract: every page
+// of one logical read carries the same read id and an increasing sequence, so a
+// frontend updates a single status card instead of appending a page per notice.
+func TestReadShadowEmitsOneUpsertedStatusPerRead(t *testing.T) {
+	reg := tool.NewRegistry()
+	reg.Add(envelopeReader{env: tool.ReadResultEnvelope{
+		ProtocolVersion: tool.ReadResultProtocolVersion,
+		Source:          tool.ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:v1"},
+		Intent:          tool.ReadIntentRange,
+		RequestedRange:  &tool.ReadRange{Start: 0, End: 40},
+		DeliveredRanges: []tool.ReadRange{{Start: 0, End: 10}},
+		HasMore:         true,
+	}})
+	sink := &recordingSink{}
+	a := New(&userInputCaptureProvider{}, reg, NewSession("system"), Options{}, sink)
+	a.reads.tasks = newReadTasks("test-session", 1)
+	a.turn.readShadow = newReadShadowState(true)
+
+	for page := range 3 {
+		a.storeBatchToolResult(context.Background(),
+			provider.ToolCall{ID: "call-" + string(rune('a'+page)), Name: "read_file", Arguments: `{"path":"a.go","offset":0,"limit":10}`},
+			toolOutcome{output: "  1→a\n", readTaskID: "ir-1"},
+		)
+	}
+
+	statuses := sink.readStatuses()
+	if len(statuses) != 3 {
+		t.Fatalf("status events = %d, want one per page", len(statuses))
+	}
+	for i, status := range statuses {
+		if status.ReadID != "ir-1" {
+			t.Fatalf("status %d read id = %q, want ir-1 (upsert key)", i, status.ReadID)
+		}
+		if status.Path != "/w/a.go" || status.Intent != string(tool.ReadIntentRange) {
+			t.Fatalf("status %d = %+v", i, status)
+		}
+	}
+	if statuses[0].Sequence >= statuses[2].Sequence {
+		t.Fatalf("sequences must advance: %+v", statuses)
+	}
+}

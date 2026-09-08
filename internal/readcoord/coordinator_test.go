@@ -2,6 +2,7 @@ package readcoord
 
 import (
 	"testing"
+	"time"
 
 	"reasonix/internal/tool"
 )
@@ -36,14 +37,14 @@ func envelope(readID, path, version string, intent tool.ReadIntent, requested *t
 func TestInspectObligationEndsAfterOnePage(t *testing.T) {
 	c := New()
 	env := envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentInspect, nil, ranges(0, 2000), false)
-	tr, ok := c.Observe(env)
+	tr, ok := c.Observe(env, 0)
 	if !ok {
 		t.Fatal("inspect delivery must be folded")
 	}
 	if tr.To != StateSatisfied || !tr.Progress || len(tr.Missing) != 0 {
 		t.Fatalf("transition = %+v, want satisfied with no missing coverage", tr)
 	}
-	if _, ok := c.Observe(env); ok {
+	if _, ok := c.Observe(env, 0); ok {
 		t.Fatal("a satisfied obligation must ignore a late delivery")
 	}
 }
@@ -55,7 +56,7 @@ func TestRangeObligationPagesUntilCovered(t *testing.T) {
 	c.Begin("ir-1", scope, req)
 
 	first := envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 20}, ranges(0, 10), false)
-	tr, ok := c.Observe(first)
+	tr, ok := c.Observe(first, 0)
 	if !ok || tr.To != StateNeedsMore {
 		t.Fatalf("first page transition = %+v (ok=%v), want needs_more", tr, ok)
 	}
@@ -64,7 +65,7 @@ func TestRangeObligationPagesUntilCovered(t *testing.T) {
 	}
 
 	second := envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 20}, ranges(10, 20), false)
-	tr, ok = c.Observe(second)
+	tr, ok = c.Observe(second, 0)
 	if !ok || tr.To != StateSatisfied || len(tr.Missing) != 0 {
 		t.Fatalf("second page transition = %+v (ok=%v), want satisfied", tr, ok)
 	}
@@ -78,7 +79,7 @@ func TestRangeObligationIsSatisfiedByEOFShortOfWindow(t *testing.T) {
 	c := New()
 	req := Requirement{Intent: tool.ReadIntentRange, Ranges: ranges(0, 20)}
 	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, req)
-	tr, ok := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 20}, ranges(0, 5), true))
+	tr, ok := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 20}, ranges(0, 5), true), 0)
 	if !ok || tr.To != StateSatisfied {
 		t.Fatalf("EOF short of the window must satisfy the range: %+v (ok=%v)", tr, ok)
 	}
@@ -89,14 +90,14 @@ func TestWholeFileRequiresContiguousCoverageFromLineZero(t *testing.T) {
 	req := Requirement{Intent: tool.ReadIntentFull, WholeFile: true}
 	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, req)
 
-	tr, _ := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(10, 20), true))
+	tr, _ := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(10, 20), true), 0)
 	if tr.To != StateNeedsMore {
 		t.Fatalf("tail-only delivery must not satisfy a whole-file read: %+v", tr)
 	}
 	if !sameRanges(tr.Missing, ranges(0, 10)) {
 		t.Fatalf("Missing = %+v, want 0-10", tr.Missing)
 	}
-	tr, _ = c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 10), false))
+	tr, _ = c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 10), false), 0)
 	if tr.To != StateSatisfied {
 		t.Fatalf("contiguous coverage from line 0 after EOF must satisfy: %+v", tr)
 	}
@@ -105,7 +106,7 @@ func TestWholeFileRequiresContiguousCoverageFromLineZero(t *testing.T) {
 func TestWholeFileWithoutEOFStaysNeedsMore(t *testing.T) {
 	c := New()
 	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, Requirement{Intent: tool.ReadIntentFull, WholeFile: true})
-	tr, _ := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 100), false))
+	tr, _ := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 100), false), 0)
 	if tr.To != StateNeedsMore {
 		t.Fatalf("coverage without EOF cannot prove the whole file: %+v", tr)
 	}
@@ -114,9 +115,9 @@ func TestWholeFileWithoutEOFStaysNeedsMore(t *testing.T) {
 func TestVersionChangeResetsCoverageAndBumpsGeneration(t *testing.T) {
 	c := New()
 	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, Requirement{Intent: tool.ReadIntentFull, WholeFile: true})
-	c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 10), false))
+	c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 10), false), 0)
 
-	tr, ok := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v2", tool.ReadIntentFull, nil, ranges(10, 20), true))
+	tr, ok := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v2", tool.ReadIntentFull, nil, ranges(10, 20), true), 0)
 	if !ok || !tr.Stale || tr.Generation != 1 {
 		t.Fatalf("version change must be reported stale with a new generation: %+v (ok=%v)", tr, ok)
 	}
@@ -134,7 +135,7 @@ func TestOutOfOrderPagesStillSatisfyAWholeFileRead(t *testing.T) {
 	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, Requirement{Intent: tool.ReadIntentFull, WholeFile: true})
 	for _, r := range [][]tool.ReadRange{ranges(20, 30), ranges(0, 10), ranges(10, 20)} {
 		eof := r[0].Start == 20
-		c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, r, eof))
+		c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, r, eof), 0)
 	}
 	ob, _ := c.Get("ir-1")
 	if ob.State != StateSatisfied {
@@ -150,10 +151,10 @@ func TestRepeatedPageIsNotProgress(t *testing.T) {
 	req := Requirement{Intent: tool.ReadIntentRange, Ranges: ranges(0, 40)}
 	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, req)
 	page := envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 40}, ranges(0, 10), false)
-	if tr, _ := c.Observe(page); !tr.Progress {
+	if tr, _ := c.Observe(page, 0); !tr.Progress {
 		t.Fatal("first delivery is progress")
 	}
-	tr, _ := c.Observe(page)
+	tr, _ := c.Observe(page, 0)
 	if tr.Progress || len(tr.Added) != 0 {
 		t.Fatalf("a repeated page must not count as progress: %+v", tr)
 	}
@@ -170,7 +171,7 @@ func TestCancelledObligationIgnoresLateDelivery(t *testing.T) {
 	if !ok || tr.To != StateCancelled {
 		t.Fatalf("cancel transition = %+v (ok=%v)", tr, ok)
 	}
-	if _, ok := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 10), true)); ok {
+	if _, ok := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 10), true), 0); ok {
 		t.Fatal("a cancelled obligation must not accept a late delivery")
 	}
 	ob, _ := c.Get("ir-1")
@@ -194,7 +195,7 @@ func TestStopReasonsAreReportedAndClearedByADelivery(t *testing.T) {
 	if !ob.Requirement.WholeFile {
 		t.Fatal("narrowing must not silently downgrade a whole-file requirement")
 	}
-	tr, ok = c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 10), true))
+	tr, ok = c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 10), true), 0)
 	if !ok || tr.To != StateSatisfied || tr.Stop != nil {
 		t.Fatalf("a delivery must clear the stop reason: %+v (ok=%v)", tr, ok)
 	}
@@ -203,13 +204,13 @@ func TestStopReasonsAreReportedAndClearedByADelivery(t *testing.T) {
 func TestBeginRefreshesRequirementAndKeepsCoverage(t *testing.T) {
 	c := New()
 	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, Requirement{Intent: tool.ReadIntentRange, Ranges: ranges(0, 10)})
-	c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 10}, ranges(0, 10), false))
+	c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 10}, ranges(0, 10), false), 0)
 	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, Requirement{Intent: tool.ReadIntentRange, Ranges: ranges(0, 20)})
 	ob, _ := c.Get("ir-1")
 	if !sameRanges(ob.Covered, ranges(0, 10)) {
 		t.Fatalf("Covered = %+v, want the earlier delivery kept", ob.Covered)
 	}
-	tr, _ := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 10, End: 20}, ranges(10, 20), false))
+	tr, _ := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 10, End: 20}, ranges(10, 20), false), 0)
 	if tr.To != StateSatisfied {
 		t.Fatalf("refreshed requirement transition = %+v, want satisfied", tr)
 	}
@@ -217,14 +218,14 @@ func TestBeginRefreshesRequirementAndKeepsCoverage(t *testing.T) {
 
 func TestObserveIgnoresEnvelopesWithoutIdentity(t *testing.T) {
 	c := New()
-	if _, ok := c.Observe(tool.ReadResultEnvelope{Intent: tool.ReadIntentInspect}); ok {
+	if _, ok := c.Observe(tool.ReadResultEnvelope{Intent: tool.ReadIntentInspect}, 0); ok {
 		t.Fatal("an envelope without a read id or path must be ignored")
 	}
 }
 
 func TestObserveWithoutBeginDerivesTheRequirementFromIntent(t *testing.T) {
 	c := New()
-	if _, ok := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 10), true)); !ok {
+	if _, ok := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 10), true), 0); !ok {
 		t.Fatal("an unregistered full read must still be folded")
 	}
 	ob, _ := c.Get("ir-1")
@@ -235,7 +236,7 @@ func TestObserveWithoutBeginDerivesTheRequirementFromIntent(t *testing.T) {
 		t.Fatalf("state = %s, want satisfied after a complete full read", ob.State)
 	}
 
-	inspect, ok := c.Observe(envelope("ir-2", "/w/b.go", "rw1:v1", tool.ReadIntentInspect, nil, ranges(0, 200), false))
+	inspect, ok := c.Observe(envelope("ir-2", "/w/b.go", "rw1:v1", tool.ReadIntentInspect, nil, ranges(0, 200), false), 0)
 	if !ok || inspect.To != StateSatisfied {
 		t.Fatalf("inspect transition = %+v (ok=%v)", inspect, ok)
 	}
@@ -258,7 +259,7 @@ func TestSnapshotIsOrderedByKey(t *testing.T) {
 func TestReturnedObligationsAreDeepCopies(t *testing.T) {
 	c := New()
 	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, Requirement{Intent: tool.ReadIntentRange, Ranges: ranges(0, 20)})
-	c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 20}, ranges(0, 10), false))
+	c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 20}, ranges(0, 10), false), 0)
 
 	got, _ := c.Get("ir-1")
 	got.Covered[0] = tool.ReadRange{Start: 99, End: 100}
@@ -283,7 +284,7 @@ func TestRangeCompletionNeedsATrustworthySourceEnd(t *testing.T) {
 	// EOF without a source end proves nothing: the reader may have stopped early.
 	unvouched := envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 20}, ranges(0, 5), true)
 	unvouched.SourceEnd = nil
-	if tr, _ := c.Observe(unvouched); tr.To != StateNeedsMore {
+	if tr, _ := c.Observe(unvouched, 0); tr.To != StateNeedsMore {
 		t.Fatalf("bare EOF must not complete a range: %+v", tr)
 	}
 
@@ -291,7 +292,62 @@ func TestRangeCompletionNeedsATrustworthySourceEnd(t *testing.T) {
 	shortFile := envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 20}, ranges(0, 5), true)
 	shortFile.SourceEnd = new(int)
 	*shortFile.SourceEnd = 5
-	if tr, _ := c.Observe(shortFile); tr.To != StateSatisfied {
+	if tr, _ := c.Observe(shortFile, 0); tr.To != StateSatisfied {
 		t.Fatalf("a source end inside the window completes the range: %+v", tr)
+	}
+}
+
+func TestStalledPagesPivotOnceThenPause(t *testing.T) {
+	c := NewWithPolicy(Policy{MaxPages: 64, PivotAfter: 2, PauseAfter: 2})
+	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, Requirement{Intent: tool.ReadIntentRange, Ranges: ranges(0, 40)})
+	page := envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 40}, ranges(0, 10), false)
+	c.Observe(page, 0)
+
+	if tr, _ := c.Observe(page, 0); tr.Advice != "" {
+		t.Fatalf("one stalled page must not pivot yet: %+v", tr)
+	}
+	tr, _ := c.Observe(page, 0)
+	if tr.Advice != AdvicePivot {
+		t.Fatalf("the second stalled page must pivot once: %+v", tr)
+	}
+	c.Observe(page, 0)
+	tr, _ = c.Observe(page, 0)
+	if tr.To != StateBlocked || tr.Stop == nil || tr.Stop.Code != "no_progress" {
+		t.Fatalf("two stalled pages after the pivot must pause the read: %+v", tr)
+	}
+}
+
+func TestPageBudgetStopsContinuation(t *testing.T) {
+	c := NewWithPolicy(Policy{MaxPages: 2})
+	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, Requirement{Intent: tool.ReadIntentRange, Ranges: ranges(0, 100)})
+	for _, r := range [][]tool.ReadRange{ranges(0, 10), ranges(10, 20), ranges(20, 30)} {
+		env := envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 100}, r, false)
+		tr, _ := c.Observe(env, 0)
+		if r[0].Start == 20 {
+			if tr.To != StateBlocked || tr.Stop == nil || tr.Stop.Code != "page_budget" {
+				t.Fatalf("the page budget must stop continuation: %+v", tr)
+			}
+		}
+	}
+}
+
+func TestActiveTimeBudgetStopsContinuation(t *testing.T) {
+	c := NewWithPolicy(Policy{MaxActiveTime: 100 * time.Millisecond})
+	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, Requirement{Intent: tool.ReadIntentRange, Ranges: ranges(0, 100)})
+	env := envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 100}, ranges(0, 10), false)
+	tr, _ := c.Observe(env, 200)
+	if tr.To != StateBlocked || tr.Stop == nil || tr.Stop.Code != "time_budget" {
+		t.Fatalf("the active-time budget must stop continuation: %+v", tr)
+	}
+}
+
+func TestContentChangeDoesNotResetTheBudget(t *testing.T) {
+	c := NewWithPolicy(Policy{MaxPages: 1})
+	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, Requirement{Intent: tool.ReadIntentFull, WholeFile: true})
+	c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentFull, nil, ranges(0, 10), false), 0)
+
+	tr, _ := c.Observe(envelope("ir-1", "/w/a.go", "rw1:v2", tool.ReadIntentFull, nil, ranges(10, 20), false), 0)
+	if tr.To != StateBlocked || tr.Stop == nil || tr.Stop.Code != "page_budget" {
+		t.Fatalf("a content change must not reset the hard budget: %+v", tr)
 	}
 }

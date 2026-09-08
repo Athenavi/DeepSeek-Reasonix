@@ -1,6 +1,10 @@
 package readcoord
 
-import "reasonix/internal/tool"
+import (
+	"time"
+
+	"reasonix/internal/tool"
+)
 
 // Scope identifies the file a read requirement targets.
 type Scope struct {
@@ -82,8 +86,13 @@ type Obligation struct {
 	Generation uint64
 	Sequence   uint64
 	Pages      int
-	// Stagnant counts consecutive deliveries that added no new coverage.
+	// Stagnant counts consecutive deliveries that added no new coverage;
+	// Pivoted records that the one allowed strategy change already happened.
 	Stagnant int
+	Pivoted  bool
+	// ActiveTime is the host-measured time spent producing this read's pages.
+	// Waiting for the model is not counted.
+	ActiveTime time.Duration
 	// Stop carries the reason for StateBlocked or StateNeedsScope.
 	Stop *Block
 }
