@@ -335,7 +335,7 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
-          cache-dependency-path: desktop/frontend/pnpm-lock.yaml
+          cache-dependency-path: desktop/pnpm-lock.yaml
 
       # Linux: WebKitGTK 4.1 toolchain (-tags webkit2_41 in desktop-build.sh).
       # 4.1 ships from ubuntu-22.04 on and is the only one present on 24.04+/Fedora 40+.

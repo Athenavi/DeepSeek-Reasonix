@@ -31,6 +31,7 @@ mem.prof
 /desktop/frontend/sourcemaps/
 /desktop/frontend/wailsjs/
 /desktop/frontend/package.json.md5
+/desktop/electron/dist/
 
 # Environment / local config (reasonix.example.toml is the shared template)
 .env

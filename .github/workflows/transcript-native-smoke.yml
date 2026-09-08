@@ -45,7 +45,7 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
-          cache-dependency-path: desktop/frontend/pnpm-lock.yaml
+          cache-dependency-path: desktop/pnpm-lock.yaml
 
       - name: Build focused transcript fixture
         run: |

@@ -364,7 +364,7 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
-          cache-dependency-path: desktop/frontend/pnpm-lock.yaml
+          cache-dependency-path: desktop/pnpm-lock.yaml
       - run: pnpm --dir frontend install --frozen-lockfile
       - uses: actions/download-artifact@v8
         with:
@@ -372,6 +372,11 @@ jobs:
           path: desktop/frontend
       - name: Verify CI test coverage and runner
         run: node --test frontend/scripts/ci-test-plan.test.mjs
+      - name: Check the Electron shell
+        run: |
+          pnpm --dir electron typecheck
+          pnpm --dir electron test
+          pnpm --dir electron build
       - name: Test desktop frontend once per suite
         env:
           REASONIX_TEST_CONCURRENCY: "2"
@@ -394,7 +399,7 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
-          cache-dependency-path: desktop/frontend/pnpm-lock.yaml
+          cache-dependency-path: desktop/pnpm-lock.yaml
       - run: pnpm --dir frontend install --frozen-lockfile
       - uses: actions/download-artifact@v8
         with:
@@ -437,7 +442,7 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
-          cache-dependency-path: desktop/frontend/pnpm-lock.yaml
+          cache-dependency-path: desktop/pnpm-lock.yaml
 
       - name: Install Wails CLI
         run: |
@@ -508,7 +513,7 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
-          cache-dependency-path: desktop/frontend/pnpm-lock.yaml
+          cache-dependency-path: desktop/pnpm-lock.yaml
 
       - uses: actions/download-artifact@v8
         with:
@@ -617,7 +622,7 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
-          cache-dependency-path: desktop/frontend/pnpm-lock.yaml
+          cache-dependency-path: desktop/pnpm-lock.yaml
 
       - name: Install Wails CLI and build frontend
         run: |
@@ -697,7 +702,7 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
-          cache-dependency-path: desktop/frontend/pnpm-lock.yaml
+          cache-dependency-path: desktop/pnpm-lock.yaml
 
       - name: Install Wails CLI
         run: |
@@ -837,7 +842,7 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
-          cache-dependency-path: desktop/frontend/pnpm-lock.yaml
+          cache-dependency-path: desktop/pnpm-lock.yaml
 
       - name: required native motion contracts
         if: github.event_name != 'pull_request' || needs.changes.outputs.desktop != 'false'
