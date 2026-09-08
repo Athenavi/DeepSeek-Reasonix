@@ -706,10 +706,11 @@
 .settings-subagent-advanced > summary { cursor: pointer; color: var(--fg-dim); padding: 12px 0; }
 
 /* Settings templates: geometry is shared; only task layout varies. */
+/* Defaults must yield to component layouts and named page containers. */
+:where(.settings-center .settings-page[data-layout]) { container: settings-page / inline-size; }
 :root .settings-center .settings-page[data-layout] {
   --settings-space: 24px;
   --settings-control-height: 40px;
-  container: settings-page / inline-size;
   max-width: none;
   color: var(--fg);
 }
@@ -735,13 +736,12 @@
   font-weight: 650;
   line-height: 1.5;
 }
-:root .settings-center .settings-page[data-layout] .settings-field {
+:where(.settings-center .settings-page[data-layout]) .settings-field {
   grid-template-columns: minmax(160px, .8fr) minmax(0, 1.2fr);
   gap: 24px;
   padding: 16px 0;
-  align-items: center;
 }
-:root .settings-center .settings-page[data-layout] .settings-field--wide-copy { grid-template-columns: minmax(0, 1fr) auto; }
+:where(.settings-center .settings-page[data-layout]) .settings-field--wide-copy { grid-template-columns: minmax(0, 1fr) auto; }
 :root .settings-center .settings-page[data-layout] :is(.settings-field__copy, .settings-field__control) { min-width: 0; }
 :root .settings-center .settings-page[data-layout] .settings-field__hint-line {
   white-space: normal;
@@ -818,7 +818,7 @@
 :root .settings-center .settings-page--storage .settings-field__control input[readonly] { background: transparent; border-color: transparent; font-family: var(--font-mono, monospace); }
 :root .settings-center .settings-center__navitem:not(.settings-center__navitem--active):hover { background: color-mix(in srgb, var(--fg) 3%, transparent); }
 @container settings-page (max-width: 680px) {
-  :root .settings-center .settings-page[data-layout] .settings-field { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  :where(.settings-center .settings-page[data-layout]) .settings-field { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   :root .settings-center .settings-page--bots .bot-channel-manager { grid-template-columns: minmax(0, 1fr); }
   :root .settings-center .settings-page--bots .bot-channel-tabs { border: 0; padding: 0; display: flex; overflow-x: auto; }
   :root .settings-center .settings-page--bots .bot-channel-tab { flex: 0 0 160px; }
@@ -831,14 +831,14 @@
 :root .settings-center .settings-page[data-layout] .settings-path-value input { flex: 1; min-width: 0; }
 
 /* Model preferences: one assignment matrix, then compact runtime controls. */
-.model-preferences { width: 100%; max-width: 1120px; margin: 0 auto; }
+.model-preferences { container: model-preferences / inline-size; --model-assignment-columns: minmax(140px, 1fr) minmax(220px, 1.5fr) minmax(140px, .8fr); width: 100%; max-width: 1120px; margin: 0 auto; }
 .model-preferences .settings-section { background: transparent; border: 0; box-shadow: none; padding: 0; margin: 0; border-radius: 0; }
 .model-preferences .settings-section + .settings-section { margin-top: 20px; }
 .model-preferences .settings-section__head { padding: 0 0 16px; margin: 0; }
 .model-preferences .settings-section__title { font-size: 16px; }
 .model-preferences .settings-section__body { padding: 0; }
 .model-preferences .settings-field { padding: 16px 0; min-height: 0; gap: 24px; }
-.model-assignment-head, .model-preferences .model-assignment-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(220px, 1.5fr) minmax(140px, .8fr); gap: 24px; align-items: center; border-bottom: 1px solid var(--border); }
+.model-assignment-head, .model-preferences .model-assignment-row { display: grid; grid-template-columns: var(--model-assignment-columns); gap: 24px; align-items: center; border-bottom: 1px solid var(--border); }
 .model-assignment-head { padding: 12px 0; font-size: 13px; color: var(--fg-dim); }
 .model-preferences .model-assignment-row .settings-field__control { display: contents; }
 .model-assignment-row .settings-model-picker { min-width: 0; width: 100%; }
@@ -853,8 +853,13 @@
 .model-preferences .compact-ratio-preset__caption, .model-preferences .compact-ratio-current { display: none; }
 .model-preferences .compact-ratio-presets .set-seg__btn { min-height: 40px; padding: 8px 16px; }
 .model-preferences .compact-ratio-summary { justify-content: flex-end; }
-@media (max-width: 900px) {
+@container model-preferences (max-width: 780px) {
  .model-assignment-head { display: none; }
  .model-preferences .model-assignment-row { grid-template-columns: minmax(120px, .7fr) minmax(160px, 1fr); gap: 8px 16px; }
  .model-assignment-connection { grid-column: 2; }
+}
+
+@container model-preferences (max-width: 440px) {
+ .model-preferences .model-assignment-row { grid-template-columns: minmax(0, 1fr); }
+ .model-assignment-connection { grid-column: 1; }
 }

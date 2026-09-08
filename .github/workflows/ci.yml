@@ -397,6 +397,7 @@ jobs:
           pnpm --dir frontend test:todo-visibility
           pnpm --dir frontend test:app-lifecycle
           PLAYWRIGHT_BROWSERS_PATH=.pw-browsers pnpm --dir frontend test:app-browser
+          PLAYWRIGHT_BROWSERS_PATH=.pw-browsers REASONIX_SETTINGS_BROWSERS=chromium,webkit pnpm --dir frontend test:settings-browser
           pnpm --dir frontend test:all
           pnpm --dir frontend test:transcript
           xvfb-run -a env REASONIX_TRANSCRIPT_NATIVE_THUMB=1 pnpm --dir frontend test:transcript-browser
@@ -606,6 +607,12 @@ jobs:
         run: |
           pnpm --dir frontend exec playwright install chromium
           pnpm --dir frontend test:transcript-browser
+
+      - name: Test settings layout on Windows
+        timeout-minutes: 5
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/desktop/frontend/.pw-browsers
+        run: pnpm --dir frontend test:settings-browser
 
       - name: Test WebView2 native transcript and composer scrolling
         timeout-minutes: 5
