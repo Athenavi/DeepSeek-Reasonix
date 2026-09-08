@@ -91,7 +91,12 @@ func (r readFile) ObserveModelText(args json.RawMessage, output string) (tool.Mo
 		hashes[i] = hex.EncodeToString(sum[:])
 	}
 	rp := resolveReadablePath(r.workDir, p.Path, r.paths)
-	return tool.ModelTextObservation{Path: rp.Path, StartLine: window.StartLine, LineHashes: hashes}, true
+	return tool.ModelTextObservation{
+		Path:       rp.Path,
+		StartLine:  window.StartLine,
+		LineHashes: hashes,
+		Version:    tool.ReadWindowVersionToken(rp.Path, window),
+	}, true
 }
 
 // ReadEnvelope reports what one read_file call delivered: its intent, the

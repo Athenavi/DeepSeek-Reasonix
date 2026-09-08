@@ -96,6 +96,7 @@ func (a *Agent) storeBatchToolResult(call provider.ToolCall, o toolOutcome) {
 		if raw, err := json.Marshal(env); err == nil {
 			msg.ReadResult = raw
 		}
+		a.observeReadShadow(env)
 	}
 	a.sess.conversation.Add(msg)
 }

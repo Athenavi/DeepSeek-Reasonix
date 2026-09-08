@@ -43,6 +43,7 @@ func (a *Agent) recordModelTextObservationValue(observed tool.ModelTextObservati
 	a.task.ledger.RecordTextObservation(evidence.TextObservation{
 		Path:       observed.Path,
 		StartLine:  observed.StartLine,
+		Version:    observed.Version,
 		LineHashes: observed.LineHashes,
 	})
 }

@@ -201,6 +201,10 @@ func TestReadEnvelopeKeepsUnicodeWindowsIntact(t *testing.T) {
 	if again.Source.VersionToken != env.Source.VersionToken {
 		t.Fatal("identical unicode window must produce a stable version token")
 	}
+	observed, ok := r.ObserveModelText(json.RawMessage(`{"path":"u.go","offset":1,"limit":2}`), out)
+	if !ok || observed.Version != env.Source.VersionToken {
+		t.Fatalf("observation version %q must match the envelope token %q (ok=%v)", observed.Version, env.Source.VersionToken, ok)
+	}
 }
 
 func TestReadEnvelopeRejectsCallsWithoutAPath(t *testing.T) {

@@ -13,6 +13,10 @@ type ModelTextObservation struct {
 	Path       string
 	StartLine  int
 	LineHashes []string
+	// Version is the content version of the observed lines, empty when the
+	// reader cannot bind one. Two observations may only be combined when their
+	// versions match.
+	Version string
 }
 
 // ModelTextObserver is an optional reader capability. The agent passes the

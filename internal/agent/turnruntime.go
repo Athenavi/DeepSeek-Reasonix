@@ -104,6 +104,10 @@ type turnRuntime struct {
 	// or finish from a silent partial read.
 	incompleteReads incompleteReadState
 
+	// readShadow is the host-only shadow of the read coordinator; it is inert
+	// unless Options.ReadCoordinatorShadow is set for this run.
+	readShadow readShadowState
+
 	phase phaseClock
 
 	// sessionContext is the content-free diagnostic for the snapshot selected

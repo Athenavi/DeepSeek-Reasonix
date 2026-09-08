@@ -33,4 +33,7 @@ type agentConfig struct {
 	recentKeep             int
 	archiveDir             string
 	legacyAnchorSafetyGate bool
+	// readCoordinatorShadow fixes the internal read-coordinator rollout switch
+	// for the whole run; see Options.ReadCoordinatorShadow.
+	readCoordinatorShadow bool
 }
