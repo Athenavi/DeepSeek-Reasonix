@@ -1479,8 +1479,6 @@ function normalizeStatusBarStyle(style: string | undefined): StatusBarStyle {
 
 function statusBarItemLabel(id: StatusBarItemId, t: ReturnType<typeof useT>): string {
   switch (id) {
-    case "model":
-      return t("settings.statusBarItem.model");
     case "workspace":
       return t("settings.statusBarItem.workspace");
     case "cache":

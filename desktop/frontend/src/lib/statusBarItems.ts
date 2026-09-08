@@ -1,5 +1,4 @@
 export const STATUS_BAR_ITEM_IDS = [
-  "model",
   "workspace",
   "cache",
   "cache_avg",

@@ -7,6 +7,8 @@ Normal execution and Standard delivery are the defaults. Active modes appear
 as removable chips; removing Delivery restores Standard without changing Plan
 or Goal. Approval policy remains a separate Ask/Auto/Yolo menu. Model and
 reasoning effort have independent selectors; unsupported models hide effort.
+The status bar no longer repeats the model name. Its turn cost uses two decimal
+places; detailed cost values retain their existing precision.
 
 The context ring opens usage details. **Turn time** excludes user-approval and
 answer waits and stops at the controller's completion timestamp. Retry time

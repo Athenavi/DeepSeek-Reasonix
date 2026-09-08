@@ -164,7 +164,6 @@ export function StatusBar({
   context,
   usage,
   balance,
-  running,
   sessionTurns,
   sessionTokens,
   turnTokens,
@@ -176,7 +175,6 @@ export function StatusBar({
   turnRateBand,
   cost,
   currency,
-  modelLabel,
   labelStyle = "icon",
   items,
   workspacePath,
@@ -244,7 +242,7 @@ export function StatusBar({
   const turnEstimated = usage?.estimated === true;
   const sessionEstimated = context.estimated === true;
   const markEstimated = (value: string, estimated: boolean) => estimated && value !== "-" ? `≈${value}` : value;
-  const turnCostLabel = appendRateBand(markEstimated(formatMoneyLocalized(turnCost, currency, { locale }), turnEstimated), turnRateBand, t);
+  const turnCostLabel = appendRateBand(markEstimated(formatMoneyLocalized(turnCost, currency, { locale, fractionDigits: 2 }), turnEstimated), turnRateBand, t);
   const costLabel = markEstimated(formatMoneyLocalized(cost, currency, { locale }), sessionEstimated);
   const displayWorkspacePath = (workspacePath || workspaceName || "").trim();
   const workspaceLabel = compactPath(displayWorkspacePath, workspaceName);
@@ -289,14 +287,6 @@ export function StatusBar({
   const cacheTooltip = sourceCacheTooltip(t, t("status.cacheTitle"), context);
   const avgCacheTooltip = sourceCacheTooltip(t, t("status.cacheAvgTitle"), context);
   const itemRenderers: Record<StatusBarItemId, ReactNode> = {
-    model: (
-      <Tooltip label={t("status.modelTitle")}>
-        <span className="stat stat--model">
-          <span className={`statusbar__dot ${running ? "statusbar__dot--busy" : ""}`} />
-          {modelLabel && <span className="statusbar__model">{modelLabel}</span>}
-        </span>
-      </Tooltip>
-    ),
     workspace: branchLabel || workspaceLabel ? (
       <Tooltip label={workspaceTitle} className="statusbar__metric statusbar__metric--workspace">
         <span className="stat statusbar__workspace">
