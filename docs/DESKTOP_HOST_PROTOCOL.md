@@ -151,9 +151,25 @@ phase.
 | `host/remoteWindow.focus` `close` | `{"hostKey"}` | `{}` |
 | `host/tray.ensure` | `{"openTitle","openTooltip","quitTitle","quitTooltip","tooltip"}` | `{"ready":bool,"reason":string}` |
 | `host/tray.destroy` | `{}` | `{}` |
+| `host/browser.grant` `revoke` | `{"grantId","tabId","sessionId"}` / `{"grantId"}` | `{}` |
+| `host/browser.tabs.list` | `{"grantId"}` | `{"tabs":[{"id","url","title","loading","temporary"}]}` |
+| `host/browser.tabs.open` | `{"grantId","url","temporary"}` | tab |
+| `host/browser.tabs.navigate` | `{"grantId","tabId","url","action"}` | tab |
+| `host/browser.tabs.close` | `{"grantId","tabId"}` | `{}` |
+| `host/browser.snapshot` | `{"grantId","tabId","selector"}` | `{"documentToken","url","title","tree","refs"}` |
+| `host/browser.act` | `{"grantId","operationId","tabId","documentToken","action","ref","text","keys","options","files","submit","deltaX","deltaY"}` | `{"executed","reason","documentToken"}` |
+| `host/browser.screenshot` | `{"grantId","tabId","ref","fullPage","directory"}` | `{"path","mime","width","height"}` |
+| `host/browser.downloads` | `{"grantId","tabId","waitForMs"}` | `{"downloads":[{"id","url","path","state","bytes"}]}` |
 
-Tray clicks arrive as `desktop/hostEvent` with `name` `tray.open` or `tray.quit`;
-a second launch arrives as `secondInstance` with the raw argv in `payload`.
+Browser calls fail with `-32010` (stale reference), `-32011` (the user took the
+tab over) or `-32012` (no current grant); the Go executor maps them onto the
+kernel sentinels and records the operation outcome in its ledger. Grant
+`tabId` is the desktop tab (the task); browser tabs opened under that grant
+belong to it.
+
+Host events (`desktop/hostEvent`): `tray.open`, `tray.quit`, `secondInstance`
+(raw argv in `payload`), `menu.showWindow`, `remoteWindow.closed`
+(`{"hostKey"}`), `browser.takeover` (`{"tabId","epoch","reason"}`).
 
 Dialog results never expose file contents; they return paths that Go then
 authorises through the existing workspace and media checks.
@@ -192,8 +208,28 @@ interface ReasonixDesktopHost {
     getPathForFile(file: File): string;          // native drop paths
     onServiceState(cb: (state: ServiceState) => void): () => void;
   };
+  browser: {                                       // user-driven browser panel; agent calls go through Go
+    list(): Promise<BrowserTabView[]>;
+    open(url: string, opts?: { temporary?: boolean; taskId?: string }): Promise<BrowserTabView>;
+    close(tabId: string): Promise<void>;
+    activate(tabId: string | null): Promise<void>;
+    navigate(tabId: string, target: { url?: string; action?: "back" | "forward" | "reload" | "stop" }): Promise<void>;
+    setZoom(tabId: string, factor: number): Promise<void>;
+    toggleDevTools(tabId: string): Promise<void>;
+    resume(tabId: string): Promise<void>;          // hand a taken-over tab back to the agent
+    setLayout(rect: { x: number; y: number; width: number; height: number } | null): void;
+    setOverlay(active: boolean): void;             // app overlays hide every website view
+    onTabs(cb: (tabs: BrowserTabView[]) => void): () => void;
+    onDownload(cb: (download: BrowserDownloadView) => void): () => void;
+  };
 }
 ```
+
+`BrowserTabView` is `{ id, taskId, url, title, loading, canGoBack, canGoForward,
+temporary, mode: "agent" | "human", epoch, zoom, error }` and
+`BrowserDownloadView` is `{ id, tabId, url, filename, path, state, received,
+total }`. Website views live in `persist:browser` (shared logins) or
+`temp:<id>` partitions and never receive the application preload.
 
 `ServiceState` is `{ phase: "starting" | "ready" | "restarting" | "failed" | "exited"; generation: string; error?: string }`.
 Business components import the typed SDK, never this object; only the bridge

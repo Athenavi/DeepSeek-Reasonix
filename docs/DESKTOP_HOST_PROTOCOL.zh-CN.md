@@ -134,9 +134,23 @@ Wails 实现在最后阶段删除。
 | `host/remoteWindow.focus` `close` | `{"hostKey"}` | `{}` |
 | `host/tray.ensure` | `{"openTitle","openTooltip","quitTitle","quitTooltip","tooltip"}` | `{"ready":bool,"reason":string}` |
 | `host/tray.destroy` | `{}` | `{}` |
+| `host/browser.grant` `revoke` | `{"grantId","tabId","sessionId"}` / `{"grantId"}` | `{}` |
+| `host/browser.tabs.list` | `{"grantId"}` | `{"tabs":[{"id","url","title","loading","temporary"}]}` |
+| `host/browser.tabs.open` | `{"grantId","url","temporary"}` | tab |
+| `host/browser.tabs.navigate` | `{"grantId","tabId","url","action"}` | tab |
+| `host/browser.tabs.close` | `{"grantId","tabId"}` | `{}` |
+| `host/browser.snapshot` | `{"grantId","tabId","selector"}` | `{"documentToken","url","title","tree","refs"}` |
+| `host/browser.act` | `{"grantId","operationId","tabId","documentToken","action","ref","text","keys","options","files","submit","deltaX","deltaY"}` | `{"executed","reason","documentToken"}` |
+| `host/browser.screenshot` | `{"grantId","tabId","ref","fullPage","directory"}` | `{"path","mime","width","height"}` |
+| `host/browser.downloads` | `{"grantId","tabId","waitForMs"}` | `{"downloads":[{"id","url","path","state","bytes"}]}` |
 
-托盘点击以 `desktop/hostEvent` 到达，`name` 为 `tray.open` 或 `tray.quit`；第二次启动以
-`secondInstance` 到达，`payload` 携带原始 argv。
+浏览器调用以 `-32010`（引用过期）、`-32011`（用户已接管该标签）或 `-32012`（没有当前授权）
+失败；Go 执行器把它们映射到内核哨兵错误，并把操作结果记入账本。授权的 `tabId` 是桌面
+标签（任务）；该授权下打开的浏览器标签归属于它。
+
+宿主事件（`desktop/hostEvent`）：`tray.open`、`tray.quit`、`secondInstance`（`payload` 携带
+原始 argv）、`menu.showWindow`、`remoteWindow.closed`（`{"hostKey"}`）、`browser.takeover`
+（`{"tabId","epoch","reason"}`）。
 
 对话框结果从不暴露文件内容；它们只返回路径，再由 Go 经现有工作区和媒体检查授权。
 
@@ -172,8 +186,27 @@ interface ReasonixDesktopHost {
     getPathForFile(file: File): string;          // 原生拖放路径
     onServiceState(cb: (state: ServiceState) => void): () => void;
   };
+  browser: {                                       // 用户驱动的浏览器面板；Agent 调用经 Go
+    list(): Promise<BrowserTabView[]>;
+    open(url: string, opts?: { temporary?: boolean; taskId?: string }): Promise<BrowserTabView>;
+    close(tabId: string): Promise<void>;
+    activate(tabId: string | null): Promise<void>;
+    navigate(tabId: string, target: { url?: string; action?: "back" | "forward" | "reload" | "stop" }): Promise<void>;
+    setZoom(tabId: string, factor: number): Promise<void>;
+    toggleDevTools(tabId: string): Promise<void>;
+    resume(tabId: string): Promise<void>;          // 把接管的标签交还给 Agent
+    setLayout(rect: { x: number; y: number; width: number; height: number } | null): void;
+    setOverlay(active: boolean): void;             // 应用覆盖层隐藏所有网站视图
+    onTabs(cb: (tabs: BrowserTabView[]) => void): () => void;
+    onDownload(cb: (download: BrowserDownloadView) => void): () => void;
+  };
 }
 ```
+
+`BrowserTabView` 为 `{ id, taskId, url, title, loading, canGoBack, canGoForward,
+temporary, mode: "agent" | "human", epoch, zoom, error }`，`BrowserDownloadView` 为
+`{ id, tabId, url, filename, path, state, received, total }`。网站视图位于
+`persist:browser`（共享登录）或 `temp:<id>` 分区，永远不会获得应用 preload。
 
 `ServiceState` 为 `{ phase: "starting" | "ready" | "restarting" | "failed" | "exited"; generation: string; error?: string }`。
 业务组件只导入类型化 SDK，从不直接使用该对象；只有桥接适配层读取它。
