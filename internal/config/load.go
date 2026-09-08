@@ -334,27 +334,6 @@ func tomlFileDefinesKey(path string, key ...string) bool {
 	return meta.IsDefined(key...)
 }
 
-// ConfigFileDefinesCompactRatio reports whether path explicitly overrides the
-// automatic compaction threshold. It is used by config surfaces that need to
-// explain whether the effective value came from defaults, user config, or the
-// current project.
-func ConfigFileDefinesCompactRatio(path string) bool {
-	return tomlFileDefinesKey(path, "agent", "compact_ratio")
-}
-
-// ConfigFileDefinesSkillKey reports whether a project or user TOML file
-// explicitly owns one of the supported [skills] settings. Desktop settings use
-// this narrow provenance check to edit the file that wins at runtime instead
-// of persisting a shadowed value to the global config.
-func ConfigFileDefinesSkillKey(path, key string) bool {
-	switch strings.TrimSpace(key) {
-	case "paths", "excluded_paths", "disabled_skills", "disable_implicit_invocation", "max_depth":
-		return tomlFileDefinesKey(path, "skills", key)
-	default:
-		return false
-	}
-}
-
 // backfillDeepSeekPro restores deepseek-pro for configs the pre-fix setup wizard
 // wrote with only deepseek-v4-flash: a keyless /models probe used to drop the Pro
 // SKU, leaving users unable to switch to it. In-memory only — the user's file is
@@ -1816,6 +1795,7 @@ func legacyMimoConfigRefs(c *Config) []string {
 		c.DefaultModel,
 		c.Agent.PlannerModel,
 		c.Agent.VisionModel,
+		c.Agent.WebSearchModel,
 		c.Agent.SubagentModel,
 		c.Bot.Model,
 	}
@@ -1977,6 +1957,7 @@ func NormalizeLegacyDesktopProviderAccess(c *Config) {
 	addRef(c.DefaultModel)
 	addRef(c.Agent.PlannerModel)
 	addRef(c.Agent.VisionModel)
+	addRef(c.Agent.WebSearchModel)
 	addRef(c.Agent.SubagentModel)
 	for _, ref := range c.Agent.SubagentModels {
 		addRef(ref)

@@ -508,6 +508,7 @@ var ChineseTraditional = Messages{
 	ProviderErrQuotaExhaustedFmt:   "%s：供應商餘額或方案額度不足（HTTP %d）。請檢查帳戶額度後繼續。",
 	ProviderErrReasonMissing:       "上游拒絕了請求，但未提供具體原因。",
 	SearchSourcesNotProvided:       "搜尋已完成，供應商未提供可用的結構化來源。",
+	SearchModelUnavailable:         "指定的網頁搜尋模型不可用；不會改用其他帳號。",
 	ProtocolRecoveryLabel:          "從有效歷史恢復",
 	ProviderErrInsufficientBalance: "餘額不足 (HTTP 402)：帳戶餘額不足，請前往儲值後重試。",
 	ProviderErrUnprocessable:       "參數錯誤 (HTTP 422)：某個請求參數被拒絕，通常是程式缺陷。若持續出現請回報。",

@@ -34,7 +34,8 @@ func desktopStartupSettingsFromConfig(cfg *config.Config) DesktopStartupSettings
 func (a *App) defaultSettingsView() SettingsView {
 	defaults := config.Default()
 	return SettingsView{
-		Providers: []ProviderView{}, OfficialProviders: officialProviderViews(map[string]bool{}, ""),
+		WebSearchModels: []string{},
+		Providers:       []ProviderView{}, OfficialProviders: officialProviderViews(map[string]bool{}, ""),
 		ProviderPresets: providerPresetViewsForRootWithResolver(nil, a.activeWorkspaceRoot(), nil),
 		ProviderKinds:   nonNil(provider.Kinds()),
 		Permissions:     PermissionsView{Mode: "ask", Allow: []string{}, Ask: []string{}, Deny: []string{}},
