@@ -2,9 +2,12 @@ package agent
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"os"
 	"time"
+
+	"reasonix/internal/provider"
 
 	fileencoding "reasonix/internal/fileutil/encoding"
 	"reasonix/internal/store"
@@ -96,4 +99,22 @@ func writeSessionDAGIndex(ctx context.Context, sessionPath string, st *sessionDA
 	}
 	b = append(b, '\n')
 	return atomicWriteFileContext(ctx, indexPath, ".session-event-index.*.tmp", "event-index", b, 0o600, false)
+}
+
+// refreshSessionEventIndexContext rewrites the event index in the schema the
+// log actually uses: a schema-2 log gets its head index replayed, a schema-1
+// log the listing index. A listing repair must never downgrade a head index.
+func refreshSessionEventIndexContext(ctx context.Context, sessionPath string, msgs []provider.Message, digest [sha256.Size]byte, revision int64) error {
+	probe, err := probeSessionEventLog(sessionPath)
+	if err != nil {
+		return err
+	}
+	if !probe.dag {
+		return writeSessionEventIndexContext(ctx, sessionPath, msgs, digest, revision)
+	}
+	st, err := replaySessionDAG(ctx, store.SessionEventLog(sessionPath), defaultSessionReplayLimits)
+	if err != nil {
+		return err
+	}
+	return writeSessionDAGIndex(ctx, sessionPath, st)
 }
