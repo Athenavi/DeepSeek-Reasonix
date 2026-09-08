@@ -1,6 +1,8 @@
 import { attributeRetention, evidenceIntegrity, retainedCohorts, screeningBlockers } from "./app-memory-evidence.mjs";
 
-export const MEMORY_PROTOCOL = Object.freeze({ version: 2, shards: 3, cycles: 128, mixedCycles: 512, hydration: "async-task", pointerRest: [0, 0], viewport: { width: 1440, height: 1000 } });
+// Version 3 requires a settled, repeated baseline reading before the measured
+// cycles, so a single early reading can no longer anchor the drift verdict.
+export const MEMORY_PROTOCOL = Object.freeze({ version: 3, shards: 3, cycles: 128, mixedCycles: 512, hydration: "async-task", pointerRest: [0, 0], viewport: { width: 1440, height: 1000 } });
 export const MEMORY_FIXTURES = Object.freeze({
   full: { label: "bench:small-6t", marker: "ASYNC LAYOUT EXPANSION COMPLETE" },
   geometry: { label: "bench:geometry", marker: "Geometry contract fixture complete." },

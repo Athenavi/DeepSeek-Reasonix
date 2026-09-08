@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { attributeRetention, evidenceIntegrity, retainedCohorts, screeningBlockers, summarizeHeap, TRANSIENT_EXCURSION_REASON } from "./app-memory-evidence.mjs";
+import { attributeRetention, BASELINE_NOT_SETTLED_REASON, evidenceIntegrity, retainedCohorts, screeningBlockers, summarizeHeap, TRANSIENT_EXCURSION_REASON } from "./app-memory-evidence.mjs";
 
 const sample = (ids, roundTrips) => ({ phase: "full", roundTrips, lifecycle: {
   liveRenderTokenIds: ids, liveRenderTokens: ids.length,
@@ -102,6 +102,42 @@ test("an explicit settled tail sample is the authoritative resting state", () =>
   const stuck = blipBeforeSettled.map((sample_) => ({ ...sample_ }));
   stuck[21] = { ...stuck[21], dom: { nodes: 6049, jsEventListeners: 614 } };
   assert.deepEqual(screeningBlockers(attributeRetention(stuck).reasons), ["post-gc-dom-or-listener-drift"]);
+});
+test("an unsettled baseline is reported instead of being judged as displacement", () => {
+  // Round 5 CI data: the baseline sample itself caught the cleanup blip (616),
+  // every later reading rested at 514, and the gate misreported the series as
+  // persistent drift.
+  const samples = Array.from({ length: 21 }, (_, index) => ({
+    ...sample([1, index + 2], index * 32),
+    dom: { nodes: 6049, jsEventListeners: index === 0 ? 616 : 512 },
+  }));
+  samples[0] = { ...samples[0], baselineStable: false, baselineReadings: [{ nodes: 6049, jsEventListeners: 616 }, { nodes: 6049, jsEventListeners: 512 }] };
+  samples.push({ ...sample([1, 23], 512), phase: "settled", dom: { nodes: 6049, jsEventListeners: 512 } });
+  const result = attributeRetention(samples);
+  assert.ok(result.reasons.includes(BASELINE_NOT_SETTLED_REASON));
+  assert.deepEqual(screeningBlockers(result.reasons), [BASELINE_NOT_SETTLED_REASON]);
+});
+test("an unsettled baseline still blocks sustained growth away from a low point", () => {
+  // 616 -> 400 -> 450 -> 500 -> 550 ends below the baseline but keeps growing;
+  // skipping the displacement check must not hide it.
+  const listeners = [616, 400, 450, 500, 550];
+  const samples = listeners.map((value, index) => ({
+    ...sample([1, index + 2], index * 32),
+    dom: { nodes: 6049, jsEventListeners: value },
+  }));
+  samples[0] = { ...samples[0], baselineStable: false };
+  const result = attributeRetention(samples);
+  assert.ok(result.reasons.includes("post-gc-dom-or-listener-drift"));
+  assert.deepEqual(screeningBlockers(result.reasons), [BASELINE_NOT_SETTLED_REASON, "post-gc-dom-or-listener-drift"]);
+});
+test("a settled baseline keeps the displacement check", () => {
+  const samples = Array.from({ length: 21 }, (_, index) => ({
+    ...sample([1, index + 2], index * 32),
+    dom: { nodes: 6049, jsEventListeners: index === 0 ? 512 : 514 },
+  }));
+  samples[0] = { ...samples[0], baselineStable: true };
+  samples.push({ ...sample([1, 23], 512), phase: "settled", dom: { nodes: 6049, jsEventListeners: 514 } });
+  assert.deepEqual(screeningBlockers(attributeRetention(samples).reasons), ["post-gc-dom-or-listener-drift"]);
 });
 test("native objects are not automatically detached DOM", () => {
   const heap = { snapshot: { meta: {
