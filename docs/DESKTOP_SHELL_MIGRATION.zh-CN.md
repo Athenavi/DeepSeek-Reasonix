@@ -86,11 +86,14 @@ React 界面 ──preload 类型化 IPC──▶ Electron 主进程 ──stdio
 
 ### B. 抽离桌面服务，建立统一桥接
 
-- `nativeHost` 接口及其 Wails 实现；Go 业务代码不再直接调用壳工具包。
+- `nativeHost` 接口及其 Wails 实现；Go 业务代码不再直接调用壳工具包：implemented，
+  locally tested（`desktop/native_host*.go`，`go test -short .` 通过）。
 - `desktop/internal/hostrpc`：反射注册表、契约摘要、TypeScript 生成器、基于 `rpcwire`
-  的严格 JSON-RPC 服务、事件封装、反向宿主请求。
+  的严格 JSON-RPC 服务、事件封装、反向宿主请求：implemented，locally tested；注册表
+  接受全部 575 个命令。
 - `reasonix-desktop --host-rpc`：一个 Go 服务进程管理全部会话与标签；`-emit-contract`
-  输出生成的 TypeScript 与 JSON。
+  输出生成的 TypeScript 与 JSON；RPC 原生宿主、托盘与退出钩子经壳连接工作：
+  implemented，locally tested。
 - `desktop/` 下统一的 pnpm workspace 管理前端与壳。
 - 根 Go 模块保持纯静态构建；桌面模块保留自己的构建。
 

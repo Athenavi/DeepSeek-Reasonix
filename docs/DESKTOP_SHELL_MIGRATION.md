@@ -110,12 +110,16 @@ case. Met for the inventory; acceptance cases are listed under gates below.
 ### B. Extract the desktop service and the unified bridge
 
 - `nativeHost` interface with the Wails implementation behind it; Go business
-  code no longer calls the shell toolkit directly.
+  code no longer calls the shell toolkit directly: implemented, locally tested
+  (`desktop/native_host*.go`, `go test -short .` green).
 - `desktop/internal/hostrpc`: reflection registry, contract digest, TypeScript
   emitter, strict JSON-RPC server over `rpcwire`, event envelope, reverse host
-  requests.
+  requests: implemented, locally tested; all 575 commands accepted by the
+  registry.
 - `reasonix-desktop --host-rpc`: one Go service process for all sessions and
-  tabs; `-emit-contract` writes the generated TypeScript and JSON.
+  tabs; `-emit-contract` writes the generated TypeScript and JSON; the RPC
+  native host, tray and quit hooks run over the shell connection:
+  implemented, locally tested.
 - One pnpm workspace under `desktop/` for the frontend and the shell.
 - The root Go module stays static-only; the desktop module keeps its own build.
 
