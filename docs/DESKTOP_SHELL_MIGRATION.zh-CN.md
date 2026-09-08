@@ -128,6 +128,15 @@ Chromium sandbox 不使用 `--no-sandbox`；minisign 与摘要校验不变。
 退出条件：四类产物均可安装、启动、卸载，并通过 Wails→Electron 升级、Electron→Electron
 升级和安装失败恢复测试。
 
+版本化安装布局（Windows 与 Linux）的设计说明：`installlayout` 激活器只允许
+`versions/<v>/` 内的扁平常规文件。Electron 载荷新增一个树成员 `app/` 承载 Electron
+包；Windows 载荷清单升级到 schema 2，列出 `app/` 下每个文件及其摘要，激活器在移动
+`current.json` 之前校验整棵树。`reasonix-desktop(.exe)` 仍是瘦启动器启动的活动桌面
+可执行文件：不带 `--host-rpc` 时它引导 `app/Reasonix(.exe)` 后退出，Electron 再以
+`--host-rpc` 启动同一二进制作为服务。因此启动器、`current.json`、单实例身份与重启
+逻辑保持现状。macOS 上 bundle 的主可执行文件是 Electron，Go 服务位于
+`Contents/MacOS/`；`.app` 替换路径不变。
+
 ### F. 全矩阵验收并删除旧实现
 
 CI 切换到新构建、契约生成和原生测试入口；删除 Wails 入口、依赖、生成绑定、WebView2

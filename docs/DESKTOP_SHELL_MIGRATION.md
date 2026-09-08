@@ -165,6 +165,19 @@ Exit condition: all four artifacts install, start and uninstall, and the
 Wails→Electron upgrade, Electron→Electron upgrade and failed-install recovery
 tests pass.
 
+Design notes for the versioned install layout (Windows and Linux): the
+`installlayout` activator whitelists flat regular files inside
+`versions/<v>/`. The Electron payload adds one tree member, `app/`, holding
+the Electron bundle; the Windows payload manifest moves to schema 2 and lists
+every file under `app/` with its digest so the activator validates the tree
+before `current.json` moves. `reasonix-desktop(.exe)` stays the active desktop
+executable the thin launcher starts: without `--host-rpc` it bootstraps
+`app/Reasonix(.exe)` and exits, and Electron spawns the same binary with
+`--host-rpc` as the service. Launcher, `current.json`, single-instance
+identity and relaunch logic therefore keep their current shape. On macOS the
+bundle's main executable is Electron and the Go service lives in
+`Contents/MacOS/`; the `.app` swap path is unchanged.
+
 ### F. Full-matrix acceptance and removal of the old shell
 
 CI on the new build, contract generation and native test entry points; Wails
