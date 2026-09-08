@@ -79,7 +79,9 @@ lifecycle_phase() {
 	python3 - "$home" "$pid" <<'PY'
 import glob, json, os, sys
 home, pid = sys.argv[1], sys.argv[2]
-for path in glob.glob(os.path.join(home, "**", "diagnostics", "lifecycle", pid + "-*.json"), recursive=True):
+# The Go process writes the file under its own pid; a fresh home has one.
+paths = glob.glob(os.path.join(home, "**", "diagnostics", "lifecycle", "*.json"), recursive=True)
+for path in sorted(paths, key=os.path.getmtime, reverse=True):
     try:
         with open(path) as fh:
             state = json.load(fh)

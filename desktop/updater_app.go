@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"regexp"
 	"runtime"
 	"strings"
@@ -367,9 +366,7 @@ func (a *App) installDebUpdate(requestID string, meta *cachedUpdate) error {
 	// Ensure installing was shown even if a phase line was missed (older helper).
 	a.emitProgress(requestID, meta.Channel, meta.Version, "installing", meta.Size, meta.Size, "")
 	a.emitProgress(requestID, meta.Channel, meta.Version, "done", meta.Size, meta.Size, "")
-	a.shutdown(a.ctx)
-	_ = relaunchThroughLauncher()
-	os.Exit(0)
+	a.relaunchDesktop(true)
 	return nil
 }
 
@@ -439,11 +436,7 @@ func (a *App) installPortableUpdate(requestID string, meta *cachedUpdate, data [
 	// Persist the conversation and stop subprocesses before handing off (same as
 	// shutdown). On Linux the binary is now replaced, so relaunch it; on Windows and
 	// macOS the installer/helper we launched takes over once we exit.
-	a.shutdown(a.ctx)
-	if runtime.GOOS == "linux" {
-		_ = relaunchThroughLauncher()
-	}
-	os.Exit(0)
+	a.relaunchDesktop(runtime.GOOS == "linux")
 	return nil
 }
 

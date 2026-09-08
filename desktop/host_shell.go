@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"os"
+	"sync"
 
 	"reasonix/desktop/internal/hostrpc"
 )
@@ -13,8 +15,10 @@ import (
 // host/* requests and routes the shell's hostEvent notifications back into
 // the App entry points the Wails callbacks used to call.
 type hostShellBridge struct {
-	app    *App
-	server *hostrpc.Server
+	app      *App
+	server   *hostrpc.Server
+	remoteMu sync.Mutex
+	remote   *hostRemoteWindows
 }
 
 func (a *App) hostMode() bool { return a != nil && a.hostShell != nil }
@@ -117,9 +121,11 @@ func (b *hostShellBridge) updateTrayLocale(locale string) {
 
 // handleHostEvent maps shell-originated events onto the App entry points
 // that Wails callbacks (second instance, tray menu, app menu) used to call.
-func (b *hostShellBridge) handleHostEvent(_ context.Context, name string, _ json.RawMessage) error {
+func (b *hostShellBridge) handleHostEvent(_ context.Context, name string, payload json.RawMessage) error {
 	a := b.app
 	switch name {
+	case "remoteWindow.closed":
+		b.remoteWindowClosed(payload)
 	case "secondInstance":
 		a.goSafe("secondInstanceLaunch", a.secondInstanceLaunch)
 	case "tray.open":
@@ -157,4 +163,29 @@ func (a *App) startNativeShellSupport() {
 	})
 	a.goSafe("applyWindowIconsFromExecutable", applyWindowIconsFromExecutable)
 	a.startMainThreadWatchdog()
+}
+
+// relaunch asks the shell to restart the whole application; the shell then
+// drives beforeClose and shutdown, so the caller must not exit on its own.
+func (b *hostShellBridge) relaunch() error {
+	ctx, cancel := context.WithTimeout(context.Background(), rpcHostWindowTimeout)
+	defer cancel()
+	return b.server.Request(ctx, "host/app.relaunch", map[string][]string{"args": {}}, nil)
+}
+
+// relaunchDesktop restarts Reasonix after an update. Under the shell the
+// restart is owned by Electron; the Wails build exits itself after handing
+// off to the thin launcher.
+func (a *App) relaunchDesktop(relaunchBinary bool) {
+	if a.hostMode() {
+		if err := a.hostShell.relaunch(); err != nil {
+			slog.Warn("desktop host: relaunch request failed", "err", err)
+		}
+		return
+	}
+	a.shutdown(a.ctx)
+	if relaunchBinary {
+		_ = relaunchThroughLauncher()
+	}
+	os.Exit(0)
 }

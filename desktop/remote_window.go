@@ -494,6 +494,9 @@ func (a *App) openRemoteWindowForHost(hostID, workspace, rawURL string) error {
 	if a.remoteWindowOpener != nil {
 		return a.remoteWindowOpener(launch)
 	}
+	if a.hostMode() {
+		return a.hostShell.openRemoteWindow(launch)
+	}
 	return a.spawnRemoteWindow(launch.HostKey, launch)
 }
 
@@ -509,6 +512,9 @@ func (a *App) remoteWindowWorkspace(hostID string) string {
 // closeRemoteWindowForHost terminates the host's web window. Called on explicit
 // disconnect, stop-server, host removal, and deterministic SSH failure.
 func (a *App) closeRemoteWindowForHost(hostID string) {
+	if a.hostMode() {
+		a.hostShell.closeRemoteWindow(remoteWindowHostKey(hostID))
+	}
 	if a.remoteWindows == nil {
 		return
 	}
@@ -516,6 +522,9 @@ func (a *App) closeRemoteWindowForHost(hostID string) {
 }
 
 func (a *App) hasRemoteWindow(hostID string) bool {
+	if a.hostMode() {
+		return a.hostShell.hasRemoteWindow(remoteWindowHostKey(hostID))
+	}
 	if a.remoteWindows == nil {
 		return false
 	}
@@ -523,6 +532,9 @@ func (a *App) hasRemoteWindow(hostID string) bool {
 }
 
 func (a *App) closeAllRemoteWindows() {
+	if a.hostMode() {
+		a.hostShell.closeAllRemoteWindows()
+	}
 	if a.remoteWindows == nil {
 		return
 	}
