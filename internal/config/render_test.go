@@ -205,6 +205,7 @@ func TestRenderTOMLRoundTrips(t *testing.T) {
 	orig.Desktop.CloseBehavior = "background"
 	orig.Desktop.DisplayMode = "compact"
 	orig.Desktop.StatusBarStyle = "text"
+	orig.Desktop.StatusBarStyleInitialized = true
 	orig.Desktop.StatusBarItems = []string{"model", "balance", "cache"}
 	orig.Desktop.DefaultToolApprovalMode = "auto"
 	orig.Desktop.CheckUpdates = boolPtr(false)
@@ -784,6 +785,7 @@ func TestScopedRenderSeparatesUserAndProjectConfig(t *testing.T) {
 	c.Desktop.ThemeStyle = "graphite"
 	c.Desktop.CloseBehavior = "background"
 	c.Desktop.StatusBarStyle = "text"
+	c.Desktop.StatusBarStyleInitialized = true
 	c.Desktop.DefaultToolApprovalMode = "auto"
 	c.Desktop.CheckUpdates = boolPtr(false)
 	c.Desktop.UpdateChannel = "preview"

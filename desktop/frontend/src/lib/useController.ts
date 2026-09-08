@@ -1207,7 +1207,8 @@ function endTurnModelActivity(s: State, now = Date.now(), stashForUsage = false)
 }
 
 function snapshotCompletedTurnTelemetry(s: State, now = Date.now()): State {
-  const settled = endTurnModelActivity(s, now);
+  if (!s.turnStartAt || s.turnDoneAt > 0) return s;
+  const settled = endPromptWait(endTurnModelActivity(s, now), now);
   const liveChars = (settled.live?.text.length ?? 0) + (settled.live?.reasoning.length ?? 0);
   const inFlightChars = settled.turnOutputTokens > 0
     ? Math.max(0, liveChars - settled.turnOutputCharsAtUsage) + settled.turnArgChars
@@ -1921,7 +1922,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       s = { ...s, readStatuses: undefined, readStatusClosed: true };
       const now = Date.now();
       s = snapshotCompletedTurnTelemetry(s, now);
-      const workDurationMs = currentTurnDurationMs(s, now);
+      const workDurationMs = s.turnDoneAt ? Math.max(1, s.turnDoneAt - s.turnStartAt - (s.lastTurnWaitAccumMs ?? 0)) : undefined;
       const completedItems = removeEmptyAssistantItems(s.items.map((it) => {
         if (it.kind === "assistant") {
           const completedLive = s.live?.id === it.id ? completeLiveReasoning(s.live, now) : undefined;
@@ -2036,7 +2037,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
         streamInterruptNoticeShown: undefined,
       };
       // Close user-wait unless the plan approval gate remains open.
-      if (!keepPlanApproval) next = endPromptWait(next, now);
+      next = keepPlanApproval ? beginPromptWait(next, now) : endPromptWait(next, now);
       return next;
     }
     default: return s;
@@ -2153,6 +2154,7 @@ export function reducer(s: State, a: Action): State {
       if (foregroundRunning) {
         return {
           ...s,
+          ...(s.turnDoneAt > 0 && turnStartedAt !== s.turnStartAt ? resetTurnTiming(turnStartedAt) : {}),
           ...runtimeStatus,
           running: true,
           turnActive: true,

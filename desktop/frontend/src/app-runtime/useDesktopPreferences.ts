@@ -49,7 +49,7 @@ export function useDesktopPreferences() {
   return {
     desktopLayoutStyle: layoutStyleFromSnapshot(snapshot?.desktopLayoutStyle),
     startupUpdateChecksEnabled: snapshot ? snapshot.checkUpdates !== false : startupFailed ? true : null,
-    statusBarStyle: snapshot ? snapshot.statusBarStyle === "text" ? "text" as const : "icon" as const : "text" as const,
+    statusBarStyle: snapshot?.statusBarStyle === "text" ? "text" as const : "icon" as const,
     statusBarItems: snapshot ? normalizeStatusBarItems(snapshot.statusBarItems) : DEFAULT_STATUS_BAR_ITEMS,
     sidebarImConnections, imTopicSources,
     configLoadWarnings: warnings.configLoadWarnings, reloadConfigWarnings: warnings.reload, dismissConfigWarnings: warnings.dismiss,
