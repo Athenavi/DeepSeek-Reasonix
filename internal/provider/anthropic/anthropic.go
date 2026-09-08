@@ -365,74 +365,7 @@ func (c *client) Stream(ctx context.Context, req provider.Request) (<-chan provi
 // turn. Consecutive same-role messages are coalesced because the API requires
 // alternating user/assistant turns (tool results are user turns).
 func (c *client) buildRequest(ctx context.Context, req provider.Request) anthRequest {
-	var system []textBlock
-	var msgs []anthMessage
-	// appendBlocks adds blocks under role, merging into the previous message when
-	// it shares the role (keeps user/assistant strictly alternating).
-	appendBlocks := func(role string, blocks ...contentBlock) {
-		if len(blocks) == 0 {
-			return
-		}
-		if n := len(msgs); n > 0 && msgs[n-1].Role == role {
-			msgs[n-1].Content = mergeThinkingFirst(msgs[n-1].Content, blocks)
-			return
-		}
-		msgs = append(msgs, anthMessage{Role: role, Content: blocks})
-	}
-
-	messages := c.replayMessages(req.Messages)
-	for _, m := range provider.SanitizeToolPairing(messages) {
-		switch m.Role {
-		case provider.RoleSystem:
-			if m.Content != "" {
-				system = append(system, textBlock{Type: "text", Text: m.Content})
-			}
-		case provider.RoleUser:
-			if m.Content != "" {
-				appendBlocks("user", sessionContextTextBlocks(m.Content)...)
-			}
-			if c.vision {
-				for _, ref := range m.Images {
-					if src := imageSourceFromRef(ref); src != nil {
-						appendBlocks("user", contentBlock{Type: "image", Source: src})
-					}
-				}
-			}
-		case provider.RoleTool:
-			content := m.Content
-			if content == "" {
-				content = "(no output)" // tool_result content must be non-empty
-			}
-			block := contentBlock{Type: "tool_result", ToolUseID: m.ToolCallID, Content: content}
-			if c.vision && !c.deepseek {
-				if blocks := toolResultBlocks(content, m.Images); blocks != nil {
-					block.Content = blocks
-				}
-			}
-			appendBlocks("user", block)
-		case provider.RoleAssistant:
-			var blocks []contentBlock
-			// Replay provider reasoning ahead of the content it led to. DeepSeek's
-			// thinking mode requires every historical assistant turn's thinking
-			// block back whenever the request declares tools — tool-call turn or
-			// not — even if the current request no longer declares tools or has
-			// since disabled thinking. Anthropic proper requires a signature, so
-			// reasoning without one cannot be replayed on that endpoint.
-			blocks = append(blocks, c.replayReasoningBlocks(m)...)
-			blocks = appendServerSearchBlocks(blocks, m.ServerSearch)
-			if m.Content != "" {
-				blocks = append(blocks, contentBlock{Type: "text", Text: m.Content})
-			}
-			for _, tc := range m.ToolCalls {
-				input := json.RawMessage(tc.Arguments)
-				if len(input) == 0 {
-					input = json.RawMessage("{}") // input is required, even when empty
-				}
-				blocks = append(blocks, contentBlock{Type: "tool_use", ID: tc.ID, Name: tc.Name, Input: input})
-			}
-			appendBlocks("assistant", blocks...)
-		}
-	}
+	system, msgs := c.buildMessages(req.Messages)
 
 	tools := encodeAnthTools(c, req)
 	if !c.deepseek {
