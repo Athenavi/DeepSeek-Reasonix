@@ -510,6 +510,7 @@ var ChineseTraditional = Messages{
 	SearchSourcesNotProvided:       "搜尋已完成，供應商未提供可用的結構化來源。",
 	ProtocolRecoveryLabel:          "從有效歷史恢復",
 	ProviderErrInsufficientBalance: "餘額不足 (HTTP 402)：帳戶餘額不足，請前往儲值後重試。",
+	ProviderErrNotFound:            "請求位址不存在（HTTP 404）。請檢查 API 格式和請求位址。",
 	ProviderErrUnprocessable:       "參數錯誤 (HTTP 422)：某個請求參數被拒絕，通常是程式缺陷。若持續出現請回報。",
 	ProviderErrInputSensitive:      "輸入被 MiniMax 內容審查拒絕（錯誤碼 1026）。審查對象可能包含對話歷史和工具結果；請調整相關內容，或建立新對話只保留必要上下文。原樣重試通常無效。",
 	ProviderErrOutputSensitive:     "MiniMax 產生的內容被內容審查拒絕（錯誤碼 1027）。請調整請求內容後重試；若持續出現，可改用其他服務商。",

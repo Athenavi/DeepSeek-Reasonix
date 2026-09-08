@@ -1,4 +1,7 @@
 // Presentation and conservative endpoint checks shared by provider settings.
+import type { ProviderCatalog } from "./providerCatalogTypes";
+import { providerEndpointMismatchDetail } from "./providerEndpoint";
+
 export function providerProtocolLabel(kind: string): string {
   switch (kind.trim().toLowerCase()) {
     case "anthropic": return "Anthropic Messages (/v1/messages)";
@@ -9,15 +12,8 @@ export function providerProtocolLabel(kind: string): string {
   }
 }
 
-export function providerEndpointMismatch(kind: string, address: string): boolean {
-  let path: string;
-  try { path = new URL(address).pathname.replace(/\/+$/, ""); } catch { return false; }
-  const protocol = kind.trim().toLowerCase();
-  const expected = protocol === "anthropic" ? "/messages"
-    : protocol === "openai" ? "/chat/completions"
-    : protocol === "responses" || protocol === "dashscope-responses" ? "/responses" : "";
-  // Base URLs and custom gateway paths cannot be inferred safely.
-  return Boolean(expected) && ["/messages", "/chat/completions", "/responses"].some(suffix => path.endsWith(suffix)) && !path.endsWith(expected);
+export function providerEndpointMismatch(kind: string, address: string, catalog?: ProviderCatalog): boolean {
+  return providerEndpointMismatchDetail(kind, address, catalog).mismatch;
 }
 
 // Registered adapters are not all user-facing protocols. Keep saved/custom

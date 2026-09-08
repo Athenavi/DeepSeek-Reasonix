@@ -1989,7 +1989,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
         }
         items = [...finalized, ...interruptItems];
       } else if (e.err && !s.streamInterruptNoticeShown) {
-        items = [...finalized, { kind: "notice", id: `e${s.seq}`, level: "warn", text: e.err }];
+        items = [...finalized, { kind: "notice", id: `e${s.seq}`, level: "warn", text: e.err, detail: e.detail }];
       }
       if (e.protocolRecovery?.id && e.status !== "interrupted" && !s.cancelRequested) {
         items = items.map(item => item.kind==="notice" && item.action==="recover_context" ? {...item,action:undefined} : item);

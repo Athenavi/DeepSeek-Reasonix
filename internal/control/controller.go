@@ -1112,6 +1112,7 @@ func (c *Controller) finishGuardedTurn(err error, completion *guardedTurnComplet
 	}
 	done = c.applyTurnDoneProtocol(done, cancelRequested)
 	done.Diagnostic = provider.DiagnoseFailure(err)
+	done.Detail = provider.FailureDiagnosticDetail(done.Diagnostic)
 	if !cancelRequested {
 		done.ProtocolRecovery = c.executor.PendingProtocolRecovery()
 	}

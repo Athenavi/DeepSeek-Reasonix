@@ -18,6 +18,7 @@ const (
 	NoticeCodeWorkspaceLease                                    = "workspace_lease"
 	NoticeCodeBackgroundJobFinished                             = "background_job_finished"
 	NoticeCodeCancelledTurn                                     = "cancelled_turn_display"
+	NoticeCodeProviderRequestFailed                             = "provider_request_failed"
 	NoticeCodeStreamInterruptedIdleTimeout                      = "stream_interrupted_idle_timeout"
 	NoticeCodeStreamInterruptedPrematureEOF                     = "stream_interrupted_premature_eof"
 	NoticeCodeStreamInterruptedConnectionReset                  = "stream_interrupted_connection_reset"

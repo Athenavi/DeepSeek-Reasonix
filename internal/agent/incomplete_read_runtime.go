@@ -42,7 +42,7 @@ func (a *Agent) resolveIncompleteReadToolRoundBoundary(ctx context.Context, stat
 		a.emitIncompleteReadNotice(event.NoticeCodeReadContinuationRequired, i18n.M.ReadContinuationRequired, "read continuation instruction appended")
 	}
 	if ctx.Err() != nil {
-		a.recordInterruptedDisplay("", "", nil, true, state.workDurationMs())
+		a.recordInterruptedDisplay("", "", nil, true, ctx.Err(), state.workDurationMs())
 		return false, ctx.Err(), true
 	}
 	if instruction == "" {

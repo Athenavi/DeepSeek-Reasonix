@@ -79,6 +79,17 @@ func TestExplainError(t *testing.T) {
 		}
 	}
 
+	notFoundCause := &provider.APIError{Provider: "deepseek-anthropic", ProviderDisplayName: "Deepseek2", Protocol: "openai", Status: 404}
+	notFound := explainError(notFoundCause)
+	for _, want := range []string{"Deepseek2 · Chat Completions", i18n.M.ProviderErrNotFound} {
+		if !strings.Contains(notFound.Error(), want) {
+			t.Errorf("404 = %q, want %q", notFound.Error(), want)
+		}
+	}
+	if d := provider.DiagnoseFailure(notFound); d.ProviderID != "deepseek-anthropic" || d.ProviderDisplayName != "Deepseek2" || d.Protocol != "openai" || d.Status != 404 {
+		t.Fatalf("explained 404 diagnostic = %+v", d)
+	}
+
 	jsonBody := explainError(&provider.APIError{Provider: "deepseek", Status: 400, Body: `{"error":{"message":"This model's maximum context length is 65536 tokens.","type":"invalid_request_error"}}`})
 	if !strings.Contains(jsonBody.Error(), i18n.M.ProviderErrBadRequest) || !strings.Contains(jsonBody.Error(), "maximum context length") {
 		t.Errorf("400 should append the provider reason from a JSON body, got %q", jsonBody.Error())

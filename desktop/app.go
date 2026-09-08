@@ -5102,7 +5102,32 @@ type HistoryMessage struct {
 	DecisionReceipt  *provider.DecisionReceipt        `json:"decisionReceipt,omitempty"`
 	Readiness        *event.FinalReadiness            `json:"readiness,omitempty"`
 	ProtocolRecovery *provider.ProtocolRecoveryAction `json:"protocolRecovery,omitempty"`
+	Diagnostic       *provider.FailureDiagnostic      `json:"diagnostic,omitempty"`
 	ServerSearch     []provider.ServerSearchCall      `json:"serverSearch,omitempty"`
+}
+
+func interruptedTurnHistoryNotice(recovery *provider.InterruptedTurnRecovery) HistoryMessage {
+	if recovery != nil && recovery.TerminalStatus == "failed" {
+		diagnostic := recovery.FailureDiagnostic
+		message := "The provider request failed. Check the connection settings and try again."
+		detail := provider.FailureDiagnosticDetail(diagnostic)
+		if diagnostic != nil {
+			if statusMessage := i18n.M.ProviderStatusMessage(diagnostic.Status); statusMessage != "" {
+				message = statusMessage
+			} else if diagnostic.Status > 0 {
+				message = fmt.Sprintf("Provider request failed (HTTP %d).", diagnostic.Status)
+			}
+			label := provider.ProviderDisplayLabel(diagnostic.ProviderID, diagnostic.ProviderDisplayName, diagnostic.Protocol)
+			if label != "" {
+				message = label + ": " + message
+			}
+		}
+		return HistoryMessage{Role: "notice", Level: "warn", Code: event.NoticeCodeProviderRequestFailed, Content: message, Detail: detail, Diagnostic: diagnostic}
+	}
+	return HistoryMessage{
+		Role: "notice", Level: "info", Code: event.NoticeCodeCancelledTurn,
+		Content: "This turn was interrupted. Partial output is kept for reference; only completed tool pairs and a bounded recovery summary enter the next model turn. Inspect the workspace before continuing or reverting changes.",
+	}
 }
 
 type HistoryToolCall struct {
@@ -5583,10 +5608,7 @@ func (state *historyMessageConvertState) convertHistoryMessage(
 		})
 	}
 	if m.LocalOnly && m.InterruptedTurn != nil {
-		out = append(out, HistoryMessage{
-			Role: "notice", Level: "info", Code: event.NoticeCodeCancelledTurn,
-			Content: "This turn was interrupted. Partial output is kept for reference; only completed tool pairs and a bounded recovery summary enter the next model turn. Inspect the workspace before continuing or reverting changes.",
-		})
+		out = append(out, interruptedTurnHistoryNotice(m.InterruptedTurn))
 	}
 	if m.Role == provider.RoleUser {
 		key := messageDisplayKey(agent.UserMessageText(m))

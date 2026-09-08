@@ -281,6 +281,25 @@ const legacyChatURLProvider: ProviderView = {
   chatUrl: "https://legacy.example.com/chat/completions/",
 };
 
+const mismatchedDeepSeekProvider: ProviderView = {
+  ...builtInProvider,
+  name: "deepseek-anthropic",
+  displayName: "Deepseek2",
+  builtIn: false,
+  presetId: "deepseek-anthropic",
+  kind: "openai",
+  baseUrl: "https://api.deepseek.com/anthropic/v1",
+  requestUrl: "https://api.deepseek.com/anthropic/v1/chat/completions",
+  catalog: {
+    brandId: "deepseek", brandLabel: "DeepSeek", region: "global", product: "api", format: "anthropic", baseUrl: "https://api.deepseek.com/anthropic",
+    protocols: {
+      openai: { baseUrl: "https://api.deepseek.com/v1", source: "fixture", checkedOn: "2026-09-08" },
+      responses: { baseUrl: "https://api.deepseek.com", source: "fixture", checkedOn: "2026-09-08" },
+      anthropic: { baseUrl: "https://api.deepseek.com/anthropic", source: "fixture", checkedOn: "2026-09-08" },
+    },
+  },
+};
+
 function renderProviderEditor(initial?: ProviderView, onSave: (provider: ProviderView) => void | Promise<void> = () => undefined) {
   return (
     <LocaleProvider>
@@ -403,6 +422,18 @@ await act(async () => {
 });
 ok(exactProvider?.requestUrl === "https://exact.example.com/custom/?token=1" && exactProvider?.baseUrl === legacyChatURLProvider.baseUrl, "saving preserves an explicit requestUrl and independent baseUrl exactly");
 ok(exactProvider?.chatUrl === exactProvider?.requestUrl, "saving mirrors the exact OpenAI request URL for previous releases");
+
+await act(async () => {
+  root.render(renderProviderEditor(mismatchedDeepSeekProvider));
+  await flushPromises();
+});
+const mismatchAlert = rootEl.querySelector<HTMLElement>('[role="alert"]');
+const mismatchSave = Array.from(rootEl.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.trim() === "Save changes");
+const useRecommended = Array.from(rootEl.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.trim() === "Apply" && button.title === "https://api.deepseek.com/v1/chat/completions");
+ok(mismatchAlert?.textContent?.includes("does not match") === true && mismatchSave?.disabled === true, "protocol mismatch is a blocking editor error");
+await act(async () => { useRecommended?.click(); await flushPromises(); });
+ok(rootEl.querySelector<HTMLInputElement>(".provider-url-input")?.value === "https://api.deepseek.com/v1/chat/completions", "recommended action applies the catalog request URL");
+ok(rootEl.querySelector<HTMLElement>('[role="alert"]') === null, "recommended route clears the mismatch gate");
 
 await act(async () => {
   root.render(renderProviderEditor({ ...legacyChatURLProvider, name: "save-failure" }, () => { throw new Error("storage unavailable"); }));

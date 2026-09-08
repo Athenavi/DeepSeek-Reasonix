@@ -2512,6 +2512,9 @@ func NewProviderWithProxyAndModelInfo(e *config.ProviderEntry, proxy netclient.P
 // clientSearch suppresses new native searches while retaining the adapter's
 // ability to read and replay existing native search history.
 func newProviderWithSearchMode(e *config.ProviderEntry, proxy netclient.ProxySpec, modelInfo *provider.ModelInfo, clientSearch bool) (provider.Provider, error) {
+	if err := config.ValidateProviderEndpoint(e); err != nil {
+		return nil, err
+	}
 	if err := config.ReasoningCapabilityForEntry(e).Validate(e.Model, config.EffectiveEffort(e)); err != nil {
 		return nil, err
 	}
@@ -2520,11 +2523,8 @@ func newProviderWithSearchMode(e *config.ProviderEntry, proxy netclient.ProxySpe
 		modelInfo = &resolved.ModelInfo
 	}
 	return provider.New(e.Kind, provider.Config{
-		Name:      e.Name,
-		BaseURL:   e.BaseURL,
-		Model:     e.Model,
-		APIKey:    e.APIKey(),
-		ModelInfo: modelInfo,
+		Name: e.Name, DisplayName: e.DisplayName, Protocol: e.Kind,
+		BaseURL: e.BaseURL, Model: e.Model, APIKey: e.APIKey(), ModelInfo: modelInfo,
 		// Pass the key's env var so auth failures can name where to fix it, plus
 		// provider-kind-specific knobs. EffectiveEffort applies a configured
 		// default_effort when the user has not explicitly selected /effort.

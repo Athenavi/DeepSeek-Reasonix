@@ -44,6 +44,8 @@ import (
 type ProviderView struct {
 	DisplayName                 *string                       `json:"displayName,omitempty"`
 	Name                        string                        `json:"name"`
+	PresetID                    string                        `json:"presetId,omitempty"`
+	Catalog                     *config.ProviderCatalog       `json:"catalog,omitempty"`
 	BuiltIn                     bool                          `json:"builtIn"`
 	Added                       bool                          `json:"added"`
 	Kind                        string                        `json:"kind"`
@@ -686,8 +688,13 @@ func providerViewFromEntryForRootWithResolverAndCredentials(p config.ProviderEnt
 		visionCapability = "unsupported"
 	}
 	modelCapabilities := providerModelCapabilitiesForView(p, models)
+	presetID, catalog, hasCatalog := config.CatalogForProviderEntry(&p)
+	var catalogView *config.ProviderCatalog
+	if hasCatalog {
+		catalogView = &catalog
+	}
 	return ProviderView{
-		DisplayName: &p.DisplayName, Name: p.Name, BuiltIn: builtIn, Added: added, Kind: p.Kind, BaseURL: p.BaseURL, ChatURL: p.ChatURL, RequestURL: p.RequestURL,
+		DisplayName: &p.DisplayName, Name: p.Name, PresetID: presetID, Catalog: catalogView, BuiltIn: builtIn, Added: added, Kind: p.Kind, BaseURL: p.BaseURL, ChatURL: p.ChatURL, RequestURL: p.RequestURL,
 		Models: nonNil(models), VisionModels: nonNil(providerVisionModels(models, visionModels)), VisionModelsSet: visionModelsSet, VisionCapability: visionCapability, ModelsURL: p.ModelsURL, Default: p.DefaultModel(),
 		APIKeyEnv:                   p.APIKeyEnv,
 		Headers:                     nonNilStringMap(p.Headers),
@@ -2578,6 +2585,9 @@ func saveProviderConfig(c *config.Config, p ProviderView) error {
 		e.Vision = false
 		e.VisionModels = nil
 		e.ModelOverrides = nil
+	}
+	if err := config.ValidateProviderEndpoint(&e); err != nil {
+		return err
 	}
 	if err := c.UpsertProvider(e); err != nil {
 		return err
