@@ -139,7 +139,7 @@ func (r *ModelCapabilityResolver) resolveWithCredentialRevision(entry *ProviderE
 	if requestURL == "" && entry.Kind == "openai" {
 		requestURL = entry.ChatURL
 	}
-	if (openai.IsDeepSeek(entry.BaseURL) || openai.IsDeepSeek(requestURL)) && !openai.IsOfficialDeepSeekVisionModel(entry.Model) {
+	if (openai.IsDeepSeek(entry.BaseURL) || openai.IsDeepSeek(requestURL)) && openai.IsOfficialDeepSeekTextModel(entry.Model) {
 		resolved.State, resolved.Source = CapabilityUnsupported, CapabilitySourceProtocol
 		resolved.InputModalities = []provider.ModelModality{provider.ModalityText}
 		resolved.AutomaticState, resolved.AutomaticSource = CapabilityUnsupported, CapabilitySourceProtocol

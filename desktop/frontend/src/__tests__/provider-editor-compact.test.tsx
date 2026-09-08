@@ -58,8 +58,11 @@ const add=document.querySelector('.provider-model-toolbar .provider-model-draft_
 await act(async()=>add.click());
 await change(dialog().querySelector('.provider-model-dialog__id input')!,'model-a');await submit();
 assert.ok(dialog().querySelector('[role="alert"]'),'duplicate IDs rejected');
-await change(dialog().querySelector('.provider-model-dialog__id input')!,'model-b');await submit();
+assert.equal(dialog().querySelector('[role="alert"]')!.textContent,'This model ID is already added.');
+await change(dialog().querySelector('.provider-model-dialog__id input')!,'Model-A');await submit();
 assert.equal(document.querySelectorAll('.provider-model-draft__option').length,2);
 assert.equal(document.querySelectorAll('.provider-model-draft__option input:checked').length,2,'added model enabled in draft');
+await act(async()=>save.click());
+assert.deepEqual(saved.models,['model-a','Model-A'],'save preserves exact model IDs');
 await act(async()=>root.unmount());
 console.log('PASS: unified add/edit, isolated cancel, duplicate validation, complete model overrides and failed/successful save');

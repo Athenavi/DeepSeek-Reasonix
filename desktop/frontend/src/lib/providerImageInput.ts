@@ -3,13 +3,13 @@ import type { ProviderModelCapabilityView, ProviderModelOverrideView } from "./t
 export type ImageInputMode = "auto" | "on" | "off";
 
 // A negative-only guard for manually typed models before a backend preview
-// exists. Mirrors openai.IsDeepSeek / IsOfficialDeepSeekVisionModel; it never
+// exists. Mirrors openai.IsDeepSeek / IsOfficialDeepSeekTextModel; it never
 // infers positive capabilities from a model name.
 export function imageInputHardBlocked(baseURL: string | undefined, model: string, capability?: ProviderModelCapabilityView): boolean {
   if (capability?.imageInputEnableAllowed !== undefined) return !capability.imageInputEnableAllowed;
   try {
     return new URL(baseURL ?? "").hostname.toLowerCase().endsWith(".deepseek.com")
-      && model.trim().toLowerCase() !== "deepseek-v4-flash-vision-exp";
+      && ["deepseek-v4-flash", "deepseek-v4-pro"].includes(model.trim().toLowerCase());
   } catch { return false; }
 }
 

@@ -20,6 +20,8 @@ assert.equal(result.contextWindow, 0);
 assert.equal(result.maxOutputTokens, -1);
 assert.equal(result.vision, null);
 assert.equal(modelDraftError({ ...auto, model: "existing" }, ["existing"]), "duplicate");
+assert.equal(modelDraftError({ ...auto, model: "Existing" }, ["existing"]), null);
+assert.equal(modelDraftError({ ...auto, model: "bad model" }, []), "syntax");
 assert.equal(modelDraftError({ ...auto, context: "1.5" }, []), "context");
 assert.equal(modelDraftError({ ...auto, output: "0" }, []), "output");
 

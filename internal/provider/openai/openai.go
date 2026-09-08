@@ -100,8 +100,7 @@ func New(cfg provider.Config) (provider.Provider, error) {
 	if cfg.ModelInfo != nil {
 		vision = modelInfo.SupportsInput(provider.ModalityImage)
 	}
-	// Official DeepSeek image input is pinned to one SKU even when a catalog
-	// or gateway metadata entry claims otherwise.
+	// Keep known text-only models blocked; unknown models use declared capability.
 	vision = DeepSeekImageInputAllowed(officialDeepSeek, chatURL, cfg.Model, cfg.ModelInfo != nil, vision)
 	if vision {
 		modelInfo.InputModalities = []provider.ModelModality{provider.ModalityText, provider.ModalityImage}
