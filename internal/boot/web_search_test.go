@@ -240,15 +240,13 @@ func TestAssignedSearchRuntimeSnapshotAndStableSchema(t *testing.T) {
 		t.Fatal("assignment changed main tool prefix")
 	}
 	var wg sync.WaitGroup
-	for i := 0; i < 2; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 2 {
+		wg.Go(func() {
 			search, _ := old.Get("web_search")
 			if _, err := search.Execute(context.Background(), json.RawMessage(`{"query":"test"}`)); err != nil {
 				t.Error(err)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	search, _ := next.Get("web_search")

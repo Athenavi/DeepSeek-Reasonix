@@ -13,6 +13,7 @@ const port = Number(process.env.REASONIX_SETTINGS_PORT ?? 4679);
 const preview = await startPreviewServer(root, port);
 const themes = ["graphite", "aurora", "slate", "carbon", "nocturne", "amber"];
 const sizes = [1600, 1100, 900, 700, 400];
+const assignmentRows = 5;
 let cases = 0;
 
 async function settle(page) {
@@ -87,7 +88,7 @@ try {
               await settle(page);
               const g = await page.evaluate(geometry);
               const context = `${engineName}/${layout[0]}/${theme}/${width}px/${zoom}x`;
-              assert.equal(g.rows.length, 4, `${context}: all assignments remain visible`);
+              assert.equal(g.rows.length, assignmentRows, `${context}: all assignments remain visible`);
               const columns = g.width > 780 ? 3 : g.width > 440 ? 2 : 1;
               assert.equal(g.headVisible, columns === 3, `${context}: header follows content width`);
               for (const row of g.rows) {
