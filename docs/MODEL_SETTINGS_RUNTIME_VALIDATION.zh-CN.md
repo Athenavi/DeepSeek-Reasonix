@@ -11,6 +11,7 @@
 | 队列后续消息与机器人请求经过新运行边界 | `internal/control/inbox_dispatch.go`、`internal/bot/model_settings.go` | `TestModelSettingsQueuedFollowupAppliesLatestBeforeDispatch`、`TestBotNewRunAppliesModelSettingsAndKeepsSessionOnFailure` |
 | 项目覆盖及非活动、后台分离会话分别应用 | 运行时所有者查找和既有 Desktop 重建流程 | `TestModelSettingsProjectOverrideSkipsRebuild`、`TestModelSettingsRemovalRetryKeepsFailedTargetAndAppliesInactiveSibling`、`TestModelSettingsRetryAppliesDetachedRuntimeWithoutCreatingTab` |
 | 启动和连续保存的发布保护 | 启动版本校验、携带版本的延迟重建项 | `TestModelSettingsStartupPublicationRejectsCandidateBuiltBeforeSave`、延迟重建测试 |
+| 最终 lease 失效保留旧运行时并允许安全重试 | 最终 authority 绑定、拒绝失效写入和迁移快照前的 authority 恢复 | `TestModelSettingsFinalAuthorityFailurePreservesRuntimeAndRecovers` 在最终绑定前释放真实 lease |
 | 删除后没有可用模型时阻止新运行，保留历史 | 经过校验的运行时模型选择 | `TestModelSettingsLastProviderRemovalBlocksNewRun`、服务删除测试 |
 | 远程不可变路由、候选所有权和自动下一轮应用 | `desktop/cred_proxy.go`、`desktop/remote_model_settings.go`、`internal/serve/model_settings_source.go` | `TestRemoteModelOwnershipRetiresOldRouteAfterInFlightRequest`、`TestRemoteModelSourceRefreshesAutonomousHTTPRunAndRetiresOldRoute`、Serve 应用失败与回执测试 |
 | 远端项目配置继续优先 | `internal/config/model_runtime_settings.go` | `TestManagedModelSnapshotPreservesProjectProviderAndAssignments` |

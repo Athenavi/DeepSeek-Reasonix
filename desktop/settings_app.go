@@ -1941,10 +1941,7 @@ func (a *App) rebuildSettingTurnLockedWithModel(setting string, tab *WorkspaceTa
 		if prevPath == "" {
 			prevPath = oldCtrl.SessionPath()
 		}
-		if err := a.ensureTabSessionLeaseForRebuild(tab, prevPath, setting); err != nil {
-			return err
-		}
-		if err := a.snapshotTabForAction(tab, "rebuilding settings"); err != nil {
+		if err := a.snapshotSettingsRebuildSource(tab, oldCtrl, prevPath, setting); err != nil {
 			return err
 		}
 		prevPath = sessionPathAfterSnapshot(oldCtrl, prevPath)
@@ -1986,6 +1983,10 @@ func (a *App) rebuildSettingTurnLockedWithModel(setting string, tab *WorkspaceTa
 		return err
 	}
 	if err := validateModelSettingsReplacement(ctrl, oldCtrl); err != nil {
+		return err
+	}
+	if err := a.runRebindCandidateHook("settings_before_authority"); err != nil {
+		ctrl.Close()
 		return err
 	}
 	a.mu.Lock()
