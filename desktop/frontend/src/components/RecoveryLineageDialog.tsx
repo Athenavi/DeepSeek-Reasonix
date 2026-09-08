@@ -5,7 +5,7 @@ import { app } from "../lib/bridge";
 import { recordFrontendDiagnostic } from "../lib/frontendDiagnosticBridge";
 import type { ProjectTopicKey } from "../lib/sessionCatalogTypes";
 import type { RecoveryLineageMember, RecoveryLineageView } from "../lib/types";
-import { useT } from "../lib/i18n";
+import { useT, type DictKey } from "../lib/i18n";
 import { useToast } from "../lib/toast";
 import { normalizeRecoveryLineageView, userVisibleRecoveryVersions } from "../lib/sessionRecoveryVersions";
 
@@ -20,6 +20,18 @@ interface RecoveryLineageDialogProps {
 /** Heads of one log share a path, so the head id is the version identity. */
 function memberKey(member: RecoveryLineageMember): string {
   return member.headId ? `${member.path}#${member.headId}` : member.path;
+}
+
+const headKindKeys: Record<string, DictKey> = {
+  main: "recovery.headKind.main",
+  fork: "recovery.headKind.fork",
+  rewind: "recovery.headKind.rewind",
+  concurrent: "recovery.headKind.concurrent",
+};
+
+function memberTitleKey(member: RecoveryLineageMember): DictKey {
+  if (member.headId) return member.selected ? "recovery.currentVersion" : "recovery.alternateVersion";
+  return member.canonical ? "recovery.defaultVersion" : "recovery.alternateVersion";
 }
 
 function versionActivityAt(member: RecoveryLineageMember): number {
@@ -38,6 +50,7 @@ export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOp
   const [editingPath, setEditingPath] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
   const members = useMemo(() => userVisibleRecoveryVersions(view), [view]);
+  const heads = view.state === "heads";
 
   useEffect(() => setView(normalizeRecoveryLineageView(initial)), [initial]);
 
@@ -82,6 +95,20 @@ export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOp
     setNoteDraft(member.versionNote || "");
   };
 
+  const retireCovered = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await app.CleanRecoveryLineage({ scope: topic.scope, workspaceRoot: topic.workspaceRoot, topicId: topic.topicId, apply: true });
+      showToast(t("recovery.retireCoveredDone", { removed: result.moved, busy: result.busy }), result.busy > 0 ? "warn" : "info");
+      await refresh();
+    } catch (error) {
+      showToast(t("recovery.retireCoveredFailed", { error: failureText(error) }), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const saveNote = async (member: RecoveryLineageMember) => {
     if (busy || editingPath !== memberKey(member)) return;
     setBusy(true);
@@ -106,7 +133,7 @@ export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOp
               <GitBranch size={17} aria-hidden="true" /> {t("recovery.lineageTitle")}
             </div>
             <div className="management-modal__summary">
-              {t("recovery.lineageSummary", { branches: members.length, unresolved: view.unresolved })}
+              {heads ? t("recovery.headsSummary", { branches: members.length }) : t("recovery.lineageSummary", { branches: members.length, unresolved: view.unresolved })}
             </div>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label={t("common.close")}><X size={16} /></button>
@@ -119,7 +146,8 @@ export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOp
               <article className="recovery-lineage-dialog__member" key={memberKey(member)}>
                 <div className="recovery-lineage-dialog__member-copy">
                   <div className="recovery-lineage-dialog__member-name">
-                    {member.headName?.trim() || t(member.canonical ? "recovery.defaultVersion" : "recovery.alternateVersion")}
+                    {member.headName?.trim() || t(memberTitleKey(member))}
+                    {member.headKind && headKindKeys[member.headKind] && <span className="hist-item__badge">{t(headKindKeys[member.headKind])}</span>}
                     {(member.open || member.running) && <span className="hist-item__badge hist-item__badge--open">{t("recovery.inUse")}</span>}
                   </div>
                   {editing ? (
@@ -157,7 +185,7 @@ export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOp
                   )}
                   {!member.canonical && (
                     <button type="button" className="btn btn--small" disabled={busy} onClick={() => void choose(member)}>
-                      {t("recovery.chooseBranch")}
+                      {t(member.headId ? "recovery.makeCurrent" : "recovery.chooseBranch")}
                     </button>
                   )}
                 </div>
@@ -167,6 +195,11 @@ export function RecoveryLineageDialog({ topic, initial, onClose, onChanged, onOp
           {members.length === 0 && <div className="management-modal__summary">{t("recovery.lineageEmpty")}</div>}
         </div>
         <footer className="modal__actions recovery-lineage-dialog__actions">
+          {heads && view.cleanupEligible > 0 && (
+            <button type="button" className="btn" disabled={busy} onClick={() => void retireCovered()}>
+              {t("recovery.retireCovered", { n: view.cleanupEligible })}
+            </button>
+          )}
           <button type="button" className="btn" onClick={onClose}>{t("common.close")}</button>
         </footer>
       </section>

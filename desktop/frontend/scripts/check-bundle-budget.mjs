@@ -291,7 +291,10 @@ for (const path of localeChunks) {
   // The #9889/#9890 series adds recovery-wait, dialog-failure, and stall copy:
   // zh-TW measures 63492 B (62.004 KiB) with the four PRs merged together.
   // Integrated settings and ownership copy measures 61.415 / 62.212 KiB.
-  const budget = name.startsWith("zh-TW-") ? 62.3 * 1024 : 61.5 * 1024;
+  // Session-log head versions (head kinds, current/covered wording, and the
+  // three head notices) measure 61.7 / 62.4 KiB; keep the next one-decimal
+  // ceiling for cross-platform CI.
+  const budget = name.startsWith("zh-TW-") ? 62.5 * 1024 : 61.8 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -402,6 +405,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // UI to 2384.9 KiB. Retain 0.2 KiB headroom.
 // Mainline provider/settings integration measures 2398.2 KiB in the
 // extracted shell. Retain the same bounded 0.2 KiB build headroom.
-const rawInitialBudgetKiB = 2_398.4;
+// The head-version dialog copy and its covered-version cleanup control
+// measure 2399.2 KiB; retain the same bounded 0.2 KiB build headroom.
+const rawInitialBudgetKiB = 2_399.4;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);
