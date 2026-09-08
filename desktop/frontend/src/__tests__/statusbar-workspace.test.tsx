@@ -36,6 +36,17 @@ function renderStatusBar(props: Partial<Parameters<typeof StatusBar>[0]> = {}): 
 
 console.log("\nstatus bar workspace");
 
+{
+  ok(normalizeStatusBarItems(["model"]).join(",") === "workspace", "model-only migration keeps one workspace item");
+  ok(normalizeStatusBarItems(["model", "unknown"]).join(",") === "workspace", "removed model with unknown entries remains compact");
+  ok(normalizeStatusBarItems(["cache", "model", "git_branch", "workspace"]).join(",") === "cache,workspace", "migration preserves valid order and merges branch duplicates");
+  for (const input of [undefined, [], ["unknown"]]) {
+    ok(normalizeStatusBarItems(input).join(",") === DEFAULT_STATUS_BAR_ITEMS.join(","), "missing or invalid configuration retains defaults");
+  }
+  const saved = JSON.parse(JSON.stringify(normalizeStatusBarItems(["model"])));
+  ok(normalizeStatusBarItems(saved).join(",") === "workspace", "migration stays compact after save and reload");
+}
+
 
 {
   const defaultItems = DEFAULT_STATUS_BAR_ITEMS as readonly string[];

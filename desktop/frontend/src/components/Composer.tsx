@@ -582,6 +582,7 @@ export function Composer({
   turnStartAt,
   turnDoneAt,
   lastTurnOutputTokens,
+  lastTurnWaitAccumMs,
   turnWaitAccumMs = 0,
   promptWaitStartedAt,
   turnTokens,
@@ -669,6 +670,7 @@ export function Composer({
   turnStartAt?: number;
   turnDoneAt?: number;
   lastTurnOutputTokens?: number;
+  lastTurnWaitAccumMs?: number;
   // Tab-scoped user-wait from the controller (approval/ask). Counts while the
   // tab is in the background so Composer does not invent a wait start on focus.
   turnWaitAccumMs?: number;
@@ -3748,13 +3750,13 @@ export function Composer({
           : null;
   const runMetrics = turnStartAt && (running || turnDoneAt)
     ? (() => {
-        const metricsNow = running ? now : turnDoneAt!;
-        const elapsedMs = Math.max(0, metricsNow - turnStartAt - waitAccumMs);
+        const metricsNow = turnDoneAt || now;
+        const elapsedMs = Math.max(0, metricsNow - turnStartAt - (turnDoneAt ? lastTurnWaitAccumMs ?? waitAccumMs : waitAccumMs));
         const usageTokens = turnTokens ?? 0;
         // Include streaming tool-call args in the estimate so TPS stays
         // meaningful while the model streams a write_file / long tool body.
         const inFlightChars = Math.max(0, liveTextChars - (turnOutputCharsAtUsage ?? 0)) + (turnArgChars ?? 0);
-        const estimatedChars = running ? Math.round(inFlightChars / 4)
+        const estimatedChars = !turnDoneAt ? Math.round(inFlightChars / 4)
           : Math.max(0, (lastTurnOutputTokens ?? turnOutputTokens ?? 0) - (turnOutputTokens ?? 0));
         const liveTokens = usageTokens + estimatedChars;
         const outTok: number = (turnOutputTokens ?? 0) + estimatedChars;

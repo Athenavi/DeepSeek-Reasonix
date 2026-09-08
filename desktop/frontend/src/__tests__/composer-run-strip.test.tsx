@@ -542,6 +542,8 @@ console.log("\ncomposer run strip");
   const completed = await readRunMetrics();
   ok(/19s|20s/.test(completed), `completed duration uses the controller timestamp minus local wait (got "${completed}")`);
   ok(completed.includes("104 tokens"), "completion keeps final in-flight token estimates");
+  await rerender({ lastTurnWaitAccumMs: 0, turnWaitAccumMs: 60_000 });
+  ok((await readRunMetrics()).includes("20s"), "later wait accounting cannot change the frozen completion duration");
   await rerender({ sessionKey: "completed-tab", tabId: "completed-tab" });
   ok((await readRunMetrics()).includes("20s"), "switching to a completed tab preserves its duration");
   await rerender({ running: true, turnStartAt: Date.now(), turnDoneAt: 0,

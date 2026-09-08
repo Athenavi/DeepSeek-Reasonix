@@ -16,6 +16,8 @@ remains part of the turn. Turn tokens and throughput remain available during
 waits, retries, and after completion; in-flight tokens are estimates. **Session
 time** is the separately reported session aggregate. Starting a new turn resets
 turn metrics. These live metrics are not a persisted historical report.
+Completed metrics are settled once per turn; later background-job updates do
+not replace them.
 
 The composer defaults to 140px and preserves manual resizing. Running work
 uses a theme-aware perimeter trace; reduced motion uses a static outline.
@@ -23,7 +25,8 @@ Approval, answer, and retry notices remain visible.
 
 The bottom status bar combines workspace and branch into one item: it shows
 the branch name, with both workspace path and branch in the tooltip. Non-Git
-workspaces show the workspace name. Older item lists are deduplicated. On the
+workspaces show the workspace name. Older item lists are deduplicated. For a
+model-only legacy configuration, migration retains only workspace and branch. On the
 first upgrade, status labels default to icons; subsequent manual text/icon
 choices are preserved. An older binary that rewrites preferences can remove
 the upgrade marker, causing the icon default to apply again on re-upgrade.

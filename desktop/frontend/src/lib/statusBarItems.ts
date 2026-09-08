@@ -24,8 +24,10 @@ const statusBarItemSet = new Set<string>(STATUS_BAR_ITEM_IDS);
 export function normalizeStatusBarItems(items: readonly string[] | null | undefined): StatusBarItemId[] {
   const out: StatusBarItemId[] = [];
   const seen = new Set<string>();
+  let removedModel = false;
   for (const raw of items ?? []) {
     const value = String(raw ?? "").trim();
+    if (value === "model") removedModel = true;
     // Older preferences stored workspace and branch independently. Keep their
     // first configured position while rendering one combined workspace item.
     const id = value === "git_branch" ? "workspace" : value;
@@ -33,5 +35,5 @@ export function normalizeStatusBarItems(items: readonly string[] | null | undefi
     out.push(id as StatusBarItemId);
     seen.add(id);
   }
-  return out.length > 0 ? out : [...DEFAULT_STATUS_BAR_ITEMS];
+  return out.length > 0 ? out : removedModel ? ["workspace"] : [...DEFAULT_STATUS_BAR_ITEMS];
 }
