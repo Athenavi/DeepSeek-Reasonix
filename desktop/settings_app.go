@@ -326,6 +326,12 @@ type SettingsView struct {
 	DefaultModel                 string               `json:"defaultModel"`
 	PlannerModel                 string               `json:"plannerModel"`
 	VisionModel                  string               `json:"visionModel"`
+	WebSearchModel               string               `json:"webSearchModel"`
+	WebSearchModels              []string             `json:"webSearchModels"`
+	WebSearchModelStatus         string               `json:"webSearchModelStatus"`
+	WebSearchModelReason         string               `json:"webSearchModelReason"`
+	EffectiveWebSearchModel      string               `json:"effectiveWebSearchModel"`
+	WebSearchModelOverridden     bool                 `json:"webSearchModelOverridden"`
 	SubagentModel                string               `json:"subagentModel"`
 	SubagentEffort               string               `json:"subagentEffort"`
 	AutoPlan                     string               `json:"autoPlan"`
@@ -1058,6 +1064,8 @@ func (a *App) Settings() SettingsView {
 		DefaultModel:      cfg.DefaultModel,
 		PlannerModel:      cfg.Agent.PlannerModel,
 		VisionModel:       cfg.Agent.VisionModel,
+		WebSearchModel:    cfg.Agent.WebSearchModel,
+		WebSearchModels:   []string{},
 		SubagentModel:     cfg.Agent.SubagentModel,
 		SubagentEffort:    cfg.Agent.SubagentEffort,
 		AutoPlan:          "off", // deprecated JSON compatibility for older frontends
@@ -1128,6 +1136,7 @@ func (a *App) Settings() SettingsView {
 			v.Agent.CompactRatioOverridden = math.Abs(effective-v.Agent.CompactRatio) > 0.0001
 		}
 	}
+	a.populateWebSearchSettings(&v, cfg, root)
 	added := providerAccessSet(cfg.Desktop.ProviderAccess)
 	resolver := config.NewCredentialResolverForRoot(root)
 	credentialsRevision := providerCredentialsRevision()
@@ -1393,6 +1402,10 @@ func (a *App) applySkillConfigChangeForFields(fields []string, setting string, m
 }
 
 func (a *App) applyConfigChangeWithWarning(setting string, mutate func(*config.Config) error) (string, error) {
+	return a.applyConfigChangeWithSave(setting, mutate, func(c *config.Config, path string) error { return c.SaveTo(path) })
+}
+
+func (a *App) applyConfigChangeWithSave(setting string, mutate func(*config.Config) error, save func(*config.Config, string) error) (string, error) {
 	if err := a.ensureActiveTabRebuildAllowed(setting); err != nil {
 		return "", err
 	}
@@ -1410,7 +1423,7 @@ func (a *App) applyConfigChangeWithWarning(setting string, mutate func(*config.C
 		if err := mutate(cfg); err != nil {
 			return err
 		}
-		return cfg.SaveTo(path)
+		return save(cfg, path)
 	}(); err != nil {
 		return "", err
 	}

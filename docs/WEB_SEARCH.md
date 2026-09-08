@@ -30,6 +30,44 @@ is an explicit allowlist, include `web_search`. Offline mode omits this tool.
 Providers supplied exclusively by a remote broker or extension do not imply
 local search credentials: an enabled local search account is still needed.
 
+## Assigning a search model
+
+Desktop **Model preferences → Model assignment → Web search** offers Automatic
+or an explicit connection/model. Automatic preserves the account selection rules
+above. An explicit assignment uses the search switch on the assigned connection,
+independently of the conversation account's search switch.
+
+```toml
+[agent]
+web_search_model = "my-search-connection/deepseek-v4-flash"
+```
+
+Omission, an empty string, and `"auto"` mean automatic selection. Explicit values
+use `provider/model`, including model IDs containing `/`. Offline mode, the tool
+allowlist and connection access restrictions still apply. Third-party candidates
+indicate configured native-search eligibility, not live-verified model support.
+
+Desktop writes the global user setting and displays an effective project override
+when `reasonix.toml` owns the field. Selection is frozen when a runtime is built.
+Saving in an idle session rebuilds its runtime; a running task cannot be forcibly
+rebuilt by this setting. Other runtimes adopt it on their next rebuild.
+
+If an assigned connection is removed, disabled or loses credentials, the reference
+is retained. New runtimes omit the search tool and report the problem once; normal
+chat remains available. There is no fallback to another account. Select Automatic
+or a valid model to recover. Search requests and usage belong to the assigned
+connection/model, without changing the conversation model.
+
+No config-version or session migration is required. Previous versions ignore the
+new field and retain their old search-selection behavior. Their general config
+writer re-renders the file and may discard this field, comments and unknown keys;
+downgrading does not preserve explicit search-account selection. Saving this
+setting in the new Desktop changes only the field and preserves other content.
+
+Switching between valid search assignments preserves the main model's tool
+schema. Enabling or disabling the tool changes the tool list and may invalidate
+an existing prompt-cache prefix.
+
 ## Requests and results
 
 Each call contains only its query, so include necessary context in the query.

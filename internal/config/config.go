@@ -1240,6 +1240,7 @@ type AgentConfig struct {
 	PlannerMaxSteps int     `toml:"planner_max_steps"`
 	Temperature     float64 `toml:"temperature"`
 	PlannerModel    string  `toml:"planner_model"`
+	WebSearchModel  string  `toml:"web_search_model"` // empty or auto preserves automatic search selection
 	// VisionModel is empty (off), "auto", or a canonical provider/model ref
 	// used to summarize images before a text-only executor turn.
 	VisionModel         string  `toml:"vision_model"`

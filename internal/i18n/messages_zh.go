@@ -536,6 +536,7 @@ var Chinese = Messages{
 	ProviderErrQuotaExhaustedFmt:   "%s：供应商余额或套餐额度不足（HTTP %d）。请检查账户额度后继续。",
 	ProviderErrReasonMissing:       "上游拒绝了请求，但未提供具体原因。",
 	SearchSourcesNotProvided:       "搜索已完成，供应商未提供可用的结构化来源。",
+	SearchModelUnavailable:         "指定的网页搜索模型不可用；不会改用其他账号。",
 	ProtocolRecoveryLabel:          "从有效历史恢复",
 	ProviderErrInsufficientBalance: "余额不足 (HTTP 402)：账户余额不足，请前往充值后重试。",
 	ProviderErrNotFound:            "请求地址不存在（HTTP 404）。请检查 API 格式和请求地址。",

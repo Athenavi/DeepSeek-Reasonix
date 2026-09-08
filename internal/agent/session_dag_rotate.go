@@ -79,7 +79,27 @@ func rotateSessionDAG(sessionPath string, st *sessionDAGState, now time.Time) er
 		return err
 	}
 	fileutil.Crash("dag-rotate", path)
-	return fileutil.AtomicWriteFileStrict(path, data, 0o600)
+	staged, err := fileutil.StageAtomicWrite(path, data, 0o600)
+	if err != nil {
+		return err
+	}
+	// The marker brackets the window an unlocked appender cannot see into:
+	// bytes it lands before the late read are carried, bytes after it are
+	// re-appended by the appender once the marker clears.
+	marker := store.SessionEventLogRotating(sessionPath)
+	if err := os.WriteFile(marker, nil, 0o600); err != nil {
+		_ = os.Remove(staged)
+		return err
+	}
+	defer os.Remove(marker)
+	if hook := sessionDAGRotateBeforeReplace; hook != nil {
+		hook(sessionPath)
+	}
+	if err := appendLateLinesToStaged(path, st.size, staged); err != nil {
+		_ = os.Remove(staged)
+		return err
+	}
+	return fileutil.PublishStagedWrite(staged, path)
 }
 
 func buildRotatedSessionDAG(st *sessionDAGState, now time.Time) ([]sessionDAGEntry, error) {
