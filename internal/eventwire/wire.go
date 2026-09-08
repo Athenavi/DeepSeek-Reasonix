@@ -108,6 +108,8 @@ func ToWire(e event.Event) Event {
 	switch e.Kind {
 	case event.Notice:
 		w.applyNotice(e)
+	case event.ReadStatus:
+		w.ReadStatus = toWireReadStatus(e.ReadStatus)
 	case event.ToolDispatch, event.ToolResult, event.ToolProgress, event.ToolResultPreview:
 		w.Tool = toWireTool(e.Tool)
 	case event.WorkspaceChanged:
@@ -153,6 +155,7 @@ func ToWire(e event.Event) Event {
 		w.Extension = ToWireExtensionSurface(e.Extension)
 	case event.TurnDone:
 		w.Outcome = e.Outcome
+		w.ReadPause = e.ReadPause
 		w.CheckpointTurn = e.CheckpointTurn
 		w.Receipt = completionReceiptWire(e.Receipt)
 		w.ProtocolRecovery = e.ProtocolRecovery
@@ -577,6 +580,7 @@ var kindNames = map[event.Kind]string{
 	event.MCPInteractionRequest:   "mcp_interaction",
 	event.PromptAnswered:          "prompt_answered",
 	event.SessionChanged:          "session_changed",
+	event.ReadStatus:              "read_status",
 }
 
 // ContextMaintenance is the JSON form of event.ContextMaintenance.

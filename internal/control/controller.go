@@ -1131,6 +1131,10 @@ func (c *Controller) finishGuardedTurn(err error, completion *guardedTurnComplet
 	}
 	done.Receipt = bindCompletionLogSources(done.Receipt, c.History())
 	done = c.applyTurnDoneProtocol(done, cancelRequested)
+	var readErr *agent.IncompleteReadError
+	if errors.As(err, &readErr) {
+		done.ReadPause = readErr.Pause
+	}
 	done.Diagnostic = provider.DiagnoseFailure(err)
 	done.Detail = provider.FailureDiagnosticDetail(done.Diagnostic)
 	if !cancelRequested {

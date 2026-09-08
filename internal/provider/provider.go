@@ -100,11 +100,16 @@ type Message struct {
 	// ModelMessages removes it before provider serialization.
 	FinalReadinessRecovery *FinalReadinessRecovery `json:"final_readiness_recovery,omitempty"`
 	ProtocolRecovery       json.RawMessage         `json:"protocol_recovery,omitempty"`
+	ReadPause              *ReadPause              `json:"read_pause,omitempty"`
 	// ToolExecution is local shell UI metadata on tool-result messages. It ispersisted for
 	// Desktop/CLI/Servecards and stripped by
 	// ModelMessagesbeforeanyproviderrequestsotoolschemasandprompt-cacheprefixes stay stable.
 	ToolExecution *ToolExecution `json:"tool_execution,omitempty"`
 	ToolRunState  ToolRunState   `json:"tool_run_state,omitempty"`
+	// ReadResult is the host-only delivery envelope of a reader tool result. It
+	// is persisted for diagnostics and stripped by ModelMessages; provider
+	// serializers must never emit it on the wire.
+	ReadResult json.RawMessage `json:"read_result,omitempty"`
 	// MCPApp is the local MCP Apps presentation for results from App-capableservers. Persisted for
 	// Desktopcardsand stripped by ModelMessages;
 	// provider serializers must never emit it on the wire.

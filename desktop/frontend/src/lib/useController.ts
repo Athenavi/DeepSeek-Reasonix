@@ -34,12 +34,13 @@ import { recordFrontendDiagnostic } from "./frontendDiagnosticBridge";
 import { uiPerfTracker } from "./uiPerf";
 import { getLocale, t } from "./i18n";
 import {
+  appendNoticeItem,
   deliveryReadinessDetail,
   errorMessage,
-  localizedNoticeText,
-  quietTranscriptNoticeKey,
   readinessMissingIds,
 } from "./controllerNotices";
+import { applyReadStatusEvent, type ReadStatusHost } from "./readStatus";
+import { upsertReadPause } from "./readPause";
 import { applyHydrateErrorState, hydratePlaceholderItems as resolveHydratePlaceholders } from "./hydrateErrorState";
 import { isHostRecoveryGuidance } from "./hostRecoverySteer";
 import { activeTabHydrationPlan, canAdoptUnboundLiveSurface, duplicateLiveItemIds, hasCachedLiveTurn, hasReusableCachedTranscript, hydratedHistoryApplyMode, sameSessionHydrateIdentity, sameSessionPlaceholderItems, shouldPreferResidentHistory, type HydrateSurfacePolicy } from "./hydrateHistoryApply";
@@ -378,7 +379,7 @@ function handlePromptFailure(dispatchTo: (tabId: string, action: Action) => void
 export function isSteerNoticeText(text: string): boolean {
   return text.startsWith(STEER_NOTICE_PREFIX);
 }
-export interface State {
+export interface State extends ReadStatusHost {
   items: Item[];
   /** Exact backend-owned turn targeted by Stop/Ask. */
   activeTurnId?: string;
@@ -888,6 +889,10 @@ export function historyMessagesToItems(messages: HistoryMessage[], idPrefix: str
       continue;
     }
     if (m.role === "notice") {
+      if (m.code === "incomplete_read") {
+        items = upsertReadPause(items, m.readPause, `${idPrefix}${seq++}`);
+        continue;
+      }
       if (m.completionReceipt || m.completionSummary) {
         const result = historicalResultNotice(m, `${idPrefix}${seq}`);
         if (result) { items.push(result); seq++; }
@@ -1517,6 +1522,10 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
         || (Boolean(e.turnId) && e.turnId !== s.activeTurnId);
       const fresh = {
         ...s,
+        // A new turn starts from no live read status: the previous turn's
+        // progress is history, not this turn's state.
+        readStatuses: undefined,
+        readStatusClosed: false,
         activeTurnId: e.turnId ?? s.activeTurnId,
         assistantSegmentOrdinal: startsNewTurn ? 0 : s.assistantSegmentOrdinal,
         pendingSearchSources: undefined,
@@ -1824,6 +1833,8 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       // arguments, so drop the live estimate rather than double-count it.
       return { ...settled, usage, context: { ...settled.context, used, sessionTokens }, turnTokens, turnOutputTokens, turnOutputCharsAtUsage, turnOutputEstimated, turnTotalTokens, turnCost, turnRateBand, turnArgChars: updateContextGauge ? 0 : settled.turnArgChars, sessionTokens, sessionCost, sessionCurrency, usageSeq: settled.usageSeq + 1, lastRequestTps, pendingRequestModelMs: updateContextGauge ? undefined : settled.pendingRequestModelMs };
     }
+    case "read_status":
+      return applyReadStatusEvent(s, e);
     case "notice": {
       const next = appendNoticeToState(s, e.level ?? "info", e.text ?? "", e.detail, e.code, e.decisionReceipt);
       return e.code?.startsWith("stream_interrupted_") ? { ...next, streamInterruptNoticeShown: true } : next;
@@ -1912,6 +1923,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
     }
     case "turn_done": {
       if (e.turnId && s.activeTurnId && e.turnId !== s.activeTurnId) return s;
+      s = { ...s, readStatuses: undefined, readStatusClosed: true };
       const now = Date.now();
       s = snapshotCompletedTurnTelemetry(s, now);
       const workDurationMs = s.turnDoneAt ? Math.max(1, s.turnDoneAt - s.turnStartAt - (s.lastTurnWaitAccumMs ?? 0)) : undefined;
@@ -1949,7 +1961,9 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       } else if (todoGapResolved) {
         items = finalized.filter((item) => item.kind !== "notice" || item.variant !== "delivery" || !todoOnlyMissing(item.missing));
       }
-      if (e.outcome === "final_readiness") {
+      if (e.outcome === "incomplete_read") {
+        items = upsertReadPause(items, e.readPause, `read-pause-${e.turnId ?? s.seq}`);
+      } else if (e.outcome === "final_readiness") {
         const previous = items.map((item) => item.kind === "notice" && item.variant === "delivery"
           ? { ...item, action: undefined }
           : item);
@@ -2093,6 +2107,8 @@ export function reducer(s: State, a: Action): State {
     case "cancel_requested": {
       return endPromptWait({
         ...s,
+        readStatuses: undefined,
+        readStatusClosed: true,
         pendingPrompt: false,
         cancelRequested: true,
         approval: undefined,
@@ -2475,18 +2491,6 @@ function latestTodosAllComplete(items: Item[]): boolean {
     }
   }
   return false;
-}
-
-function appendNoticeItem(items: Item[], seq: number, id: string, level: "info" | "warn", rawText: string, detail?: string, code?: string, decisionReceipt?: WireDecisionReceipt): { items: Item[]; seq: number } {
-  if (quietTranscriptNoticeKey(rawText, code)) {
-    return { items, seq };
-  }
-  const text = localizedNoticeText(rawText, code);
-  if (quietTranscriptNoticeKey(text, code)) {
-    return { items, seq };
-  }
-  const trimmedDetail = detail?.trim();
-  return { items: [...items, { kind: "notice", id, level, text, ...(trimmedDetail ? { detail: trimmedDetail } : {}), ...(code ? { code } : {}), ...(decisionReceipt ? { decisionReceipt } : {}) }], seq: seq + 1 };
 }
 
 function appendNoticeToState(s: State, level: "info" | "warn", text: string, detail?: string, code?: string, decisionReceipt?: WireDecisionReceipt): State {

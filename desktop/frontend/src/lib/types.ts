@@ -1,5 +1,7 @@
 import type { ProviderCatalog, ProviderPresetView } from "./providerCatalogTypes";
 export type { ProviderProtocolEndpoint, ProviderCatalog, ProviderPresetView } from "./providerCatalogTypes";
+import type { WireReadStatus } from "./readStatus";
+export type { WireReadStatus } from "./readStatus";
 import type { RecoveryEventFields } from "./recoveryStatus";
 // Wire contract — mirrors desktop/wire.go (itself mirroring internal/serve/wire.go).
 // One event channel carries every kind; `kind` discriminates the payload.
@@ -44,6 +46,7 @@ export type EventKind =
   | "workspace_changed"
   | "turn_phase"
   | "completion_summary"
+  | "read_status"
   | "provider_unreachable";
 export type StreamAttemptAction = "begin" | "discard" | "commit";
 export type TurnStatus = "queued" | "in_progress" | "waiting_user" | "cancelling" | "completed" | "interrupted" | "failed" | "protocol_failed";
@@ -385,7 +388,9 @@ export interface MemoryCitation {
 
 export interface WireEvent extends RecoveryEventFields {
 	receipt?: WireCompletionReceipt;
+	readPause?: import("./readPause").WireReadPause;
   kind: EventKind;
+  readStatus?: WireReadStatus;
   /** session_changed: the transcript was replaced under the same path (head switch, clear). */
   sessionReset?: boolean;
   promptId?: string;
@@ -414,7 +419,7 @@ export interface WireEvent extends RecoveryEventFields {
   err?: string;
   checkpointTurn?: number; // Authoritative TurnDone rewind target; zero is valid.
   submissionId?: string; // Opaque correlation for the exact optimistic user submission.
-  outcome?: "completed" | "partial" | "blocked" | "final_readiness" | "recovery_paused" | "completion_uncertain";
+  outcome?: "completed" | "partial" | "blocked" | "final_readiness" | "recovery_paused" | "completion_uncertain" | "incomplete_read";
   readiness?: WireFinalReadiness;
   protocolRecovery?: { id: string };
   diagnostic?: { kind: string; status?: number; traceId?: string; providerId?: string; providerDisplayName?: string; protocol?: string; requestPath?: string };
@@ -812,6 +817,7 @@ export interface HistoryMessage {
 	completionReceipt?: WireCompletionReceipt;
 	completionSummary?: WireCompletionSummary;
 	turnId?: string;
+	readPause?: import("./readPause").WireReadPause;
   role: string;
   content: string;
   detail?: string;
