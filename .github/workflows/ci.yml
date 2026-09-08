@@ -72,6 +72,10 @@ jobs:
   test:
     needs: changes
     if: always()
+    # Backstop against a wedged step holding the workflow's concurrency group:
+    # the Windows full-suite step has outlived its own timeout and kept the job
+    # alive. Normal full-suite wall time is 8-12 minutes per platform.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -779,7 +783,10 @@ jobs:
             -HealthySeconds 5
 
       - name: test (Windows desktop and update helper)
-        timeout-minutes: 15
+        # Normal wall time is 6-7 minutes; a loaded runner has exceeded 15 with
+        # every package still passing. Keep the budget above that load spike so
+        # the job-level timeout, not this step, ends a real hang.
+        timeout-minutes: 25
         run: go test ./...
 
       - name: test (vendored systray identity)

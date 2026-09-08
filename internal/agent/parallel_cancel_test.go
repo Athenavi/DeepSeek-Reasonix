@@ -30,6 +30,22 @@ func (s stubbornTool) Execute(context.Context, json.RawMessage) (string, error) 
 	return "late", nil
 }
 
+// fastTool reports when it has entered execution, so the test cancels only
+// after both tools of the batch are running.
+type fastTool struct {
+	once    *sync.Once
+	started chan struct{}
+}
+
+func (fastTool) Name() string            { return "fast" }
+func (fastTool) Description() string     { return "always succeeds" }
+func (fastTool) Schema() json.RawMessage { return json.RawMessage(`{"type":"object"}`) }
+func (fastTool) ReadOnly() bool          { return true }
+func (f fastTool) Execute(context.Context, json.RawMessage) (string, error) {
+	f.once.Do(func() { close(f.started) })
+	return "ok", nil
+}
+
 // A read-only parallel segment must not keep the whole turn wedged behind one
 // tool that ignores cancellation: after the grace the batch reports that call
 // as an unknown effect while the calls that did finish keep their results.
@@ -40,9 +56,10 @@ func TestParallelBatchAbandonsToolThatIgnoresCancellation(t *testing.T) {
 
 	stub := stubbornTool{once: &sync.Once{}, started: make(chan struct{}), release: make(chan struct{})}
 	t.Cleanup(func() { close(stub.release) })
+	fast := fastTool{once: &sync.Once{}, started: make(chan struct{})}
 	reg := tool.NewRegistry()
 	reg.Add(stub)
-	reg.Add(okTool{name: "fast"})
+	reg.Add(fast)
 	prov := &scriptedProvider{name: "p", turns: [][]provider.Chunk{
 		{toolCallChunk("stubborn-1", "stubborn", `{}`), toolCallChunk("fast-1", "fast", `{}`)},
 		{{Type: provider.ChunkText, Text: "done"}},
@@ -58,6 +75,11 @@ func TestParallelBatchAbandonsToolThatIgnoresCancellation(t *testing.T) {
 	case <-stub.started:
 	case <-time.After(5 * time.Second):
 		t.Fatal("stubborn tool never started")
+	}
+	select {
+	case <-fast.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("fast tool never started")
 	}
 	cancel()
 	select {
