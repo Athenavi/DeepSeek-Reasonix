@@ -668,6 +668,9 @@ jobs:
     needs: changes
     if: always() && (github.event_name != 'pull_request' || needs.changes.outputs.desktop != 'false')
     runs-on: windows-latest
+    # A hung native step must not hold the workflow's concurrency group for the
+    # six-hour default. Normal runs finish in ~25 minutes.
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash

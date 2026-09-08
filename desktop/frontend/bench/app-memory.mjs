@@ -26,6 +26,7 @@ function integerEnv(name, fallback) {
 
 const CYCLES = integerEnv("REASONIX_APP_MEMORY_CYCLES", 128);
 const MIXED_CYCLES = integerEnv("REASONIX_APP_MEMORY_MIXED_CYCLES", 512);
+const BASELINE_ATTEMPTS = integerEnv("REASONIX_APP_MEMORY_BASELINE_ATTEMPTS", 4);
 const SHARD = process.env.REASONIX_APP_MEMORY_SHARD === undefined ? null : Number(process.env.REASONIX_APP_MEMORY_SHARD);
 if (SHARD !== null && ![1, 2, 3].includes(SHARD)) throw new Error("memory shard must be 1, 2 or 3");
 const PROCESSES = SHARD === null ? integerEnv("REASONIX_APP_MEMORY_PROCESSES", 3) : 1;
@@ -145,10 +146,27 @@ async function runProcess(index) {
       await settleFrames(page);
     }
     // Baseline and checkpoints share a post-navigation resting state. Layout
-    // controls can still own transient listeners immediately after closing.
+    // controls can still own transient listeners immediately after closing, so
+    // one early reading can sit above the resting value and make every later
+    // reading look displaced. Settle and require consecutive identical readings
+    // before accepting the baseline; an unsettled baseline is reported instead
+    // of being judged as drift.
     await selectFixture(page, fixtures.geometry);
     await selectFixture(page, fixtures.full);
-    const samples = [{ phase: "baseline", roundTrips: 0, ...await forceGc(cdp, page) }];
+    const samples = [];
+    const baselineReadings = [];
+    for (let attempt = 1; attempt <= BASELINE_ATTEMPTS; attempt++) {
+      await settleFrames(page, 12);
+      const reading = await forceGc(cdp, page);
+      baselineReadings.push({ nodes: reading.dom.nodes, jsEventListeners: reading.dom.jsEventListeners });
+      const previous = baselineReadings.at(-2);
+      const stable = previous && previous.nodes === reading.dom.nodes && previous.jsEventListeners === reading.dom.jsEventListeners;
+      if (stable || attempt === BASELINE_ATTEMPTS) {
+        samples.push({ phase: "baseline", roundTrips: 0, baselineStable: Boolean(stable), baselineReadings, ...reading });
+        process.stdout.write(`[app-memory] process=${index} phase=baseline stable=${Boolean(stable)} readings=${JSON.stringify(baselineReadings)}\n`);
+        break;
+      }
+    }
     const snapshots = [await heapSnapshot(cdp, `${index}-baseline`)];
     for (const phase of ["full", "windowed", "safety", "mixed"]) {
       const count = phase === "mixed" ? MIXED_CYCLES : CYCLES;
