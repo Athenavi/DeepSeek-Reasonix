@@ -294,7 +294,9 @@ for (const path of localeChunks) {
   // Session-log head versions (head kinds, current/covered wording, and the
   // three head notices) measure 61.7 / 62.4 KiB; keep the next one-decimal
   // ceiling for cross-platform CI.
-  const budget = name.startsWith("zh-TW-") ? 62.5 * 1024 : 61.8 * 1024;
+  // Search assignment copy adds 239 / 231 B over main-v2 (63147 / 63920 B).
+  // Measured result: 63386 / 64151 B; retain bounded cross-platform headroom.
+  const budget = name.startsWith("zh-TW-") ? 62.8 * 1024 : 62.1 * 1024;
   assertBudget(`${name} gzip`, gzipBytes(path), budget);
 }
 
@@ -407,6 +409,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // extracted shell. Retain the same bounded 0.2 KiB build headroom.
 // The head-version dialog copy and its covered-version cleanup control
 // measure 2399.2 KiB; retain the same bounded 0.2 KiB build headroom.
-const rawInitialBudgetKiB = 2_399.4;
+// Search-assignment bridge and metadata add 1.0 KiB over the measured
+// main-v2 baseline (2399.3 KiB); result 2400.3 KiB plus 0.2 KiB headroom.
+const rawInitialBudgetKiB = 2_400.5;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

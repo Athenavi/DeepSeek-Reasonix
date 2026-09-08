@@ -575,6 +575,7 @@ type Messages struct {
 	ProviderErrQuotaExhaustedFmt   string // provider name, actual HTTP status
 	ProviderErrReasonMissing       string
 	SearchSourcesNotProvided       string
+	SearchModelUnavailable         string
 	ProtocolRecoveryLabel          string
 	ProviderErrInsufficientBalance string // 402
 	ProviderErrNotFound            string // 404

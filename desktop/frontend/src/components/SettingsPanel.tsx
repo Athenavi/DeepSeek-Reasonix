@@ -1,3 +1,4 @@
+import { ModelSettingHelp } from "./ModelSettingHelp";
 import { SettingsOptions } from "./SettingsOptions";
 import { SettingsSelect } from "./SettingsSelect";
 import { providerProtocolLabel, providerProtocolChoices } from "../lib/providerProtocol";
@@ -348,7 +349,7 @@ export function SettingsPanel({
             ) : (
               <>
                 {tab === "general" && s && <SettingsPageShell key={tab} s={s} tab={tab} busy={busy} apply={apply}><GeneralSection s={s} busy={busy} apply={apply} agentRunning={agentRunning} /></SettingsPageShell>}
-                {(tab === "models" || tab === "providers" || tab === "model-stats") && s && <SettingsPageShell key="model-pages" s={s} tab={tab} busy={busy} apply={apply}><ModelsSection s={s} busy={busy} apply={apply} backgroundApply={backgroundApply} onboarding={initialFocus?.target === "model-access" && initialFocus.onboarding} onOnboardingComplete={onClose} subtab={tab === "providers" ? "access" : tab === "model-stats" ? "stats" : "usage"} /></SettingsPageShell>}
+                {(tab === "models" || tab === "providers" || tab === "model-stats") && s && <SettingsPageShell key="model-pages" s={s} tab={tab} busy={busy} apply={apply}><ModelsSection onOpenProviders={() => selectTab("providers")} s={s} busy={busy} apply={apply} backgroundApply={backgroundApply} onboarding={initialFocus?.target === "model-access" && initialFocus.onboarding} onOnboardingComplete={onClose} subtab={tab === "providers" ? "access" : tab === "model-stats" ? "stats" : "usage"} /></SettingsPageShell>}
                 {tab === "bots" && s && <SettingsPageShell key={tab} s={s} tab={tab} busy={busy} apply={apply}><BotsSection s={s} busy={busy} apply={apply} initialFocus={initialFocus} /></SettingsPageShell>}
                 {tab === "mcp" && <SettingsPageShell key={tab} s={s} tab={tab} busy={false} apply={apply}><Suspense fallback={lazySettingsPageFallback}><MCPServersSettingsPage /></Suspense></SettingsPageShell>}
                 {tab === "remote" && <SettingsPageShell key={tab} s={s} tab={tab} busy={false} apply={apply}><Suspense fallback={lazySettingsPageFallback}><RemoteHostsPage /></Suspense></SettingsPageShell>}
@@ -500,6 +501,7 @@ type SectionProps = {
 };
 
 type ModelsSectionProps = SectionProps & {
+  onOpenProviders?: () => void;
   onboarding?: boolean;
   onOnboardingComplete?: () => void;
   backgroundApply: (fn: () => Promise<void>) => Promise<void>;
@@ -1400,6 +1402,8 @@ function normalizeSettingsView(view: SettingsView | null | undefined): SettingsV
   agent.compactRatioOverridden = Boolean(agent.compactRatioOverridden);
   return {
     ...view,
+    webSearchModel: view.webSearchModel || "auto",
+    webSearchModels: asArray(view.webSearchModels).filter((ref): ref is string => typeof ref === "string"),
     providers: asArray(view.providers).map(normalizeProviderView),
     officialProviders: asArray(view.officialProviders).map(normalizeProviderView),
     providerPresets: asArray(view.providerPresets).map(normalizeProviderPresetView).filter((p) => p.id),
@@ -4056,7 +4060,7 @@ function botDraftWithDerivedGatewayState(draft: BotSettingsView): BotSettingsVie
   };
 }
 
-export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboarding, onOnboardingComplete }: ModelsSectionProps) {
+export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboarding, onOnboardingComplete, onOpenProviders }: ModelsSectionProps) {
   const t = useT();
   const autoRefreshKeyRef = useRef("");
   const autoRefreshGenerationRef = useRef(0);
@@ -4246,7 +4250,7 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
         <div className="model-preferences">
           <SettingsSection className="model-assignment-section" title={t("settings.models.preferences")} description={t("settings.defaultModelHint")}>
             <div className="model-assignment-head"><span>{t("settings.modelPurpose")}</span><span>{t("settings.modelUsage")}</span><span>{t("settings.modelConnection")}</span></div>
-            <SettingsField className="model-assignment-row" label={t("settings.defaultModel")}>
+            <SettingsField className="model-assignment-row" label={<ModelSettingHelp label={t("settings.defaultModel")} text={t("providerUI.defaultModelHelp")} />}>
               <ModelPicker
                 s={s}
                 refs={refs}
@@ -4258,7 +4262,7 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
             <span className="model-assignment-connection">{toRef(s.defaultModel, s) && toRef(s.defaultModel, s) !== "auto" ? modelOptionMeta(modelOptionFromRef(toRef(s.defaultModel, s), s)!, t) : t("settings.connectionAutomatic")}</span>
             </SettingsField>
 
-            <SettingsField className="model-assignment-row" label={t("settings.plannerModel")}>
+            <SettingsField className="model-assignment-row" label={<ModelSettingHelp label={t("settings.plannerModel")} text={t("providerUI.plannerModelHelp")} />}>
               <ModelPicker
                 s={s}
                 refs={refs}
@@ -4271,7 +4275,7 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
             <span className="model-assignment-connection">{plannerSelectRef && plannerSelectRef !== "auto" ? modelOptionMeta(modelOptionFromRef(plannerSelectRef, s)!, t) : t("settings.connectionFollowSession")}</span>
             </SettingsField>
 
-            <SettingsField className="model-assignment-row" label={t("settings.imageUnderstandingModel")}>
+            <SettingsField className="model-assignment-row" label={<ModelSettingHelp label={t("settings.imageUnderstandingModel")} text={t("providerUI.visionModelHelp")} />}>
               <ModelPicker
                 s={s}
                 refs={visionRefs}
@@ -4286,7 +4290,19 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
             </SettingsField>
 
 
-            <SettingsField className="model-assignment-row" label={t("settings.subagentModel")}>
+            <SettingsField className="model-assignment-row" label={<ModelSettingHelp label={t("settings.webSearchModel")} text={t("providerUI.searchModelHelp")} />}>
+              <div className="web-search-assignment-control">
+                <ModelPicker s={s} refs={s.webSearchModels ?? []} value={s.webSearchModel || "auto"}
+                  disabled={busy} ariaLabel={t("settings.webSearchModel")} autoOptionLabel={t("common.auto")}
+                  onPick={(ref) => void apply(() => app.SetWebSearchModel(ref))} />
+                {(s.webSearchModelStatus === "invalid" || Boolean(s.webSearchModel && s.webSearchModel !== "auto" && !(s.webSearchModels ?? []).includes(s.webSearchModel))) && <p role="status" className="web-search-assignment-hint">{t("settings.webSearchModelUnavailable")} {s.webSearchModelReason}</p>}
+                {s.webSearchModelOverridden && <p className="web-search-assignment-hint">{t("settings.webSearchModelOverride", { model: s.effectiveWebSearchModel || t("common.auto") })}</p>}
+                {(s.webSearchModels ?? []).length === 0 && <p className="web-search-assignment-hint">{t("settings.webSearchModelEmpty")} {onOpenProviders && <button type="button" className="btn btn--small" onClick={onOpenProviders}>{t("settings.webSearchModelConnections")}</button>}</p>}
+              </div>
+              <span className="model-assignment-connection">{!s.webSearchModel || s.webSearchModel === "auto" ? t("settings.webSearchModelAutomatic") : (s.providers.find(p => p.name === s.webSearchModel?.split("/")[0])?.displayName || s.webSearchModel.split("/")[0])}</span>
+            </SettingsField>
+
+            <SettingsField className="model-assignment-row" label={<ModelSettingHelp label={t("settings.subagentModel")} text={t("providerUI.subagentModelHelp")} />}>
               <ModelPicker
                 s={s}
                 refs={refs}
@@ -4300,7 +4316,7 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
             <span className="model-assignment-connection">{subagentRef && subagentRef !== "auto" ? modelOptionMeta(modelOptionFromRef(subagentRef, s)!, t) : t("settings.connectionFollowParent")}</span>
             </SettingsField>
 
-            <SettingsField className="model-assignment-effort" label={t("settings.subagentReasoning")} hint={t("settings.subagentReasoningHint")}>
+            <SettingsField className="model-assignment-effort" label={<ModelSettingHelp label={t("settings.subagentReasoning")} text={t("providerUI.subagentEffortHelp")} />}>
               <SettingsSelect
                 className="mem-select set-grow"
                 aria-label={t("settings.subagentReasoning")}

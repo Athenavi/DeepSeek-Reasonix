@@ -535,6 +535,7 @@ var English = Messages{
 	ProviderErrQuotaExhaustedFmt:   "%s: provider credits or subscription quota exhausted (HTTP %d). Check your account allowance before continuing.",
 	ProviderErrReasonMissing:       "The upstream rejected the request but did not provide a specific reason.",
 	SearchSourcesNotProvided:       "Search completed; the provider did not supply usable structured sources.",
+	SearchModelUnavailable:         "Assigned web search model is unavailable; no other account will be used.",
 	ProtocolRecoveryLabel:          "Recover from valid history",
 	ProviderErrInsufficientBalance: "Insufficient balance (HTTP 402): your account is out of credit. Top up your account, then retry.",
 	ProviderErrNotFound:            "Request endpoint not found (HTTP 404). Check the API format and request address.",

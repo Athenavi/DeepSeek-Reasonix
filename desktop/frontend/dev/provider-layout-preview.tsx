@@ -35,8 +35,8 @@ function ScrollPreview() {
 }
 function PreferencesPreview() {
  const t=useT();
- const [settings,setSettings]=useState({...baseSettings(),defaultModel:'deepseek/deepseek-v4-flash',visionModel:'auto',providers:[{...sample,displayName:'DeepSeek 官方1'}]});
- const setters: Record<string,string> = {SetDefaultModel:'defaultModel',SetPlannerModel:'plannerModel',SetVisionModel:'visionModel',SetSubagentModel:'subagentModel',SetSubagentEffort:'subagentEffort'};
+ const [settings,setSettings]=useState({...baseSettings(),defaultModel:'deepseek/deepseek-v4-flash',visionModel:'auto',webSearchModel:'auto',webSearchModels:['deepseek/deepseek-v4-flash','deepseek/deepseek-v4-pro'],providers:[{...sample,displayName:'DeepSeek 官方1'}]});
+ const setters: Record<string,string> = {SetDefaultModel:'defaultModel',SetPlannerModel:'plannerModel',SetVisionModel:'visionModel',SetWebSearchModel:'webSearchModel',SetSubagentModel:'subagentModel',SetSubagentEffort:'subagentEffort'};
  Object.entries(setters).forEach(([method,key])=>{(window as any).go.main.App[method]=async(value:string)=>setSettings(s=>({...s,[key]:value}));});
  const agentSetters: Record<string,string>={SetReasoningLanguage:'reasoningLanguage',SetCompactRatio:'compactRatio',SetMaxSubagentDepth:'maxSubagentDepth',SetMaxSubagentConcurrency:'maxSubagentConcurrency',SetMaxParallelWriters:'maxParallelWriters'};
  Object.entries(agentSetters).forEach(([method,key])=>{(window as any).go.main.App[method]=async(value:unknown)=>setSettings(s=>({...s,agent:{...s.agent,[key]:value}}));});

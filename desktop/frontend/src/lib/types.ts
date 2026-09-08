@@ -2248,6 +2248,12 @@ export interface SettingsView {
   defaultModel: string;
   plannerModel: string;
   visionModel: string;
+  webSearchModel?: string;
+  webSearchModels?: string[];
+  webSearchModelStatus?: string;
+  webSearchModelReason?: string;
+  effectiveWebSearchModel?: string;
+  webSearchModelOverridden?: boolean;
   subagentModel: string;
   subagentEffort: string;
   autoPlan: string;
