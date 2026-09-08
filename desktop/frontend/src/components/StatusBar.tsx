@@ -177,7 +177,7 @@ export function StatusBar({
   cost,
   currency,
   modelLabel,
-  labelStyle = "text",
+  labelStyle = "icon",
   items,
   workspacePath,
   workspaceName,

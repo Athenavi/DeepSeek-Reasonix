@@ -1474,7 +1474,7 @@ function desktopLayoutStyleLabel(style: DesktopLayoutStyle, t: ReturnType<typeof
 
 type StatusBarStyle = "icon" | "text";
 function normalizeStatusBarStyle(style: string | undefined): StatusBarStyle {
-  return style === "icon" ? "icon" : "text";
+  return style === "text" ? "text" : "icon";
 }
 
 function statusBarItemLabel(id: StatusBarItemId, t: ReturnType<typeof useT>): string {

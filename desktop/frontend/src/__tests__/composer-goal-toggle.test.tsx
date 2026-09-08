@@ -284,39 +284,21 @@ console.log("\ncomposer goal toggle");
   eq(textarea.value, "/reviewer ship the release notes", "prefix insert preserves the draft as a subagent task");
   eq(calls.send.length, 0, "prefix insert does not send the subagent task");
 
-  const intentButton = document.querySelector(".composer-task-mode-trigger") as HTMLButtonElement | null;
-  if (!intentButton) throw new Error("composer intent button did not render");
-  eq(intentButton.textContent?.trim(), "Standard", "execution method trigger shows only the current method");
-  eq(intentButton.getAttribute("aria-label"), "Execution method · Standard", "execution method trigger keeps its full accessible name");
-  const intentTooltipTrigger = intentButton.closest(".tooltip-trigger");
-  if (!intentTooltipTrigger) throw new Error("composer intent tooltip trigger did not render");
-  await act(async () => {
-    intentTooltipTrigger.dispatchEvent(new Event("focusin", { bubbles: true }));
-    await flushTimers();
-  });
-  await waitFor("execution method tooltip", () => document.querySelector('[role="tooltip"]') !== null);
-  eq(document.querySelector('[role="tooltip"]')?.textContent, "Execution method · Standard: Analyze and act as you go", "execution method tooltip combines category, value, and summary");
-  await act(async () => {
-    intentTooltipTrigger.dispatchEvent(new Event("focusout", { bubbles: true }));
-    await flushTimers();
-  });
-
+  eq(document.querySelector(".composer-task-mode-trigger"), null, "default execution has no mode chip");
+  const intentButton = document.querySelector(".composer-content-trigger") as HTMLButtonElement;
   await act(async () => {
     intentButton.click();
     await flushTimers();
   });
 
   const taskModeItems = document.querySelectorAll(".composer-intent-menu__item");
-  eq(taskModeItems.length, 3, "task method menu exposes three mutually exclusive choices");
+  eq(taskModeItems.length, 2, "task method menu exposes only Plan and Goal");
   eq(document.querySelectorAll(".composer-intent-switch").length, 0, "task method menu does not present independent switches");
-  const planButton = taskModeItems[1] as HTMLButtonElement | undefined;
+  const planButton = taskModeItems[0] as HTMLButtonElement | undefined;
   if (!planButton) throw new Error("composer Plan menu item did not render");
-  ok(planButton.textContent?.includes("tool use follows current permissions and sandbox settings") === true, "Plan menu explains that permissions and sandbox still govern tools");
+  eq(planButton.querySelector(".composer-access-menu__desc"), null, "Plan menu keeps a single-line label");
   ok(planButton.textContent?.toLowerCase().includes("read-only") === false, "Plan menu does not present Plan as a read-only permission mode");
-  const askApprovalButton = document.querySelector(".composer-modebar__item--ask") as HTMLButtonElement | null;
-  if (!askApprovalButton) throw new Error("composer Ask approval button did not render");
-  ok(askApprovalButton.title.includes("Ask is not read-only"), "Ask tooltip distinguishes approval policy from read-only sandboxing");
-  const goalButton = taskModeItems[2] as HTMLButtonElement | undefined;
+  const goalButton = taskModeItems[1] as HTMLButtonElement | undefined;
   if (!goalButton) throw new Error("composer goal menu item did not render");
 
   await act(async () => {
@@ -327,6 +309,25 @@ console.log("\ncomposer goal toggle");
   eq(calls.send.length, 0, "enabling goal mode with a draft does not send");
   eq(calls.setCollaborationMode.join(","), "goal", "enabling goal mode switches only the collaboration axis");
   eq(textarea.value, "/reviewer ship the release notes", "enabling goal mode preserves the prefixed draft text");
+
+  await rerender({ collaborationMode: "plan" });
+  ok(document.querySelector(".composer-task-mode-trigger") !== null, "Plan exposes its active mode chip");
+  await act(async () => {
+    document.querySelector<HTMLButtonElement>(".composer-content-trigger")?.click();
+    await flushTimers();
+  });
+  await act(async () => {
+    document.querySelector<HTMLButtonElement>(".composer-intent-menu__item")?.click();
+    await flushTimers();
+  });
+  eq(calls.setCollaborationMode.at(-1), "normal", "selecting active Plan exits to the implicit default");
+  eq(textarea.value, "/reviewer ship the release notes", "exiting Plan preserves the draft");
+  await act(async () => {
+    document.querySelector<HTMLButtonElement>(".composer-task-mode-trigger")?.click();
+    await flushTimers();
+  });
+  eq(calls.setCollaborationMode.at(-1), "normal", "clicking the mode chip exits Plan directly");
+  eq(textarea.value, "/reviewer ship the release notes", "dismissing the chip preserves the draft");
 
   await act(async () => {
     root.unmount();
@@ -706,7 +707,7 @@ console.log("\ncomposer goal toggle");
   ok(intentButton.textContent?.includes("Goal") === true, "task method trigger exposes an active goal");
 
   await act(async () => {
-    intentButton.click();
+    (document.querySelector(".composer-content-trigger") as HTMLButtonElement).click();
     await flushTimers();
   });
 
@@ -720,6 +721,11 @@ console.log("\ncomposer goal toggle");
   });
   eq(calls.clearGoal, 1, "explicit stop action clears the active goal");
   eq(calls.setCollaborationMode.length, 0, "stopping a goal does not race a second mode update");
+  await act(async () => {
+    intentButton.click();
+    await flushTimers();
+  });
+  eq(calls.clearGoal, 2, "dismissing an active goal chip uses the existing clear-goal action");
 
   await act(async () => {
     root.unmount();
@@ -2551,6 +2557,54 @@ console.log("\ncomposer goal toggle");
     root.unmount();
   });
   globalThis.requestAnimationFrame = realRequestAnimationFrame;
+  dom.window.close();
+}
+
+{
+  const dom = installDom();
+  const picked: string[] = [];
+  let modelChanges = 0;
+  const { root, rerender } = await renderComposer({
+    effort: { supported: true, current: "auto", default: "high", levels: ["auto", "high", "max"] },
+    onSetEffort: level => picked.push(level),
+    onSwitchModel: () => { modelChanges += 1; },
+  });
+  const trigger = document.querySelector<HTMLButtonElement>(".composer-effort-control button");
+  if (!trigger) throw new Error("missing independent effort selector");
+  await act(async () => { trigger.click(); await flushTimers(); });
+  const high = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')].find(e => e.textContent === "high");
+  if (!high) throw new Error("missing high effort option");
+  await act(async () => { high.click(); await flushTimers(); });
+  eq(picked.join(","), "high", "separate effort selector changes reasoning effort");
+  eq(modelChanges, 0, "changing effort does not switch models");
+  eq(trigger.getAttribute("aria-expanded"), "false", "effort menu closes after selection");
+  await rerender({ effort: { supported: false, current: "auto", default: "auto", levels: [] } });
+  eq(document.querySelector(".composer-effort-control"), null, "unsupported models hide effort control");
+  await act(async () => root.unmount());
+  dom.window.close();
+}
+
+{
+  const dom = installDom();
+  const floors: string[] = [];
+  const { root, rerender, calls } = await renderComposer({ collaborationMode: "plan", onSetQualityFloor: floor => floors.push(floor) });
+  eq(document.querySelector(".composer-delivery-trigger"), null, "default standard has no delivery chip");
+  await act(async () => {
+    document.querySelector<HTMLButtonElement>(".composer-content-trigger")?.click();
+    await flushTimers();
+  });
+  const toggle = document.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]');
+  if (!toggle) throw new Error("delivery toggle missing");
+  eq(toggle.getAttribute("aria-checked"), "false", "delivery is off by default");
+  await act(async () => { toggle.click(); await flushTimers(); });
+  eq(floors.at(-1), "delivery", "delivery toggle enables delivery verification");
+  await rerender({ qualityFloor: "delivery" });
+  const chip = document.querySelector<HTMLButtonElement>(".composer-delivery-trigger");
+  if (!chip) throw new Error("delivery chip missing");
+  await act(async () => { chip.click(); await flushTimers(); });
+  eq(floors.at(-1), "standard", "closing delivery chip restores implicit standard");
+  eq(calls.setCollaborationMode.length, 0, "delivery does not change Plan or Goal mode");
+  await act(async () => root.unmount());
   dom.window.close();
 }
 

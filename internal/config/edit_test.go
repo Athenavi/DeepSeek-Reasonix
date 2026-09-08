@@ -289,8 +289,8 @@ func TestDesktopExternalOpenerValidation(t *testing.T) {
 }
 
 func TestDesktopStatusBarStyleNormalizes(t *testing.T) {
-	if got := Default().DesktopStatusBarStyle(); got != "text" {
-		t.Fatalf("default desktop status bar style = %q, want text", got)
+	if got := Default().DesktopStatusBarStyle(); got != "icon" {
+		t.Fatalf("default desktop status bar style = %q, want icon", got)
 	}
 	for _, tt := range []struct {
 		in      string
@@ -302,7 +302,7 @@ func TestDesktopStatusBarStyleNormalizes(t *testing.T) {
 		{"icons", "icon", false},
 		{"text", "text", false},
 		{"labels", "text", false},
-		{"later", "text", true},
+		{"later", "icon", true},
 	} {
 		c := Default()
 		if err := c.SetDesktopStatusBarStyle(tt.in); (err != nil) != tt.wantErr {

@@ -129,6 +129,23 @@ console.log("\ncontext window ring");
 
 {
   const dom = installDom();
+  installContextPanelMock(async () => contextPanelInfo(2));
+  const { root } = await renderRing();
+  const trigger = document.querySelector<HTMLButtonElement>(".context-ring")!;
+  eq(trigger.textContent, "10%", "ring exposes its percentage outside Creation layout");
+  await act(async () => { trigger.focus(); trigger.click(); await wait(); });
+  eq(trigger.getAttribute("aria-expanded"), "true", "keyboard activation opens usage details");
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await wait(230);
+  });
+  eq(trigger.getAttribute("aria-expanded"), "false", "Escape cancels pending hover timers without reopening");
+  await act(async () => { root.unmount(); });
+  dom.window.close();
+}
+
+{
+  const dom = installDom();
   const calls: string[] = [];
   installContextPanelMock(async (tabId) => {
     calls.push(tabId);

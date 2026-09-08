@@ -2,7 +2,7 @@ import { recoveryStatusText, type RecoveryRetry } from "../lib/recoveryStatus";
 import { useAppNavigationStore } from "../store/appNavigation";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { ArrowRight, ArrowUp, Check, ChevronsUpDown, CornerDownRight, Equal, Eye, FileText, Folder, Gauge, List, MessageSquare, PackageCheck, Plus, Search, Shield, ShieldAlert, ShieldCheck, Square, Target, Trash2, X } from "lucide-react";
+import { ArrowRight, ArrowUp, Brain, Check, CornerDownRight, Eye, FileText, Folder, Lightbulb, List, MessageSquare, Plus, Search, Shield, ShieldAlert, ShieldCheck, Square, Target, Trash2, X } from "lucide-react";
 import { asArray } from "../lib/array";
 import { filterAtMatches } from "../lib/atMatches";
 import { DedupIndex, sha256 } from "../lib/attachDedup";
@@ -17,7 +17,7 @@ import { guidanceIsInFlight, guidanceNeedsRetry, guidanceTextMatches, kickIdleGu
 import { canUsePromptHistory, composerEnterAction, composerEscapeAction, composerMenuKeyAction, insertComposerNewline, isFnKeyEvent, isImeKeyEvent, promptHistoryDirectionFromEvent } from "../lib/composerKeyboard";
 import { cacheGeneration, loadOlder } from "../lib/composerHistory";
 import { sessionTurnsLabel } from "../lib/sessionTurnsPresentation";
-import { SPINNER_WORDS, useI18n, type Translator } from "../lib/i18n";
+import { useI18n, type Translator } from "../lib/i18n";
 import { detectShortcutPlatform, formatShortcutCombo, isReservedComposerHistoryShortcut, matchesShortcut, useShortcutComboLabel } from "../lib/keyboardShortcuts";
 import { fallbackCopyText } from "../lib/clipboard";
 import {
@@ -50,7 +50,7 @@ import {
 import { SlashMenu, sortSlashCommandsForMenu } from "./SlashMenu";
 import { ArgMenu } from "./ArgMenu";
 import { ANCHORED_POPOVER_CLOSE_MS, AnchoredPopover } from "./AnchoredPopover";
-import { EffortSwitcher } from "./EffortSwitcher";
+import { ComposerChoice } from "./ComposerChoice";
 const ModelSwitcher = lazy(() => import("./ModelSwitcher").then((module) => ({ default: module.ModelSwitcher })));
 import { Tooltip } from "./Tooltip";
 const RecoveryWaitBanner = lazy(() => import("./RecoveryWaitBanner").then((module) => ({ default: module.RecoveryWaitBanner })));
@@ -104,6 +104,7 @@ export interface WorkspaceReference {
 const LONG_PASTE_MIN_CHARS = 2000;
 const LONG_PASTE_MIN_LINES = 20;
 const COMPOSER_MIN_HEIGHT = 104;
+const COMPOSER_DEFAULT_HEIGHT = 140;
 const COMPOSER_MAX_HEIGHT = 360;
 // Height reserved for the in-card run strip while a turn runs; applied via a
 // CSS calc so --composer-height always stays in "logical height" space.
@@ -407,7 +408,7 @@ function clampComposerHeight(height: number): number {
 }
 
 function loadComposerHeight(): number | null {
-  return loadOptionalLayoutSize("composerHeight", clampComposerHeight);
+  return loadOptionalLayoutSize("composerHeight", clampComposerHeight) ?? clampComposerHeight(COMPOSER_DEFAULT_HEIGHT);
 }
 
 function fmtElapsed(ms: number): string {
@@ -760,8 +761,6 @@ export function Composer({
   const [textareaAutoOverflow, setTextareaAutoOverflow] = useState(false);
   const [intentMenuOpen, setIntentMenuOpen] = useState(false);
   const [intentMenuClosing, setIntentMenuClosing] = useState(false);
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const [moreMenuClosing, setMoreMenuClosing] = useState(false);
   const [contentMenuOpen, setContentMenuOpen] = useState(false);
   const [showPastChats, setShowPastChats] = useState(false);
   const [directPastChats, setDirectPastChats] = useState(false);
@@ -804,9 +803,7 @@ export function Composer({
   const composerWrapRef = useRef<HTMLDivElement>(null);
   const contentMenuAnchorRef = useRef<HTMLButtonElement>(null);
   const intentMenuAnchorRef = useRef<HTMLButtonElement>(null);
-  const moreMenuAnchorRef = useRef<HTMLButtonElement>(null);
   const intentCloseTimerRef = useRef<number | null>(null);
-  const moreCloseTimerRef = useRef<number | null>(null);
   // Creation chrome: hover-open task menus (same pattern as ContextWindowRing).
   const intentHoverTimerRef = useRef<number | null>(null);
   const creationChrome = showContextWindowRing;
@@ -943,8 +940,6 @@ export function Composer({
     setImageViewer((current) => current.open ? { ...current, open: false } : current);
     setIntentMenuOpen(false);
     setIntentMenuClosing(false);
-    setMoreMenuOpen(false);
-    setMoreMenuClosing(false);
   };
 
   const composerEditSnapshot = (
@@ -1938,16 +1933,6 @@ export function Composer({
     timerRef.current = null;
   };
 
-  const openIntentMenu = useCallback(() => {
-    clearIntentCloseTimer();
-    clearHoverTimer(intentHoverTimerRef);
-    setContentMenuOpen(false);
-    setDirectPastChats(false);
-    setDismissed(true);
-    setIntentMenuClosing(false);
-    setIntentMenuOpen(true);
-  }, [clearIntentCloseTimer]);
-
   const closeIntentMenu = useCallback((afterClose?: () => void) => {
     clearIntentCloseTimer();
     clearHoverTimer(intentHoverTimerRef);
@@ -1966,15 +1951,6 @@ export function Composer({
     clearHoverTimer(intentHoverTimerRef);
   }, [clearIntentCloseTimer]);
 
-  const onIntentHoverEnter = useCallback(() => {
-    if (!creationChrome || disabled || running) return;
-    clearHoverTimer(intentHoverTimerRef);
-    intentHoverTimerRef.current = window.setTimeout(() => {
-      intentHoverTimerRef.current = null;
-      openIntentMenu();
-    }, 120);
-  }, [creationChrome, disabled, openIntentMenu, running]);
-
   const onIntentHoverLeave = useCallback(() => {
     if (!creationChrome) return;
     clearHoverTimer(intentHoverTimerRef);
@@ -1989,35 +1965,6 @@ export function Composer({
     if (!creationChrome) return;
     clearHoverTimer(intentHoverTimerRef);
   }, [creationChrome]);
-
-  const clearMoreCloseTimer = useCallback(() => {
-    if (moreCloseTimerRef.current === null) return;
-    window.clearTimeout(moreCloseTimerRef.current);
-    moreCloseTimerRef.current = null;
-  }, []);
-
-  const openMoreMenu = useCallback(() => {
-    clearMoreCloseTimer();
-    setContentMenuOpen(false);
-    setDirectPastChats(false);
-    setDismissed(true);
-    setMoreMenuClosing(false);
-    setMoreMenuOpen(true);
-  }, [clearMoreCloseTimer]);
-
-  const closeMoreMenu = useCallback((afterClose?: () => void) => {
-    clearMoreCloseTimer();
-    setMoreMenuClosing(true);
-    window.requestAnimationFrame(() => setMoreMenuOpen(false));
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    moreCloseTimerRef.current = window.setTimeout(() => {
-      moreCloseTimerRef.current = null;
-      setMoreMenuClosing(false);
-      afterClose?.();
-    }, reduceMotion ? 0 : ANCHORED_POPOVER_CLOSE_MS);
-  }, [clearMoreCloseTimer]);
-
-  useEffect(() => () => clearMoreCloseTimer(), [clearMoreCloseTimer]);
 
   const fileDedupKey = async (file: File): Promise<AttachmentDedupKey> => ({
     hash: await sha256(file),
@@ -3032,7 +2979,7 @@ export function Composer({
   };
 
   const resetComposerHeight = () => {
-    setComposerHeight(null);
+    setComposerHeight(clampComposerHeight(COMPOSER_DEFAULT_HEIGHT));
     clearLayoutSize("composerHeight");
   };
 
@@ -3221,7 +3168,6 @@ export function Composer({
 
   const openContentMenu = () => {
     if (intentMenuOpen || intentMenuClosing) closeIntentMenu();
-    if (moreMenuOpen || moreMenuClosing) closeMoreMenu();
     setDirectPastChats(false);
     setShowPastChats(false);
     setDismissed(true);
@@ -3637,7 +3583,14 @@ export function Composer({
   // --composer-height stays in logical card-height space. It may be the saved
   // manual floor or a larger content-derived height; the run-strip reservation
   // remains separate so the live resize writer uses the same coordinate space.
-  const showRunStrip = Boolean(retry || running);
+  const waitingPrompt = suspendedByDecision
+    ? null
+    : pendingApprovalLabel
+      ? "approval"
+      : pendingAsk
+        ? "ask"
+        : null;
+  const showRunStrip = Boolean(retry || waitingPrompt);
   const effectiveComposerHeight = composerHeight === null
     ? null
     : resolveComposerContentSizing({
@@ -3667,17 +3620,18 @@ export function Composer({
     requestActiveDraftFrame(focusComposerInput);
   };
   const chooseTaskMode = (nextMode: CollaborationMode) => {
+    setContentMenuOpen(false);
     closeIntentMenu(() => {
       if (nextMode !== collaborationMode) onSetCollaborationMode(nextMode);
       requestActiveDraftFrame(focusComposerInput);
     });
   };
-  const floorOn = qualityFloor === "delivery";
   const chooseQualityFloor = (floor: QualityFloor) => {
     if (floor === qualityFloor) return;
     onSetQualityFloor?.(floor);
   };
   const stopGoalMode = () => {
+    setContentMenuOpen(false);
     closeIntentMenu(() => {
       onClearGoal();
       requestActiveDraftFrame(focusComposerInput);
@@ -3688,42 +3642,20 @@ export function Composer({
     : collaborationMode === "goal"
       ? "composer.taskModeGoalShort"
       : "composer.taskModeDirectShort";
-  const taskModeTooltipSummaryKey = collaborationMode === "plan"
-    ? "composer.taskModePlanTooltipSummary"
-    : collaborationMode === "goal"
-      ? "composer.taskModeGoalTooltipSummary"
-      : "composer.taskModeDirectTooltipSummary";
-  const TaskModeIcon = collaborationMode === "plan" ? List : collaborationMode === "goal" ? Target : ArrowRight;
-  const taskModeTriggerLabel = t("composer.taskModeTrigger", { mode: t(taskModeShortKey) });
-  const taskModeTooltipLabel = t("composer.controlTooltip", {
-    category: t("composer.intentMenuTitle"),
-    mode: t(taskModeShortKey),
-    summary: t(taskModeTooltipSummaryKey),
-  });
+  const TaskModeIcon = collaborationMode === "plan" ? Lightbulb : collaborationMode === "goal" ? Target : ArrowRight;
+  const taskModeTriggerLabel = `${t("common.close")} ${t(taskModeShortKey)}`;
+  const taskModeTooltipLabel = taskModeTriggerLabel;
   const effortOptions = asArray(effort?.options);
-  const effortLabel = (id: string) => effortOptions.find((option) => option.id === id)?.name || id;
+  const effortLabel = (id: string) => id === "auto" ? t("common.auto") : effortOptions.find((option) => option.id === id)?.name || id;
   const effortLevels = effort?.options ? ["auto", ...effortOptions.map((option) => option.id)] : asArray(effort?.levels);
   const currentEffort = effort?.current || "auto";
-  const compactEffortTitle = currentEffort === "auto"
-    ? t("status.effortAutoTitle", { def: effort?.default || "auto" })
-    : `${t("status.effortTitle")}: ${currentEffort}`;
   const hasEffort = Boolean(effort?.supported && effortLevels.length > 0);
   const chooseEffortLevel = (level: string) => {
-    closeMoreMenu(() => {
-      if (level !== currentEffort) onSetEffort(level);
-      requestActiveDraftFrame(focusComposerInput);
-    });
+    if (level !== currentEffort) onSetEffort(level);
   };
   // Run-strip state machine: retry > waiting-approval > waiting-ask > streaming.
   // Decision surfaces own the "waiting on user" UI; while suspendedByDecision
   // is true we still pause the work clock but do not render a waiting strip.
-  const waitingPrompt = suspendedByDecision
-    ? null
-    : pendingApprovalLabel
-      ? "approval"
-      : pendingAsk
-        ? "ask"
-        : null;
   const pauseWorkClock = suspendedByDecision || Boolean(waitingPrompt);
   // Decision surfaces hide the whole composer, so mode controls stay disabled.
   // Legacy tests that pass pendingApprovalLabel without suspendedByDecision
@@ -3768,8 +3700,7 @@ export function Composer({
     setDirectPastChats(false);
     setShowPastChats(false);
     closeIntentMenu();
-    closeMoreMenu();
-  }, [suspendedByDecision, closeIntentMenu, closeMoreMenu]);
+  }, [suspendedByDecision, closeIntentMenu]);
   // Live text+reasoning character count for the run-strip TPS fallback. Reads
   // through the live store's own subscription so stream deltas re-render only
   // this component — the controller's bump path stays text-delta-free.
@@ -3811,26 +3742,20 @@ export function Composer({
         : running && !suspendedByDecision
           ? turnPhaseLabel
           : null;
-  const runTicker = !retry && !pauseWorkClock && running && turnStartAt
+  const runMetrics = !retry && !pauseWorkClock && running && turnStartAt
     ? (() => {
         const elapsedMs = Math.max(0, now - turnStartAt - waitAccumMs);
-        const words = SPINNER_WORDS[locale];
-        const word = words[Math.floor(elapsedMs / 3000) % words.length];
         const usageTokens = turnTokens ?? 0;
         // Include streaming tool-call args in the estimate so TPS stays
         // meaningful while the model streams a write_file / long tool body.
         const inFlightChars = Math.max(0, liveTextChars - (turnOutputCharsAtUsage ?? 0)) + (turnArgChars ?? 0);
         const estimatedChars = Math.round(inFlightChars / 4);
         const liveTokens = usageTokens + estimatedChars;
-        const tok = liveTokens > 0 ? ` · ↓ ${formatTokens(liveTokens)} ${t("status.tokens")}` : "";
         const outTok: number = (turnOutputTokens ?? 0) + estimatedChars;
         const modelActiveAt = liveModelActiveAt ?? turnModelActiveAt;
         const modelElapsedMs = Math.max(0, turnModelActiveMs + (modelActiveAt && modelActiveAt > 0 ? Math.max(0, now - modelActiveAt) : 0));
         const tps = outTok > 0 && modelElapsedMs >= 500 ? Math.round(outTok / (modelElapsedMs / 1000)) : null;
-        const tpsStr = tps !== null ? ` · ${tps} tokens/s` : "";
-        const suffix = `${tpsStr}${tok}`;
-        const prefix = `${word}… ${fmtElapsed(elapsedMs)}`;
-        return { prefix, suffix: suffix || null };
+        return { elapsed: fmtElapsed(elapsedMs), tokens: liveTokens > 0 ? `${formatTokens(liveTokens)} ${t("status.tokens")}` : null, tps: tps !== null ? `${tps} tokens/s` : null };
       })()
     : null;
   const submitEmpty = !text.trim() && attachments.length === 0 && workspaceRefs.length === 0 &&
@@ -3847,9 +3772,11 @@ export function Composer({
         ? t("composer.steerPlaceholder", { combo: sendComboLabel })
         : goalModeOn && !activeGoal
           ? t("composer.goalInputPlaceholder")
-          : t("composer.placeholder");
+          : planModeOn
+            ? t("composer.planInputPlaceholder")
+            : t("composer.placeholder");
   const composerMetaClass = [
-    "composer-meta",
+    "composer-meta composer-meta--unified",
     hasEffort ? "composer-meta--has-effort" : "composer-meta--no-effort",
   ].join(" ");
 
@@ -3943,11 +3870,11 @@ export function Composer({
           requestActiveDraftFrame(() => taRef.current?.focus());
         }}
       />
-      <AnchoredPopover
-        open={contentMenuOpen && !disabled && !readOnly && !running}
-        anchorRef={contentMenuAnchorRef}
-        onClose={() => setContentMenuOpen(false)}
-        className="composer-access-menu composer-content-menu"
+      {!heroMode && <AnchoredPopover
+        open={(contentMenuOpen || intentMenuOpen) && !disabled && !readOnly && !running}
+        anchorRef={contentMenuOpen ? contentMenuAnchorRef : intentMenuAnchorRef}
+        onClose={() => { setContentMenuOpen(false); closeIntentMenu(); }}
+        className="composer-access-menu composer-content-menu composer-intent-menu composer-menu-surface"
         align="start"
       >
         <ComposerContentMenuActions
@@ -3956,15 +3883,6 @@ export function Composer({
           onChooseAttachment={chooseAttachmentFiles}
           onInsertTrigger={insertContentTrigger}
         />
-      </AnchoredPopover>
-      {!heroMode && <AnchoredPopover
-        open={intentMenuOpen}
-        closing={intentMenuClosing}
-        anchorRef={intentMenuAnchorRef}
-        onClose={() => closeIntentMenu()}
-        className="composer-access-menu composer-intent-menu"
-        align="start"
-      >
         <div
           className="composer-access-menu__section"
           role="menu"
@@ -3976,30 +3894,14 @@ export function Composer({
           <button
             type="button"
             role="menuitemradio"
-            aria-checked={collaborationMode === "normal"}
-            className={`composer-access-menu__item composer-intent-menu__item${collaborationMode === "normal" ? " composer-access-menu__item--active" : ""}`}
-            onClick={() => chooseTaskMode("normal")}
-            disabled={disabled || running}
-          >
-            <ArrowRight size={16} />
-            <span className="composer-access-menu__copy">
-              <span className="composer-access-menu__title">{t("composer.taskModeDirect")}</span>
-              <span className="composer-access-menu__desc">{t("composer.taskModeDirectDesc")}</span>
-            </span>
-            {collaborationMode === "normal" && <Check className="composer-intent-menu__check" size={16} aria-hidden="true" />}
-          </button>
-          <button
-            type="button"
-            role="menuitemradio"
             aria-checked={planModeOn}
             className={`composer-access-menu__item composer-intent-menu__item${planModeOn ? " composer-access-menu__item--active" : ""}`}
-            onClick={() => chooseTaskMode("plan")}
+            onClick={() => chooseTaskMode(planModeOn ? "normal" : "plan")}
             disabled={disabled || running}
           >
             <List size={16} />
             <span className="composer-access-menu__copy">
               <span className="composer-access-menu__title">{t("composer.taskModePlan")}</span>
-              <span className="composer-access-menu__desc">{t("composer.taskModePlanDesc")}</span>
             </span>
             {planModeOn && <Check className="composer-intent-menu__check" size={16} aria-hidden="true" />}
           </button>
@@ -4008,14 +3910,13 @@ export function Composer({
             role="menuitemradio"
             aria-checked={goalModeOn}
             className={`composer-access-menu__item composer-intent-menu__item${goalModeOn ? " composer-access-menu__item--active" : ""}`}
-            onClick={() => chooseTaskMode("goal")}
+            onClick={() => chooseTaskMode(goalModeOn && !activeGoal ? "normal" : "goal")}
             disabled={disabled || running}
             title={activeGoal || undefined}
           >
             <Target size={16} />
             <span className="composer-access-menu__copy">
               <span className="composer-access-menu__title">{t("composer.taskModeGoal")}</span>
-              <span className="composer-access-menu__desc">{activeGoal || t("composer.taskModeGoalDesc")}</span>
             </span>
             {goalModeOn && <Check className="composer-intent-menu__check" size={16} aria-hidden="true" />}
           </button>
@@ -4074,38 +3975,19 @@ export function Composer({
             </div>
           )}
         </div>
+        <div className="composer-access-menu__section" role="menu" aria-label={t("composer.qualityFloor")} data-inferred={floorInferred || undefined}>
+          <div className="composer-access-menu__label">{t("composer.qualityFloor")}</div>
+            <button type="button" role="menuitemcheckbox"
+              aria-checked={qualityFloor === "delivery"}
+              className={`composer-access-menu__item${qualityFloor === "delivery" ? " composer-access-menu__item--active" : ""}`}
+              disabled={approvalBarDisabled || !onSetQualityFloor}
+              onClick={() => { chooseQualityFloor(qualityFloor === "delivery" ? "standard" : "delivery"); setContentMenuOpen(false); closeIntentMenu(); }}>
+              <ShieldCheck size={18} aria-hidden="true" />
+              <span className="composer-access-menu__copy"><span className="composer-access-menu__title">{t("composer.qualityFloorDelivery")}</span></span>
+              {qualityFloor === "delivery" && <Check size={14} aria-hidden="true" />}
+            </button>
+        </div>
       </AnchoredPopover>}
-      <AnchoredPopover
-        open={moreMenuOpen && !disabled && !running}
-        closing={moreMenuClosing}
-        anchorRef={moreMenuAnchorRef}
-        onClose={() => closeMoreMenu()}
-        className="composer-access-menu composer-more-menu"
-        align="end"
-      >
-        {hasEffort && (
-          <div className="composer-access-menu__section">
-            <div className="composer-access-menu__label">{t("status.effortTitle")}</div>
-            <div className="composer-more-menu__items" role="listbox" aria-label={t("status.effortTitle")}>
-              {effortLevels.map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  role="option"
-                  aria-selected={level === currentEffort}
-                  className={`composer-more-menu__item${level === currentEffort ? " composer-more-menu__item--active" : ""}`}
-                  onClick={() => chooseEffortLevel(level)}
-                  disabled={running}
-                >
-                  <Gauge size={14} />
-                  <span>{effortLabel(level)}</span>
-                  {level === currentEffort && <Check size={13} />}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </AnchoredPopover>
       {menuMode === "slash" && (
         <SlashMenu
           items={slashMatches}
@@ -4426,6 +4308,9 @@ export function Composer({
         ref={composerCardRef}
         style={composerCardStyle}
       >
+        {running && !waitingPrompt && !retry?.recovery?.waiting && (
+          <span className="composer-glowring" aria-hidden="true"><i /></span>
+        )}
         <button
           className="composer-resize-handle"
           type="button"
@@ -4440,24 +4325,13 @@ export function Composer({
           onKeyDown={onComposerResizeKeyDown}
           onDoubleClick={resetComposerHeight}
         />
-        {runStateText && (
+        {showRunStrip && runStateText && (
           <div className={`composer-run-strip${waitingPrompt ? " composer-run-strip--waiting" : ""}`}>
             <span className="composer-run-strip__dot" aria-hidden="true" />
-            {runTicker ? (
-              <>
-                <span className="composer-run-strip__text" aria-hidden="true">{runTicker.prefix}</span>
-                {runTicker.suffix && (
-                  <Tooltip label={t("composer.runStripEstimateHint")}>
-                    <span className="composer-run-strip__text" aria-hidden="true">{runTicker.suffix}</span>
-                  </Tooltip>
-                )}
-              </>
-            ) : (
-              <span className="composer-run-strip__text">{runStateText}</span>
-            )}
-            <span className="sr-only" role="status">{runStateText}</span>
+            <span className="composer-run-strip__text">{runStateText}</span>
           </div>
         )}
+        <span className="sr-only" role="status">{runStateText}</span>
         <div
           className={`composer${invocations.length > 0 ? " composer--has-invocation" : ""}${dragOver ? " composer--dragover" : ""}${disabled || readOnly ? " composer--disabled" : ""}${shellModeActive ? " composer--shell" : ""}`}
           onDrop={onDrop}
@@ -4579,29 +4453,6 @@ export function Composer({
                 {composerPrompt}
               </span>
             )}
-            {running && (
-              <Tooltip label={t("composer.stop")}>
-                <button
-                  className="composer__btn composer__btn--stop"
-                  type="button"
-                  onClick={() => void handleCancel()}
-                  disabled={cancelSettlingDraftsRef.current.has(draftKey)}
-                  aria-label={t("composer.stop")}
-                >
-                  <Square size={12} fill="currentColor" />
-                </button>
-              </Tooltip>
-            )}
-            <Tooltip label={submitTooltip}>
-              <button
-                className={`composer__btn composer__btn--send${running ? " composer__btn--steer" : ""}`}
-                onClick={submit}
-                disabled={submitBlocked}
-                aria-label={submitTooltip}
-              >
-                {running ? <CornerDownRight size={16} /> : <ArrowUp size={16} />}
-              </button>
-            </Tooltip>
           </div>
         </div>
         <ContextMenu
@@ -4633,126 +4484,55 @@ export function Composer({
                 </Tooltip>
               </div>
             )}
-            {!heroMode && (
+            {!heroMode && <div className="composer-meta__control composer-meta__control--approval">
+              <ComposerChoice key={`approval-${tabId}`} label={toolApprovalMode === "yolo" ? "Yolo" : t(toolApprovalMode === "ask" ? "composer.accessAskShort" : "common.auto")}
+                showChevron
+                icon={toolApprovalMode === "yolo" ? <ShieldAlert size={16} /> : toolApprovalMode === "auto" ? <ShieldCheck size={16} /> : <Shield size={16} />}
+                tone={`composer-choice--permission-${toolApprovalMode}`}
+                value={toolApprovalMode} disabled={approvalBarDisabled} onPick={value => chooseApprovalMode(value as ToolApprovalMode)}
+                options={[
+                  { value: "ask", label: t("composer.accessAskShort"), icon: <Shield size={18} />, description: t("composer.accessAskDesc") },
+                  { value: "auto", label: t("common.auto"), icon: <ShieldCheck size={18} />, description: t("composer.accessAutoDesc") },
+                  { value: "yolo", label: "Yolo", icon: <ShieldAlert size={18} />, description: t("composer.accessYoloDesc"), title: t("composer.accessYoloTitle", { shortcut: yoloComboLabel }) },
+                ]} />
+            </div>}
+            {!heroMode && collaborationMode !== "normal" && (
               <div className="composer-meta__control composer-meta__control--intent">
-                <Tooltip label={taskModeTooltipLabel} disabled={intentMenuOpen || intentMenuClosing || creationChrome}>
+                <Tooltip label={taskModeTooltipLabel} disabled={intentMenuOpen || intentMenuClosing}>
                   <button
                     ref={intentMenuAnchorRef}
                     type="button"
-                    className={`composer-task-mode-trigger${intentMenuOpen || intentMenuClosing ? " composer-task-mode-trigger--open" : ""}`}
-                    onClick={() => (intentMenuOpen || intentMenuClosing ? closeIntentMenu() : openIntentMenu())}
-                    onMouseEnter={creationChrome ? onIntentHoverEnter : undefined}
-                    onMouseLeave={creationChrome ? onIntentHoverLeave : undefined}
+                    className="composer-task-mode-trigger composer-task-mode-trigger--removable"
+                    onClick={() => { if (goalModeOn && activeGoal) stopGoalMode(); else chooseTaskMode("normal"); }}
                     disabled={disabled || running}
-                    aria-haspopup="menu"
-                    aria-expanded={intentMenuOpen && !intentMenuClosing}
                     aria-label={taskModeTriggerLabel}
                     title={intentMenuOpen || intentMenuClosing || creationChrome ? undefined : taskModeTriggerLabel}
                   >
-                    <TaskModeIcon size={14} aria-hidden="true" />
+                    <span className="composer-task-mode-trigger__icon"><TaskModeIcon size={16} aria-hidden="true" /><X className="composer-task-mode-trigger__remove" size={14} aria-hidden="true" /></span>
                     <span className="composer-task-mode-trigger__value">{t(taskModeShortKey)}</span>
-                    <ChevronsUpDown size={11} aria-hidden="true" />
                   </button>
                 </Tooltip>
               </div>
             )}
-            {!heroMode && (
-              <div className="composer-meta__control composer-meta__control--approval">
-                {/* A pending tool approval disables the composer, but the approval
-                    bar stays usable so mode changes remain possible mid-prompt;
-                    the approval card explains that the pending request still needs
-                    an explicit decision. */}
-                <div
-                  className="composer-modebar composer-modebar--approval"
-                  data-mode={toolApprovalMode}
-                  title={t("composer.accessMenuTitle", { shortcut: yoloComboLabel })}
-                >
-                  <span className="composer-modebar__thumb" aria-hidden="true" />
-                  <button
-                    type="button"
-                    className={`composer-modebar__item composer-modebar__item--ask${toolApprovalMode === "ask" ? " composer-modebar__item--active" : ""}`}
-                    onClick={() => chooseApprovalMode("ask")}
-                    disabled={approvalBarDisabled}
-                    aria-pressed={toolApprovalMode === "ask"}
-                    title={t("composer.accessAskTitle")}
-                  >
-                    <Shield size={14} />
-                    <span>{t("composer.modeAsk")}</span>
+            {!heroMode && qualityFloor === "delivery" && (
+              <div className="composer-meta__control composer-meta__control--delivery">
+                <Tooltip label={`${t("common.close")} ${t("composer.qualityFloorDelivery")}`}>
+                  <button type="button"
+                    className="composer-task-mode-trigger composer-task-mode-trigger--removable composer-delivery-trigger"
+                    aria-label={`${t("common.close")} ${t("composer.qualityFloorDelivery")}`}
+                    disabled={approvalBarDisabled || !onSetQualityFloor}
+                    onClick={() => { chooseQualityFloor("standard"); requestActiveDraftFrame(focusComposerInput); }}>
+                    <span className="composer-task-mode-trigger__icon"><ShieldCheck size={16} aria-hidden="true" /><X className="composer-task-mode-trigger__remove" size={14} aria-hidden="true" /></span>
+                    <span className="composer-task-mode-trigger__value">{t("composer.qualityFloorDelivery")}</span>
                   </button>
-                  <button
-                    type="button"
-                    className={`composer-modebar__item composer-modebar__item--auto${toolApprovalMode === "auto" ? " composer-modebar__item--active" : ""}`}
-                    onClick={() => chooseApprovalMode("auto")}
-                    disabled={approvalBarDisabled}
-                    aria-pressed={toolApprovalMode === "auto"}
-                    title={t("composer.accessAutoTitle")}
-                  >
-                    <ShieldCheck size={14} />
-                    <span>{t("composer.modeNormal")}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`composer-modebar__item composer-modebar__item--yolo${toolApprovalMode === "yolo" ? " composer-modebar__item--active" : ""}`}
-                    onClick={() => chooseApprovalMode("yolo")}
-                    disabled={approvalBarDisabled}
-                    aria-pressed={toolApprovalMode === "yolo"}
-                    title={t("composer.accessYoloTitle", { shortcut: yoloComboLabel })}
-                  >
-                    <ShieldAlert size={14} />
-                    <span>{t("composer.modeYolo")}</span>
-                  </button>
-                </div>
+                </Tooltip>
               </div>
             )}
-            {!heroMode && (
-              <div className="composer-meta__control composer-meta__control--floor">
-                {/* Orthogonal to the intent menu: the floor only raises the
-                    completion gates, so goal mode and delivery combine. */}
-                <div
-                  className="composer-modebar composer-modebar--floor"
-                  data-floor={floorOn ? "delivery" : "standard"}
-                  title={t("composer.qualityFloor")}
-                >
-                  <span className="composer-modebar__thumb" aria-hidden="true" />
-                  <button
-                    type="button"
-                    className={`composer-modebar__item${floorOn ? "" : " composer-modebar__item--active"}`}
-                    onClick={() => chooseQualityFloor("standard")}
-                    disabled={approvalBarDisabled || !onSetQualityFloor}
-                    aria-pressed={!floorOn}
-                    title={t("composer.qualityFloor")}
-                  >
-                    <Equal size={14} />
-                    <span>{t("composer.qualityFloorStandard")}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`composer-modebar__item${floorOn ? " composer-modebar__item--active" : ""}`}
-                    onClick={() => chooseQualityFloor("delivery")}
-                    disabled={approvalBarDisabled || !onSetQualityFloor}
-                    aria-pressed={floorOn}
-                    title={t("composer.qualityFloorDeliveryTitle")}
-                  >
-                    <PackageCheck size={14} />
-                    <span>{t("composer.qualityFloorDelivery")}</span>
-                    {floorOn && floorInferred ? <span className="composer-modebar__inferred" /> : null}
-                  </button>
-                </div>
-              </div>
-            )}
-            {!heroMode && <span className="composer-meta__divider" aria-hidden="true" />}
             <div className="composer-meta__control composer-meta__control--model">
-              {/*
-                Creation-only: showContextWindowRing is wired to sidebarCreation
-                (desktopLayoutStyle === "creation") in App.tsx. The ring popover
-                is portaled to <body> without an .app--creation prefix, so its
-                styles look global but only ever apply in creation layout. If you
-                ever surface this ring in another layout, its font sizes already
-                scale via --font-scale (see .context-ring-popover in styles.css).
-              */}
-              {!heroMode && showContextWindowRing && (
+              {!heroMode && (
                 <ContextWindowRing
-                  enabled={showContextWindowRing}
+                  enabled
+                  turnMetrics={runMetrics ?? undefined}
                   context={context}
                   tabId={tabId}
                   turnCost={turnCost}
@@ -4763,37 +4543,44 @@ export function Composer({
                   balance={balance}
                 />
               )}
-              <Suspense fallback={<span className="modelsw__label">{modelLabel}</span>}><ModelSwitcher label={modelLabel} tabId={tabId} onPick={onSwitchModel} onManage={() => {
+              <Suspense fallback={<span className="modelsw__label">{modelLabel}</span>}><ModelSwitcher composerMenu label={modelLabel} tabId={tabId} onPick={onSwitchModel} onManage={() => {
                 useAppNavigationStore.getState().setSettingsFocus({ target: "model-access" });
                 useAppNavigationStore.getState().setSettingsTarget("models");
               }} /></Suspense>
+              {hasEffort && !heroMode && <div className="composer-effort-control">
+                <ComposerChoice key={`effort-${tabId}`} label={effortLabel(currentEffort)}
+                  ariaLabel={`${t("status.effortTitle")}: ${effortLabel(currentEffort)}`}
+                  icon={<Brain size={16} />} showChevron
+                  value={currentEffort} disabled={disabled || readOnly || running}
+                  onPick={chooseEffortLevel}
+                  options={effortLevels.map(level => ({ value: level, label: effortLabel(level) }))} />
+              </div>}
             </div>
-            {!heroMode && hasEffort && (
-              <div className="composer-meta__control composer-meta__control--effort">
-                <EffortSwitcher effort={effort} disabled={running} onPick={onSetEffort} />
-              </div>
-            )}
-            {!heroMode && hasEffort && (
-              <div className="composer-meta__control composer-meta__control--more">
-                <Tooltip label={compactEffortTitle} disabled={moreMenuOpen || moreMenuClosing}>
+            <div className="composer-toolbar-send">
+              {running && (
+                <Tooltip label={t("composer.stop")}>
                   <button
-                    ref={moreMenuAnchorRef}
+                    className="composer__btn composer__btn--stop"
                     type="button"
-                    className={`composer-more-trigger composer-more-trigger--effort${currentEffort !== "auto" ? " composer-more-trigger--explicit" : ""}${moreMenuOpen || moreMenuClosing ? " composer-more-trigger--open" : ""}`}
-                    onClick={() => (moreMenuOpen || moreMenuClosing ? closeMoreMenu() : openMoreMenu())}
-                    disabled={disabled || running}
-                    aria-haspopup="menu"
-                    aria-expanded={moreMenuOpen && !moreMenuClosing}
-                    aria-label={compactEffortTitle}
-                    title={moreMenuOpen || moreMenuClosing ? undefined : compactEffortTitle}
+                    onClick={() => void handleCancel()}
+                    disabled={cancelSettlingDraftsRef.current.has(draftKey)}
+                    aria-label={t("composer.stop")}
                   >
-                    <Gauge size={14} />
-                    <span>{effortLabel(currentEffort)}</span>
-                    <ChevronsUpDown size={11} />
+                    <Square size={12} fill="currentColor" />
                   </button>
                 </Tooltip>
-              </div>
-            )}
+              )}
+              <Tooltip label={submitTooltip}>
+                <button
+                  className={`composer__btn composer__btn--send${running ? " composer__btn--steer" : ""}`}
+                  onClick={submit}
+                  disabled={submitBlocked}
+                  aria-label={submitTooltip}
+                >
+                  {running ? <CornerDownRight size={16} /> : <ArrowUp size={16} />}
+                </button>
+              </Tooltip>
+            </div>
           </div>
         </div>
       </div>
