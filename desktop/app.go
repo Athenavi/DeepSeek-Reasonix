@@ -204,7 +204,7 @@ type App struct {
 	projectTreeChangedHook func()
 	projectTreeRuntime     projectTreeRuntimeState
 	runtimeStateProjection desktopRuntimeProjection
-	remoteRuntimeSync remoteRuntimeSync
+	remoteRuntimeSync      remoteRuntimeSync
 
 	// singleSurfaceMu serializes open/reuse plus visible-tab pruning for the
 	// one-conversation layout so overlapping navigation cannot remove the tab
