@@ -374,3 +374,20 @@ func lineMatchSummary(lines []string, target string, limit int) string {
 	b.WriteString(")")
 	return b.String()
 }
+
+// DeclareEvidenceTarget exposes the same validated target ResolveAnchoredTextTarget
+// resolves, expressed as zero-based half-open ranges for the host evidence check.
+func (d deleteRange) DeclareEvidenceTarget(ctx context.Context, args json.RawMessage) (tool.EvidenceTargetInfo, error) {
+	resolved, err := d.ResolveAnchoredTextTarget(ctx, args)
+	if err != nil {
+		return tool.EvidenceTargetInfo{}, err
+	}
+	if resolved.Path == "" || resolved.StartLine < 1 || resolved.EndLine < resolved.StartLine {
+		return tool.EvidenceTargetInfo{}, fmt.Errorf("delete_range target did not resolve to a line interval")
+	}
+	return tool.EvidenceTargetInfo{
+		Path:   resolved.Path,
+		Ranges: []tool.ReadRange{{Start: resolved.StartLine - 1, End: resolved.EndLine}},
+		Hashes: resolved.LineHashes,
+	}, nil
+}

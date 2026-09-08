@@ -7,9 +7,11 @@ type TextObservation struct {
 	Sequence  uint64
 	Path      string
 	StartLine int
-	// Version binds these lines to one content version; empty when the reader
-	// could not identify one. Windows from different versions never combine.
+	// Version is the window digest; Snapshot binds these lines to one content
+	// version and is empty when the reader could not identify one. Windows from
+	// different snapshots never combine.
 	Version    string
+	Snapshot   string
 	LineHashes []string
 }
 

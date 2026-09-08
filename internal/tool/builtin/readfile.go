@@ -178,7 +178,24 @@ func (r readFile) ObserveModelText(args json.RawMessage, output string) (tool.Mo
 		StartLine:  window.StartLine,
 		LineHashes: hashes,
 		Version:    tool.WindowDigest(rp.Path, window),
+		Snapshot:   r.sourceSnapshot(rp),
 	}, true
+}
+
+// sourceSnapshot names the content version this reader can vouch for. An
+// overlay-capable reader leaves it empty because the observation interface
+// carries no context to probe the buffer; such windows are matched on their own
+// instead of being stitched across pages.
+func (r readFile) sourceSnapshot(rp ResolvedPath) string {
+	if r.overlay != nil && !rp.External && filepath.IsAbs(rp.Path) {
+		return ""
+	}
+	info, err := os.Stat(rp.Path)
+	if err != nil {
+		return ""
+	}
+	identity := diskSourceIdentity(info)
+	return tool.SourceSnapshot(tool.ReadSourceDisk, rp.Path, identity)
 }
 
 // ReadEnvelope reports what one read_file call delivered. The source identity

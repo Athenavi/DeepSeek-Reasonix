@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	fileenc "reasonix/internal/fileutil/encoding"
 	"reasonix/internal/sandbox"
@@ -49,6 +50,25 @@ func (writeFile) ReadOnly() bool { return false }
 
 func (w writeFile) DeclareWriteAccess(args json.RawMessage) (tool.WriteAccessDeclaration, error) {
 	return declareFilePathWriteAccess(w.workDir, args)
+}
+
+// DeclareEvidenceTarget requires whole-file evidence only when the write would
+// replace existing content; creating a new file has no prior content to see.
+func (w writeFile) DeclareEvidenceTarget(ctx context.Context, args json.RawMessage) (tool.EvidenceTargetInfo, error) {
+	var p struct {
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal(args, &p); err != nil {
+		return tool.EvidenceTargetInfo{}, fmt.Errorf("invalid args: %w", err)
+	}
+	if strings.TrimSpace(p.Path) == "" {
+		return tool.EvidenceTargetInfo{}, fmt.Errorf("path is required")
+	}
+	path := resolveIn(w.workDir, p.Path)
+	if info, err := os.Stat(path); err != nil || info.IsDir() {
+		return tool.EvidenceTargetInfo{Path: path}, nil
+	}
+	return tool.EvidenceTargetInfo{Path: path, WholeFile: true}, nil
 }
 
 func (w writeFile) Execute(ctx context.Context, args json.RawMessage) (string, error) {

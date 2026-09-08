@@ -1037,10 +1037,9 @@ type Options struct {
 	// delete_range to the pre-fingerprint full-file fresh-read requirement.
 	// It never enters provider-visible prompts or tool schemas.
 	LegacyAnchorSafetyGate bool
-	// ReadCoordinatorShadow runs the host-only read coordinator in shadow mode:
-	// it records what the obligation model would decide without changing any
-	// request, gate, or provider byte. Internal rollout switch, off by default.
-	ReadCoordinatorShadow bool
+	// ReadPipeline carries the internal read-pipeline rollout switches; both are
+	// off by default, fixed per run, and never enter provider bytes.
+	ReadPipeline ReadPipelineOptions
 }
 
 // New constructs an Agent. MaxSteps <= 0 means no cap — the run loop continues
@@ -1097,6 +1096,7 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 		imageInput: newImageInput(opts.ImageInput, prov),
 		svc: newAgentServices(prov, tools, sink, gate, planModeReadOnlyTrust,
 			sandboxEscapeApprover, configWriteApprover, hooks, opts),
+		reads: readState{gates: opts.ReadPipeline.EvidenceGates},
 		agentConfig: agentConfig{
 			maxSteps:               opts.MaxSteps,
 			maxStepsKey:            maxStepsKey,
@@ -1115,7 +1115,7 @@ func New(prov provider.Provider, tools *tool.Registry, session *Session, opts Op
 			recentKeep:             opts.RecentKeep,
 			archiveDir:             opts.ArchiveDir,
 			legacyAnchorSafetyGate: opts.LegacyAnchorSafetyGate,
-			readCoordinatorShadow:  opts.ReadCoordinatorShadow,
+			readCoordinatorShadow:  opts.ReadPipeline.CoordinatorShadow,
 		},
 		sess: sessionRuntime{
 			conversation: session,

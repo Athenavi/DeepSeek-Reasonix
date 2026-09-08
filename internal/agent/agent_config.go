@@ -34,6 +34,17 @@ type agentConfig struct {
 	archiveDir             string
 	legacyAnchorSafetyGate bool
 	// readCoordinatorShadow fixes the internal read-coordinator rollout switch
-	// for the whole run; see Options.ReadCoordinatorShadow.
+	// for the whole run; see Options.ReadPipeline.
 	readCoordinatorShadow bool
+}
+
+// ReadPipelineOptions carries the internal read-pipeline rollout switches. They
+// are host-local, off by default, and fixed for the whole run.
+type ReadPipelineOptions struct {
+	// CoordinatorShadow records what the obligation model would decide without
+	// changing any request, gate, or provider byte.
+	CoordinatorShadow bool
+	// EvidenceGates blocks a writer whose own declaration says it would replace
+	// content the model has not seen this turn.
+	EvidenceGates bool
 }

@@ -101,6 +101,9 @@ func (a *Agent) resolveToolPolicy(ctx context.Context, turn *turnRuntime, plan *
 	if blocked, early := a.applyExecutionPreflight(turn, plan); early {
 		return blocked, true
 	}
+	if blocked, early := a.applyEvidenceGates(ctx, plan); early {
+		return blocked, true
+	}
 	if msg, blocked := turn.incompleteReads.gate(plan); blocked {
 		return toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg)}, true
 	}

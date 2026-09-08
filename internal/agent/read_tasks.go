@@ -13,6 +13,8 @@ import (
 type readState struct {
 	tasks  *readTasks
 	runGen uint64
+	// gates enables the per-operation evidence check for this run.
+	gates bool
 }
 
 // readTasks keeps the logical identity of in-flight read tasks so a
