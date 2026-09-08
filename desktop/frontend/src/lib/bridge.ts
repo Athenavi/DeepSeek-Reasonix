@@ -1887,7 +1887,7 @@ function makeMockApp(): AppBindings {
     conversationWidth: "standard",
     closeBehavior: "background",
     displayMode: "standard", sessionExperience: "standard", reasoningDisplayMode: "auto", reasoningDisplayModeExplicit: false,
-    statusBarStyle: "text",
+    statusBarStyle: "icon",
     statusBarItems: [...DEFAULT_STATUS_BAR_ITEMS],
     defaultToolApprovalMode: "auto",
     checkUpdates: true,

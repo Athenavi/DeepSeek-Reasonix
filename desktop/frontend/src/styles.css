@@ -6804,6 +6804,40 @@ body > .mermaid-diagram--fullscreen {
   display: flex;
   flex-direction: column;
 }
+/* Ported from studio's glowring: a constant-speed trace along the perimeter.
+   Mounted only during active work, so idle/waiting cards consume no frames. */
+.composer-glowring {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  overflow: hidden;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.composer-glowring i {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle closest-side, var(--accent) 0%,
+    color-mix(in srgb, var(--accent) 42%, transparent) 38%, transparent 72%);
+  offset-path: border-box;
+  animation: composer-border-trace 3.4s linear infinite;
+}
+@keyframes composer-border-trace {
+  to { offset-distance: 100%; }
+}
+@supports not (offset-path: border-box) {
+  .composer-glowring { background: var(--accent); }
+  .composer-glowring i { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer-glowring { background: color-mix(in srgb, var(--accent) 60%, transparent); }
+  .composer-glowring i { display: none; animation: none; }
+}
 .composer-card:focus-within {
   border-color: var(--fg-faint);
 }
@@ -7737,82 +7771,6 @@ body > .mermaid-diagram--fullscreen {
   transform: none;
 }
 
-.composer-profile-trigger {
-  --wails-draggable: no-drag;
-  --composer-profile-accent: var(--fg-dim);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  min-width: 0;
-  height: var(--composer-control-height);
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--composer-control-radius);
-  background: var(--surface-2);
-  color: var(--fg-dim);
-  box-shadow: var(--app-graphite-shadow);
-  font: inherit;
-  font-size: var(--composer-control-font-size);
-  font-weight: var(--composer-control-font-weight);
-  transition: border-color 0.14s, background 0.14s, color 0.14s, transform 0.14s var(--ease-out);
-}
-
-.composer-profile-trigger[data-profile="economy"] {
-  --composer-profile-accent: #3b82f6;
-}
-
-.composer-profile-trigger[data-profile="delivery"] {
-  --composer-profile-accent: #f97316;
-}
-
-.composer-profile-trigger > svg:first-child {
-  flex: 0 0 auto;
-  color: var(--composer-profile-accent);
-}
-
-.composer-profile-trigger > svg:last-child {
-  flex: 0 0 auto;
-  color: var(--fg-faint);
-}
-
-.composer-profile-trigger__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer-profile-trigger__value {
-  color: var(--fg);
-  font-weight: var(--composer-control-font-weight);
-}
-
-.composer-profile-trigger:hover:not(:disabled),
-.composer-profile-trigger:focus-visible,
-.composer-profile-trigger--open {
-  outline: none;
-  color: var(--fg);
-  border-color: var(--border-soft);
-  background: var(--bg-soft);
-  transform: none;
-}
-
-.composer-profile-trigger:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-  transform: none;
-}
-
-.composer-profile-trigger:focus-visible {
-  box-shadow: var(--focus-ring);
-  transform: none;
-}
-
 .composer-more-trigger {
   --wails-draggable: no-drag;
   display: inline-flex;
@@ -8205,22 +8163,11 @@ body > .mermaid-diagram--fullscreen {
   overflow-wrap: anywhere;
 }
 
-.composer-intent-menu,
-.composer-profile-menu {
+.composer-intent-menu {
   width: min(284px, calc(100vw - 16px));
 }
 
-.composer-profile-menu .composer-access-menu__desc {
-  color: var(--fg-dim);
-  font-size: 12px;
-  line-height: 18px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer-intent-menu__item,
-.composer-profile-menu__item {
+.composer-intent-menu__item {
   height: auto;
   min-height: 58px;
   padding-block: 8px;
@@ -8230,6 +8177,49 @@ body > .mermaid-diagram--fullscreen {
 .composer-intent-menu__check {
   flex: 0 0 auto;
   color: var(--accent);
+}
+
+:root[data-theme-style] .app .composer-meta--unified .composer-task-mode-trigger--removable {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 16px;
+  gap: 6px;
+  padding: 5px 8px;
+  color: var(--fg-dim);
+}
+:root[data-theme-style] .app .composer-meta--unified .composer-task-mode-trigger--removable:hover {
+  background: var(--bg-elev-2);
+}
+.composer-task-mode-trigger--removable .composer-task-mode-trigger__value {
+  font-weight: 400;
+}
+.composer-task-mode-trigger__icon {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+}
+.composer-task-mode-trigger__icon > svg {
+  grid-area: 1 / 1;
+}
+.composer-task-mode-trigger__remove {
+  visibility: hidden;
+}
+.composer-task-mode-trigger--removable:is(:hover, :focus-visible) .composer-task-mode-trigger__icon > svg:first-child {
+  visibility: hidden;
+}
+.composer-task-mode-trigger--removable:is(:hover, :focus-visible) .composer-task-mode-trigger__remove {
+  visibility: visible;
+}
+
+.composer-content-menu .composer-access-menu__item > svg {
+  width: 18px;
+  height: 18px;
+}
+.composer-content-menu .composer-content-menu__trigger-icon {
+  flex-basis: 18px;
+  width: 18px;
 }
 
 .composer-modebar__inferred {
@@ -32233,7 +32223,6 @@ body > .mermaid-diagram--fullscreen {
 
 .app--creation .composer-card::before,
 :root[data-theme-style] .app--creation .composer-card::before {
-  --creation-run-angle: 0deg;
   content: "";
   position: absolute;
   inset: -1px;
@@ -32322,53 +32311,13 @@ body > .mermaid-diagram--fullscreen {
 
 .app--creation .composer-card--running::before,
 :root[data-theme-style] .app--creation .composer-card--running::before {
-  opacity: 1;
-  background: conic-gradient(
-    from var(--creation-run-angle),
-    transparent 0deg,
-    transparent 42deg,
-    color-mix(in srgb, var(--accent) 28%, transparent) 62deg,
-    color-mix(in srgb, var(--accent) 96%, #fff 16%) 82deg,
-    color-mix(in srgb, var(--accent) 28%, transparent) 104deg,
-    transparent 126deg,
-    transparent 220deg,
-    color-mix(in srgb, var(--accent) 24%, transparent) 238deg,
-    color-mix(in srgb, var(--accent) 82%, #fff 14%) 258deg,
-    color-mix(in srgb, var(--accent) 24%, transparent) 280deg,
-    transparent 304deg,
-    transparent 360deg
-  );
-  filter: drop-shadow(0 0 12px color-mix(in srgb, var(--accent) 52%, transparent));
-  animation: creation-composer-border-run 3.2s linear infinite;
-}
-
-@property --creation-run-angle {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
+  opacity: 0;
 }
 
 @property --creation-hover-angle {
   syntax: "<angle>";
   inherits: false;
   initial-value: 0deg;
-}
-
-@keyframes creation-composer-border-run {
-  0% {
-    --creation-run-angle: 0deg;
-    opacity: 0.76;
-  }
-  42% {
-    opacity: 1;
-  }
-  58% {
-    opacity: 0.88;
-  }
-  100% {
-    --creation-run-angle: 360deg;
-    opacity: 0.76;
-  }
 }
 
 @keyframes creation-composer-border-settle {
@@ -32831,88 +32780,61 @@ body > .mermaid-diagram--fullscreen {
 
 /* —— Creation 上下文窗口环形进度 —— */
 
-.context-ring {
-  display: none;
-}
-.app--creation .context-ring,
-:root[data-theme-style] .app--creation .context-ring {
+.context-ring,
+:root[data-theme-style] .context-ring {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: auto;
+  min-width: 30px;
+  height: 30px;
   padding: 0;
   border: none;
   background: transparent;
   cursor: pointer;
-  border-radius: 50%;
+  border-radius: 6px;
   flex-shrink: 0;
-  margin-right: 10px;
+  margin-right: 8px;
+  gap: 6px;
   transition: background 0.16s var(--ease-out);
 }
-.app--creation .context-ring:hover,
-:root[data-theme-style] .app--creation .context-ring:hover {
+.context-ring:hover,
+:root[data-theme-style] .context-ring:hover {
   background: color-mix(in srgb, var(--fg-faint) 8%, transparent);
 }
-.app--creation .context-ring__svg {
+.context-ring__svg {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
-.app--creation .context-ring__track {
-  stroke: color-mix(in srgb, var(--fg-faint) 18%, transparent);
+.context-ring__track {
+  stroke: color-mix(in srgb, var(--context-ring-color, var(--fg-faint)) 25%, transparent);
 }
-.app--creation .context-ring__arc {
+.context-ring--good { --context-ring-color: var(--ok); }
+.context-ring--notice { --context-ring-color: var(--warn); }
+.context-ring--warn { --context-ring-color: var(--err); }
+.context-ring__arc {
   transition: stroke-dashoffset 0.4s var(--ease-out), stroke 0.4s var(--ease-out);
 }
-.app--creation .context-ring--good .context-ring__arc {
-  stroke: var(--accent);
+.context-ring--good .context-ring__arc {
+  stroke: var(--ok);
 }
-.app--creation .context-ring--notice .context-ring__arc {
+.context-ring--notice .context-ring__arc {
   stroke: var(--warn);
 }
-.app--creation .context-ring--warn .context-ring__arc {
+.context-ring--warn .context-ring__arc {
   stroke: var(--err);
 }
 
 /* popover 卡片 —— 对齐 context-panel__capacity-card 风格（portal 到 body，无 .app--creation 前缀） */
 /*
-/*
- * NOTE (font-scale): this popover is portaled to <body>, so it has no
- * .app--creation prefix, yet it is ONLY rendered in creation layout
- * (Composer gates it behind showContextWindowRing = sidebarCreation =
- * desktopLayoutStyle === "creation"). Font sizes here intentionally use
- * calc(<px> * var(--font-scale)) to match the rest of creation and follow
+ * NOTE (font-scale): this shared popover is portaled to <body>, so it has no
+ * layout-specific prefix. Font sizes here intentionally use
+ * calc(<px> * var(--font-scale)) to match the composer and follow
  * the interface text-size setting. Keep the calc(); do NOT revert to bare px.
  * The typography-overflow-contract test asserts no bare-px font-size remains
  * in .context-ring-popover rules, so a plain "12px" here will fail CI.
  */
-.context-ring-popover,
-:root[data-theme-style] .context-ring-popover {
-  min-width: 220px;
-  max-width: 270px;
-  padding: 0;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--accent) 12%, var(--border-soft));
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, var(--bg)) 0%, var(--bg) 100%);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
-  font-size: calc(12px * var(--font-scale));
-  line-height: 1.5;
-}
-/* 警告/注意态 tinted border + gradient */
-.context-ring-popover--notice,
-:root[data-theme-style] .context-ring-popover--notice {
-  border-color: color-mix(in srgb, var(--warn) 26%, var(--border-soft));
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--warn) 6%, var(--bg)) 0%, var(--bg) 100%);
-}
-.context-ring-popover--warn,
-:root[data-theme-style] .context-ring-popover--warn {
-  border-color: color-mix(in srgb, var(--err) 28%, var(--border-soft));
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--err) 6%, var(--bg)) 0%, var(--bg) 100%);
-}
 .context-ring-popover__inner {
   padding: 10px;
 }
@@ -34615,46 +34537,6 @@ body > .mermaid-diagram--fullscreen {
   letter-spacing: -0.035em;
   text-wrap: balance;
   overflow-wrap: anywhere;
-}
-
-.app--workbench .chat-pane--creation-empty .composer-meta__params {
-  flex-wrap: wrap;
-  row-gap: 8px;
-}
-
-.app--workbench .chat-pane--creation-empty .composer-meta {
-  flex-shrink: 0;
-}
-
-@container (min-width: 340px) and (max-width: 700px) {
-  .app--workbench .chat-pane--creation-empty .composer-meta__params {
-    display: grid;
-    grid-template-columns: 34px max-content max-content minmax(0, 1fr);
-  }
-
-  .app--workbench .chat-pane--creation-empty .composer-meta__control--model {
-    grid-column: 1 / 4;
-    width: 100%;
-    max-width: none;
-  }
-
-  .app--workbench .chat-pane--creation-empty .composer-meta__control--more {
-    justify-self: end;
-  }
-
-  .app--workbench .chat-pane--creation-empty .composer-meta__divider {
-    display: none;
-  }
-}
-
-@container workbench-welcome (max-width: 560px) {
-  .app--workbench .composer-decision-host--creation-hero .composer-meta {
-    padding: 8px;
-  }
-
-  .app--workbench .chat-pane--creation-empty .composer-meta__control--model {
-    min-width: 100px;
-  }
 }
 
 .app--creation .context-panel__body {
@@ -39417,3 +39299,181 @@ body > .mermaid-diagram--fullscreen {
 .tool__mcp-app-open:hover {
   filter: brightness(0.95);
 }
+
+/* Shared composer toolbar: context and permissions left, model controls right. */
+:root[data-theme-style] .composer-meta.composer-meta--unified .composer-meta__params,
+.composer-meta.composer-meta--unified .composer-meta__params {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+  gap: 6px;
+  align-items: center;
+}
+.composer-meta--unified { container-type: inline-size; }
+:root[data-theme-style] .composer-meta--unified .composer-meta__control,
+.composer-meta--unified .composer-meta__control {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+}
+.composer-meta--unified .composer-meta__control--content { order: 0; }
+.composer-meta--unified .composer-meta__control--approval { order: 1; }
+.composer-meta--unified .composer-meta__control--intent { order: 2; }
+.composer-meta--unified .composer-meta__control--delivery { order: 3; }
+:root[data-theme-style] .composer-meta--unified .composer-meta__control--model,
+.composer-meta--unified .composer-meta__control--model {
+  order: 4;
+  flex: 0 1 auto;
+  max-width: 48%;
+}
+.composer-toolbar-send { order: 5; display: flex; gap: 6px; flex-shrink: 0; margin-left: auto; }
+:root[data-theme-style] .composer-meta--unified .modelsw__trigger,
+:root[data-theme-style] .composer-meta--unified .composer-content-trigger,
+.composer-meta--unified .modelsw__trigger,
+.composer-meta--unified .composer-content-trigger,
+.composer-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+.composer-choice { white-space: nowrap; border-radius: 6px; }
+.composer-choice:hover { background: var(--bg-soft); }
+.composer-choice:disabled { opacity: 0.5; cursor: default; }
+.composer-choice--warning { color: var(--accent); }
+.composer-choice:focus-visible, .context-ring:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.composer-meta--unified .modelsw { min-width: 0; }
+.composer-meta--unified .composer-effort-control { flex: 0 0 auto; }
+.composer-meta--unified .composer-meta__control--model { gap: 4px; }
+.composer-meta--unified .context-ring__svg { transform: translateY(1px); }
+:root[data-theme-style] .composer-meta--unified .context-ring,
+.composer-meta--unified .context-ring { margin-right: 0; }
+:root[data-theme-style] .composer-meta--unified .composer-meta__control--approval,
+.composer-meta--unified .composer-meta__control--approval { margin-left: 0; }
+:root[data-theme-style] .composer-meta--unified .composer-meta__control--model { margin-left: auto; }
+.composer-meta--unified .modelsw__kind,
+.composer-meta--unified .context-ring__percent { display: none; }
+.composer-meta--unified .composer-toolbar-send { margin-left: 2px; }
+.composer-meta--unified .modelsw__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.modelsw__detail, .context-ring__percent { color: var(--fg-dim); }
+.context-ring__percent { font-size: calc(12px * var(--font-scale)); }
+@container (max-width: 650px) {
+  :root[data-theme-style] .composer-meta--unified .composer-meta__control--model,
+  .composer-meta--unified .composer-meta__control--model { max-width: 55%; flex: 0 1 auto; }
+  .composer-meta--unified .modelsw__kind { display: none; }
+}
+@container (max-width: 520px) {
+  :root[data-theme-style] .composer-meta.composer-meta--unified .composer-meta__params,
+  .composer-meta.composer-meta--unified .composer-meta__params {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+  .composer-meta--unified .composer-meta__control--model { gap: 4px; }
+  .composer-meta--unified .composer-choice > span,
+  .composer-meta--unified .composer-task-mode-trigger__value,
+  .composer-meta--unified .modelsw__label,
+  .composer-meta--unified .modelsw__trigger > svg:last-child,
+  .composer-meta--unified .context-ring__percent { display: none; }
+  :root[data-theme-style] .composer-meta--unified .composer-meta__control--model {
+    flex: 0 0 auto;
+    max-width: none;
+  }
+  .composer-meta--unified .modelsw__kind { display: inline-flex; }
+  .composer-meta--unified .composer-effort-control .composer-choice > svg:last-child,
+  .composer-meta--unified .composer-meta__control--approval .composer-choice > svg:last-child { display: none; }
+  .composer-meta--unified .composer-toolbar-send { margin-left: 0; }
+}
+
+/* Composer popovers share one surface and row rhythm across all menus. */
+:root .composer-menu-surface,
+:root[data-theme-style] .composer-menu-surface {
+  --composer-menu-radius: 20px;
+  --composer-menu-row-radius: 18px;
+  --composer-menu-row-height: 34px;
+  width: max-content;
+  min-width: min(128px, calc(100vw - 16px));
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 10px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--composer-menu-radius);
+  background: var(--bg-elev);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+  color: var(--fg);
+  font-size: calc(14px * var(--font-scale));
+  line-height: 22px;
+}
+:root .composer-menu-surface :is(.composer-access-menu__item, .modelsw__item) {
+  height: auto;
+  min-height: var(--composer-menu-row-height);
+  padding: 6px 10px;
+  gap: 10px;
+  border-radius: var(--composer-menu-row-radius);
+  color: var(--fg);
+  font-size: inherit;
+  font-weight: 400;
+  line-height: 22px;
+}
+:root .composer-menu-surface .composer-access-menu__title {
+  font-size: inherit;
+  font-weight: 400;
+  line-height: 22px;
+}
+:root .composer-menu-surface :is(.composer-access-menu__label, .modelsw__group-label) {
+  padding: 2px 10px 6px;
+  color: var(--fg-faint);
+  font-size: calc(13px * var(--font-scale));
+  line-height: 20px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+:root .composer-menu-surface .composer-access-menu__section { gap: 0; }
+:root .composer-menu-surface :is(.composer-access-menu__section + .composer-access-menu__section, .modelsw__group + .modelsw__group, .modelsw__manage) {
+  margin-top: 12px;
+  border-top: 0;
+}
+:root .composer-menu-surface .composer-access-menu__section + .composer-access-menu__section { padding-top: 0; }
+:root .composer-menu-surface :is(.composer-access-menu__desc, .modelsw__empty) {
+  font-size: calc(12px * var(--font-scale));
+  line-height: 18px;
+  color: var(--fg-dim);
+}
+:root .composer-menu-surface :is(.composer-access-menu__item, .modelsw__item):is(:hover, :focus-visible),
+:root .composer-menu-surface :is(.composer-access-menu__item--active, .modelsw__item--current) {
+  background: var(--bg-elev-2);
+  color: var(--fg);
+}
+:root .composer-menu-surface :is(.composer-access-menu__item, .modelsw__item):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+:root .composer-menu-surface button:disabled { opacity: 0.45; cursor: default; }
+:root .composer-menu-surface :is(.modelsw__check, .composer-intent-menu__check, .composer-access-menu__item > svg:last-child) { color: var(--accent); }
+:root .composer-menu-surface .modelsw__search {
+  min-height: 34px;
+  margin: 0 4px 12px;
+  padding: 6px 10px;
+  border-radius: 14px;
+}
+:root .composer-menu-surface .modelsw__search-input { font-size: inherit; }
+:root .composer-menu-surface .context-ring-popover__inner { padding: 6px 10px; }
+:root .composer-menu-surface.modelsw__menu { min-width: min(240px, calc(100vw - 16px)); }
+:root .composer-menu-surface.context-ring-popover { min-width: min(260px, calc(100vw - 16px)); }
+:root .composer-menu-surface .composer-access-menu__title { overflow-wrap: anywhere; }
+:root .composer-choice--permission-auto { color: var(--ok); }
+:root { --composer-permission-ask: #60a5fa; }
+:root[data-theme="light"] { --composer-permission-ask: #2563eb; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) { --composer-permission-ask: #2563eb; }
+}
+:root .composer-choice--permission-ask { color: var(--composer-permission-ask); }
+:root .composer-choice--permission-yolo { color: var(--err); }

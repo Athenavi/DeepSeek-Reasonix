@@ -1474,17 +1474,13 @@ function desktopLayoutStyleLabel(style: DesktopLayoutStyle, t: ReturnType<typeof
 
 type StatusBarStyle = "icon" | "text";
 function normalizeStatusBarStyle(style: string | undefined): StatusBarStyle {
-  return style === "icon" ? "icon" : "text";
+  return style === "text" ? "text" : "icon";
 }
 
 function statusBarItemLabel(id: StatusBarItemId, t: ReturnType<typeof useT>): string {
   switch (id) {
-    case "model":
-      return t("settings.statusBarItem.model");
     case "workspace":
       return t("settings.statusBarItem.workspace");
-    case "git_branch":
-      return t("settings.statusBarItem.gitBranch");
     case "cache":
       return t("status.cacheLabel");
     case "cache_avg":

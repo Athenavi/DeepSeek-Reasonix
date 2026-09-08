@@ -36,6 +36,8 @@ export function projectConversation({ local, remote, tab, activeTabId, backgroun
   const modelLabel = remote ? remote.modelLabel || tab?.label : local.meta?.label;
   const timing = {
     turnPhase: runtime.turnPhase, turnStartAt: runtime.turnStartAt,
+    turnDoneAt: runtime.turnDoneAt, lastTurnOutputTokens: runtime.lastTurnOutputTokens,
+    lastTurnWaitAccumMs: runtime.lastTurnWaitAccumMs,
     turnWaitAccumMs: runtime.turnWaitAccumMs, promptWaitStartedAt: runtime.promptWaitStartedAt,
     turnTokens: runtime.turnTokens, turnOutputTokens: runtime.turnOutputTokens,
     turnOutputCharsAtUsage: runtime.turnOutputCharsAtUsage,

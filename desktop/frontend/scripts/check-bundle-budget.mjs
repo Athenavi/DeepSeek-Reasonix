@@ -231,7 +231,9 @@ if (initialCSS.length > 0) {
 // 116.9 KiB gzip while reusing existing layout primitives. Retain a bounded
 // 0.1 KiB headroom ratchet.
 // Mainline provider/settings and recovery styles measure 119.435 KiB gzip.
-assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 119.5 * 1024);
+// Workbench's column-responsive welcome adds 291 bytes over the 119.479 KiB
+// toolbar-refresh base; round the measured 119.763 KiB to the next tenth.
+assertBudget("deferred app-shell CSS gzip", appShellCSSGzip, 119.8 * 1024);
 if (localeChunks.length !== 2) {
   throw new Error(`expected 2 on-demand Chinese locale chunks, found ${localeChunks.length}`);
 }
@@ -411,6 +413,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2399.2 KiB; retain the same bounded 0.2 KiB build headroom.
 // Search-assignment bridge and metadata add 1.0 KiB over the measured
 // main-v2 baseline (2399.3 KiB); result 2400.3 KiB plus 0.2 KiB headroom.
-const rawInitialBudgetKiB = 2_400.5;
+// Workbench welcome plus toolbar-refresh integration measures 2401.108 KiB
+// against the 2398.0 KiB base; retain only the next one-decimal ceiling.
+const rawInitialBudgetKiB = 2_401.2;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

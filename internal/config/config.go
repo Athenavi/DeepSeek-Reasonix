@@ -486,15 +486,18 @@ func (c *Config) DesktopDefaultToolApprovalMode() string {
 }
 
 // DesktopStatusBarStyle normalizes the desktop status bar metric label style.
-// Default is "text"; explicit "icon" preserves the user's compact choice.
+// Unmigrated configurations adopt icon labels once; later choices are preserved.
 func (c *Config) DesktopStatusBarStyle() string {
+	if !c.Desktop.StatusBarStyleInitialized {
+		return "icon"
+	}
 	switch strings.ToLower(strings.TrimSpace(c.Desktop.StatusBarStyle)) {
 	case "icon":
 		return "icon"
 	case "text":
 		return "text"
 	default:
-		return "text"
+		return "icon"
 	}
 }
 
