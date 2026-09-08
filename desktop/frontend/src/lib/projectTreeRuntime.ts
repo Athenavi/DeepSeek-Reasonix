@@ -1,4 +1,5 @@
 import { asArray } from "./array";
+import { runtimeStateStore } from "./runtimeStateStore";
 import type { ProjectNode, ProjectRuntimeTopic, ProjectTreeRuntimeSnapshot } from "./types";
 
 const noExcludedTopicIds: ReadonlySet<string> = new Set();
@@ -177,13 +178,24 @@ export function bindProjectTreeRuntime(
     snapshot = next;
     setTree(apply);
   };
-  const stop = onProjectTreeRuntimeChanged(accept);
-  void getSnapshot()?.then(accept).catch(() => {});
+  const unified = () => {
+    const current = runtimeStateStore.getSnapshot();
+    if (current) {
+      const topics = runtimeStateStore.getFailed() ? current.topics.map(topic => ({ ...topic, node: { ...topic.node, running: false, status: "unknown" as const } })) : current.topics;
+      snapshot = null;
+      accept({ revision: current.revision, topics });
+    }
+  };
+  const stopUnified = runtimeStateStore.subscribe(unified);
+  const stop = onProjectTreeRuntimeChanged(next => { if (!runtimeStateStore.getSnapshot()) accept(next); });
+  unified();
+  if (!runtimeStateStore.getSnapshot()) void getSnapshot()?.then(next => { if (!runtimeStateStore.getSnapshot()) accept(next); }).catch(() => {});
   return {
     apply,
     dispose() {
       active = false;
       stop();
+      stopUnified();
     },
   };
 }

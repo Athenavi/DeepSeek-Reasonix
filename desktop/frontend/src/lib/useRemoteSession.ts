@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRuntimeSession } from "./useRuntimeState";
 import { app, onRemoteTabEvent, onRemoteTabState } from "./bridge";
 import type { CancelOutcome } from "./inboxCancel";
 import { initialState, reducer, type ControllerLiveStore, type State } from "./useController";
@@ -17,15 +18,15 @@ const loadRemoteSurface = () => import("../components/RemoteSessionSurface");
 // backend_status action so the remote surface reuses the local tab's running
 // reconciliation (including its staleness guards). The serve reports the
 // fields it knows; the rest stay undefined and the reducer keeps prior values.
-function remoteStatusToAction(status: unknown, snapshotAt: number) {
+function remoteStatusToAction(status: unknown, snapshotAt: number, previousRunning = false) {
   const raw = (status ?? null) as { running?: unknown; pendingPrompt?: unknown; backgroundJobs?: unknown; cancelRequested?: unknown; cancellable?: unknown } | null;
   return {
     type: "backend_status" as const,
-    running: raw?.running === true,
+    running: typeof raw?.running === "boolean" ? raw.running : previousRunning,
     pendingPrompt: raw?.pendingPrompt === undefined ? undefined : raw.pendingPrompt === true,
     backgroundJobs: typeof raw?.backgroundJobs === "number" ? raw.backgroundJobs : undefined,
     cancelRequested: raw?.cancelRequested === undefined ? undefined : raw.cancelRequested === true,
-    cancellable: raw?.cancellable === undefined ? (raw?.running === true) : raw.cancellable === true,
+    cancellable: raw?.cancellable === undefined ? undefined : raw.cancellable === true,
     snapshotAt,
   };
 }
@@ -209,6 +210,7 @@ export function useActiveRemoteSession(
 }
 
 export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabStateValue): RemoteSessionApi {
+  const runtimeState = useRuntimeSession(tabId);
   const [state, setState] = useState<RemoteTabStateValue>(initial === "disconnected" ? "connecting" : (initial ?? "connecting"));
   const [error, setError] = useState("");
   const [transcript, setTranscript] = useState<State>(initialState);
@@ -347,7 +349,7 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
       if (cancelled || connectionGeneration !== expectedConnectionGeneration) return;
       applyRemoteStatus(status);
       setTranscript((current) => hydrateRemoteTelemetry(
-        reducer(current, remoteStatusToAction(status, Date.now())),
+        reducer(current, remoteStatusToAction(status, Date.now(), current.running)),
         status,
       ));
       await replayMissingPrompt(status, Boolean(transcriptRef.current.approval || transcriptRef.current.ask), expectedConnectionGeneration);
@@ -417,7 +419,7 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
             // Hydrate doubles as the post-reconnect running reconciliation:
             // whatever the serve reports about its current state lands now,
             // not only after the next watchdog tick.
-            next = reducer(next, remoteStatusToAction(status, Date.now()));
+            next = reducer(next, remoteStatusToAction(status, Date.now(), next.running));
             next = hydrateRemoteTelemetry(next, status);
             const seenPrompts = new Set<string>();
             for (const event of replay) {
@@ -484,7 +486,8 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
         // Leaving ready can only mean the serve connection dropped. A turn
         // that was running is now unobservable — stop the pill instead of
         // spinning forever on a turn_done that can never arrive.
-        setTranscript((prev) => (prev.running || prev.turnActive ? reducer(prev, { type: "turn_interrupted" }) : prev));
+        // Keep the last observed runtime. Disconnection is uncertainty,
+        // not a terminal outcome of the model turn.
       }
     });
     // Subscribe before activating a restored shell. SetActiveTab republishes
@@ -523,7 +526,7 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
   // turn_done frame (dropped SSE, slow-consumer drop, half-dead tunnel) then
   // clears within one tick instead of spinning forever.
   useEffect(() => {
-    if (!tabId || !hydrated || state !== "ready" || !transcript.running) return;
+    if (runtimeState.known || !tabId || !hydrated || state !== "ready" || !transcript.running) return;
     const reconcile = () => {
       const current = refreshStatusRef.current;
       if (!current || current.tabId !== tabId) return;
@@ -535,7 +538,7 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
     return () => {
       window.clearInterval(timer);
     };
-  }, [tabId, hydrated, state, transcript.running]);
+  }, [tabId, hydrated, state, transcript.running, runtimeState.known]);
 
   const submit = useCallback(async (text: string) => {
     if (!tabId) return;
@@ -723,7 +726,7 @@ export function useRemoteSession(tabId: string | undefined, initial?: RemoteTabS
   }, []);
 
   return {
-    state, error, transcript, liveStore, hydrated, running: transcript.running, modelLabel, commands,
+    state, error, transcript, liveStore, hydrated, running: runtimeState.running ?? transcript.running, modelLabel, commands,
     composerProfile, goalRuntime, effort, surfaceGeneration, promptError, submit, runManagementCommand, compact, cancelTurn,
     approve, resolvePlanDecision, answer, clearExtensionForm, rewind, setModel, setEffort, setQualityFloor, pauseGoal, resumeGoal, steer, cancelJob,
     drainApprovals, retryHydration,

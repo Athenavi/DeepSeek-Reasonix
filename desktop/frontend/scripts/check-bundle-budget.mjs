@@ -411,6 +411,9 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // measure 2399.2 KiB; retain the same bounded 0.2 KiB build headroom.
 // Search-assignment bridge and metadata add 1.0 KiB over the measured
 // main-v2 baseline (2399.3 KiB); result 2400.3 KiB plus 0.2 KiB headroom.
-const rawInitialBudgetKiB = 2_400.5;
+// Shared local/remote runtime selectors and finishing controls measure
+// 2401.017 KiB after deferring reconciliation, folder details and enqueue code.
+// Retain the next one-decimal ceiling; gzip/chunk/CSS budgets are unchanged.
+const rawInitialBudgetKiB = 2_401.1;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

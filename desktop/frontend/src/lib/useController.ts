@@ -2,6 +2,7 @@
 // per-tab output, tool state, and approvals while the user switches tabs; components
 // render the active tab's state.
 import { runtimeStatusSnapshotIsStale } from "./runtimeStatusFreshness";
+import { useRuntimeSession } from "./useRuntimeState";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { asArray } from "./array";
 import { createControllerModelCommands } from "./controllerModelCommands";
@@ -2507,6 +2508,7 @@ export function useController() {
   // can schedule an authoritative refetch after it rejects a stale snapshot.
   const scheduleStalePromptReconcileRef = useRef<(tabId: string) => void>(() => {});
   const [activeTabId, setActiveTabId] = useState<string | undefined>();
+  const runtimeState = useRuntimeSession(activeTabId);
   const activeTabIdRef = useRef<string | undefined>(undefined);
   // Invalidates async navigation completions even for ABA switches where the
   // visible tab ID eventually returns to the original value.
@@ -3736,7 +3738,7 @@ export function useController() {
     await reconcileTabRuntime(tabId, { refreshAncillary: false });
   }, [reconcileTabRuntime]);
   useStaleTurnWatchdog({
-    tabId: activeTabId, visibleState: activeState, activeTabIdRef, statesRef,
+    tabId: runtimeState.known ? undefined : activeTabId, visibleState: activeState, activeTabIdRef, statesRef,
     lastTurnActivityAtByTab, reconcile: reconcileStaleTurn,
   });
 
@@ -5021,8 +5023,9 @@ export function useController() {
     } catch { /* ignore */ }
   }, []);
 
+  const projectedState = useMemo(() => runtimeState.known ? { ...activeState, running: runtimeState.running ?? activeState.running } : activeState, [activeState, runtimeState.known, runtimeState.running]);
   return {
-    state: activeState,
+    state: projectedState,
     liveStore,
     activeTabId,
     send, sendToTab, recoverDeliveryToTab, runShell, runShellForTab, steer, steerForTab, notice,

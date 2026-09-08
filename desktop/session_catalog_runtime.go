@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"reasonix/internal/control"
+	"reasonix/internal/event"
 	"reasonix/internal/sessioncatalog"
 )
 
@@ -29,6 +30,7 @@ type catalogRuntimeSnapshot struct {
 	topicTitle       string
 	topicTitleSource string
 	ctrl             control.SessionAPI
+	state            *event.RuntimeStateSnapshot
 	open             bool
 }
 
@@ -62,16 +64,13 @@ func (a *App) catalogRuntimeOverlays() (map[string]catalogRuntimeOverlay, map[st
 	topics := map[string]catalogRuntimeOverlay{}
 	sessions := map[string]catalogRuntimeOverlay{}
 	for _, snap := range a.catalogRuntimeSnapshots() {
-		runtimeStatus := control.RuntimeStatus{}
 		path := strings.TrimSpace(snap.sessionPath)
 		if snap.ctrl != nil {
-			runtimeStatus = snap.ctrl.RuntimeStatus()
 			if path == "" {
 				path = snap.ctrl.SessionPath()
 			}
 		}
-		status := catalogRuntimeStatus(snap.activity, runtimeStatus)
-		running := status != "" || runtimeStatus.Running || runtimeStatus.PendingPrompt || runtimeStatus.BackgroundJobs > 0
+		status, running := catalogControllerStatus(snap.ctrl, snap.activity)
 		overlay := catalogRuntimeOverlay{open: snap.open, running: running, status: status}
 		key := topicSummaryKey(snap.scope, snap.workspaceRoot, snap.topicID)
 		current := topics[key]
@@ -229,12 +228,10 @@ func (a *App) runtimeProjectTopicNodes(scope, workspaceRoot string, snapshots []
 			Health: string(sessioncatalog.HealthOK), Children: []ProjectNode{},
 		}
 		for _, session := range sessions {
-			runtimeStatus := control.RuntimeStatus{}
-			if session.ctrl != nil {
-				runtimeStatus = session.ctrl.RuntimeStatus()
+			status, running := catalogControllerStatus(session.ctrl, session.activity)
+			if session.state != nil {
+				status, running = catalogStateStatus(*session.state, session.activity)
 			}
-			status := catalogRuntimeStatus(session.activity, runtimeStatus)
-			running := status != "" || runtimeStatus.Running || runtimeStatus.PendingPrompt || runtimeStatus.BackgroundJobs > 0
 			if len(sessions) == 1 {
 				node.Open = session.open
 				node.Running = running

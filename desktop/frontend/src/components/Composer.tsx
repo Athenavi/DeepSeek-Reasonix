@@ -1,4 +1,5 @@
 import { recoveryStatusText, type RecoveryRetry } from "../lib/recoveryStatus";
+import { useRuntimeSession } from "../lib/useRuntimeState";
 import { useAppNavigationStore } from "../store/appNavigation";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CSSProperties, ClipboardEvent, DragEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
@@ -7,7 +8,7 @@ import { asArray } from "../lib/array";
 import { filterAtMatches } from "../lib/atMatches";
 import { DedupIndex, sha256 } from "../lib/attachDedup";
 import { app, onFilesDropped } from "../lib/bridge";
-import { enqueueInboxGuidanceForActiveTurn, steerInboxItemForActiveTurn } from "../lib/inboxSubmit";
+import { steerInboxItemForActiveTurn } from "../lib/inboxSubmit";
 import { formatInboxError, isInboxItemMissing } from "../lib/inboxError";
 import { inboxScopeKey } from "../lib/composerInboxQueue";
 import { useComposerInboxRefresh } from "../lib/useComposerInboxRefresh";
@@ -731,6 +732,11 @@ export function Composer({
   const redoComboLabel = useShortcutComboLabel("composer.redo");
   const yoloComboLabel = useShortcutComboLabel("toolApproval.yolo");
   const draftKey = sessionKey || tabId || DEFAULT_COMPOSER_DRAFT_KEY;
+  const runtimeState = useRuntimeSession(tabId, inboxSessionPath);
+  const finishing = runtimeState.finishing;
+  if (runtimeState.known) running = runtimeState.running ?? running;
+  if (runtimeState.unknown) disabled = true;
+  const finishingRequests = useRef(new Map<string, { content: string; id: string }>());
   const inboxSessionKey = inboxScopeKey(inboxSessionPath, workspaceScopeKey);
   const now = useTick(running);
   const [text, setText] = useState("");
@@ -1219,7 +1225,7 @@ export function Composer({
   const applyInboxQueue = useCallback((items: PendingGuidance[]) => updatePendingGuidanceForDraft(draftKey, () => items), [draftKey]);
   const collapseInboxQueue = useCallback(() => setGuidanceExpanded(false), []);
   const refreshInboxQueue = useCallback(() => setGuidanceRetryNonce((value) => value + 1), []);
-  useComposerInboxRefresh(tabId, draftKey, guidanceDraftKey, inboxSessionKey, guidanceQueuePreviewKey, guidanceRetryNonce, running, applyInboxQueue, collapseInboxQueue, refreshInboxQueue);
+  useComposerInboxRefresh(tabId, draftKey, guidanceDraftKey, inboxSessionKey, guidanceQueuePreviewKey, guidanceRetryNonce, running, applyInboxQueue, collapseInboxQueue, refreshInboxQueue, runtimeState.state?.revision);
 
   useEffect(() => {
     return () => {
@@ -2064,7 +2070,7 @@ export function Composer({
         const guidanceText = displayText.trim() || (structured?.display.trim() ?? "");
         const guidanceSubmitText = submitText.trim();
         if (guidanceText) {
-          if (!localDurableGuidance && onSteer) {
+          if (!finishing && !localDurableGuidance && onSteer) {
             try {
               await onSteer(guidanceSubmitText, submitTabId);
               clearSubmittedDraft(submitDraftKey);
@@ -2077,7 +2083,16 @@ export function Composer({
           const receiptTracker = guidanceReceiptTrackerRef.current;
           receiptTracker?.start(submitDraftKey);
           try {
-            const receipt = await enqueueInboxGuidanceForActiveTurn(app, submitTabId || "", guidanceText, guidanceSubmitText, structured, turnId);
+            const { enqueueInboxGuidance, enqueueInboxGuidanceForActiveTurn } = await import("../lib/inboxGuidanceSubmit");
+            const content = JSON.stringify([guidanceText, guidanceSubmitText, structured]);
+            let request = finishingRequests.current.get(submitDraftKey);
+            if (!request || request.content !== content) {
+              request = { content, id: `followup-${crypto.randomUUID()}` };
+              finishingRequests.current.set(submitDraftKey, request);
+            }
+            const receipt = finishing
+              ? await enqueueInboxGuidance(app, submitTabId || "", guidanceText, guidanceSubmitText, structured, { idempotency: request.id })
+              : await enqueueInboxGuidanceForActiveTurn(app, submitTabId || "", guidanceText, guidanceSubmitText, structured, turnId);
             if (receipt?.error) throw new Error(receipt.error);
             const consumedBeforeReceipt = receiptTracker?.takeConsumed(submitDraftKey, receipt.itemId) ?? false;
             if (!consumedBeforeReceipt) {
@@ -2097,6 +2112,8 @@ export function Composer({
               });
             }
             clearSubmittedDraft(submitDraftKey);
+            finishingRequests.current.delete(submitDraftKey);
+            if (finishing) showToast(t("runtime.queued"), "info");
           } catch (error) {
             showToast(formatInboxError(error, locale), "warn");
             // Keep draft on durable failure.
@@ -2740,6 +2757,7 @@ export function Composer({
   // handleCancel stops the in-flight turn; if it was cancelled before the server
   // replied, the just-sent text is handed back so we drop it back into the input.
   const handleCancel = async () => {
+    if (finishing || runtimeState.unknown || runtimeState.cancellable === false) return;
     const targetDraftKey = activeDraftKeyRef.current;
     if (cancelSettlingDraftsRef.current.has(targetDraftKey)) return;
     cancelSettlingDraftsRef.current.add(targetDraftKey);
@@ -3596,7 +3614,7 @@ export function Composer({
       : pendingAsk
         ? "ask"
         : null;
-  const showRunStrip = Boolean(retry || waitingPrompt);
+  const showRunStrip = Boolean(retry || waitingPrompt || finishing || runtimeState.unknown || runtimeState.kind === "background_job" || runtimeState.kind === "cancelling");
   const effectiveComposerHeight = composerHeight === null
     ? null
     : resolveComposerContentSizing({
@@ -3739,7 +3757,7 @@ export function Composer({
         return t("composer.runAnnounceRunning");
     }
   })();
-  const runStateText = retry
+  const runStateText = runtimeState.unknown ? t("runtime.unknown") : finishing ? t("runtime.finishing") : runtimeState.kind === "cancelling" ? t("status.jobStopping") : runtimeState.kind === "background_job" ? t("runtime.background", { count: runtimeState.state?.backgroundJobs ?? 0 }) : retry
     ? recoveryStatusText(t, retry, now)
     : waitingPrompt === "approval"
       ? t("composer.runWaitingApproval", { tool: pendingApprovalLabel ?? "" })
@@ -4312,7 +4330,7 @@ export function Composer({
       )}
       {retry?.recovery?.waiting && <Suspense fallback={null}><RecoveryWaitBanner retry={retry} now={now} onStop={() => void handleCancel()} stopDisabled={cancelSettlingDraftsRef.current.has(draftKey)} /></Suspense>}
       <div
-        className={`composer-card${composerHeight !== null || composerResizing ? " composer-card--resized" : ""}${composerAutoExpanded ? " composer-card--autosized" : ""}${composerAutoOverflow ? " composer-card--auto-overflow" : ""}${composerResizing ? " composer-card--resizing" : ""}${running ? (waitingPrompt ? " composer-card--waiting" : " composer-card--running") : ""}`}
+        className={`composer-card${composerHeight !== null || composerResizing ? " composer-card--resized" : ""}${composerAutoExpanded ? " composer-card--autosized" : ""}${composerAutoOverflow ? " composer-card--auto-overflow" : ""}${composerResizing ? " composer-card--resizing" : ""}${running && !finishing && !runtimeState.unknown ? (waitingPrompt ? " composer-card--waiting" : " composer-card--running") : ""}`}
         ref={composerCardRef}
         style={composerCardStyle}
       >
@@ -4335,7 +4353,7 @@ export function Composer({
         />
         {showRunStrip && runStateText && (
           <div className={`composer-run-strip${waitingPrompt ? " composer-run-strip--waiting" : ""}`}>
-            <span className="composer-run-strip__dot" aria-hidden="true" />
+            {!finishing && !runtimeState.unknown && <span className="composer-run-strip__dot" aria-hidden="true" />}
             <span className="composer-run-strip__text">{runStateText}</span>
           </div>
         )}
@@ -4565,13 +4583,13 @@ export function Composer({
               </div>}
             </div>
             <div className="composer-toolbar-send">
-              {running && (
+              {running && !finishing && !runtimeState.unknown && (
                 <Tooltip label={t("composer.stop")}>
                   <button
                     className="composer__btn composer__btn--stop"
                     type="button"
                     onClick={() => void handleCancel()}
-                    disabled={cancelSettlingDraftsRef.current.has(draftKey)}
+                    disabled={runtimeState.cancellable === false || cancelSettlingDraftsRef.current.has(draftKey)}
                     aria-label={t("composer.stop")}
                   >
                     <Square size={12} fill="currentColor" />

@@ -22,15 +22,17 @@ import (
 // turns alive without sending a background session's frames to the foreground
 // browser.
 type sessionTagSink struct {
-	bc      *Broadcaster
-	mu      sync.Mutex
-	path    string
-	active  bool
-	pending []event.Event
+	pendingRuntimeState *event.RuntimeStateSnapshot
+	bc                  *Broadcaster
+	mu                  sync.Mutex
+	path                string
+	active              bool
+	runtimeActive       bool
+	pending             []event.Event
 }
 
 func newSessionTagSink(bc *Broadcaster) *sessionTagSink {
-	return &sessionTagSink{bc: bc}
+	return &sessionTagSink{bc: bc, runtimeActive: true}
 }
 
 // SessionTagSink is exported for the CLI, which builds Serve's initial
@@ -43,6 +45,9 @@ func NewSessionTagSink(bc *Broadcaster) *SessionTagSink {
 
 func (s *sessionTagSink) SetPath(path string) {
 	s.mu.Lock()
+	if s.path != "" && s.path != canonicalSessionPath(path) {
+		s.runtimeActive = false
+	}
 	s.path = canonicalSessionPath(path)
 	s.activateLocked()
 	s.mu.Unlock()
@@ -53,6 +58,7 @@ func (s *sessionTagSink) SetPath(path string) {
 func (s *sessionTagSink) PrimePath(path string) {
 	s.mu.Lock()
 	s.path = canonicalSessionPath(path)
+	s.runtimeActive = s.bc.CurrentSession() == s.path
 	s.mu.Unlock()
 }
 
@@ -63,6 +69,7 @@ func (s *sessionTagSink) BufferPath(path string) {
 	s.mu.Lock()
 	s.path = canonicalSessionPath(path)
 	s.active = false
+	s.runtimeActive = false
 	s.mu.Unlock()
 }
 
@@ -84,6 +91,10 @@ func (s *sessionTagSink) activateLocked() {
 		return
 	}
 	s.active = true
+	if s.runtimeActive && s.pendingRuntimeState != nil {
+		s.bc.publishRuntimeState(s.path, *s.pendingRuntimeState)
+		s.pendingRuntimeState = nil
+	}
 	for _, e := range s.pending {
 		if s.path != "" {
 			e.SessionPath = s.path
@@ -449,6 +460,23 @@ func (s *Server) busyDetach(ctx context.Context, cur *control.Controller, target
 
 func (s *Server) announceSessionChanged(path string, reset bool) {
 	s.bc.Emit(event.Event{Kind: event.SessionChanged, SessionPath: path, SessionReset: reset})
+	if ctrl, ok := s.ctl().(*control.Controller); ok {
+		if tag := s.tagFor(ctrl); tag != nil {
+			tag.ActivateRuntime()
+		}
+	}
+}
+
+// The routing barrier precedes the new instance's runtime projection. Content
+// boot notices retain their historical order relative to session_changed.
+func (s *sessionTagSink) ActivateRuntime() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.runtimeActive = true
+	if s.active && s.pendingRuntimeState != nil {
+		s.bc.publishRuntimeState(s.path, *s.pendingRuntimeState)
+		s.pendingRuntimeState = nil
+	}
 }
 
 var errReplacedDuringBind = &replacedDuringBindError{}

@@ -158,6 +158,9 @@ func (a *App) inboxCtrl(tabID string) (control.SessionAPI, error) {
 
 // InboxSnapshot returns durable inbox metadata for a tab (no bodies).
 func (a *App) InboxSnapshot(tabID string) (InboxSnapshotView, error) {
+	if a.isRemoteTab(tabID) {
+		return a.remoteInboxSnapshot(tabID)
+	}
 	ctrl, err := a.inboxCtrl(tabID)
 	if err != nil {
 		return InboxSnapshotView{}, err
@@ -289,6 +292,12 @@ func (a *App) CancelTabWithInboxItemsResult(tabID string, itemIDs []string) (Inb
 }
 
 func (a *App) enqueueInbox(tabID string, intent sessioninbox.InboxIntent, display, submit string, invocations []InvocationRequest, idempotency string, trySteer bool) (InboxReceiptView, error) {
+	a.remoteTabMu.Lock()
+	remote := a.remoteTabs[tabID] != nil
+	a.remoteTabMu.Unlock()
+	if remote && !trySteer {
+		return a.enqueueRemoteFollowup(tabID, display, submit, invocations, idempotency)
+	}
 	ctrl, err := a.inboxCtrl(tabID)
 	if err != nil {
 		return InboxReceiptView{}, err

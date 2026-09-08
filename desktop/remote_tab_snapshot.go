@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"reasonix/internal/agent"
+	"reasonix/internal/event"
 )
 
 // errRemoteTabStatusSuperseded marks the benign lost race where a /status
@@ -208,13 +209,14 @@ func (a *App) reserveRemoteTabStatusSequence(tabID string, client *http.Client, 
 }
 
 type remoteTabStatusPayload struct {
-	SessionName     string `json:"sessionName"`
-	SessionPath     string `json:"sessionPath"`
-	Running         *bool  `json:"running"`
-	PendingPrompt   *bool  `json:"pendingPrompt"`
-	BackgroundJobs  *int   `json:"backgroundJobs"`
-	CancelRequested *bool  `json:"cancelRequested"`
-	Cancellable     *bool  `json:"cancellable"`
+	RuntimeState    *event.RuntimeStateSnapshot `json:"runtimeState"`
+	SessionName     string                      `json:"sessionName"`
+	SessionPath     string                      `json:"sessionPath"`
+	Running         *bool                       `json:"running"`
+	PendingPrompt   *bool                       `json:"pendingPrompt"`
+	BackgroundJobs  *int                        `json:"backgroundJobs"`
+	CancelRequested *bool                       `json:"cancelRequested"`
+	Cancellable     *bool                       `json:"cancellable"`
 	// TakenOver reports Serve's single-writer handoff state: a local runtime
 	// on the serve host owns the session and this tab is read-only.
 	TakenOver *bool `json:"takenOver"`
@@ -273,10 +275,15 @@ func (a *App) recordRemoteTabSessionStatus(tabID string, client *http.Client, ge
 	if pathChanged {
 		a.goRemoteTabSafe("remoteTabStatusTitle", func() { a.refreshRemoteTabTitle(tabID) })
 	}
+	a.emitRuntimeStateChanged()
 	return true
 }
 
 func applyRemoteTabStatusPayload(tab *remoteTab, payload remoteTabStatusPayload) {
+	if payload.RuntimeState != nil && validRuntimeState(*payload.RuntimeState) {
+		acceptRemoteRuntimeStateLocked(tab, payload.SessionPath, *payload.RuntimeState, true)
+		payload.Running, payload.PendingPrompt, payload.BackgroundJobs, payload.CancelRequested, payload.Cancellable = nil, nil, nil, nil, nil
+	}
 	if name := strings.TrimSpace(payload.SessionName); name != "" {
 		tab.session.name = name
 		tab.session.newSession = false

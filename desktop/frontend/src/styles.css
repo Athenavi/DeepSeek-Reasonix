@@ -31112,6 +31112,9 @@ body > .mermaid-diagram--fullscreen {
 .project-tree__group-children {
   padding-left: 0;
 }
+.project-tree__folder-active-indicator--static {
+  animation: none !important;
+}
 .project-tree__folder-active-indicator {
   width: 10px;
   height: 10px;

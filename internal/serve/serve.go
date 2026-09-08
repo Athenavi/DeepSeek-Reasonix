@@ -44,7 +44,8 @@ var logoWordmarkSVG []byte
 // Server wires a controller to its HTTP surface. The Broadcaster must be the
 // same sink the controller was constructed with, so events reach SSE clients.
 type Server struct {
-	mu sync.RWMutex // guards ctrl, which rebuild paths swap at runtime
+	runtimeProjection serveRuntimeProjection
+	mu                sync.RWMutex // guards ctrl, which rebuild paths swap at runtime
 	// bindMu serializes every entry point that changes the active session
 	// path or controller generation — /resume, /new, /fork, switchModel, and
 	// extension reload. net/http runs handlers
@@ -541,6 +542,7 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("GET /provider-setup", s.providerSetupStatus)
 	mux.HandleFunc("POST /provider-setup", s.providerSetupSave)
 	mux.HandleFunc("GET /events", s.events)
+	mux.HandleFunc("GET /runtime-states", s.runtimeStates)
 	mux.HandleFunc("GET /history", s.history)
 	mux.HandleFunc("GET /context", s.context)
 	mux.HandleFunc("POST /submit", s.submit)
@@ -1317,6 +1319,12 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	if raw := r.URL.Query().Get("session"); raw != "" {
 		if path, err := s.resolveSessionPath(raw); err == nil {
 			held := s.sessionMirrored(path) || leaseHeldByForeignRuntime(path)
+			if !held {
+				if view, ok := s.ownedRuntimeStatusView(path); ok {
+					writeJSON(w, view)
+					return
+				}
+			}
 			writeJSON(w, s.statusViewForPath(path, held))
 			if s.sessionMirrored(path) {
 				s.maybeAutoReclaimMirrored(path)
@@ -1332,8 +1340,9 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 	ctrl := s.ctl()
 	used, window := ctrl.ContextSnapshot()
 	hit, miss := ctrl.SessionCache()
-	rs := ctrl.RuntimeStatus()
+	state, rs := runtimeStateAndStatus(ctrl)
 	sess := map[string]any{
+		"runtimeState":     state,
 		"label":            ctrl.Label(),
 		"running":          rs.Running,
 		"plan":             ctrl.PlanMode(),

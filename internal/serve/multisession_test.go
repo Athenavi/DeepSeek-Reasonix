@@ -531,6 +531,12 @@ func (c *balanceProbeController) RuntimeStatus() control.RuntimeStatus {
 	return control.RuntimeStatus{Running: true, PendingPrompt: true, Cancellable: true}
 }
 
+func (c *balanceProbeController) RuntimeStateSnapshot() event.RuntimeStateSnapshot {
+	state := c.Controller.RuntimeStateSnapshot()
+	state.Phase, state.Running, state.PendingPrompt, state.Cancellable = "executing", true, true, true
+	return state
+}
+
 func TestStatusRuntimeQuerySkipsBalance(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := &balanceProbeController{Controller: control.New(control.Options{Sink: bc})}
