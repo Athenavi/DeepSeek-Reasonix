@@ -47,6 +47,7 @@ func (c *mutationBarrierCause) message() string {
 // form the model sees; rawOutput is the full original when truncation applied
 // (empty when identical so we avoid double storage). images ride outside text.
 type toolOutcome struct {
+	runState                   provider.ToolRunState
 	visionSummary              *provider.VisionSummary
 	output                     string
 	rawOutput                  string // full original when different from output

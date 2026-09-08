@@ -17,6 +17,7 @@ import (
 type summaryProvider struct {
 	calls atomic.Int32
 	fail  bool
+	text  string
 }
 
 func (*summaryProvider) Name() string { return "vision" }
@@ -26,7 +27,11 @@ func (p *summaryProvider) Stream(ctx context.Context, r provider.Request) (<-cha
 		return nil, errors.New("vision unavailable")
 	}
 	out := make(chan provider.Chunk, 1)
-	out <- provider.Chunk{Type: provider.ChunkText, Text: "OCR: Z7; red left, blue right"}
+	text := p.text
+	if text == "" {
+		text = "OCR: Z7; red left, blue right"
+	}
+	out <- provider.Chunk{Type: provider.ChunkText, Text: text}
 	close(out)
 	return out, nil
 }
@@ -37,10 +42,18 @@ func (nativeImageProvider) ModelInfo() provider.ModelInfo {
 	return provider.ModelInfo{InputModalities: []provider.ModelModality{provider.ModalityText, provider.ModalityImage}}
 }
 func TestToolImageFallbackPreservesOriginalResult(t *testing.T) {
-	for _, mode := range []string{"summary", "native", "disabled", "failed"} {
+	for _, mode := range []string{"summary", "native", "disabled", "failed", "canceled", "ocr"} {
 		t.Run(mode, func(t *testing.T) {
 			vp := &summaryProvider{fail: mode == "failed"}
-			cfg := &imageinput.Config{Model: "vision/model", Resolve: func(string) (provider.Provider, error) { return vp, nil }}
+			if mode == "ocr" {
+				vp.text = "context canceled; write outcome unknown:"
+			}
+			cfg := &imageinput.Config{Model: "vision/model", Resolve: func(string) (provider.Provider, error) {
+				if mode == "canceled" {
+					return nil, context.Canceled
+				}
+				return vp, nil
+			}}
 			if mode == "disabled" {
 				cfg = nil
 			}
@@ -78,7 +91,7 @@ func TestToolImageFallbackPreservesOriginalResult(t *testing.T) {
 				t.Fatal("no tool result")
 			}
 			want := int32(1)
-			if mode == "native" || mode == "disabled" {
+			if mode == "native" || mode == "disabled" || mode == "canceled" {
 				want = 0
 			}
 			if vp.calls.Load() != want {

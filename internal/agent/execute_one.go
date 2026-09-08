@@ -24,6 +24,7 @@ import (
 // — the caller emits ToolDispatch/ToolResult — so it is safe to invoke fromparallel goroutines. Stages:
 // parse → policy → prepare → finish.
 func (a *Agent) executeOne(ctx context.Context, turn *turnRuntime, call provider.ToolCall) (out toolOutcome) {
+	defer func() { out.runState = outcomeRunState(out) }()
 	ctx = withTurnState(a.withAgentContext(ctx), turn)
 	plan := &toolCallPlan{call: call}
 	defer func() {
@@ -615,10 +616,6 @@ func (a *Agent) finishToolExecution(ctx context.Context, plan *toolCallPlan) too
 	// before evidence, hooks, and recovery observation, so every downstreamconsumer sees the final
 	// (possiblyreplaced) outcome.
 	result, err = a.interceptToolAfter(ctx, call, result, err)
-	var visionSummary *provider.VisionSummary
-	if err == nil {
-		result, visionSummary = a.processToolImages(cctx, result, images)
-	}
 	// A tool that refused its own call never ran:
 	// reportitlikethepermissionandplan-modeblocksaboveratherthanasanexecution failure.
 	if msg, refused := tool.BlockedMessage(err); refused {
@@ -668,9 +665,14 @@ func (a *Agent) finishToolExecution(ctx context.Context, plan *toolCallPlan) too
 	if a.svc.hooks != nil && call.Name == "task" && !isBackgroundTaskCall(call.Arguments) {
 		a.svc.hooks.SubagentStop(ctx, result)
 	}
+	runState := outcomeRunState(toolOutcome{executed: true, output: result})
+	var visionSummary *provider.VisionSummary
+	if runState == provider.ToolRunCompleted {
+		result, visionSummary = a.processToolImages(cctx, result, images)
+	}
 	body, truncMsg, original, readObserver := a.boundIncompleteReadAwareResult(plan, result)
 	out := toolOutcome{
-		output: body, images: images, visionSummary: visionSummary, truncated: truncMsg != "" || original != "", truncMsg: truncMsg,
+		runState: runState, output: body, images: images, visionSummary: visionSummary, truncated: truncMsg != "" || original != "", truncMsg: truncMsg,
 		execution: execution, mcpApp: toProviderMCPApp(plan.mcpApp), recoveryGeneration: recoveryGen,
 	}
 	if original != "" {
