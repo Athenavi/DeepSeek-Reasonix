@@ -185,3 +185,20 @@ func TestReadContinuationCursorAbsentIsNotABlock(t *testing.T) {
 		t.Fatal("a plain read must not be treated as a continuation")
 	}
 }
+
+// TestModelInputMessagesStripsReadResult guards the single provider boundary:
+// every request path goes through modelInputMessages, so no host envelope may
+// survive it.
+func TestModelInputMessagesStripsReadResult(t *testing.T) {
+	msgs := []provider.Message{
+		{Role: provider.RoleUser, Content: "look"},
+		{Role: provider.RoleTool, ToolCallID: "c1", Name: "read_file", Content: "   1→a\n",
+			ReadResult: json.RawMessage(`{"protocol_version":2,"read_id":"ir-1"}`)},
+	}
+	out := modelInputMessages(msgs)
+	for i, msg := range out {
+		if len(msg.ReadResult) != 0 {
+			t.Fatalf("message %d leaked the read envelope into provider input: %s", i, msg.ReadResult)
+		}
+	}
+}

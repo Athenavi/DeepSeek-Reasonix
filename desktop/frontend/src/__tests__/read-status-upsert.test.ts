@@ -32,4 +32,12 @@ equal(Object.keys(s.readStatuses ?? {}).length, 2, "independent reads keep indep
 const next = reducer(s, { type: "event", e: { kind: "turn_started", turnId: "turn-2", status: "in_progress" } });
 equal(next.readStatuses, undefined, "a new turn starts from no live read status");
 
+// A hundred pages of one read still leave exactly one status entry.
+let many = initialState;
+for (let page = 1; page <= 100; page++) {
+  many = reducer(many, { type: "event", e: frame(page, "needs_more", { covered: [[1, page * 10]] as [number, number][] }) });
+}
+equal(Object.keys(many.readStatuses ?? {}).length, 1, "a hundred pages still render one status");
+equal(many.readStatuses?.["ir-1"]?.seq, 100, "the latest page wins");
+
 console.log("read status upsert tests passed");

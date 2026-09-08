@@ -116,3 +116,44 @@
 默认行为已切换：无范围、无 intent 的读取是有界预览，不再产生全文债务；只有 `intent=full` 会分页到结尾。跨平台界面验收（Windows WebView2、macOS WKWebView）与固定任务集对比需要在具备真实桌面的环境执行，不能由本仓库的单元测试替代。
 
 默认使用新行为；仅保留主机内部、按 turn 固定的回退入口，用于诊断和紧急回退，不暴露普通用户开关。旧活跃状态不能在半个工具批次中转换；恢复时重新验证，回退不撤销用户文件中已完成的修改。
+
+## 9. 验收记录
+
+以下每项都由仓库内的确定性测试覆盖；命令为 `go test ./...`、`pnpm test`（桌面前端）与 `make lint`。
+
+协议与证据：
+
+| 验收点 | 覆盖测试 |
+| --- | --- |
+| 多页共用稳定读取身份并累计覆盖 | `TestRangeObligationPagesUntilCovered`、`TestOutOfOrderPagesStillSatisfyAWholeFileRead`、`TestReadContinuationCursorJoinsTheLogicalRead` |
+| 不同窗口摘要不被误判为文件变化 | `TestReadEnvelopeNamesTheServingStore`、`TestReadEnvelopeSeparatesSourceIdentityFromWindowDigest` |
+| CRLF/UTF-16/编码差异不错误复用证据 | `TestReadEnvelopeKeepsUnicodeWindowsIntact`、`TestReadEnvelopeSeparatesSourceIdentityFromWindowDigest` |
+| 半行截断不计作已读 | `TestClipToNarrowsDeliveredRangeToVisibleBytes`、`TestReadShadowRecordsTheCoordinatorVerdict` |
+| 单独 EOF 不能伪造完成 | `TestRangeCompletionNeedsATrustworthySourceEnd`、`TestWholeFileRequiresContiguousCoverageFromLineZero` |
+| 旧游标、跨会话、跨文件、过期引用被拒绝 | `TestReadContinuationCursorRejections`、`TestReadCursorRoundTripAndMatching` |
+| 同批 read 不能为同批修改作证 | `TestEvidenceGateIgnoresSameBatchReads` |
+| 跨快照分页不拼接 | `TestEvidenceGateNeverStitchesAcrossSnapshots`、`TestEvidenceGateStitchesPagesOfOneSnapshot` |
+| host-only 元数据被剥离 | `TestReadResultEnvelopeDoesNotAffectProviderVisibleBytes`、`TestModelInputMessagesStripsReadResult` |
+| 协调器状态不可被外部修改 | `TestReturnedObligationsAreDeepCopies` |
+
+实际任务：
+
+| 验收点 | 覆盖测试 |
+| --- | --- |
+| 大文件局部查询不强制全文 | `TestImplicitReadIsABoundedPreview` |
+| 明确全文任务分页到 EOF | `TestExplicitFullReadContinuesSourcePagesToEOF` |
+| 覆盖/删除/精确编辑的证据规则 | `TestEvidenceGateBlocksAnUnreadOverwrite`、`TestEvidenceGateAllowsAfterTheModelSawTheContent`、`TestEvidenceGateRejectsStaleContent`、`TestWriteFileDeclaresWholeFileEvidenceOnlyForOverwrites` |
+| 未知写范围不绕过证据阻塞 | `TestEvidenceGateBlocksUnknownScopeWriterAfterABlock`、`TestEvidenceGateLeavesUndeclaredWritersAlone` |
+| 重复页与无进展有界退出 | `TestRepeatedPageIsNotProgress`、`TestStalledPagesPivotOnceThenPause` |
+| 预算耗尽与内容变化不重置 | `TestPageBudgetStopsContinuation`、`TestActiveTimeBudgetStopsContinuation`、`TestContentChangeDoesNotResetTheBudget` |
+| 未知上下文窗口不猜测 | `TestReadShadowNarrowsAnUnboundedFullRead` |
+
+界面：
+
+| 验收点 | 覆盖测试 |
+| --- | --- |
+| 连续 100 次更新仍只有一条活动状态 | `read-status-upsert.test.ts` |
+| 乱序事件不回退 | `read-status-upsert.test.ts` |
+| 新回合清空上一回合状态 | `read-status-upsert.test.ts` |
+
+尚未由本仓库验证、需要真实环境执行：Windows WebView2 与 macOS WKWebView 的界面与滚动；Linux/Windows 的路径与换行行为；固定任务集的新旧策略对比（成功率、介入次数、工具轮数、输入 token、耗时、压缩次数）。CLI 与 ACP 消费同一结构化事件，但终端状态行未单独渲染。
