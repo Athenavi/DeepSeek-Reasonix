@@ -90,8 +90,9 @@ Desktop 保存用户全局设置；项目 `reasonix.toml` 覆盖此字段时，�
 新安装的 CLI 默认账号 `deepseek-flash`、`deepseek-pro` 和 Desktop 官方模板
 `deepseek` 使用 Chat Completions，Flash 默认、思考开启、强度 high，搜索默认开启。
 配置版本 9 会将已有 DeepSeek 官方标准端点迁移为 Chat Completions，包含重命名账号、
-Anthropic/Responses 预设和标准请求 URL。模型、密钥变量、headers、extra_body、
-思考设置、价格和搜索开关均保留。第三方网关、自定义路径及含查询参数的地址不迁移。
+Anthropic/Responses 预设和标准请求 URL；标准覆盖项会被清除，以继续使用派生端点
+及其独立搜索。模型、密钥变量、headers、extra_body、思考设置、价格和搜索开关均保留。
+第三方网关、自定义路径及含查询参数的地址不迁移。
 迁移完成后再次手动选择其他协议会保留；项目配置与历史会话文件不重写。
 版本 7、8 配置仅修改协议、地址和版本标记，注释与未知字段保留。
 更早版本仍先执行已有的配置升级步骤。旧版本能读取新配置中的 OpenAI 协议，

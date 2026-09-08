@@ -113,8 +113,10 @@ New CLI defaults (`deepseek-flash`, `deepseek-pro`) and the Desktop `deepseek`
 template use Chat Completions, with Flash selected, thinking enabled, high effort
 and independent search enabled. Config version 9 migrates existing official
 DeepSeek standard endpoints to Chat Completions, including renamed accounts,
-Anthropic/Responses presets and standard request URL overrides. Model selection,
-key references, headers, extra body, effort, prices and search settings survive.
+Anthropic/Responses presets and standard request URL overrides, which are
+cleared so the derived endpoint and its independent search still apply. Model
+selection, key references, headers, extra body, effort, prices and search
+settings survive.
 Third-party gateways, nonstandard paths and URLs containing queries are excluded.
 Later manual protocol edits remain authoritative. Project configs and session
 files are not rewritten. Version 7 and 8 files receive a scalar-only edit preserving comments and unknown data;

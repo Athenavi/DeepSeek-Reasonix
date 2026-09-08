@@ -42,12 +42,10 @@ func migrateOfficialDeepSeekChat(c *Config) {
 			continue
 		}
 		p.Kind, p.BaseURL = "openai", "https://api.deepseek.com"
-		if p.RequestURL != "" {
-			p.RequestURL = "https://api.deepseek.com/chat/completions"
-		}
-		if p.ChatURL != "" {
-			p.ChatURL = "https://api.deepseek.com/chat/completions"
-		}
+		// Drop the standard override instead of pinning the canonical URL: the
+		// derived endpoint is identical, and a non-empty override hides the
+		// account from IsOfficialDeepSeekSearchEndpoint (independent search).
+		p.RequestURL, p.ChatURL = "", ""
 	}
 }
 

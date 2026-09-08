@@ -215,8 +215,10 @@ func rewriteDeepSeekProtocol(raw, kind, baseURL string, eligible func(*ProviderE
 			tomlReplacement{start: block.baseURLStart, end: block.baseURLEnd, value: strconv.Quote(baseURL)},
 		)
 		if kind == "openai" {
+			// Clear the standard override rather than pin the canonical URL so
+			// the derived endpoint applies and independent search stays enabled.
 			for _, span := range block.chatEndpoints {
-				replacements = append(replacements, tomlReplacement{start: span[0], end: span[1], value: strconv.Quote("https://api.deepseek.com/chat/completions")})
+				replacements = append(replacements, tomlReplacement{start: span[0], end: span[1], value: strconv.Quote("")})
 			}
 		}
 	}

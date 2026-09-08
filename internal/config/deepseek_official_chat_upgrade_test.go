@@ -37,7 +37,7 @@ func TestOfficialDeepSeekV9MigrationAndManualChoice(t *testing.T) {
 				want := strings.Replace(raw, "config_version = 8", "config_version = 9", 1)
 				want = strings.Replace(want, `kind="`+kind+`"`, `kind="openai"`, 1)
 				want = strings.Replace(want, `base_url="`+base+`"`, `base_url="https://api.deepseek.com"`, 1)
-				want = strings.Replace(want, `request_url="`+endpoint+`"`, `request_url="https://api.deepseek.com/chat/completions"`, 1)
+				want = strings.Replace(want, `request_url="`+endpoint+`"`, `request_url=""`, 1)
 				if string(got) != want {
 					t.Fatalf("unexpected edit:\n%s\nwant:\n%s", got, want)
 				}
@@ -50,8 +50,13 @@ func TestOfficialDeepSeekV9MigrationAndManualChoice(t *testing.T) {
 				}
 				loaded := LoadForEdit(path)
 				p, ok := loaded.Provider("Deepseek2")
-				if !ok || p.Kind != "openai" || p.RequestURL != "https://api.deepseek.com/chat/completions" {
+				if !ok || p.Kind != "openai" || p.RequestURL != "" {
 					t.Fatal("preset identity restored the old protocol on load")
+				}
+				// Clearing the standard override is what keeps the account visible
+				// to IsOfficialDeepSeekSearchEndpoint.
+				if !EffectiveIndependentWebSearch(p) {
+					t.Fatal("migration disabled independent web search")
 				}
 				// Persist through the ordinary writer, then restart twice.
 				c.Providers[0].Kind, c.Providers[0].BaseURL, c.Providers[0].RequestURL = kind, base, endpoint
