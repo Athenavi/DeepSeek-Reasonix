@@ -61,6 +61,8 @@ func (a *Agent) beginRunTurn(ctx context.Context, input string, pinned pinnedRev
 	// budgets) lives in taskRuntime and is reconciled there.
 	a.turn = turnRuntime{}
 	a.turn.readShadow = newReadShadowState(a.readCoordinatorShadow)
+	a.reads.runGen++
+	a.reads.tasks = newReadTasks(a.sess.path, a.reads.runGen)
 	a.resetStructuralRunGuards()
 	scope, scoped := DeliveryExecutionScopeFromContext(ctx)
 	preserveEvidence, readinessRecovered := a.beginFinalReadinessRecovery()
@@ -267,7 +269,7 @@ func (a *Agent) runToolLoop(ctx context.Context, state *turnRuntime) (runErr err
 
 		if usage != nil && usage.FinishReason == "length" {
 			truncatedRounds++
-			if err := a.recordTruncatedToolResults(calls); err != nil {
+			if err := a.recordTruncatedToolResults(ctx, calls); err != nil {
 				return err
 			}
 			if truncatedRounds > maxStreamRecoveries {

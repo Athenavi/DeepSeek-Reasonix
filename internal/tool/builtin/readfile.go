@@ -52,10 +52,17 @@ const (
 
 // readFileParams is one validated read_file call with defaults applied.
 type readFileParams struct {
-	Path   string
-	Offset int
-	Limit  int
+	Path        string
+	Intent      tool.ReadIntent
+	WindowGiven bool
+	Offset      int
+	Limit       int
 }
+
+const (
+	readFileEmptyOutput = "(empty file)"
+	readFilePastEOFTail = " is past EOF — file has "
+)
 
 // readWindowGiven reports whether the call named an explicit line window.
 func readWindowGiven(args json.RawMessage) bool {
@@ -83,7 +90,9 @@ func parseReadFileParams(args json.RawMessage) (readFileParams, error) {
 	if p.Path == "" {
 		return readFileParams{}, fmt.Errorf("path is required")
 	}
-	if _, err := readIntentFor(p.Intent, readWindowGiven(args)); err != nil {
+	windowGiven := readWindowGiven(args)
+	intent, err := readIntentFor(p.Intent, windowGiven)
+	if err != nil {
 		return readFileParams{}, err
 	}
 	if p.Offset < 0 {
@@ -92,7 +101,7 @@ func parseReadFileParams(args json.RawMessage) (readFileParams, error) {
 	if p.Limit <= 0 {
 		p.Limit = readFileDefaultLimit
 	}
-	return readFileParams{Path: p.Path, Offset: p.Offset, Limit: p.Limit}, nil
+	return readFileParams{Path: p.Path, Intent: intent, WindowGiven: windowGiven, Offset: p.Offset, Limit: p.Limit}, nil
 }
 
 // readIntentFor resolves the effective read intent and rejects combinations
@@ -133,6 +142,7 @@ func (readFile) Schema() json.RawMessage {
 "properties":{
   "path":{"type":"string","description":"File path"},
   "intent":{"type":"string","enum":["inspect","range","full"],"description":"Why you are reading. inspect (default): a bounded preview; one page is a complete answer. range (default when offset or limit is given): an explicit window. full: scan the whole file, paging until every line has been delivered."},
+  "cursor":{"type":"string","description":"Continuation cursor returned by a previous read_file result. It names the exact next position; pass it back unchanged instead of computing an offset."},
   "offset":{"type":"integer","description":"0-based line offset to start reading from (default 0)","minimum":0},
   "limit":{"type":"integer","description":"Maximum lines to return (default 2000)","minimum":1}
 },
@@ -167,52 +177,47 @@ func (r readFile) ObserveModelText(args json.RawMessage, output string) (tool.Mo
 		Path:       rp.Path,
 		StartLine:  window.StartLine,
 		LineHashes: hashes,
-		Version:    tool.ReadWindowVersionToken(rp.Path, window),
+		Version:    tool.WindowDigest(rp.Path, window),
 	}, true
 }
 
-// ReadEnvelope reports what one read_file call delivered: its intent, the
-// requested window, the delivered window, the paging state, and the content
-// version of the delivered lines. read_id, result_ref and workspace_id are host
-// identity the agent fills in; total_lines and total_bytes stay empty because
-// the reader never scans ahead to count them.
-func (r readFile) ReadEnvelope(args json.RawMessage, output string) (tool.ReadResultEnvelope, bool) {
-	var p struct {
-		Path   string `json:"path"`
-		Intent string `json:"intent,omitempty"`
-		Offset int    `json:"offset"`
-		Limit  int    `json:"limit"`
-	}
-	if err := json.Unmarshal(args, &p); err != nil || strings.TrimSpace(p.Path) == "" {
-		return tool.ReadResultEnvelope{}, false
-	}
-	windowGiven := readWindowGiven(args)
-	intent, err := readIntentFor(p.Intent, windowGiven)
+// ReadEnvelope reports what one read_file call delivered. The source identity
+// comes from the store that actually served the content, the snapshot stays
+// constant across the pages of one logical read, and the window digest covers
+// only this page's delivered lines. read_id, result_ref and workspace_id are
+// host identity the agent fills in.
+func (r readFile) ReadEnvelope(ctx context.Context, args json.RawMessage, output string) (tool.ReadResultEnvelope, bool) {
+	p, err := parseReadFileParams(args)
 	if err != nil {
 		return tool.ReadResultEnvelope{}, false
 	}
-	if p.Offset < 0 {
-		p.Offset = 0
-	}
-	if p.Limit <= 0 {
-		p.Limit = readFileDefaultLimit
-	}
-
 	rp := resolveReadablePath(r.workDir, p.Path, r.paths)
 	env := tool.ReadResultEnvelope{
 		ProtocolVersion: tool.ReadResultProtocolVersion,
 		Source:          tool.ReadResultSource{CanonicalPath: rp.Path},
-		Intent:          intent,
+		Intent:          p.Intent,
 	}
-	if windowGiven {
+	if p.WindowGiven {
 		requested := tool.ReadRange{Start: p.Offset, End: p.Offset + p.Limit}
 		env.RequestedRange = &requested
 	}
-	if window, ok := tool.ParseReadWindow(output); ok {
-		env.DeliveredRanges = []tool.ReadRange{window.Range()}
-		env.Source.VersionToken = tool.ReadWindowVersionToken(rp.Path, window)
-	}
 
+	// The store that served the content owns the identity: an unsaved editor
+	// buffer must never be proven by the disk file's identity.
+	if content, ok := r.overlayText(ctx, rp); ok {
+		env.Source.Kind = tool.ReadSourceOverlay
+		env.Source.Identity = "overlay:" + digestText(content)
+	} else if info, statErr := os.Stat(rp.Path); statErr == nil {
+		env.Source.Kind = tool.ReadSourceDisk
+		env.Source.Identity = diskSourceIdentity(info)
+	}
+	env.Source.Snapshot = tool.SourceSnapshot(env.Source.Kind, rp.Path, env.Source.Identity)
+
+	window, hasWindow := tool.ParseReadWindow(output)
+	if hasWindow {
+		env.DeliveredRanges = []tool.ReadRange{window.Range()}
+		env.WindowDigest = tool.WindowDigest(rp.Path, window)
+	}
 	trailer := tool.ParseReadTrailer(output)
 	env.HasMore = trailer.HasMore
 	env.EOF = !trailer.HasMore
@@ -222,14 +227,60 @@ func (r readFile) ReadEnvelope(args json.RawMessage, output string) (tool.ReadRe
 	case trailer.HasMore:
 		env.SourceCut = tool.ReadCutPageLimit
 	}
+	if env.EOF {
+		if end, ok := readSourceEnd(output, window, hasWindow); ok {
+			env.SourceEnd = &end
+		}
+	}
 	if trailer.HasMore {
 		env.NextCursor = tool.EncodeReadCursor(tool.ReadCursor{
 			Path:      rp.Path,
-			Version:   env.Source.VersionToken,
+			Snapshot:  env.Source.Snapshot,
 			NextStart: trailer.NextOffset,
 		})
 	}
 	return env, true
+}
+
+// overlayText mirrors Execute's overlay routing so the envelope names the same
+// store that produced the delivered bytes.
+func (r readFile) overlayText(ctx context.Context, rp ResolvedPath) (string, bool) {
+	if r.overlay == nil || rp.External || !filepath.IsAbs(rp.Path) {
+		return "", false
+	}
+	return r.overlay.ReadTextFile(ctx, rp.Path)
+}
+
+func digestText(content string) string {
+	sum := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(sum[:])
+}
+
+// diskSourceIdentity is a cheap change detector over the file's metadata. It is
+// never a content proof: the authoritative check re-reads the delivered lines.
+func diskSourceIdentity(info os.FileInfo) string {
+	return fmt.Sprintf("disk:%d:%d:%d", info.Size(), info.ModTime().UnixNano(), info.Mode())
+}
+
+// readSourceEnd recovers the source's zero-based end line index from the
+// reader's own result text: a complete window ends at its last line, and the
+// empty-file / past-EOF markers state the count directly.
+func readSourceEnd(output string, window tool.ReadWindow, hasWindow bool) (int, bool) {
+	if hasWindow {
+		return window.Range().End, true
+	}
+	trimmed := strings.TrimSpace(output)
+	if trimmed == readFileEmptyOutput {
+		return 0, true
+	}
+	if rest, ok := strings.CutPrefix(trimmed, "(offset "); ok {
+		if _, tail, found := strings.Cut(rest, readFilePastEOFTail); found {
+			if n, err := strconv.Atoi(strings.TrimSuffix(strings.TrimSpace(tail), " lines)")); err == nil && n >= 0 {
+				return n, true
+			}
+		}
+	}
+	return 0, false
 }
 
 // SnipHint front-loads file content: the most relevant lines are near the top,
@@ -389,10 +440,10 @@ func (r readFile) scan(src io.Reader, offset, limit int) (string, error) {
 	}
 
 	if lineNo == 0 {
-		return "(empty file)", nil
+		return readFileEmptyOutput, nil
 	}
 	if len(collected) == 0 {
-		return fmt.Sprintf("(offset %d is past EOF — file has %d lines)", offset, lineNo), nil
+		return fmt.Sprintf("(offset %d%s%d lines)", offset, readFilePastEOFTail, lineNo), nil
 	}
 
 	maxShown := offset + len(collected)

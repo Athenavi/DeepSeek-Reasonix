@@ -32,7 +32,7 @@ func readEnvelope(t *testing.T, r readFile, args string) (tool.ReadResultEnvelop
 	if err != nil {
 		t.Fatalf("Execute(%s): %v", args, err)
 	}
-	env, ok := r.ReadEnvelope(json.RawMessage(args), out)
+	env, ok := r.ReadEnvelope(context.Background(), json.RawMessage(args), out)
 	return env, out, ok
 }
 
@@ -61,7 +61,7 @@ func TestReadEnvelopeInspectDefaultsToOneBoundedPage(t *testing.T) {
 	if env.NextCursor != "" {
 		t.Fatalf("no continuation cursor at EOF, got %q", env.NextCursor)
 	}
-	if !filepath.IsAbs(env.Source.CanonicalPath) || env.Source.VersionToken == "" {
+	if !filepath.IsAbs(env.Source.CanonicalPath) || env.Source.Snapshot == "" {
 		t.Fatalf("source identity missing: %+v", env.Source)
 	}
 }
@@ -89,8 +89,8 @@ func TestReadEnvelopeRangeReportsRequestedAndDeliveredWindow(t *testing.T) {
 	if !ok || cursor.NextStart != 5 {
 		t.Fatalf("NextCursor = %q (cursor %+v, ok=%v), want next_start 5", env.NextCursor, cursor, ok)
 	}
-	if !cursor.Matches(env) {
-		t.Fatal("the envelope must accept its own cursor")
+	if cursor.Path != env.Source.CanonicalPath || cursor.Snapshot != env.Source.Snapshot || cursor.NextStart != 5 {
+		t.Fatalf("cursor %+v must name this envelope's source and position", cursor)
 	}
 }
 
@@ -104,8 +104,11 @@ func TestReadEnvelopePastEOFDeliversNothing(t *testing.T) {
 	if len(env.DeliveredRanges) != 0 || !env.EOF || env.HasMore {
 		t.Fatalf("past-EOF read delivered content: %+v", env)
 	}
-	if env.Source.VersionToken != "" {
-		t.Fatalf("no delivered lines means no content version, got %q", env.Source.VersionToken)
+	if env.SourceEnd == nil || *env.SourceEnd != 3 {
+		t.Fatalf("past-EOF read must still report the source end, got %+v", env.SourceEnd)
+	}
+	if env.Source.Snapshot == "" {
+		t.Fatal("an existing file must still carry a source snapshot")
 	}
 }
 
@@ -135,7 +138,7 @@ func TestReadEnvelopeVersionTokenFollowsDeliveredContent(t *testing.T) {
 	if !ok {
 		t.Fatal("second read must produce an envelope")
 	}
-	if before.Source.VersionToken == after.Source.VersionToken {
+	if before.Source.Snapshot == after.Source.Snapshot {
 		t.Fatal("an edited line must change the content version token")
 	}
 	if before.DeliveredRanges[0] != after.DeliveredRanges[0] {
@@ -143,10 +146,10 @@ func TestReadEnvelopeVersionTokenFollowsDeliveredContent(t *testing.T) {
 	}
 }
 
-// TestReadEnvelopeVersionTokenBindsDecodedText records a known limit: the token
-// covers decoded line text, so a rewrite that only changes line terminators
-// (CRLF to LF) does not move it. Raw-byte identity is a separate check.
-func TestReadEnvelopeVersionTokenBindsDecodedText(t *testing.T) {
+// TestReadEnvelopeSeparatesSourceIdentityFromWindowDigest pins the v2 split: a
+// line-terminator rewrite moves the source snapshot (the file changed) while the
+// decoded window digest stays put, so neither can stand in for the other.
+func TestReadEnvelopeSeparatesSourceIdentityFromWindowDigest(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "a.txt")
 	if err := os.WriteFile(path, []byte("alpha\r\nbeta\r\n"), 0o600); err != nil {
@@ -164,8 +167,11 @@ func TestReadEnvelopeVersionTokenBindsDecodedText(t *testing.T) {
 	if !ok {
 		t.Fatal("lf read must produce an envelope")
 	}
-	if crlf.Source.VersionToken != lf.Source.VersionToken {
-		t.Fatalf("token is expected to bind decoded text only: %q vs %q", crlf.Source.VersionToken, lf.Source.VersionToken)
+	if crlf.Source.Snapshot == lf.Source.Snapshot {
+		t.Fatalf("a raw byte change must move the source snapshot: %q", crlf.Source.Snapshot)
+	}
+	if crlf.WindowDigest != lf.WindowDigest {
+		t.Fatalf("decoded window digest changed unexpectedly: %q vs %q", crlf.WindowDigest, lf.WindowDigest)
 	}
 	if crlf.DeliveredRanges[0] != lf.DeliveredRanges[0] {
 		t.Fatalf("decoded windows differ: %+v vs %+v", crlf.DeliveredRanges, lf.DeliveredRanges)
@@ -194,16 +200,16 @@ func TestReadEnvelopeKeepsUnicodeWindowsIntact(t *testing.T) {
 	if window.Lines[0] != "第二行" {
 		t.Fatalf("first delivered line = %q, want 第二行", window.Lines[0])
 	}
-	if want := tool.ReadWindowVersionToken(env.Source.CanonicalPath, window); env.Source.VersionToken != want {
-		t.Fatalf("VersionToken = %q, want %q", env.Source.VersionToken, want)
+	if want := tool.WindowDigest(env.Source.CanonicalPath, window); env.WindowDigest != want {
+		t.Fatalf("WindowDigest = %q, want %q", env.WindowDigest, want)
 	}
 	again, _, _ := readEnvelope(t, r, `{"path":"u.go","offset":1,"limit":2}`)
-	if again.Source.VersionToken != env.Source.VersionToken {
+	if again.Source.Snapshot != env.Source.Snapshot {
 		t.Fatal("identical unicode window must produce a stable version token")
 	}
 	observed, ok := r.ObserveModelText(json.RawMessage(`{"path":"u.go","offset":1,"limit":2}`), out)
-	if !ok || observed.Version != env.Source.VersionToken {
-		t.Fatalf("observation version %q must match the envelope token %q (ok=%v)", observed.Version, env.Source.VersionToken, ok)
+	if !ok || observed.Version != env.WindowDigest {
+		t.Fatalf("observation version %q must match the envelope window digest %q (ok=%v)", observed.Version, env.WindowDigest, ok)
 	}
 }
 
@@ -256,7 +262,7 @@ func TestReadIntentRejectsConflictingParameters(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("Execute(%s) error = %v, want one containing %q", tc.args, err, tc.want)
 			}
-			if _, ok := r.ReadEnvelope(json.RawMessage(tc.args), "  1→a\n"); ok {
+			if _, ok := r.ReadEnvelope(context.Background(), json.RawMessage(tc.args), "  1→a\n"); ok {
 				t.Fatalf("ReadEnvelope(%s) must not describe a rejected call", tc.args)
 			}
 		})
@@ -265,10 +271,10 @@ func TestReadIntentRejectsConflictingParameters(t *testing.T) {
 
 func TestReadEnvelopeRejectsCallsWithoutAPath(t *testing.T) {
 	r := readFile{workDir: t.TempDir()}
-	if _, ok := r.ReadEnvelope(json.RawMessage(`{"offset":1}`), "   1→a\n"); ok {
+	if _, ok := r.ReadEnvelope(context.Background(), json.RawMessage(`{"offset":1}`), "   1→a\n"); ok {
 		t.Fatal("a call without a path has no envelope")
 	}
-	if _, ok := r.ReadEnvelope(json.RawMessage(`not json`), "   1→a\n"); ok {
+	if _, ok := r.ReadEnvelope(context.Background(), json.RawMessage(`not json`), "   1→a\n"); ok {
 		t.Fatal("malformed args have no envelope")
 	}
 }
@@ -281,5 +287,49 @@ func TestReadEnvelopeNeverAppearsInProviderText(t *testing.T) {
 		if strings.Contains(out, leak) {
 			t.Fatalf("host-only envelope field %q leaked into reader output:\n%s", leak, out)
 		}
+	}
+}
+
+func TestReadEnvelopeNamesTheServingStore(t *testing.T) {
+	dir, _ := writeEnvelopeFixture(t, "a.go", 10)
+	r := readFile{workDir: dir}
+	first, _, ok := readEnvelope(t, r, `{"path":"a.go","offset":0,"limit":4}`)
+	if !ok {
+		t.Fatal("first page must produce an envelope")
+	}
+	if first.Source.Kind != tool.ReadSourceDisk || first.Source.Identity == "" || first.Source.Snapshot == "" {
+		t.Fatalf("source identity missing: %+v", first.Source)
+	}
+	second, _, ok := readEnvelope(t, r, `{"path":"a.go","offset":4,"limit":4}`)
+	if !ok {
+		t.Fatal("second page must produce an envelope")
+	}
+	if second.Source.Snapshot != first.Source.Snapshot {
+		t.Fatalf("one read's snapshot must not move between pages: %q vs %q", first.Source.Snapshot, second.Source.Snapshot)
+	}
+	if second.WindowDigest == first.WindowDigest {
+		t.Fatal("different windows must have different digests")
+	}
+}
+
+func TestReadEnvelopeSourceEndIsTrustworthy(t *testing.T) {
+	dir, _ := writeEnvelopeFixture(t, "a.go", 3)
+	r := readFile{workDir: dir}
+	complete, _, ok := readEnvelope(t, r, `{"path":"a.go"}`)
+	if !ok || complete.SourceEnd == nil || *complete.SourceEnd != 3 {
+		t.Fatalf("a complete read must report the source end: %+v", complete.SourceEnd)
+	}
+	pastEOF, _, ok := readEnvelope(t, r, `{"path":"a.go","offset":99,"limit":10}`)
+	if !ok || pastEOF.SourceEnd == nil || *pastEOF.SourceEnd != 3 {
+		t.Fatalf("a past-EOF read must report the source end: %+v", pastEOF.SourceEnd)
+	}
+	empty := t.TempDir()
+	if err := os.WriteFile(filepath.Join(empty, "empty.txt"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	er := readFile{workDir: empty}
+	env, _, ok := readEnvelope(t, er, `{"path":"empty.txt"}`)
+	if !ok || env.SourceEnd == nil || *env.SourceEnd != 0 {
+		t.Fatalf("an empty file must report a zero source end: %+v", env.SourceEnd)
 	}
 }

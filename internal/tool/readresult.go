@@ -1,6 +1,7 @@
 package tool
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -11,7 +12,8 @@ import (
 
 // ReadResultProtocolVersion is the host-only read-result contract. Additive
 // fields keep the version; changing an existing field's meaning bumps it.
-const ReadResultProtocolVersion = 1
+// Version 1 envelopes are diagnostic only and never authorize a write.
+const ReadResultProtocolVersion = 2
 
 // ReadIntent records why a read happened. It is decided by the host from the
 // call's arguments, never inferred from free text.
@@ -22,7 +24,7 @@ const (
 	// obligation, and remaining content is not an outstanding read debt.
 	ReadIntentInspect ReadIntent = "inspect"
 	// ReadIntentRange is an explicit window: it completes at the window's end
-	// or at EOF.
+	// or at a trustworthy source end.
 	ReadIntentRange ReadIntent = "range"
 	// ReadIntentFull promises whole-file coverage on one content version.
 	ReadIntentFull ReadIntent = "full"
@@ -56,14 +58,28 @@ const (
 	ReadCutToolOutput ReadCutReason = "tool_output" // provider-visible byte budget
 )
 
-// ReadResultSource identifies the exact content a result delivered.
+// ReadSourceKind names the store a read actually served.
+type ReadSourceKind string
+
+const (
+	ReadSourceDisk    ReadSourceKind = "disk"
+	ReadSourceOverlay ReadSourceKind = "overlay"
+)
+
+// ReadResultSource identifies where the delivered bytes came from and which
+// content version they belong to.
 type ReadResultSource struct {
-	WorkspaceID   string `json:"workspace_id,omitempty"`
-	CanonicalPath string `json:"canonical_path"`
-	// VersionToken binds the delivered lines to their content: identical lines
-	// at the same path produce the same token, and any edit inside the window
-	// changes it. It never covers lines the read did not deliver.
-	VersionToken string `json:"version_token,omitempty"`
+	WorkspaceID   string         `json:"workspace_id,omitempty"`
+	CanonicalPath string         `json:"canonical_path"`
+	Kind          ReadSourceKind `json:"kind,omitempty"`
+	// Identity names the underlying store at read time — a disk stat identity
+	// or an overlay buffer identity. It is a cheap change detector, never a
+	// content proof.
+	Identity string `json:"identity,omitempty"`
+	// Snapshot is the content version of this logical read. It stays constant
+	// across the pages of one read and changes when the source content changes.
+	// It is not a whole-file digest for partial reads.
+	Snapshot string `json:"snapshot,omitempty"`
 }
 
 // ReadResultEnvelope is host-only metadata describing what a reader actually
@@ -78,9 +94,16 @@ type ReadResultEnvelope struct {
 	// RequestedRange is nil when the caller requested no explicit window.
 	RequestedRange  *ReadRange  `json:"requested_range,omitempty"`
 	DeliveredRanges []ReadRange `json:"delivered_ranges,omitempty"`
-	HasMore         bool        `json:"has_more"`
-	// EOF reports that the delivered window reaches the source's end.
-	EOF        bool          `json:"eof"`
+	// WindowDigest covers exactly the delivered lines of this page. It proves
+	// this window and can never stand in for a whole-file version.
+	WindowDigest string `json:"window_digest,omitempty"`
+	HasMore      bool   `json:"has_more"`
+	// EOF reports that this delivery reached the source's end.
+	EOF bool `json:"eof"`
+	// SourceEnd is the zero-based end line index of the source when the reader
+	// established it (EOF reached, or the file is empty). nil means the reader
+	// stopped early and cannot vouch for where the source ends.
+	SourceEnd  *int          `json:"source_end,omitempty"`
 	NextCursor string        `json:"next_cursor,omitempty"`
 	SourceCut  ReadCutReason `json:"source_cut_reason,omitempty"`
 	// TransportCut names a provider-visible truncation on top of the source cut.
@@ -165,11 +188,12 @@ func ParseReadTrailer(output string) ReadTrailer {
 	return ReadTrailer{NextOffset: n, HasMore: true}
 }
 
-// ReadWindowVersionToken binds canonicalPath and the window's delivered lines
-// to one content version.
-func ReadWindowVersionToken(canonicalPath string, w ReadWindow) string {
+// WindowDigest binds one delivered window to its content. Two reads that
+// deliver byte-identical lines produce the same digest; any edit inside the
+// window changes it. It says nothing about lines outside the window.
+func WindowDigest(canonicalPath string, w ReadWindow) string {
 	h := sha256.New()
-	h.Write([]byte("reasonix/read-window/v1\x00"))
+	h.Write([]byte("reasonix/read-window/v2\x00"))
 	h.Write([]byte(canonicalPath))
 	h.Write([]byte{0})
 	h.Write([]byte(strconv.Itoa(w.StartLine)))
@@ -177,7 +201,24 @@ func ReadWindowVersionToken(canonicalPath string, w ReadWindow) string {
 		h.Write([]byte{0})
 		h.Write([]byte(line))
 	}
-	return "rw1:" + hex.EncodeToString(h.Sum(nil))
+	return "wd2:" + hex.EncodeToString(h.Sum(nil))
+}
+
+// SourceSnapshot derives the content version of one logical read from its
+// source kind and store identity. The same source yields the same snapshot
+// across pages; a changed store yields a different one.
+func SourceSnapshot(kind ReadSourceKind, canonicalPath, identity string) string {
+	if identity == "" {
+		return ""
+	}
+	h := sha256.New()
+	h.Write([]byte("reasonix/read-source/v2\x00"))
+	h.Write([]byte(kind))
+	h.Write([]byte{0})
+	h.Write([]byte(canonicalPath))
+	h.Write([]byte{0})
+	h.Write([]byte(identity))
+	return "ss2:" + hex.EncodeToString(h.Sum(nil))
 }
 
 // ClipTo narrows the envelope to the numbered lines actually present in the
@@ -187,8 +228,10 @@ func (e ReadResultEnvelope) ClipTo(visible string) ReadResultEnvelope {
 	w, ok := ParseReadWindow(visible)
 	if !ok {
 		e.DeliveredRanges = nil
+		e.WindowDigest = ""
 		e.HasMore = true
 		e.EOF = false
+		e.SourceEnd = nil
 		e.TransportCut = ReadCutToolOutput
 		return e
 	}
@@ -210,33 +253,45 @@ func (e ReadResultEnvelope) ClipTo(visible string) ReadResultEnvelope {
 		}
 	}
 	e.DeliveredRanges = kept
+	e.WindowDigest = WindowDigest(e.Source.CanonicalPath, w)
 	e.HasMore = true
 	e.EOF = false
+	e.SourceEnd = nil
 	e.TransportCut = ReadCutToolOutput
 	e.NextCursor = EncodeReadCursor(ReadCursor{
 		Path:      e.Source.CanonicalPath,
-		Version:   e.Source.VersionToken,
+		Snapshot:  e.Source.Snapshot,
+		ReadID:    e.ReadID,
 		NextStart: visibleRange.End,
 	})
 	return e
 }
 
 // ReadCursor is a host-issued continuation reference. It is opaque to callers,
-// bound to one canonical path and content version, and validated on decode, so
-// a cursor cannot be replayed against another file, version, or session.
+// bound to one session, run generation, read task, source snapshot, requested
+// window, and exact next position, and is validated at the execution entry —
+// decoding it is not the same as accepting it.
 type ReadCursor struct {
-	Path      string `json:"path"`
-	Version   string `json:"version"`
-	NextStart int    `json:"next_start"`
+	Version    int    `json:"v"`
+	SessionID  string `json:"s,omitempty"`
+	RunGen     uint64 `json:"g,omitempty"`
+	ReadID     string `json:"r"`
+	Path       string `json:"p"`
+	Snapshot   string `json:"n,omitempty"`
+	RequestEnd int    `json:"e,omitempty"`
+	NextStart  int    `json:"i"`
 }
 
-const readCursorPrefix = "rc1:"
+const readCursorPrefix = "rc2:"
 
 // EncodeReadCursor renders a cursor as an opaque token.
 func EncodeReadCursor(c ReadCursor) string {
-	if c.Path == "" || c.Version == "" || c.NextStart < 0 {
+	// A reader can encode the position it knows; the host stamps the logical
+	// read id before the cursor is ever handed to a model.
+	if c.Path == "" || c.NextStart < 0 {
 		return ""
 	}
+	c.Version = ReadResultProtocolVersion
 	raw, err := json.Marshal(c)
 	if err != nil {
 		return ""
@@ -244,7 +299,9 @@ func EncodeReadCursor(c ReadCursor) string {
 	return readCursorPrefix + base64.RawURLEncoding.EncodeToString(raw)
 }
 
-// DecodeReadCursor parses a token produced by EncodeReadCursor.
+// DecodeReadCursor parses a token produced by EncodeReadCursor. It only proves
+// the token is well formed; callers must still validate it against the live
+// session, run, read task, and source snapshot.
 func DecodeReadCursor(token string) (ReadCursor, bool) {
 	rest, ok := strings.CutPrefix(token, readCursorPrefix)
 	if !ok {
@@ -258,16 +315,19 @@ func DecodeReadCursor(token string) (ReadCursor, bool) {
 	if err := json.Unmarshal(raw, &c); err != nil {
 		return ReadCursor{}, false
 	}
-	if c.Path == "" || c.Version == "" || c.NextStart < 0 {
+	if c.Version != ReadResultProtocolVersion || c.Path == "" || c.NextStart < 0 {
 		return ReadCursor{}, false
 	}
 	return c, true
 }
 
-// Matches reports whether the cursor still belongs to this envelope: same
-// canonical path, same content version, and a start inside the delivered range.
+// Matches reports whether the cursor still belongs to this envelope: same read
+// task, canonical path, content snapshot, and a start inside the delivered range.
 func (c ReadCursor) Matches(e ReadResultEnvelope) bool {
-	if c.Path != e.Source.CanonicalPath || c.Version != e.Source.VersionToken {
+	if c.ReadID != e.ReadID || c.Path != e.Source.CanonicalPath {
+		return false
+	}
+	if c.Snapshot != "" && e.Source.Snapshot != "" && c.Snapshot != e.Source.Snapshot {
 		return false
 	}
 	if len(e.DeliveredRanges) == 0 {
@@ -281,5 +341,5 @@ func (c ReadCursor) Matches(e ReadResultEnvelope) bool {
 // delivered. output is the reader's own result text; the host clips the
 // returned envelope to the provider-visible bytes before using it.
 type ReadEnvelopeProvider interface {
-	ReadEnvelope(args json.RawMessage, output string) (ReadResultEnvelope, bool)
+	ReadEnvelope(ctx context.Context, args json.RawMessage, output string) (ReadResultEnvelope, bool)
 }

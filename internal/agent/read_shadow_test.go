@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"testing"
 
 	"reasonix/internal/event"
@@ -14,19 +15,20 @@ func newShadowTestAgent(t *testing.T, enabled bool) (*Agent, *Session) {
 	reg := tool.NewRegistry()
 	reg.Add(envelopeReader{env: tool.ReadResultEnvelope{
 		ProtocolVersion: tool.ReadResultProtocolVersion,
-		Source:          tool.ReadResultSource{CanonicalPath: "/w/a.go", VersionToken: "rw1:v1"},
+		Source:          tool.ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:v1"},
 		Intent:          tool.ReadIntentInspect,
 		DeliveredRanges: []tool.ReadRange{{Start: 0, End: 2000}},
 		HasMore:         true,
 	}})
 	sess := NewSession("system")
 	a := New(&userInputCaptureProvider{}, reg, sess, Options{}, event.Discard)
+	a.reads.tasks = newReadTasks("test-session", 1)
 	a.turn.readShadow = newReadShadowState(enabled)
 	return a, sess
 }
 
 func observeOneRead(a *Agent) {
-	a.storeBatchToolResult(
+	a.storeBatchToolResult(context.Background(),
 		provider.ToolCall{ID: "c1", Name: "read_file", Arguments: `{"path":"a.go"}`},
 		toolOutcome{output: "   1→a\n"},
 	)

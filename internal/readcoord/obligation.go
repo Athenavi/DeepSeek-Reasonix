@@ -75,7 +75,10 @@ type Obligation struct {
 	// Covered is the union of delivered ranges on Version, in normalized order.
 	Covered []tool.ReadRange
 	// SawEOF reports that some delivery on Version reached the file's end.
-	SawEOF     bool
+	SawEOF bool
+	// SourceEnd is the source's zero-based end line index when a delivery
+	// established it. Without it, EOF alone proves nothing.
+	SourceEnd  *int
 	Generation uint64
 	Sequence   uint64
 	Pages      int
@@ -83,4 +86,20 @@ type Obligation struct {
 	Stagnant int
 	// Stop carries the reason for StateBlocked or StateNeedsScope.
 	Stop *Block
+}
+
+// clone returns a deep copy so callers can never mutate coordinator state.
+func (o *Obligation) clone() Obligation {
+	out := *o
+	out.Requirement.Ranges = append([]tool.ReadRange(nil), o.Requirement.Ranges...)
+	out.Covered = append([]tool.ReadRange(nil), o.Covered...)
+	if o.SourceEnd != nil {
+		end := *o.SourceEnd
+		out.SourceEnd = &end
+	}
+	if o.Stop != nil {
+		stop := *o.Stop
+		out.Stop = &stop
+	}
+	return out
 }

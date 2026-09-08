@@ -43,6 +43,7 @@ func (a *Agent) executeOne(ctx context.Context, turn *turnRuntime, call provider
 		if plan.resolvedMeta == nil {
 			return
 		}
+		out.readTaskID = plan.readTaskID
 		out.resolved = true
 		out.resolvedName = plan.resolvedMeta.TargetName
 		out.capabilityID = plan.resolvedMeta.CapabilityID

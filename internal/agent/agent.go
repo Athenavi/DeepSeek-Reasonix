@@ -284,6 +284,9 @@ type ToolHooks interface {
 type Agent struct {
 	imageInput agentImageInput
 	agentConfig
+	// reads groups the run-scoped read registry and its generation: both are
+	// replaced at each run start so cursors from an earlier run never continue.
+	reads readState
 	// svc are the collaborators this agent talks to; see services.go.
 	svc agentServices
 	// sess is the state one conversation owns; SetSession restarts it. See

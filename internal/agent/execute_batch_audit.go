@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
@@ -86,13 +87,13 @@ func (a *Agent) recordToolExecutionAudit(readOnly, parallel bool, startedAt, dur
 	a.capabilityAudit.RecordToolExecution(readOnly, parallel, queueMs, durationMs, rawBytes, len(o.output))
 }
 
-func (a *Agent) storeBatchToolResult(call provider.ToolCall, o toolOutcome) {
+func (a *Agent) storeBatchToolResult(ctx context.Context, call provider.ToolCall, o toolOutcome) {
 	state := outcomeRunState(o)
 	msg := provider.Message{Role: provider.RoleTool, Content: o.output, Images: o.images, VisionSummary: o.visionSummary, ToolCallID: call.ID, Name: call.Name, ToolRunState: state, ToolExecution: toProviderToolExecution(o.execution)}
 	if o.rawOutput != "" && o.rawOutput != o.output {
 		msg.RawContent = o.rawOutput
 	}
-	if env, ok := a.readResultEnvelopeFor(call, o); ok {
+	if env, ok := a.readResultEnvelopeFor(ctx, call, o); ok {
 		if raw, err := json.Marshal(env); err == nil {
 			msg.ReadResult = raw
 		}

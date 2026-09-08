@@ -19,7 +19,7 @@ func (envelopeReader) Description() string                                      
 func (envelopeReader) Schema() json.RawMessage                                  { return json.RawMessage(`{"type":"object"}`) }
 func (envelopeReader) ReadOnly() bool                                           { return true }
 func (envelopeReader) Execute(context.Context, json.RawMessage) (string, error) { return "", nil }
-func (r envelopeReader) ReadEnvelope(json.RawMessage, string) (tool.ReadResultEnvelope, bool) {
+func (r envelopeReader) ReadEnvelope(context.Context, json.RawMessage, string) (tool.ReadResultEnvelope, bool) {
 	return r.env, true
 }
 
@@ -36,7 +36,9 @@ func newEnvelopeTestAgent(t *testing.T, reader tool.Tool) (*Agent, *Session) {
 	reg := tool.NewRegistry()
 	reg.Add(reader)
 	sess := NewSession("system")
-	return New(&userInputCaptureProvider{}, reg, sess, Options{WorkspaceID: "ws-1"}, event.Discard), sess
+	a := New(&userInputCaptureProvider{}, reg, sess, Options{WorkspaceID: "ws-1"}, event.Discard)
+	a.reads.tasks = newReadTasks("test-session", 1)
+	return a, sess
 }
 
 func storedEnvelope(t *testing.T, sess *Session) tool.ReadResultEnvelope {
@@ -59,13 +61,13 @@ func storedEnvelope(t *testing.T, sess *Session) tool.ReadResultEnvelope {
 func TestStoreBatchToolResultStampsReaderEnvelope(t *testing.T) {
 	reader := envelopeReader{env: tool.ReadResultEnvelope{
 		ProtocolVersion: tool.ReadResultProtocolVersion,
-		Source:          tool.ReadResultSource{CanonicalPath: "/w/a.go", VersionToken: "rw1:abc"},
+		Source:          tool.ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:abc"},
 		Intent:          tool.ReadIntentInspect,
 		DeliveredRanges: []tool.ReadRange{{Start: 0, End: 2}},
 		EOF:             true,
 	}}
 	a, sess := newEnvelopeTestAgent(t, reader)
-	a.storeBatchToolResult(provider.ToolCall{ID: "c1", Name: "read_file", Arguments: `{"path":"a.go"}`}, toolOutcome{output: "  1→a\n  2→b\n"})
+	a.storeBatchToolResult(context.Background(), provider.ToolCall{ID: "c1", Name: "read_file", Arguments: `{"path":"a.go"}`}, toolOutcome{output: "  1→a\n  2→b\n"})
 
 	env := storedEnvelope(t, sess)
 	if env.ReadID == "" || env.ResultRef == "" {
@@ -82,12 +84,12 @@ func TestStoreBatchToolResultStampsReaderEnvelope(t *testing.T) {
 func TestStoreBatchToolResultClipsEnvelopeToVisibleBytes(t *testing.T) {
 	reader := envelopeReader{env: tool.ReadResultEnvelope{
 		ProtocolVersion: tool.ReadResultProtocolVersion,
-		Source:          tool.ReadResultSource{CanonicalPath: "/w/a.go", VersionToken: "rw1:abc"},
+		Source:          tool.ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:abc"},
 		DeliveredRanges: []tool.ReadRange{{Start: 0, End: 2}},
 		EOF:             true,
 	}}
 	a, sess := newEnvelopeTestAgent(t, reader)
-	a.storeBatchToolResult(
+	a.storeBatchToolResult(context.Background(),
 		provider.ToolCall{ID: "c1", Name: "read_file", Arguments: `{"path":"a.go"}`},
 		toolOutcome{output: "  1→a\n", rawOutput: "  1→a\n  2→b\n", truncated: true},
 	)
@@ -106,7 +108,7 @@ func TestStoreBatchToolResultClipsEnvelopeToVisibleBytes(t *testing.T) {
 
 func TestStoreBatchToolResultOmitsEnvelopeForPlainReaders(t *testing.T) {
 	a, sess := newEnvelopeTestAgent(t, plainReader{})
-	a.storeBatchToolResult(provider.ToolCall{ID: "c1", Name: "read_file", Arguments: `{"path":"a.go"}`}, toolOutcome{output: "  1→a\n"})
+	a.storeBatchToolResult(context.Background(), provider.ToolCall{ID: "c1", Name: "read_file", Arguments: `{"path":"a.go"}`}, toolOutcome{output: "  1→a\n"})
 
 	stored := sess.Snapshot()
 	if len(stored) == 0 {
@@ -114,5 +116,72 @@ func TestStoreBatchToolResultOmitsEnvelopeForPlainReaders(t *testing.T) {
 	}
 	if len(stored[len(stored)-1].ReadResult) != 0 {
 		t.Fatal("a reader that cannot describe its delivery must not get a fabricated envelope")
+	}
+}
+
+func TestReadContinuationCursorJoinsTheLogicalRead(t *testing.T) {
+	a, _ := newEnvelopeTestAgent(t, envelopeReader{})
+	a.reads.tasks.remember("ir-1", tool.ReadResultEnvelope{
+		Source: tool.ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:abc"},
+	})
+	cursor := tool.EncodeReadCursor(tool.ReadCursor{
+		Path: "/w/a.go", ReadID: "ir-1", Snapshot: "ss2:abc",
+		NextStart: 5, RequestEnd: 10, SessionID: "test-session", RunGen: 1,
+	})
+	plan := &toolCallPlan{execArgs: json.RawMessage(`{"path":"/w/a.go","cursor":"` + cursor + `"}`)}
+
+	if out, blocked := a.resolveReadCursor(plan); blocked {
+		t.Fatalf("a valid continuation cursor was rejected: %+v", out)
+	}
+	if plan.readTaskID != "ir-1" {
+		t.Fatalf("readTaskID = %q, want the continued read ir-1", plan.readTaskID)
+	}
+	var args map[string]any
+	if err := json.Unmarshal(plan.execArgs, &args); err != nil {
+		t.Fatal(err)
+	}
+	if _, present := args["cursor"]; present {
+		t.Fatal("the cursor must be consumed, not forwarded to the reader")
+	}
+	if args["offset"] != float64(5) || args["limit"] != float64(5) {
+		t.Fatalf("rewritten args = %v, want offset 5 limit 5", args)
+	}
+}
+
+func TestReadContinuationCursorRejections(t *testing.T) {
+	cases := []struct {
+		name   string
+		cursor string
+	}{
+		{"malformed", "rc2:!!!"},
+		{"unknown read task", tool.EncodeReadCursor(tool.ReadCursor{Path: "/w/a.go", ReadID: "ir-other", Snapshot: "ss2:abc", NextStart: 5})},
+		{"other session", tool.EncodeReadCursor(tool.ReadCursor{Path: "/w/a.go", ReadID: "ir-1", Snapshot: "ss2:abc", NextStart: 5, SessionID: "someone-else"})},
+		{"earlier run", tool.EncodeReadCursor(tool.ReadCursor{Path: "/w/a.go", ReadID: "ir-1", Snapshot: "ss2:abc", NextStart: 5, RunGen: 99})},
+		{"other file", tool.EncodeReadCursor(tool.ReadCursor{Path: "/w/b.go", ReadID: "ir-1", Snapshot: "ss2:abc", NextStart: 5})},
+		{"changed content", tool.EncodeReadCursor(tool.ReadCursor{Path: "/w/a.go", ReadID: "ir-1", Snapshot: "ss2:zzz", NextStart: 5})},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a, _ := newEnvelopeTestAgent(t, envelopeReader{})
+			a.reads.tasks.remember("ir-1", tool.ReadResultEnvelope{
+				Source: tool.ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:abc"},
+			})
+			plan := &toolCallPlan{execArgs: json.RawMessage(`{"path":"/w/a.go","cursor":"` + tc.cursor + `"}`)}
+			out, blocked := a.resolveReadCursor(plan)
+			if !blocked || !out.blocked {
+				t.Fatalf("cursor %q must be rejected, got %+v (blocked=%v)", tc.cursor, out, blocked)
+			}
+			if plan.readTaskID != "" {
+				t.Fatalf("a rejected cursor must not select a read task, got %q", plan.readTaskID)
+			}
+		})
+	}
+}
+
+func TestReadContinuationCursorAbsentIsNotABlock(t *testing.T) {
+	a, _ := newEnvelopeTestAgent(t, envelopeReader{})
+	plan := &toolCallPlan{execArgs: json.RawMessage(`{"path":"/w/a.go"}`)}
+	if _, blocked := a.resolveReadCursor(plan); blocked {
+		t.Fatal("a plain read must not be treated as a continuation")
 	}
 }

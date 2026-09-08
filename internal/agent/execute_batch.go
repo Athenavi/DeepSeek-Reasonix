@@ -74,6 +74,7 @@ type toolOutcome struct {
 	// recoveryStopTurn is set when Auto Episode budgets are exhausted.
 	recoveryStopTurn   bool
 	recoveryStopReason string
+	readTaskID         string
 	incompleteRead     *incompleteReadDeferred
 	subagentOutcome    *SubagentOutcome
 }
@@ -168,7 +169,7 @@ func (a *Agent) executeBatch(ctx context.Context, turn *turnRuntime, calls []pro
 		a.finalizeIncompleteReadOutcome(outcomes[i].incompleteRead, &outcomes[i])
 		results[i] = outcomes[i].output
 		a.commitBatchCallResolution(calls[i])
-		a.storeBatchToolResult(calls[i], outcomes[i])
+		a.storeBatchToolResult(ctx, calls[i], outcomes[i])
 		if err := a.emitBatchToolResult(calls[i], outcomes[i], durations[i], startedAt[i], ranParallel[i], batchStart); err != nil {
 			batchErrOnce.Do(func() { batchErr = fmt.Errorf("persist tool result %s: %w", calls[i].ID, err) })
 		}

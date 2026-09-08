@@ -51,13 +51,13 @@ func (c *Coordinator) Begin(key string, scope Scope, req Requirement) Obligation
 		c.byKey[key] = ob
 	}
 	ob.Scope = scope
-	ob.Requirement = req
+	ob.Requirement = Requirement{Intent: req.Intent, Ranges: append([]tool.ReadRange(nil), req.Ranges...), WholeFile: req.WholeFile}
 	// A new requirement revives a finished obligation: coverage stays valid
 	// because it is scoped to one content version.
 	if ob.State == StateCreated || ob.State.Terminal() {
 		ob.State = StateFetching
 	}
-	return *ob
+	return ob.clone()
 }
 
 // Observe folds one delivered envelope into its obligation. ok=false means the
@@ -89,16 +89,21 @@ func (c *Coordinator) Observe(env tool.ReadResultEnvelope) (Transition, bool) {
 
 	// Fragments of two content versions must never be stitched into one
 	// coverage claim, so a version change discards what was accumulated.
-	if ob.Version != "" && env.Source.VersionToken != "" && env.Source.VersionToken != ob.Version {
+	if ob.Version != "" && env.Source.Snapshot != "" && env.Source.Snapshot != ob.Version {
 		ob.Covered = nil
 		ob.SawEOF = false
+		ob.SourceEnd = nil
 		ob.Generation++
 		tr.Stale = true
 	}
-	if env.Source.VersionToken != "" {
-		ob.Version = env.Source.VersionToken
+	if env.Source.Snapshot != "" {
+		ob.Version = env.Source.Snapshot
 	}
 	ob.SawEOF = ob.SawEOF || env.EOF
+	if env.SourceEnd != nil {
+		end := *env.SourceEnd
+		ob.SourceEnd = &end
+	}
 	// A delivery supersedes an earlier stop reason: whatever blocked the read
 	// no longer explains its state.
 	ob.Stop = nil
@@ -177,7 +182,7 @@ func (c *Coordinator) Get(key string) (Obligation, bool) {
 	if !ok {
 		return Obligation{}, false
 	}
-	return *ob, true
+	return ob.clone(), true
 }
 
 // Snapshot returns every obligation ordered by key.
@@ -187,7 +192,7 @@ func (c *Coordinator) Snapshot() []Obligation {
 
 	out := make([]Obligation, 0, len(c.byKey))
 	for _, ob := range c.byKey {
-		out = append(out, *ob)
+		out = append(out, ob.clone())
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Key < out[j].Key })
 	return out
@@ -217,7 +222,12 @@ func evaluate(ob *Obligation, env tool.ReadResultEnvelope) State {
 		// the file is not an outstanding debt.
 		return StateSatisfied
 	case tool.ReadIntentRange:
-		if len(ob.Requirement.Ranges) == 0 || Covers(ob.Covered, ob.Requirement.Ranges) || ob.SawEOF {
+		if len(ob.Requirement.Ranges) == 0 || Covers(ob.Covered, ob.Requirement.Ranges) {
+			return StateSatisfied
+		}
+		// Reaching EOF satisfies a range only when the reader vouched for where
+		// the source ends and that end is inside the requested window.
+		if ob.SawEOF && ob.SourceEnd != nil && *ob.SourceEnd <= maxRangeEnd(ob.Requirement.Ranges) {
 			return StateSatisfied
 		}
 		return StateNeedsMore
@@ -229,20 +239,26 @@ func evaluate(ob *Obligation, env tool.ReadResultEnvelope) State {
 }
 
 func evaluateWholeFile(ob *Obligation, _ tool.ReadResultEnvelope) State {
-	if !ob.SawEOF {
+	// A whole-file read is only proven by a trustworthy source end plus
+	// contiguous coverage from line 0 on one version.
+	if !ob.SawEOF || ob.SourceEnd == nil {
 		return StateNeedsMore
 	}
-	if len(ob.Covered) == 0 {
-		// An empty delivery that reached EOF on a whole-file read is an empty
-		// file, which is fully covered.
+	if *ob.SourceEnd == 0 {
 		return StateSatisfied
 	}
-	// Contiguous coverage from line 0 through a delivery that reached EOF is the
-	// only shape that proves the whole file was delivered on one version.
-	if len(ob.Covered) == 1 && ob.Covered[0].Start == 0 {
+	if len(ob.Covered) == 1 && ob.Covered[0].Start == 0 && ob.Covered[0].End >= *ob.SourceEnd {
 		return StateSatisfied
 	}
 	return StateNeedsMore
+}
+
+func maxRangeEnd(ranges []tool.ReadRange) int {
+	end := 0
+	for _, r := range ranges {
+		end = max(end, r.End)
+	}
+	return end
 }
 
 func missingFor(ob *Obligation) []tool.ReadRange {

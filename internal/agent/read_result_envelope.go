@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 
 	"reasonix/internal/provider"
@@ -8,11 +9,11 @@ import (
 )
 
 // readResultEnvelopeFor builds the host-only envelope for one reader result:
-// the reader supplies what it delivered, and the host adds call identity and
-// clips the envelope to the provider-visible bytes. ok=false means the tool
-// cannot describe its delivery, so the message carries no envelope rather than
-// a fabricated one.
-func (a *Agent) readResultEnvelopeFor(call provider.ToolCall, o toolOutcome) (tool.ReadResultEnvelope, bool) {
+// the reader supplies what it delivered and which store served it, and the host
+// adds call identity, the logical read identity, and clips the envelope to the
+// provider-visible bytes. ok=false means the tool cannot describe its delivery,
+// so the message carries no envelope rather than a fabricated one.
+func (a *Agent) readResultEnvelopeFor(ctx context.Context, call provider.ToolCall, o toolOutcome) (tool.ReadResultEnvelope, bool) {
 	if a == nil || a.svc.tools == nil {
 		return tool.ReadResultEnvelope{}, false
 	}
@@ -28,7 +29,7 @@ func (a *Agent) readResultEnvelopeFor(call provider.ToolCall, o toolOutcome) (to
 	if raw == "" {
 		raw = o.output
 	}
-	env, ok := reader.ReadEnvelope(json.RawMessage(call.Arguments), raw)
+	env, ok := reader.ReadEnvelope(ctx, json.RawMessage(call.Arguments), raw)
 	if !ok {
 		return tool.ReadResultEnvelope{}, false
 	}
@@ -36,7 +37,19 @@ func (a *Agent) readResultEnvelopeFor(call provider.ToolCall, o toolOutcome) (to
 		env = env.ClipTo(o.output)
 	}
 	env.ResultRef = toolResultRef(call.ID, raw)
-	env.ReadID = incompleteReadID(call.ID, env.ResultRef, env.Source.CanonicalPath)
+	env.ReadID = o.readTaskID
+	if env.ReadID == "" {
+		env.ReadID = incompleteReadID(call.ID, env.ResultRef, env.Source.CanonicalPath)
+	}
 	env.Source.WorkspaceID = a.workspaceID
+	a.reads.tasks.remember(env.ReadID, env)
+	if cursor, ok := tool.DecodeReadCursor(env.NextCursor); ok {
+		cursor.ReadID = env.ReadID
+		if a.reads.tasks != nil {
+			cursor.SessionID = a.reads.tasks.sessionID
+			cursor.RunGen = a.reads.tasks.generation
+		}
+		env.NextCursor = tool.EncodeReadCursor(cursor)
+	}
 	return env, true
 }

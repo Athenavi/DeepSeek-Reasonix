@@ -61,35 +61,36 @@ func TestReadWindowRangeIsZeroBasedHalfOpen(t *testing.T) {
 	}
 }
 
-func TestReadWindowVersionTokenBindsPathAndContent(t *testing.T) {
+func TestWindowDigestBindsPathAndContent(t *testing.T) {
 	base := ReadWindow{StartLine: 1, Lines: []string{"alpha", "beta"}}
 	other := ReadWindow{StartLine: 1, Lines: []string{"alpha", "gamma"}}
 	shifted := ReadWindow{StartLine: 2, Lines: []string{"alpha", "beta"}}
 
-	token := ReadWindowVersionToken("/w/a.go", base)
+	token := WindowDigest("/w/a.go", base)
 	if token == "" {
 		t.Fatal("token must not be empty")
 	}
-	if again := ReadWindowVersionToken("/w/a.go", base); again != token {
+	if again := WindowDigest("/w/a.go", base); again != token {
 		t.Fatalf("same content produced different tokens: %q vs %q", token, again)
 	}
-	if changed := ReadWindowVersionToken("/w/a.go", other); changed == token {
+	if changed := WindowDigest("/w/a.go", other); changed == token {
 		t.Fatal("edited line must change the version token")
 	}
-	if moved := ReadWindowVersionToken("/w/a.go", shifted); moved == token {
+	if moved := WindowDigest("/w/a.go", shifted); moved == token {
 		t.Fatal("shifted window must change the version token")
 	}
-	if elsewhere := ReadWindowVersionToken("/w/b.go", base); elsewhere == token {
+	if elsewhere := WindowDigest("/w/b.go", base); elsewhere == token {
 		t.Fatal("different path must change the version token")
 	}
 }
 
 func TestReadCursorRoundTripAndMatching(t *testing.T) {
 	env := ReadResultEnvelope{
-		Source:          ReadResultSource{CanonicalPath: "/w/a.go", VersionToken: "rw1:abc"},
+		ReadID:          "ir-1",
+		Source:          ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:abc"},
 		DeliveredRanges: []ReadRange{{Start: 0, End: 40}},
 	}
-	token := EncodeReadCursor(ReadCursor{Path: "/w/a.go", Version: "rw1:abc", NextStart: 40})
+	token := EncodeReadCursor(ReadCursor{Path: "/w/a.go", ReadID: "ir-1", Snapshot: "ss2:abc", NextStart: 40})
 	if token == "" {
 		t.Fatal("cursor must encode")
 	}
@@ -100,28 +101,29 @@ func TestReadCursorRoundTripAndMatching(t *testing.T) {
 	if !cursor.Matches(env) {
 		t.Fatal("cursor must match its own envelope")
 	}
-	if (ReadCursor{Path: "/w/other.go", Version: "rw1:abc", NextStart: 40}).Matches(env) {
+	if (ReadCursor{Path: "/w/other.go", ReadID: "ir-1", Snapshot: "ss2:abc", NextStart: 40}).Matches(env) {
 		t.Fatal("cursor must not match a different path")
 	}
-	if (ReadCursor{Path: "/w/a.go", Version: "rw1:def", NextStart: 40}).Matches(env) {
+	if (ReadCursor{Path: "/w/a.go", ReadID: "ir-1", Snapshot: "ss2:def", NextStart: 40}).Matches(env) {
 		t.Fatal("cursor must not match a different content version")
 	}
-	if (ReadCursor{Path: "/w/a.go", Version: "rw1:abc", NextStart: 41}).Matches(env) {
+	if (ReadCursor{Path: "/w/a.go", ReadID: "ir-1", Snapshot: "ss2:abc", NextStart: 41}).Matches(env) {
 		t.Fatal("cursor must not match a start outside the delivered range")
 	}
-	for _, bad := range []string{"", "rc1:", "rc1:!!!", "other:abc", "rc1:" + "eyJwYXRoIjoiIn0"} {
+	for _, bad := range []string{"", "rc2:", "rc2:!!!", "other:abc", "rc2:" + "eyJwYXRoIjoiIn0"} {
 		if _, ok := DecodeReadCursor(bad); ok {
 			t.Fatalf("decoded malformed cursor %q", bad)
 		}
 	}
-	if EncodeReadCursor(ReadCursor{Path: "", Version: "rw1:abc", NextStart: 0}) != "" {
+	if EncodeReadCursor(ReadCursor{Path: "", ReadID: "ir-1", Snapshot: "ss2:abc", NextStart: 0}) != "" {
 		t.Fatal("cursor without a path must not encode")
 	}
 }
 
 func TestClipToNarrowsDeliveredRangeToVisibleBytes(t *testing.T) {
 	env := ReadResultEnvelope{
-		Source:          ReadResultSource{CanonicalPath: "/w/a.go", VersionToken: "rw1:abc"},
+		Source:          ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:abc"},
+		ReadID:          "ir-1",
 		DeliveredRanges: []ReadRange{{Start: 0, End: 100}},
 		HasMore:         false,
 		EOF:             true,
@@ -155,7 +157,8 @@ func TestClipToNarrowsDeliveredRangeToVisibleBytes(t *testing.T) {
 
 func TestClipToKeepsCompleteDelivery(t *testing.T) {
 	env := ReadResultEnvelope{
-		Source:          ReadResultSource{CanonicalPath: "/w/a.go", VersionToken: "rw1:abc"},
+		Source:          ReadResultSource{CanonicalPath: "/w/a.go", Snapshot: "ss2:abc"},
+		ReadID:          "ir-1",
 		DeliveredRanges: []ReadRange{{Start: 0, End: 2}},
 		EOF:             true,
 	}

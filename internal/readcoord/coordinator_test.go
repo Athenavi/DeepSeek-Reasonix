@@ -11,14 +11,21 @@ func envelope(readID, path, version string, intent tool.ReadIntent, requested *t
 		ProtocolVersion: tool.ReadResultProtocolVersion,
 		ReadID:          readID,
 		Intent:          intent,
-		Source:          tool.ReadResultSource{CanonicalPath: path, VersionToken: version},
+		Source:          tool.ReadResultSource{CanonicalPath: path, Snapshot: version},
 		DeliveredRanges: delivered,
 		EOF:             eof,
 		HasMore:         !eof,
 	}
 	if len(delivered) > 0 {
-		next := tool.ReadCursor{Path: path, Version: version, NextStart: delivered[len(delivered)-1].End}
+		next := tool.ReadCursor{Path: path, ReadID: readID, Snapshot: version, NextStart: delivered[len(delivered)-1].End}
 		env.NextCursor = tool.EncodeReadCursor(next)
+	}
+	if eof {
+		end := 0
+		for _, r := range delivered {
+			end = max(end, r.End)
+		}
+		env.SourceEnd = &end
 	}
 	if requested != nil {
 		env.RequestedRange = requested
@@ -245,5 +252,46 @@ func TestSnapshotIsOrderedByKey(t *testing.T) {
 	snap := c.Snapshot()
 	if len(snap) != 2 || snap[0].Key != "ir-a" || snap[1].Key != "ir-b" {
 		t.Fatalf("Snapshot = %+v, want key order", snap)
+	}
+}
+
+func TestReturnedObligationsAreDeepCopies(t *testing.T) {
+	c := New()
+	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, Requirement{Intent: tool.ReadIntentRange, Ranges: ranges(0, 20)})
+	c.Observe(envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 20}, ranges(0, 10), false))
+
+	got, _ := c.Get("ir-1")
+	got.Covered[0] = tool.ReadRange{Start: 99, End: 100}
+	got.Requirement.Ranges[0] = tool.ReadRange{Start: 99, End: 100}
+
+	again, _ := c.Get("ir-1")
+	if !sameRanges(again.Covered, ranges(0, 10)) || !sameRanges(again.Requirement.Ranges, ranges(0, 20)) {
+		t.Fatalf("mutating a returned obligation changed coordinator state: %+v", again)
+	}
+	snap := c.Snapshot()
+	snap[0].Covered[0] = tool.ReadRange{Start: 1, End: 2}
+	third, _ := c.Get("ir-1")
+	if !sameRanges(third.Covered, ranges(0, 10)) {
+		t.Fatal("mutating a snapshot changed coordinator state")
+	}
+}
+
+func TestRangeCompletionNeedsATrustworthySourceEnd(t *testing.T) {
+	c := New()
+	c.Begin("ir-1", Scope{CanonicalPath: "/w/a.go"}, Requirement{Intent: tool.ReadIntentRange, Ranges: ranges(0, 20)})
+
+	// EOF without a source end proves nothing: the reader may have stopped early.
+	unvouched := envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 20}, ranges(0, 5), true)
+	unvouched.SourceEnd = nil
+	if tr, _ := c.Observe(unvouched); tr.To != StateNeedsMore {
+		t.Fatalf("bare EOF must not complete a range: %+v", tr)
+	}
+
+	// A source end inside the requested window does complete it.
+	shortFile := envelope("ir-1", "/w/a.go", "rw1:v1", tool.ReadIntentRange, &tool.ReadRange{Start: 0, End: 20}, ranges(0, 5), true)
+	shortFile.SourceEnd = new(int)
+	*shortFile.SourceEnd = 5
+	if tr, _ := c.Observe(shortFile); tr.To != StateSatisfied {
+		t.Fatalf("a source end inside the window completes the range: %+v", tr)
 	}
 }
