@@ -59,6 +59,7 @@ func (a *Agent) beginRunTurn(ctx context.Context, input string, pinned pinnedRev
 	// A fresh user turn starts from zeroed per-turn host state; the new turn's
 	// values are computed below. Cross-turn state (checkpoint, scope, failure
 	// budgets) lives in taskRuntime and is reconciled there.
+	a.stragglers.drain(ctx, parallelStragglerGrace)
 	a.turn = turnRuntime{}
 	a.turn.readShadow = newReadShadowState(a.readCoordinatorShadow)
 	a.turn.incompleteReads.legacyImplicitFullReads = a.legacyImplicitFullReads

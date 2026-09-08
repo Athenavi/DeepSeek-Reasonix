@@ -252,7 +252,11 @@ func (a *Agent) executeBatch(ctx context.Context, turn *turnRuntime, calls []pro
 		if batch.parallel && batch.end-batch.start > 1 {
 			// Parallel segments are read-only by construction; no mutation barrier.
 			private := slots.fork()
-			ranUntil, finished := runParallel(ctx, batch.start, batch.end, func(i int) { run(private, i) })
+			ranUntil, finished := runParallel(ctx, batch.start, batch.end, func(i int) {
+				a.stragglers.enter()
+				defer a.stragglers.leave()
+				run(private, i)
+			})
 			for i := batch.start; i < ranUntil; i++ {
 				if finished[i] {
 					slots.adopt(private, i)
