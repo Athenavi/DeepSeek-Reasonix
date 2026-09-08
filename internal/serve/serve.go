@@ -401,13 +401,14 @@ func (s *Server) rebuild(ctx context.Context, old *control.Controller, ref strin
 	tag := newSessionTagSink(s.bc)
 	tag.PrimePath(old.SessionPath())
 	opts := boot.Options{
-		Model:          ref,
-		Sink:           tag,
-		Stderr:         os.Stderr,
-		StatsSource:    "serve",
-		SessionDir:     old.SessionDir(),
-		WorkspaceRoot:  old.WorkspaceRoot(),
-		MCPHostProfile: plugin.HostProfileInteractive,
+		Model:           ref,
+		Sink:            tag,
+		Stderr:          os.Stderr,
+		StatsSource:     "serve",
+		SessionDir:      old.SessionDir(),
+		WorkspaceRoot:   old.WorkspaceRoot(),
+		MCPHostProfile:  plugin.HostProfileInteractive,
+		BrowserExecutor: s.buildOptions.BrowserExecutor,
 	}
 	if s.rebuildControllerWithOptions != nil {
 		ctrl, err := s.rebuildControllerWithOptions(ctx, old, ref, opts)
@@ -424,13 +425,14 @@ func (s *Server) rebuild(ctx context.Context, old *control.Controller, ref strin
 		return ctrl, err
 	}
 	res, err := boot.Rebuild(ctx, old, boot.Options{
-		Model:          ref,
-		Sink:           tag,
-		Stderr:         os.Stderr,
-		StatsSource:    "serve",
-		SessionDir:     old.SessionDir(),
-		WorkspaceRoot:  old.WorkspaceRoot(),
-		MCPHostProfile: plugin.HostProfileInteractive,
+		Model:           ref,
+		Sink:            tag,
+		Stderr:          os.Stderr,
+		StatsSource:     "serve",
+		SessionDir:      old.SessionDir(),
+		WorkspaceRoot:   old.WorkspaceRoot(),
+		MCPHostProfile:  plugin.HostProfileInteractive,
+		BrowserExecutor: s.buildOptions.BrowserExecutor,
 	})
 	if err != nil {
 		return nil, err
