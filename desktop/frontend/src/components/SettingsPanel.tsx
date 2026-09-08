@@ -1,4 +1,6 @@
 import { ModelSettingHelp } from "./ModelSettingHelp";
+import { SettingsOptions } from "./SettingsOptions";
+import { SettingsSelect } from "./SettingsSelect";
 import { providerProtocolLabel, providerEndpointMismatch, providerProtocolChoices } from "../lib/providerProtocol";
 import { providerSupportsServerWebSearch } from "../lib/providerSearch";
 export { providerSupportsServerWebSearch } from "../lib/providerSearch";
@@ -793,9 +795,9 @@ const PROXY_MODES = ["auto", "custom", "off"] as const;
 // inferred by the backend or edited in TOML for rare gateways.
 export const EFFORT_PRESETS: readonly string[] = ["low", "medium", "high", "xhigh", "max"];
 const COMPACT_RATIO_PRESETS = [
-  [0.7, "settings.compactRatioPreset.70"],
-  [0.8, "settings.compactRatioPreset.80"],
-  [0.85, "settings.compactRatioPreset.85"],
+  [0.7, "settings.compactRatioPreset.70", "settings.compactRatioPresetEffect.70"],
+  [0.8, "settings.compactRatioPreset.80", "settings.compactRatioPresetEffect.80"],
+  [0.85, "settings.compactRatioPreset.85", "settings.compactRatioPresetEffect.85"],
 ] as const;
 const REASONING_PROTOCOLS: readonly string[] = ["", "deepseek", "glm", "kimi-k3", "openai", "none"];
 const THINKING_MODES: readonly string[] = ["", "enabled", "disabled", "adaptive"];
@@ -1608,7 +1610,7 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
     <>
       <SettingsSection title={t("settings.general.sectionAppearance")} description={t("settings.general.sectionAppearanceHint")}>
       <SettingsField label={t("settings.desktopLayoutStyle")} hint={t("settings.desktopLayoutStyleHint")} icon={<Monitor size={18} />}>
-        <div className="set-seg">
+        <SettingsOptions layout="field" className="set-seg">
           {(["workbench", "creation"] as const).map((style) => (
             <button
               key={style}
@@ -1619,10 +1621,10 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
               {desktopLayoutStyleLabel(style, t)}
             </button>
           ))}
-        </div>
+        </SettingsOptions>
       </SettingsField>
       <SettingsField label={t("settings.language")} hint={t("settings.languageHint")} icon={<Languages size={18} />}>
-        <div className="set-seg">
+        <SettingsOptions layout="field" className="set-seg">
           {LANGUAGE_PREFS.map((pref) => (
             <button
               key={pref || "auto"}
@@ -1633,10 +1635,10 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
               {pref === "" ? t("settings.langAuto") : pref === "zh" ? "中文" : "English"}
             </button>
           ))}
-        </div>
+        </SettingsOptions>
       </SettingsField>
       <SettingsField label={t("settings.currency")} hint={t("settings.currencyHint")} icon={<CircleDollarSign size={18} />}>
-        <div className="set-seg">
+        <SettingsOptions layout="field" className="set-seg">
           {(["", "CNY", "USD"] as DesktopCurrency[]).map((currency) => (
             <button
               key={currency || "auto"}
@@ -1647,7 +1649,7 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
               {currency === "" ? t("settings.currencyAuto") : currency}
             </button>
           ))}
-        </div>
+        </SettingsOptions>
       </SettingsField>
       </SettingsSection>
 
@@ -1655,7 +1657,7 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
 
       <SettingsSection title={t("settings.general.sectionSystem")} description={t("settings.general.sectionSystemHint")}>
       <SettingsField label={t("settings.closeBehavior")} hint={<DesktopCloseBehaviorHint backgroundSelected={closeBehavior === "background"} hint={t("settings.closeBehaviorHint")} unavailableHint={t("settings.closeBehaviorUnavailable")} />} icon={<Power size={18} />}>
-        <div className="set-seg">
+        <SettingsOptions layout="field" className="set-seg">
           {(["background", "quit"] as const).map((mode) => (
             <button
               key={mode}
@@ -1666,10 +1668,10 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
               {closeBehaviorLabel(mode, t)}
             </button>
           ))}
-        </div>
+        </SettingsOptions>
       </SettingsField>
       <SettingsField label={t("settings.defaultToolApprovalMode")} hint={t("settings.defaultToolApprovalModeHint")} icon={<ShieldCheck size={18} />}>
-        <div className="set-seg">
+        <SettingsOptions layout="field" className="set-seg">
           {TOOL_APPROVAL_MODES.map((mode) => (
             <button
               key={mode}
@@ -1680,7 +1682,7 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
               {t(`settings.defaultToolApprovalMode.${mode}`)}
             </button>
           ))}
-        </div>
+        </SettingsOptions>
       </SettingsField>
       <SettingsField label={t("settings.sound")} hint={t("settings.soundHint")} icon={<Volume2 size={18} />} stacked>
         <div className={`settings-sound-editor${soundExpanded ? " settings-sound-editor--expanded" : ""}`}>
@@ -1763,7 +1765,7 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
         </div>
       </SettingsField>
       <SettingsField label={t("settings.statusBarStyle")} hint={t("settings.statusBarStyleHint")} icon={<PanelBottom size={18} />}>
-        <div className="set-seg">
+        <SettingsOptions layout="field" className="set-seg">
           {(["icon", "text"] as const).map((style) => (
             <button
               key={style}
@@ -1774,7 +1776,7 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
               {t(`settings.statusBarStyle.${style}`)}
             </button>
           ))}
-        </div>
+        </SettingsOptions>
       </SettingsField>
       <SettingsField label={t("settings.statusBarItems")} hint={t("settings.statusBarItemsHint")} icon={<ListChecks size={18} />} className="status-bar-items-setting" stacked>
         <StatusBarItemsEditor
@@ -1826,55 +1828,17 @@ function GenMusicSelect({
   previewDisabled?: boolean;
 }) {
   const t = useT();
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const selected = GENRE_OPTIONS.find((o) => o.value === value) ?? GENRE_OPTIONS[0];
-
   return (
     <div className="sound-select">
-      <button
-        ref={triggerRef}
-        className="sound-select__trigger"
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span className="sound-select__label">{t(selected.labelKey)}</span>
-        <ChevronDown
-          size={16}
-          className={`sound-select__chev${open ? " sound-select__chev--open" : ""}`}
-        />
-      </button>
+      <SettingsSelect value={value} onValueChange={next => onChange(next as GenerativePreset)}
+        aria-label={t("settings.generativeMusic")}
+        options={GENRE_OPTIONS.map(option => ({ value: option.value, label: t(option.labelKey) }))} />
       {!previewDisabled && (
         <button className="chip chip--icon" type="button" title={t("settings.generativeMusicPreview")} aria-label={t("settings.generativeMusicPreview")} onClick={onPreview}>
           <Play size={13} aria-hidden="true" />
         </button>
       )}
-      <AnchoredPopover
-        open={open}
-        anchorRef={triggerRef}
-        onClose={() => setOpen(false)}
-        className="sound-select__menu"
-        placement="bottom"
-      >
-        <div className="sound-select__list" role="listbox">
-          {GENRE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              className={`sound-select__option${opt.value === value ? " sound-select__option--selected" : ""}`}
-              role="option"
-              aria-selected={opt.value === value}
-              type="button"
-              onClick={() => {
-                onChange(opt.value);
-                setOpen(false);
-              }}
-            >
-              <span>{t(opt.labelKey)}</span>
-              {opt.value === value && <Check size={14} className="sound-select__check" />}
-            </button>
-          ))}
-        </div>
-      </AnchoredPopover>
+
     </div>
   );
 }
@@ -1895,7 +1859,7 @@ function NetworkSection({ s, busy, apply }: SectionProps) {
 
     >
       <SettingsField label={t("settings.proxyMode")}>
-        <div className="set-seg">
+        <SettingsOptions layout="field" className="set-seg">
           {PROXY_MODES.map((mode) => (
             <button
               key={mode}
@@ -1906,13 +1870,13 @@ function NetworkSection({ s, busy, apply }: SectionProps) {
               {proxyModeLabel(mode, t)}
             </button>
           ))}
-        </div>
+        </SettingsOptions>
       </SettingsField>
 
       {draft.proxyMode === "custom" && (
         <>
           <SettingsField label={t("settings.proxyType")}>
-            <div className="set-seg">
+            <SettingsOptions layout="field" className="set-seg">
               {PROXY_TYPES.map((typ) => (
                 <button
                   key={typ}
@@ -1923,7 +1887,7 @@ function NetworkSection({ s, busy, apply }: SectionProps) {
                   {typ.toUpperCase()}
                 </button>
               ))}
-            </div>
+            </SettingsOptions>
           </SettingsField>
           <SettingsField label={t("settings.proxyServer")}>
             <div className="settings-inline-controls">
@@ -2751,7 +2715,7 @@ function BotsSection({ s, busy, apply, initialFocus }: BotsSectionProps) {
           />
         </SettingsField>
         <SettingsField label={t("settings.botToolApprovalMode")} hint={t("settings.botToolApprovalModeHint")}>
-          <div className="provider-add-segmented" role="group" aria-label={t("settings.botToolApprovalMode")}>
+          <SettingsOptions className="provider-add-segmented" role="group" aria-label={t("settings.botToolApprovalMode")}>
             {TOOL_APPROVAL_MODES.map((mode) => (
               <button
                 key={mode}
@@ -2763,7 +2727,7 @@ function BotsSection({ s, busy, apply, initialFocus }: BotsSectionProps) {
                 {t(`settings.botToolApprovalMode.${mode}` as DictKey)}
               </button>
             ))}
-          </div>
+          </SettingsOptions>
         </SettingsField>
         <SettingsField label={t("settings.botChannelModel")} hint={t("settings.botChannelModelHint")}>
           <ModelPicker
@@ -2926,7 +2890,7 @@ function BotsSection({ s, busy, apply, initialFocus }: BotsSectionProps) {
           />
         </SettingsField>
         <SettingsField label={t("settings.botToolApprovalMode")} hint={t("settings.botToolApprovalModeHint")}>
-          <div className="provider-add-segmented" role="group" aria-label={t("settings.botToolApprovalMode")}>
+          <SettingsOptions className="provider-add-segmented" role="group" aria-label={t("settings.botToolApprovalMode")}>
             {TOOL_APPROVAL_MODES.map((mode) => (
               <button
                 key={mode}
@@ -2944,7 +2908,7 @@ function BotsSection({ s, busy, apply, initialFocus }: BotsSectionProps) {
                 {t(`settings.botToolApprovalMode.${mode}` as DictKey)}
               </button>
             ))}
-          </div>
+          </SettingsOptions>
         </SettingsField>
         <SettingsField label={t("settings.botChannelModel")} hint={t("settings.botChannelModelHint")}>
           <ModelPicker
@@ -3149,7 +3113,7 @@ function BotsSection({ s, busy, apply, initialFocus }: BotsSectionProps) {
           />
         </SettingsField>
         <SettingsField label={t("settings.botToolApprovalMode")} hint={t("settings.botToolApprovalModeHint")}>
-          <div className="provider-add-segmented" role="group" aria-label={t("settings.botToolApprovalMode")}>
+          <SettingsOptions className="provider-add-segmented" role="group" aria-label={t("settings.botToolApprovalMode")}>
             {TOOL_APPROVAL_MODES.map((mode) => (
               <button
                 key={mode}
@@ -3161,7 +3125,7 @@ function BotsSection({ s, busy, apply, initialFocus }: BotsSectionProps) {
                 {t(`settings.botToolApprovalMode.${mode}` as DictKey)}
               </button>
             ))}
-          </div>
+          </SettingsOptions>
         </SettingsField>
         <SettingsField label={t("settings.botChannelModel")} hint={t("settings.botChannelModelHint")}>
           <ModelPicker
@@ -3675,28 +3639,28 @@ function BotsSection({ s, busy, apply, initialFocus }: BotsSectionProps) {
                 </div>
               </SettingsField>
               <SettingsField label={t("settings.botQueueModeSimple")} hint={t("settings.botQueueModeSimpleHint")}>
-                <select
+                <SettingsSelect
                   className="mem-select"
                   value={normalizeBotQueueMode(draft.queueMode)}
                   disabled={busy}
-                  onChange={(event) => void persistBotSettings({ queueMode: event.target.value })}
+                  onValueChange={(value) => void persistBotSettings({ queueMode: value })}
                 >
                   {BOT_QUEUE_MODES.map((mode) => (
                     <option key={mode} value={mode}>{t(`settings.botQueueMode.${mode}` as DictKey)}</option>
                   ))}
-                </select>
+                </SettingsSelect>
               </SettingsField>
               <SettingsField label={t("settings.botQueueDropLabel")} hint={t("settings.botQueueDropHint")}>
-                <select
+                <SettingsSelect
                   className="mem-select"
                   value={normalizeBotQueueDrop(draft.queueDrop)}
                   disabled={busy}
-                  onChange={(event) => void persistBotSettings({ queueDrop: event.target.value })}
+                  onValueChange={(value) => void persistBotSettings({ queueDrop: value })}
                 >
                   {BOT_QUEUE_DROPS.map((mode) => (
                     <option key={mode} value={mode}>{t(`settings.botQueueDrop.${mode}` as DictKey)}</option>
                   ))}
-                </select>
+                </SettingsSelect>
               </SettingsField>
               <SettingsField label={t("settings.botIgnoreSelfMessages")} hint={t("settings.botIgnoreSelfMessagesHint")}>
                 <ToggleSegment
@@ -3788,53 +3752,53 @@ function BotsSection({ s, busy, apply, initialFocus }: BotsSectionProps) {
                       <div className="bot-route-grid">
                         <label>
                           <span>{t("settings.botRouteConnection")}</span>
-                          <select
+                          <SettingsSelect
                             className="mem-select"
                             value={route.connectionId}
                             disabled={busy}
-                            onChange={(event) => {
-                              updateRoute(index, { connectionId: event.target.value });
-                              void persistRoute(index, { connectionId: event.target.value });
+                            onValueChange={(value) => {
+                              updateRoute(index, { connectionId: value });
+                              void persistRoute(index, { connectionId: value });
                             }}
                           >
                             <option value="">{t("settings.botRouteAny")}</option>
                             {routeConnectionOptions.map((option) => (
                               <option key={option.id} value={option.id}>{option.label} · {option.id}</option>
                             ))}
-                          </select>
+                          </SettingsSelect>
                         </label>
                         <label>
                           <span>{t("settings.botRoutePlatform")}</span>
-                          <select
+                          <SettingsSelect
                             className="mem-select"
                             value={route.platform}
                             disabled={busy}
-                            onChange={(event) => {
-                              updateRoute(index, { platform: event.target.value });
-                              void persistRoute(index, { platform: event.target.value });
+                            onValueChange={(value) => {
+                              updateRoute(index, { platform: value });
+                              void persistRoute(index, { platform: value });
                             }}
                           >
                             <option value="">{t("settings.botRouteAny")}</option>
                             <option value="qq">QQ</option>
                             <option value="feishu">{t("settings.botFeishu")}</option>
                             <option value="weixin">{t("settings.botWeixin")}</option>
-                          </select>
+                          </SettingsSelect>
                         </label>
                         <label>
                           <span>{t("settings.botRouteChatType")}</span>
-                          <select
+                          <SettingsSelect
                             className="mem-select"
                             value={route.chatType}
                             disabled={busy}
-                            onChange={(event) => {
-                              updateRoute(index, { chatType: event.target.value });
-                              void persistRoute(index, { chatType: event.target.value });
+                            onValueChange={(value) => {
+                              updateRoute(index, { chatType: value });
+                              void persistRoute(index, { chatType: value });
                             }}
                           >
                             {BOT_ROUTE_CHAT_TYPES.map((chatType) => (
                               <option key={chatType || "any"} value={chatType}>{t(`settings.botRouteChatType.${chatType || "any"}` as DictKey)}</option>
                             ))}
-                          </select>
+                          </SettingsSelect>
                         </label>
                         <label>
                           <span>{t("settings.botRouteChatId")}</span>
@@ -3897,19 +3861,19 @@ function BotsSection({ s, busy, apply, initialFocus }: BotsSectionProps) {
                         </label>
                         <label>
                           <span>{t("settings.botToolApprovalMode")}</span>
-                          <select
+                          <SettingsSelect
                             className="mem-select"
                             value={route.toolApprovalMode}
                             disabled={busy}
-                            onChange={(event) => {
-                              updateRoute(index, { toolApprovalMode: event.target.value });
-                              void persistRoute(index, { toolApprovalMode: event.target.value });
+                            onValueChange={(value) => {
+                              updateRoute(index, { toolApprovalMode: value });
+                              void persistRoute(index, { toolApprovalMode: value });
                             }}
                           >
                             {BOT_TOOL_APPROVAL_MODES.map((mode) => (
                               <option key={mode || "inherit"} value={mode}>{t(`settings.botToolApprovalMode.${mode || "inherit"}` as DictKey)}</option>
                             ))}
-                          </select>
+                          </SettingsSelect>
                         </label>
                       </div>
                     </div>
@@ -3942,7 +3906,7 @@ function ToggleSegment({
 }) {
   const t = useT();
   return (
-    <div className="set-seg">
+    <SettingsOptions className="set-seg">
       <button
         type="button"
         className={`set-seg__btn${value ? " set-seg__btn--on" : ""}`}
@@ -3959,7 +3923,7 @@ function ToggleSegment({
       >
         {offLabel ?? t("settings.toggleOff")}
       </button>
-    </div>
+    </SettingsOptions>
   );
 }
 
@@ -4120,27 +4084,17 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
   const agent = s.agent ?? { temperature: 0, maxSteps: 0, plannerMaxSteps: 0, maxSubagentDepth: 2, maxSubagentConcurrency: 6, maxParallelWriters: 3, systemPrompt: "", reasoningLanguage: "auto", compactRatio: 0.80 };
   const compactRatio = agent.compactRatio ?? 0.80;
   const compactRatioPercent = Math.round(compactRatio * 1000) / 10;
-  const [compactRatioDraft, setCompactRatioDraft] = useState(() => String(compactRatioPercent));
-  const [compactRatioCustomOpen, setCompactRatioCustomOpen] = useState(false);
-  const compactRatioCustomInputRef = useRef<HTMLInputElement>(null);
   const compactRatioPreset = COMPACT_RATIO_PRESETS.find(([ratio]) => Math.abs(compactRatio - ratio) < 0.0001);
+  const [compactRatioDraft, setCompactRatioDraft] = useState(() => compactRatioPreset ? "" : String(compactRatioPercent));
+  const [compactRatioCustomEditing, setCompactRatioCustomEditing] = useState(false);
+  const compactRatioCustomInputRef = useRef<HTMLInputElement>(null);
+  const compactRatioCancelBlurRef = useRef(false);
   const compactRatioDraftPercent = Number(compactRatioDraft);
   const compactRatioDraftValid = compactRatioDraft !== ""
     && Number.isFinite(compactRatioDraftPercent)
     && compactRatioDraftPercent >= COMPACT_RATIO_MIN_PERCENT
     && compactRatioDraftPercent <= COMPACT_RATIO_MAX_PERCENT;
-  const compactRatioDraftDirty = compactRatioDraftValid
-    && Math.abs(compactRatioDraftPercent / 100 - compactRatio) > 0.0001;
-  const defaultModel = defaultRef.startsWith(`${defaultProvider}/`) ? defaultRef.slice(defaultProvider.length + 1) : "";
-  const modelContextWindow = defaultProviderView?.modelOverrides?.find((override) => override.model === defaultModel)?.contextWindow ?? 0;
-  const effectiveContextWindow = modelContextWindow > 0 ? modelContextWindow : (defaultProviderView?.contextWindow ?? 0);
-  const compactTokens = effectiveContextWindow > 0 ? Math.round(effectiveContextWindow * compactRatio) : 0;
-  const compactRatioImpact = compactTokens > 0
-    ? t("settings.compactRatioImpactWithTokens", { percent: compactRatioPercent, tokens: compactTokens.toLocaleString() })
-    : t("settings.compactRatioImpact", { percent: compactRatioPercent });
-  const compactRatioSelection = compactRatioPreset
-    ? t(compactRatioPreset[1])
-    : t("settings.compactRatioCustomValue", { percent: compactRatioPercent });
+  const compactRatioImpact = t("settings.compactRatioImpact");
   const compactRatioOverrideHint = agent.compactRatioOverridden
     ? t("settings.compactRatioProjectOverride", { percent: Math.round((agent.effectiveCompactRatio ?? compactRatio) * 100) })
     : "";
@@ -4167,38 +4121,45 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
   }, [defaultRef, refs, s.providers]);
 
   useEffect(() => {
-    setCompactRatioDraft(String(compactRatioPercent));
-  }, [compactRatioPercent]);
-
-  useEffect(() => {
-    if (compactRatioCustomOpen) compactRatioCustomInputRef.current?.focus();
-  }, [compactRatioCustomOpen]);
+    if (!compactRatioCustomEditing) setCompactRatioDraft(compactRatioPreset ? "" : String(compactRatioPercent));
+  }, [compactRatioCustomEditing, compactRatioPercent, compactRatioPreset]);
 
   const persistCompactRatio = async (ratio: number) => {
-    if (await apply(() => app.SetCompactRatio(ratio))) setCompactRatioCustomOpen(false);
+    return await apply(() => app.SetCompactRatio(ratio));
   };
 
-  const openCompactRatioCustom = () => {
-    setCompactRatioDraft(String(compactRatioPercent));
-    setCompactRatioCustomOpen(true);
-  };
-
-  const closeCompactRatioCustom = () => {
-    setCompactRatioDraft(String(compactRatioPercent));
-    setCompactRatioCustomOpen(false);
+  const focusCompactRatioCustom = () => {
+    setCompactRatioCustomEditing(true);
+    requestAnimationFrame(() => compactRatioCustomInputRef.current?.focus());
   };
 
   const selectCompactRatioPreset = async (ratio: number) => {
+    // A preset click replaces the draft; do not also persist it on blur.
+    if (document.activeElement === compactRatioCustomInputRef.current) {
+      compactRatioCancelBlurRef.current = true;
+      compactRatioCustomInputRef.current?.blur();
+    }
+    setCompactRatioCustomEditing(false);
     if (Math.abs(compactRatio - ratio) < 0.0001) {
-      closeCompactRatioCustom();
       return;
     }
     await persistCompactRatio(ratio);
   };
 
-  const saveCompactRatioDraft = async () => {
-    if (!compactRatioDraftValid || !compactRatioDraftDirty || busy) return;
-    await persistCompactRatio(compactRatioDraftPercent / 100);
+  const commitCompactRatioDraft = async (rawValue: string) => {
+    const percent = Number(rawValue);
+    const valid = rawValue !== ""
+      && Number.isFinite(percent)
+      && percent >= COMPACT_RATIO_MIN_PERCENT
+      && percent <= COMPACT_RATIO_MAX_PERCENT;
+    const dirty = valid && Math.abs(percent / 100 - compactRatio) > 0.0001;
+    if (!valid && rawValue !== "") return;
+    if (!valid || busy) {
+      setCompactRatioCustomEditing(false);
+      return;
+    }
+    if (dirty && !await persistCompactRatio(percent / 100)) return;
+    setCompactRatioCustomEditing(false);
   };
 
   useEffect(() => {
@@ -4287,7 +4248,7 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
     <>
       {subtab === "usage" ? (
         <div className="model-preferences">
-          <SettingsSection title={t("settings.modelAssignment")} description={t("settings.defaultModelHint")}>
+          <SettingsSection className="model-assignment-section" title={t("settings.models.preferences")} description={t("settings.defaultModelHint")}>
             <div className="model-assignment-head"><span>{t("settings.modelPurpose")}</span><span>{t("settings.modelUsage")}</span><span>{t("settings.modelConnection")}</span></div>
             <SettingsField className="model-assignment-row" label={<ModelSettingHelp label={t("settings.defaultModel")} text={t("providerUI.defaultModelHelp")} />}>
               <ModelPicker
@@ -4295,9 +4256,10 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
                 refs={refs}
                 value={toRef(s.defaultModel, s)}
                 disabled={busy}
+                ariaLabel={t("settings.defaultModel")}
                 onPick={(ref) => void apply(() => app.SetDefaultModel(ref))}
               />
-            <span className="model-assignment-connection">{toRef(s.defaultModel, s) && toRef(s.defaultModel, s) !== "auto" ? modelOptionMeta(modelOptionFromRef(toRef(s.defaultModel, s), s)!, t) : "—"}</span>
+            <span className="model-assignment-connection">{toRef(s.defaultModel, s) && toRef(s.defaultModel, s) !== "auto" ? modelOptionMeta(modelOptionFromRef(toRef(s.defaultModel, s), s)!, t) : t("settings.connectionAutomatic")}</span>
             </SettingsField>
 
             <SettingsField className="model-assignment-row" label={<ModelSettingHelp label={t("settings.plannerModel")} text={t("providerUI.plannerModelHelp")} />}>
@@ -4306,10 +4268,11 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
                 refs={refs}
                 value={plannerSelectRef}
                 disabled={busy}
+                ariaLabel={t("settings.plannerModel")}
                 includeSameDefault
                 onPick={(ref) => void apply(() => app.SetPlannerModel(ref))}
               />
-            <span className="model-assignment-connection">{plannerSelectRef && plannerSelectRef !== "auto" ? modelOptionMeta(modelOptionFromRef(plannerSelectRef, s)!, t) : "—"}</span>
+            <span className="model-assignment-connection">{plannerSelectRef && plannerSelectRef !== "auto" ? modelOptionMeta(modelOptionFromRef(plannerSelectRef, s)!, t) : t("settings.connectionFollowSession")}</span>
             </SettingsField>
 
             <SettingsField className="model-assignment-row" label={<ModelSettingHelp label={t("settings.imageUnderstandingModel")} text={t("providerUI.visionModelHelp")} />}>
@@ -4323,7 +4286,7 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
                 autoOptionLabel={t("common.auto")}
                 onPick={(ref) => void apply(() => app.SetVisionModel(ref))}
               />
-            <span className="model-assignment-connection">{visionRef && visionRef !== "auto" ? modelOptionMeta(modelOptionFromRef(visionRef, s)!, t) : "—"}</span>
+            <span className="model-assignment-connection">{visionRef && visionRef !== "auto" ? modelOptionMeta(modelOptionFromRef(visionRef, s)!, t) : (visionRef === "auto" ? t("settings.connectionAutomatic") : t("common.none"))}</span>
             </SettingsField>
 
 
@@ -4345,22 +4308,21 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
                 refs={refs}
                 value={subagentRef}
                 disabled={busy}
+                ariaLabel={t("settings.subagentModel")}
                 emptyOptionLabel={t("settings.subagentModelDefault")}
                 emptyOptionHint={t("settings.subagentModelFollowHint")}
                 onPick={(ref) => void apply(() => app.SetSubagentModel(ref))}
               />
-            <span className="model-assignment-connection">{subagentRef && subagentRef !== "auto" ? modelOptionMeta(modelOptionFromRef(subagentRef, s)!, t) : "—"}</span>
+            <span className="model-assignment-connection">{subagentRef && subagentRef !== "auto" ? modelOptionMeta(modelOptionFromRef(subagentRef, s)!, t) : t("settings.connectionFollowParent")}</span>
             </SettingsField>
 
-            </SettingsSection>
-          <SettingsSection>
-            <SettingsField label={<ModelSettingHelp label={t("settings.subagentReasoning")} text={t("providerUI.subagentEffortHelp")} />}>
-              <select
+            <SettingsField className="model-assignment-effort" label={<ModelSettingHelp label={t("settings.subagentReasoning")} text={t("providerUI.subagentEffortHelp")} />}>
+              <SettingsSelect
                 className="mem-select set-grow"
                 aria-label={t("settings.subagentReasoning")}
                 value={s.subagentEffort || ""}
                 disabled={busy}
-                onChange={(e) => void apply(() => app.SetSubagentEffort(e.target.value))}
+                onValueChange={(value) => void apply(() => app.SetSubagentEffort(value))}
               >
                 <option value="">{t("settings.subagentEffortDefault")}</option>
                 {s.subagentEffort && !subagentLevels.includes(s.subagentEffort) && <option value={s.subagentEffort} disabled>{s.subagentEffort}</option>}
@@ -4369,12 +4331,12 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
                     {level}
                   </option>
                 ))}
-              </select>
+              </SettingsSelect>
             </SettingsField>
 
             <details className="settings-subagent-advanced"><summary>{t("settings.subagentAdvanced")}</summary>
             <SettingsField label={t("settings.subagentDepth")} hint={t("settings.subagentDepthHint")}>
-              <div className="provider-add-segmented" role="group" aria-label={t("settings.subagentDepth")}>
+              <SettingsOptions className="provider-add-segmented" role="group" aria-label={t("settings.subagentDepth")}>
                 {[1, 2].map((depth) => (
                   <button
                     key={depth}
@@ -4387,7 +4349,7 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
                     {depth === 1 ? t("settings.subagentDepthOne") : t("settings.subagentDepthTwo")}
                   </button>
                 ))}
-              </div>
+              </SettingsOptions>
             </SettingsField>
 
             <SettingsField label={t("settings.subagentConcurrency")} hint={t("settings.subagentConcurrencyHint")}>
@@ -4425,12 +4387,15 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
             {modelIssue && <div className="provider-fetch-banner provider-fetch-banner--warn">{modelIssue}</div>}
           </details>
           </SettingsSection>
-          <SettingsSection title={t("settings.runtimePreferences")}>
+          <SettingsSection className="model-runtime-preferences" title={t("settings.runtimePreferences")}>
             <SettingsField label={t("settings.reasoningLanguage")} hint={t("settings.reasoningLanguageHint")}>
-              <div className="set-seg">
+              <SettingsOptions layout="field" className="set-seg" role="radiogroup" aria-label={t("settings.reasoningLanguage")}>
                 {(["auto", "zh", "en"] as const).map((lang) => (
                   <button
                     key={lang}
+                    type="button"
+                    role="radio"
+                    aria-checked={agent.reasoningLanguage === lang}
                     className={`set-seg__btn${agent.reasoningLanguage === lang ? " set-seg__btn--on" : ""}`}
                     disabled={busy}
                     onClick={() => void apply(() => app.SetReasoningLanguage(lang))}
@@ -4438,91 +4403,105 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
                     {t(`settings.reasoningLanguage.${lang}`)}
                   </button>
                 ))}
-              </div>
+              </SettingsOptions>
             </SettingsField>
             <SettingsField label={t("settings.compactRatio")} hint={t("settings.compactRatioHint")} stacked>
               <div className="compact-ratio-controls">
-                <div className="set-seg compact-ratio-presets" role="group" aria-label={t("settings.compactRatio")}>
-                  {COMPACT_RATIO_PRESETS.map(([ratio, labelKey]) => (
-                    <button
-                      key={ratio}
-                      type="button"
-                      className={`set-seg__btn${Math.abs(compactRatio - ratio) < 0.0001 ? " set-seg__btn--on" : ""}`}
-                      disabled={busy}
-                      aria-label={t(labelKey)}
-                      aria-pressed={Math.abs(compactRatio - ratio) < 0.0001}
-                      onClick={() => void selectCompactRatioPreset(ratio)}
-                    >
-                      <span className="compact-ratio-preset__percent" aria-hidden="true">{Math.round(ratio * 100)}%</span>
-                      <span className="compact-ratio-preset__caption" aria-hidden="true">{t(labelKey).split(" · ")[1]}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="compact-ratio-summary">
-                  <div className="compact-ratio-current">{t("settings.compactRatioCurrent", { value: compactRatioSelection })}</div>
-                  <button
-                    type="button"
-                    className="btn btn--small compact-ratio-custom-toggle"
-                    disabled={busy}
-                    aria-expanded={compactRatioCustomOpen}
-                    aria-controls="settings-compact-ratio-custom-panel"
-                    onClick={compactRatioCustomOpen ? closeCompactRatioCustom : openCompactRatioCustom}
-                  >
-                    {t("settings.compactRatioCustomOption")}
-                  </button>
-                </div>
-                <div className="compact-ratio-impact">{compactRatioImpact}</div>
-                {compactRatioCustomOpen && (
-                  <div id="settings-compact-ratio-custom-panel" className="compact-ratio-custom-panel">
-                    <div className="settings-inline-controls compact-ratio-custom">
-                      <label className="set-label" htmlFor="settings-compact-ratio-custom">{t("settings.compactRatioCustom")}</label>
+                <fieldset className="compact-ratio-choice-list">
+                  <legend className="sr-only">{t("settings.compactRatio")}</legend>
+                  {COMPACT_RATIO_PRESETS.map(([ratio, labelKey, effectKey]) => {
+                    const selected = Math.abs(compactRatio - ratio) < 0.0001;
+                    const active = selected;
+                    const [percent, name] = t(labelKey).split(" · ");
+                    return (
+                      <div key={ratio} className="compact-ratio-choice" data-selected={active || undefined}>
+                        <label className="compact-ratio-choice__row"
+                          onPointerDown={(event) => {
+                            if (event.button === 0 && document.activeElement === compactRatioCustomInputRef.current) event.preventDefault();
+                          }}
+                          onMouseDown={(event) => {
+                            // Keep focus until click so blur cannot disable the intended preset.
+                            if (event.button === 0 && document.activeElement === compactRatioCustomInputRef.current) event.preventDefault();
+                          }}
+                          onClick={() => {
+                            if (selected && !busy) void selectCompactRatioPreset(ratio);
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="settings-compact-ratio"
+                            value={ratio}
+                            checked={active}
+                            disabled={busy}
+                            aria-label={t(labelKey)}
+                            onChange={() => void selectCompactRatioPreset(ratio)}
+                          />
+                          <span className="compact-ratio-choice__name">{name}</span>
+                          <span className="compact-ratio-choice__percent">{percent}</span>
+                          <span className="compact-ratio-choice__effect">— {t(effectKey)}</span>
+                          {Math.abs(ratio - 0.8) < 0.0001 && <span className="compact-ratio-choice__badge">{t("settings.recommended")}</span>}
+                        </label>
+                      </div>
+                    );
+                  })}
+                  <div className="compact-ratio-choice" data-selected={!compactRatioPreset || undefined}>
+                    <div className="compact-ratio-choice__row compact-ratio-choice__row--custom">
                       <input
-                        ref={compactRatioCustomInputRef}
-                        id="settings-compact-ratio-custom"
-                        className="mem-input set-narrow"
-                        type="number"
-                        min={COMPACT_RATIO_MIN_PERCENT}
-                        max={COMPACT_RATIO_MAX_PERCENT}
-                        step={0.1}
-                        inputMode="decimal"
-                        value={compactRatioDraft}
+                        id="settings-compact-ratio-custom-choice"
+                        type="radio"
+                        name="settings-compact-ratio"
+                        value="custom"
+                        checked={!compactRatioPreset}
                         disabled={busy}
-                        aria-label={t("settings.compactRatioCustomAria")}
-                        aria-describedby="settings-compact-ratio-custom-hint"
-                        aria-invalid={!compactRatioDraftValid}
-                        onInput={(event) => setCompactRatioDraft(event.currentTarget.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            void saveCompactRatioDraft();
-                          }
-                          if (event.key === "Escape") {
-                            event.preventDefault();
-                            closeCompactRatioCustom();
-                          }
-                        }}
+                        aria-label={t("settings.compactRatioCustomOption")}
+                        onChange={focusCompactRatioCustom}
                       />
-                      <span className="compact-ratio-custom__suffix" aria-hidden="true">%</span>
-                      <button
-                        type="button"
-                        className="btn btn--small"
-                        disabled={busy || !compactRatioDraftValid || !compactRatioDraftDirty}
-                        onClick={() => void saveCompactRatioDraft()}
-                      >
-                        {t("settings.compactRatioApply")}
-                      </button>
-                      <button type="button" className="btn btn--small" disabled={busy} onClick={closeCompactRatioCustom}>
-                        {t("common.cancel")}
-                      </button>
-                    </div>
-                    <div
-                      id="settings-compact-ratio-custom-hint"
-                      className={`compact-ratio-custom__hint${compactRatioDraftValid ? "" : " compact-ratio-custom__hint--invalid"}`}
-                    >
-                      {t("settings.compactRatioCustomHint")}
+                      <label className="compact-ratio-choice__name" htmlFor="settings-compact-ratio-custom-choice">
+                        {t("settings.typography.customized")}
+                      </label>
+                      <label className="compact-ratio-choice__inline-input" htmlFor="settings-compact-ratio-custom">
+                        <input
+                          ref={compactRatioCustomInputRef}
+                          id="settings-compact-ratio-custom"
+                          type="number"
+                          min={COMPACT_RATIO_MIN_PERCENT}
+                          max={COMPACT_RATIO_MAX_PERCENT}
+                          step={0.1}
+                          inputMode="decimal"
+                          value={compactRatioDraft}
+                          placeholder={t("settings.compactRatioCustomPlaceholder")}
+                          disabled={busy}
+                          aria-label={t("settings.compactRatioCustomAria")}
+                          aria-invalid={compactRatioDraft !== "" && !compactRatioDraftValid}
+                          onFocus={() => setCompactRatioCustomEditing(true)}
+                          onInput={(event) => setCompactRatioDraft(event.currentTarget.value)}
+                          onBlur={(event) => {
+                            if (compactRatioCancelBlurRef.current) {
+                              compactRatioCancelBlurRef.current = false;
+                              return;
+                            }
+                            void commitCompactRatioDraft(event.currentTarget.value);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              event.currentTarget.blur();
+                            }
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              compactRatioCancelBlurRef.current = true;
+                              setCompactRatioDraft(compactRatioPreset ? "" : String(compactRatioPercent));
+                              setCompactRatioCustomEditing(false);
+                              event.currentTarget.blur();
+                            }
+                          }}
+                        />
+                        <span aria-hidden="true">%</span>
+                      </label>
                     </div>
                   </div>
-                )}
+                </fieldset>
+                <div className="compact-ratio-impact">{compactRatioImpact}</div>
               </div>
             </SettingsField>
             {compactRatioOverrideHint && <div className="provider-fetch-banner provider-fetch-banner--warn">{compactRatioOverrideHint}</div>}
@@ -4574,16 +4553,6 @@ export function ModelPicker({
   onPick: (ref: string) => void;
 }) {
   const t = useT();
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  // Debounce search to avoid expensive filtering on every keystroke
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query), 150);
-    return () => clearTimeout(timer);
-  }, [query]);
-  const q = debouncedQuery.trim().toLowerCase();
   const emptyLabel = includeSameDefault ? t("settings.plannerNone") : emptyOptionLabel;
   const emptyHint = includeSameDefault ? t("settings.plannerNoneHint") : emptyOptionHint;
   const emptyMeta = includeSameDefault ? t("settings.plannerNoneHintShort") : emptyOptionHint;
@@ -4602,8 +4571,6 @@ export function ModelPicker({
     : selected
     ? modelOptionMeta(selected, t)
     : t("settings.noModelsConfigured");
-  const emptyOptionVisible = Boolean(emptyLabel);
-  const autoOptionVisible = Boolean(autoLabel);
 
   const groups = useMemo(() => {
     const providerOrder: string[] = [];
@@ -4618,7 +4585,7 @@ export function ModelPicker({
     const options = refs
       .map((ref) => modelOptionFromRef(ref, s))
       .filter((opt): opt is ModelPickerOption => Boolean(opt))
-      .filter((opt) => !q || `${opt.ref} ${opt.provider} ${modelProviderLabel(opt.provider, opt.providerView, t)} ${opt.model}`.toLowerCase().includes(q));
+;
     for (const opt of options) {
       const groupID = modelOptionGroupID(opt);
       if (!providerSeen.has(groupID)) {
@@ -4639,117 +4606,31 @@ export function ModelPicker({
         };
       })
       .filter((group) => group.options.length > 0);
-  }, [q, refs, s, t]);
-
-  useEffect(() => {
-    if (!open) setQuery("");
-  }, [open]);
-
-  const pick = (ref: string) => {
-    setOpen(false);
-    if (ref !== value) onPick(ref);
-  };
+  }, [refs, s, t]);
 
   return (
     <div className="settings-model-picker">
-      <button
-        ref={triggerRef}
-        type="button"
-        className="settings-model-picker__trigger"
-        disabled={disabled || (!includeSameDefault && !emptyOptionLabel && !autoOptionLabel && refs.length === 0)}
+      <SettingsSelect
+        value={value}
+        selectedLabel={selectedLabel}
+        title={selectedMeta || undefined}
+        disabled={disabled || (!emptyLabel && !autoLabel && refs.length === 0)}
         aria-label={ariaLabel}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((next) => !next)}
-      >
-        <span className="settings-model-picker__selected">
-          <span>{selectedLabel}</span>
-          {selectedMeta && selectedMeta !== selectedLabel && <small>{selectedMeta}</small>}
-        </span>
-        <ChevronDown size={16} className={`settings-model-picker__chev${open ? " settings-model-picker__chev--open" : ""}`} />
-      </button>
-      <AnchoredPopover
-        open={open && !disabled}
-        anchorRef={triggerRef}
-        onClose={() => setOpen(false)}
-        className="settings-model-picker__menu"
-        placement="bottom"
-        style={{ width: triggerRef.current?.getBoundingClientRect().width }}
-      >
-        <div className="settings-model-picker__search">
-          <input
-            value={query}
-            placeholder={t("settings.searchModels")}
-            onChange={(e) => setQuery(e.target.value)}
-            autoFocus
-          />
-        </div>
-        <div className="settings-model-picker__list" role="listbox" aria-label={ariaLabel} onKeyDown={event => {
-          if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
-          const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button[role="option"]:not(:disabled)'));
-          if (!options.length) return;
-          event.preventDefault();
-          const current = options.indexOf(document.activeElement as HTMLButtonElement);
-          const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (current + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
-          options[next]?.focus();
-        }}>
-          {emptyOptionVisible && (
-            <button
-              type="button"
-              role="option"
-              aria-selected={value === ""}
-              className={`settings-model-picker__option settings-model-picker__option--pinned${value === "" ? " settings-model-picker__option--selected" : ""}`}
-              onClick={() => pick("")}
-            >
-              <span>
-                <strong>{emptyLabel}</strong>
-                {emptyHint && <small>{emptyHint}</small>}
-              </span>
-              {value === "" && <Check size={14} />}
-            </button>
-          )}
-          {autoOptionVisible && (
-            <button
-              type="button"
-              role="option"
-              aria-selected={value === "auto"}
-              className={`settings-model-picker__option settings-model-picker__option--pinned${value === "auto" ? " settings-model-picker__option--selected" : ""}`}
-              onClick={() => pick("auto")}
-            >
-              <span>
-                <strong>{autoLabel}</strong>
-                {autoHint && <small>{autoHint}</small>}
-              </span>
-              {value === "auto" && <Check size={14} />}
-            </button>
-          )}
-          {groups.map((group) => (
-            <div className="settings-model-picker__group" key={group.groupID}>
-              <div className="settings-model-picker__group-title">
-                <span>{group.label}</span>
-                {group.requiresKey && !group.keySet && <small>{t("settings.noKey")}</small>}
-              </div>
-              {group.options.map((opt) => (
-                <button
-                  key={opt.ref}
-                  type="button"
-                  role="option"
-                  aria-selected={opt.ref === value}
-                  className={`settings-model-picker__option${opt.ref === value ? " settings-model-picker__option--selected" : ""}`}
-                  onClick={() => pick(opt.ref)}
-                >
-                  <span>
-                    <strong>{opt.model}</strong>
-
-                  </span>
-                  {opt.ref === value && <Check size={14} />}
-                </button>
-              ))}
-            </div>
-          ))}
-          {!emptyOptionVisible && !autoOptionVisible && groups.length === 0 && <div className="settings-model-picker__empty">{t("settings.noMatchingModels")}</div>}
-        </div>
-      </AnchoredPopover>
+        searchPlaceholder={t("settings.searchModels")}
+        emptyLabel={t("settings.noMatchingModels")}
+        onValueChange={onPick}
+        options={[
+          ...(emptyLabel ? [{ value: "", label: emptyLabel, hint: emptyHint }] : []),
+          ...(autoLabel ? [{ value: "auto", label: autoLabel, hint: autoHint }] : []),
+          ...groups.flatMap(group => group.options.map(opt => ({
+            value: opt.ref,
+            label: opt.model,
+            group: group.groupID,
+            groupLabel: group.requiresKey && !group.keySet ? `${group.label} · ${t("settings.noKey")}` : group.label,
+            searchText: `${opt.ref} ${modelProviderLabel(opt.provider, opt.providerView, t)}`,
+          }))),
+        ]}
+      />
     </div>
   );
 }
@@ -5273,10 +5154,10 @@ export function AddProviderPanel({
       <div><strong>{t("settings.addProvider.chooseTitle")}</strong><span>{t("settings.catalog.hint")}</span></div>
       <button type="button" className="btn btn--small" disabled={busy} onClick={onCancel}>{t("common.cancel")}</button>
     </div>
-    <div className="provider-add-segmented" role="tablist" aria-label={t("settings.addProvider.chooseTitle")}>
+    <SettingsOptions className="provider-add-segmented" role="tablist" aria-label={t("settings.addProvider.chooseTitle")}>
       <button type="button" role="tab" aria-selected={mode === "official"} className="provider-add-segmented__item" disabled={busy} onClick={() => onMode("official")}>{t("settings.addProvider.officialChoice")}</button>
       <button type="button" role="tab" aria-selected={mode === "custom"} className="provider-add-segmented__item" disabled={busy} onClick={() => onMode("custom")}>{t("settings.addProvider.customChoice")}</button>
-    </div>
+    </SettingsOptions>
     {mode === "official" && <ProviderCatalogPicker choices={choices} busy={busy}
       onConnect={(id, key, baseURL, format) => { if (id.startsWith("official:")) void onAddOfficial("deepseek", key, baseURL, format); else void onAddPreset(id.slice(7), key, baseURL, format); }}
       onView={onViewPresetConflict} onReset={id => { if (id.startsWith("preset:")) void onResetPreset(id.slice(7)); }} />}
@@ -6416,22 +6297,22 @@ export function ProviderEditor({
         </label>
         <div className="mem-hint">{t("settings.providerNoProxyHint")}</div>
         <label className="set-label">{t("settings.reasoningProtocol")}</label>
-        <select className="mem-select" value={reasoningProtocol} onChange={(e) => setReasoningProtocol(e.target.value)}>
+        <SettingsSelect className="mem-select" aria-label={t("settings.reasoningProtocol")} value={reasoningProtocol} onValueChange={(value) => setReasoningProtocol(value)}>
           {REASONING_PROTOCOLS.map((protocol) => (
             <option key={protocol || "auto"} value={protocol}>
               {reasoningProtocolLabel(protocol, t)}
             </option>
           ))}
-        </select>
+        </SettingsSelect>
         <div className="mem-hint">{t("settings.reasoningProtocolHint")}</div>
         <label className="set-label">{t("settings.thinkingMode")}</label>
-        <select className="mem-select" value={thinking} onChange={(e) => setThinking(normalizeThinkingMode(e.target.value))}>
+        <SettingsSelect className="mem-select" aria-label={t("settings.thinkingMode")} value={thinking} onValueChange={(value) => setThinking(normalizeThinkingMode(value))}>
           {THINKING_MODES.map((mode) => (
             <option key={mode || "auto"} value={mode}>
               {thinkingModeLabel(mode, t)}
             </option>
           ))}
-        </select>
+        </SettingsSelect>
         <div className="mem-hint">{t("settings.thinkingModeHint")}</div>
         <label className="set-label">{t("settings.providerBalanceUrl")}</label>
         <input
@@ -6484,8 +6365,8 @@ export function ProviderEditor({
       </div>
       <div className="provider-connection-field">
       <label className="set-label">{t("settings.providerProtocol")}</label>
-      <select className="mem-select" aria-label={t("settings.providerProtocol")} title={providerKindHint(effectiveKind, t)} value={kind} disabled={busy || fetchingModels} onChange={(e) => {
-        const nextKind = e.target.value;
+      <SettingsSelect className="mem-select" aria-label={t("settings.providerProtocol")} title={providerKindHint(effectiveKind, t)} value={kind} disabled={busy || fetchingModels} onValueChange={(value) => {
+        const nextKind = value;
         setRequestUrl(current => {
           const catalogs = providerPresets.map(catalogForPreset);
           const currentRoute = catalogs.find(c => c.format === kind && c.baseUrl && providerRequestURLFromConfig(kind, c.baseUrl, "") === current);
@@ -6499,7 +6380,7 @@ export function ProviderEditor({
             {providerKindLabel(choice, t)}
           </option>
         ))}
-      </select>
+      </SettingsSelect>
       {providerEndpointMismatch(effectiveKind, effectiveRequestUrl) && <div role="alert" className="banner banner--warning">{t("settings.providerProtocolMismatch")}</div>}
       </div>
       <div className="provider-key-single">
@@ -6571,16 +6452,16 @@ function PermissionsSection({ s, busy, apply }: SectionProps) {
     <>
     <SettingsSection title={t("settings.permissions")} description={t("settings.permissionsModeHint")}>
       <SettingsField label={t("settings.writerMode")}>
-        <select
+        <SettingsSelect
           className="mem-select set-grow"
           value={s.permissions.mode}
           disabled={busy}
-          onChange={(e) => void apply(() => app.SetPermissionMode(e.target.value))}
+          onValueChange={(value) => void apply(() => app.SetPermissionMode(value))}
         >
           <option value="ask">{t("settings.modeAsk")}</option>
           <option value="allow">{t("settings.modeAllow")}</option>
           <option value="deny">{t("settings.modeDeny")}</option>
-        </select>
+        </SettingsSelect>
       </SettingsField>
     </SettingsSection>
     <SettingsSection title={t("settings.permissionRules")} description={t("settings.ruleForm")}>
@@ -6798,10 +6679,10 @@ function HooksSection({ onChanged }: { onChanged: (settings?: SettingsView | nul
       {err && <div className="banner banner--error">{err}</div>}
       <SettingsSection title={t("settings.hooksScopeSection")} description={t("settings.hooksScopeHint")}>
         <SettingsField label={t("settings.hooksScopeField")}>
-          <select name="hooks-scope" className="mem-select set-grow" value={scope} disabled={busy} onChange={(e) => setScope(e.target.value === "project" ? "project" : "global")}>
+          <SettingsSelect name="hooks-scope" className="mem-select set-grow" value={scope} disabled={busy} onValueChange={(value) => setScope(value === "project" ? "project" : "global")}>
             <option value="global">{t("settings.hooksGlobal")}</option>
             <option value="project">{t("settings.hooksProject")}</option>
-          </select>
+          </SettingsSelect>
         </SettingsField>
         <SettingsField label={t("settings.hooksPath")} hint={scope === "project" ? t("settings.hooksPathProjectHint") : t("settings.hooksPathGlobalHint")}>
           <div className="hooks-path-stack">
@@ -6996,10 +6877,10 @@ function SandboxSection({ s, busy, apply, windows }: SectionProps & { windows: b
         {/* Windows has no OS-level Bash backend and config.BashModeForGOOS fixes
             the effective value to off. Keep the control visibly immutable and
             omit enforce so the UI cannot imply a dormant capability. */}
-        <select className="mem-select set-grow" value={windows ? "off" : sb.bash} disabled={busy || windows} onChange={(e) => void set({ bash: e.target.value })}>
+        <SettingsSelect className="mem-select set-grow" value={windows ? "off" : sb.bash} disabled={busy || windows} onValueChange={(value) => void set({ bash: value })}>
           {!windows && <option value="enforce">{t("settings.bashEnforce")}</option>}
           <option value="off">{t("settings.bashOff")}</option>
-        </select>
+        </SettingsSelect>
       </SettingsField>
       <SettingsField label={t("settings.allowNetwork")}>
         <label className="set-check set-check--inline">

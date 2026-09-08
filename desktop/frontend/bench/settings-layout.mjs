@@ -109,11 +109,11 @@ try {
         }
         await page.evaluate(() => { document.documentElement.style.zoom = "1"; });
         await page.setViewportSize({ width: 1600, height: 1100 });
-        const picker = page.locator(".model-assignment-row .settings-model-picker__trigger").first();
+        const picker = page.getByRole("button", { name: "Default model", exact: true });
         await picker.click();
-        await page.locator(".settings-model-picker__menu").waitFor();
+        await page.getByRole("listbox", { name: "Default model", exact: true }).waitFor();
         await page.keyboard.press("Escape");
-        await page.locator(".settings-model-picker__menu").waitFor({ state: "detached" });
+        await page.getByRole("listbox", { name: "Default model", exact: true }).waitFor({ state: "detached" });
         console.log(`PASS ${engineName}/${layout[0]} assignments and picker`);
         await page.locator(".settings-screen .management-screen__back").click();
       }

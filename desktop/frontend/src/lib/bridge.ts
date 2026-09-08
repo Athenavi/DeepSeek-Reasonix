@@ -3355,7 +3355,7 @@ function makeMockApp(): AppBindings {
           if (!match) return out;
           const messages = await this.HistoryForTab(tabID);
           const message = messages[Number(match[1])];
-          if (benchMock && message?.content?.includes("ASYNC LAYOUT EXPANSION COMPLETE")) await delay(1_500);
+          if (benchMock && message?.content?.includes("ASYNC LAYOUT EXPANSION COMPLETE")) await delay((await benchFixturesPromise)!.benchHydrationDelay());
           // Storm fixture: pace ref resolutions deterministically by entry
           // index so opening the session produces a seconds-long patch storm
           // instead of a single burst (#8657).

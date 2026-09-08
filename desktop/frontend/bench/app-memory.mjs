@@ -2,6 +2,7 @@
 
 import { spawn } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync, createWriteStream } from "node:fs";
+import { createTimings } from "./app-memory-timing.mjs";
 import { once } from "node:events";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,6 +37,7 @@ const artifacts = path.resolve(process.env.REASONIX_APP_MEMORY_ARTIFACTS ?? path
 mkdirSync(artifacts, { recursive: true });
 
 const fixtures = MEMORY_FIXTURES;
+const timings = createTimings();
 
 async function ensureBuild() {
   if (prepared) {
@@ -51,31 +53,33 @@ async function ensureBuild() {
 }
 
 async function settleFrames(page, count = 6) {
-  await page.evaluate((frames) => new Promise((resolve) => {
+  await timings.measure("settle.frames", () => page.evaluate((frames) => new Promise((resolve) => {
     const tick = () => --frames <= 0 ? resolve() : requestAnimationFrame(tick);
     requestAnimationFrame(tick);
-  }), count);
+  }), count));
 }
 
 async function selectFixture(page, fixture) {
-  const active = await page.locator(".project-tree__topic--active .project-tree__topic-label").textContent().catch(() => "");
+  const active = await timings.measure("navigation.active", () => page.locator(".project-tree__topic--active .project-tree__topic-label").textContent().catch(() => ""));
   if (active?.includes(fixture.label)) throw new Error(`invalid repeated navigation: ${fixture.label}`);
-  await page.locator(`.project-tree__topic-main:has-text("${fixture.label}")`).click();
-  await page.waitForFunction(({ label, marker }) => {
+  await timings.measure("navigation.click", () => page.locator(`.project-tree__topic-main:has-text("${fixture.label}")`).click());
+  // Sample a resting page, not a hover card whose 350ms timer races hydration.
+  await timings.measure("navigation.pointer", () => page.mouse.move(0, 0));
+  await timings.measure("navigation.ready", () => page.waitForFunction(({ label, marker }) => {
     const activeLabel = document.querySelector(".project-tree__topic--active .project-tree__topic-label")?.textContent ?? "";
     const transcript = document.querySelector(".transcript");
     return activeLabel.includes(label)
       && transcript?.dataset.transcriptHydrating === "false"
       && transcript.textContent?.includes(marker)
       && !document.querySelector(".transcript-navigation-overlay");
-  }, fixture, { timeout: 45_000, polling: "raf" });
+  }, fixture, { timeout: 45_000, polling: "raf" }));
   await settleFrames(page);
 }
 
 async function forceGc(cdp, page) {
-  await cdp.send("HeapProfiler.collectGarbage");
+  await timings.measure("gc.collect", () => cdp.send("HeapProfiler.collectGarbage"));
   await settleFrames(page, 2);
-  await cdp.send("HeapProfiler.collectGarbage");
+  await timings.measure("gc.collect", () => cdp.send("HeapProfiler.collectGarbage"));
   await settleFrames(page, 2);
   const [heap, dom, lifecycle, performance] = await Promise.all([
     cdp.send("Runtime.getHeapUsage"),
@@ -95,9 +99,9 @@ async function enterSafety(page) {
     Object.defineProperty(transcript, "scrollHeight", { configurable: true, get: () => Number.NaN });
     transcript.dispatchEvent(new Event("scroll"));
   });
-  await page.waitForFunction(() => (
+  await timings.measure("safety.ready", () => page.waitForFunction(() => (
     document.querySelector(".transcript__projection")?.getAttribute("data-transcript-safe-fallback") === "true"
-  ), undefined, { timeout: 15_000, polling: "raf" });
+  ), undefined, { timeout: 15_000, polling: "raf" }));
   await page.evaluate(() => {
     const transcript = document.querySelector(".transcript");
     if (transcript instanceof HTMLElement) delete transcript.scrollHeight;
@@ -110,10 +114,10 @@ async function heapSnapshot(cdp, name) {
   const output = createWriteStream(file);
   const listener = ({ chunk }) => output.write(chunk);
   cdp.on("HeapProfiler.addHeapSnapshotChunk", listener);
-  try { await cdp.send("HeapProfiler.takeHeapSnapshot", { reportProgress: false, captureNumericValue: true }); }
+  try { await timings.measure("heap.capture", () => cdp.send("HeapProfiler.takeHeapSnapshot", { reportProgress: false, captureNumericValue: true })); }
   finally { cdp.off("HeapProfiler.addHeapSnapshotChunk", listener); output.end(); }
   await once(output, "finish");
-  const summary = summarizeHeap(JSON.parse(readFileSync(file, "utf8")));
+  const summary = await timings.measure("heap.summarize", () => summarizeHeap(JSON.parse(readFileSync(file, "utf8"))));
   writeFileSync(path.join(artifacts, `${name}.summary.json`), JSON.stringify(summary, null, 2));
   return { file: path.basename(file), summary };
 }
@@ -129,7 +133,7 @@ async function runProcess(index) {
   page.on("pageerror", (error) => pageErrors.push(error.message));
   const cdp = await context.newCDPSession(page);
   try {
-    await page.goto(`http://127.0.0.1:${PORT}/?mock=bench&bench=1&app-lifecycle-probe=1`, { waitUntil: "domcontentloaded" });
+    await page.goto(`http://127.0.0.1:${PORT}/?mock=bench&bench=1&app-lifecycle-probe=1&bench-hydration=soak`, { waitUntil: "domcontentloaded" });
     await page.locator("textarea.composer__input:not([aria-hidden=true])").waitFor();
     await selectFixture(page, fixtures.geometry);
     await selectFixture(page, fixtures.full);
@@ -137,8 +141,13 @@ async function runProcess(index) {
     await selectFixture(page, fixtures.full);
     for (const [label, className] of [["Creation", "app--creation"], ["Workbench", "app--workbench"]]) {
       await chooseAppLayout(page, label, className);
+      await page.mouse.move(0, 0);
       await settleFrames(page);
     }
+    // Baseline and checkpoints share a post-navigation resting state. Layout
+    // controls can still own transient listeners immediately after closing.
+    await selectFixture(page, fixtures.geometry);
+    await selectFixture(page, fixtures.full);
     const samples = [{ phase: "baseline", roundTrips: 0, ...await forceGc(cdp, page) }];
     const snapshots = [await heapSnapshot(cdp, `${index}-baseline`)];
     for (const phase of ["full", "windowed", "safety", "mixed"]) {
@@ -156,6 +165,7 @@ async function runProcess(index) {
         }
       }
       snapshots.push(await heapSnapshot(cdp, `${index}-${phase}`));
+      writeFileSync(path.join(artifacts, "timings.json"), JSON.stringify(timings.snapshot(), null, 2));
     }
     // The classifier blocks on a displaced final tail, so the tail must be
     // measured at rest: mid-cleanup listener blips (614 vs the 512 baseline)
@@ -188,7 +198,7 @@ async function runProcess(index) {
 
 await ensureBuild();
 const preview = await startPreviewServer(frontendDir, PORT);
-const report = { identity: buildIdentity(frontendDir), fixtures, startedAt: new Date().toISOString(), cycles: CYCLES, mixedCycles: MIXED_CYCLES,
+const report = { identity: buildIdentity(frontendDir), fixtures, protocol: MEMORY_PROTOCOL, startedAt: new Date().toISOString(), cycles: CYCLES, mixedCycles: MIXED_CYCLES,
   ...(SHARD === null ? {} : { shard: { id: SHARD, total: 3, executionId: prepared.executionId } }), processes: [] };
 try {
   for (let index = 1; index <= PROCESSES; index += 1) {
@@ -203,6 +213,9 @@ try {
   await preview.close();
 }
 report.finishedAt = new Date().toISOString();
+report.timings = timings.snapshot();
+writeFileSync(path.join(artifacts, "timings.json"), JSON.stringify(report.timings, null, 2));
+process.stdout.write(`[app-memory] timings ${JSON.stringify(report.timings)}\n`);
 report.protocolComplete = CYCLES >= 128 && MIXED_CYCLES >= 512 && report.processes.length >= 3;
 report.shardComplete = SHARD !== null && completeShard(report);
 // The automated gate passes on clean screening: protocol complete, every
