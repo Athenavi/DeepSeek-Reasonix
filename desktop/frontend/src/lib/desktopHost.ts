@@ -2,6 +2,7 @@
 // window.reasonixDesktop (preload) and Wails' window.go / window.runtime.
 // scripts/check-desktop-host-boundary.mjs enforces that boundary.
 import type { AppBindings } from "./bridge";
+import type { DesktopBrowserHost } from "./browserHost";
 import { dataTransferLooksLikeFileDrag, installWailsNonFileDragErrorSuppression } from "./wailsDragErrors";
 
 export type DesktopHostKind = "electron" | "wails" | "none";
@@ -43,6 +44,7 @@ export interface ReasonixDesktopHost {
     getPathForFile(file: File): string;
     onServiceState(cb: (state: ServiceState) => void): () => void;
   };
+  browser: DesktopBrowserHost;
 }
 
 interface WailsRuntime {
@@ -84,6 +86,8 @@ export interface DesktopHost {
     getPathForFile?(file: File): string;
     onServiceState(cb: (state: ServiceState) => void): () => void;
   };
+  /** Native website views; only the Electron shell provides them. */
+  browser?: DesktopBrowserHost;
 }
 
 const noop = () => {};
@@ -194,6 +198,7 @@ const electronHostFrom = (host: ReasonixDesktopHost): DesktopHost => {
       getPathForFile: (file) => host.native.getPathForFile(file),
       onServiceState: (cb) => host.native.onServiceState(cb),
     },
+    browser: host.browser,
   };
   return electronHost;
 };

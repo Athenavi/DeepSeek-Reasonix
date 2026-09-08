@@ -17,12 +17,13 @@ try {
     const c = (window as unknown as { runtime?: unknown }).runtime;
     const d = globalThis.window.runtime;
     const e = window["go"];
+    const f = window.reasonixDesktop?.browser;
     import { EventsOn } from "../../wailsjs/runtime/runtime";
     export { X } from "@wailsapp/runtime";
     const lazy = () => import("../wailsjs/go/main/App");
   `, "flagged.ts");
   assert.deepEqual(flagged.map((entry) => entry.replace(/^\d+: /, "")), [
-    "window.go", "window.runtime", "window.runtime", "window.runtime", 'window["go"]',
+    "window.go", "window.runtime", "window.runtime", "window.runtime", 'window["go"]', "window.reasonixDesktop",
     "import from ../../wailsjs/runtime/runtime", "export from @wailsapp/runtime", "dynamic import of ../wailsjs/go/main/App",
   ]);
 
@@ -34,7 +35,7 @@ try {
     const wails = window.wails;
     const phase = tab.runtime.phase;
     const goCount = stats.go;
-    const host = window.reasonixDesktop;
+    const host = shell.reasonixDesktop;
     export type Keys = keyof typeof GeneratedApp;
   `, "clean.ts");
   assert.deepEqual(clean, [], "comments, strings, type-only imports and unrelated members are not host access");

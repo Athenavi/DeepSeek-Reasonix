@@ -80,6 +80,10 @@ ok(
   "Sidebar Region owns the lazy project tree import without an eager runtime edge",
 );
 ok(
+  lazyRuntimeImport("../app-shell/WorkspaceDockRegion.tsx", "../components/BrowserPanelEntry"),
+  "Workspace dock owns the lazy browser panel import without an eager runtime edge",
+);
+ok(
   settingsEntrySource.includes('import "./CompactRatioSettings.css"') &&
     settingsEntrySource.includes('from "./SettingsPanel"') &&
     !settingsSource.includes('import "./CompactRatioSettings.css"'),
