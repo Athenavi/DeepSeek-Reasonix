@@ -4356,7 +4356,7 @@ func (a *App) scanPromptHistoryFromDir(dir string) ([]PromptHistoryEntry, error)
 
 func newPromptHistoryTape(dir, currentPath string) (*promptHistoryTape, error) {
 	tape := &promptHistoryTape{
-		nonce:       fmt.Sprintf("%d", time.Now().UnixNano()),
+		nonce:       rand.Text(),
 		dir:         dir,
 		currentPath: currentPath,
 		displays:    loadSessionDisplays(dir),
@@ -6623,7 +6623,7 @@ func (a *App) loadConfigForVision(root string) (*config.Config, error) {
 	if hook := a.configLoadForRootHook; hook != nil {
 		hook(root)
 	}
-	return config.LoadForRoot(root)
+	return config.LoadForRootWithoutCredentialsReadOnly(root)
 }
 
 func (a *App) MetaForTab(tabID string) Meta {
