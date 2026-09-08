@@ -13,7 +13,7 @@
       "kind": "command",
       "name": "AbandonPendingUpdate",
       "detail": "() error",
-      "location": "desktop/updater_app.go:326",
+      "location": "desktop/updater_app.go:324",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -69,7 +69,7 @@
       "kind": "command",
       "name": "ActivateBaseStyle",
       "detail": "(style string) error",
-      "location": "desktop/theme_app.go:275",
+      "location": "desktop/theme_app.go:273",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -77,7 +77,7 @@
       "kind": "command",
       "name": "ActivateThemePack",
       "detail": "(id string) error",
-      "location": "desktop/theme_app.go:237",
+      "location": "desktop/theme_app.go:235",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -101,7 +101,7 @@
       "kind": "command",
       "name": "AddMCPServer",
       "detail": "(in MCPServerInput) (int, error)",
-      "location": "desktop/app.go:8632",
+      "location": "desktop/app.go:8596",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -181,7 +181,7 @@
       "kind": "command",
       "name": "AddSkillPath",
       "detail": "(path string) error",
-      "location": "desktop/app.go:8281",
+      "location": "desktop/app.go:8245",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -213,7 +213,7 @@
       "kind": "command",
       "name": "AnswerQuestion",
       "detail": "(id string, answers []QuestionAnswer)",
-      "location": "desktop/app.go:1971",
+      "location": "desktop/app.go:1935",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -221,7 +221,7 @@
       "kind": "command",
       "name": "AnswerQuestionForTab",
       "detail": "(tabID string, id string, answers []QuestionAnswer)",
-      "location": "desktop/app.go:1975",
+      "location": "desktop/app.go:1939",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -237,7 +237,7 @@
       "kind": "command",
       "name": "ApplyUpdateRequest",
       "detail": "(selectedChannel string, expectedVersion string, requestID string) error",
-      "location": "desktop/updater_app.go:456",
+      "location": "desktop/updater_app.go:454",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -245,7 +245,7 @@
       "kind": "command",
       "name": "Approve",
       "detail": "(id string, allow bool, session bool, persist bool)",
-      "location": "desktop/app.go:1650",
+      "location": "desktop/app.go:1614",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -261,7 +261,7 @@
       "kind": "command",
       "name": "ApproveTab",
       "detail": "(tabID string, id string, allow bool, session bool, persist bool)",
-      "location": "desktop/app.go:1658",
+      "location": "desktop/app.go:1622",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -277,7 +277,7 @@
       "kind": "command",
       "name": "AttachDropped",
       "detail": "(path string) (DroppedItem, error)",
-      "location": "desktop/app.go:10934",
+      "location": "desktop/app.go:10898",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -285,7 +285,7 @@
       "kind": "command",
       "name": "AttachmentDataURL",
       "detail": "(path string) (string, error)",
-      "location": "desktop/app.go:10911",
+      "location": "desktop/app.go:10875",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -293,7 +293,7 @@
       "kind": "command",
       "name": "AuthenticateMCPServer",
       "detail": "(name string) error",
-      "location": "desktop/mcp_oauth.go:70",
+      "location": "desktop/mcp_oauth.go:68",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -301,7 +301,7 @@
       "kind": "command",
       "name": "AuthorizeAndConnectMCPServer",
       "detail": "(name string) error",
-      "location": "desktop/app.go:7228",
+      "location": "desktop/app.go:7192",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -309,7 +309,7 @@
       "kind": "command",
       "name": "AvailableSubagentTools",
       "detail": "() []ToolView",
-      "location": "desktop/app.go:7593",
+      "location": "desktop/app.go:7557",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -325,7 +325,7 @@
       "kind": "command",
       "name": "Balance",
       "detail": "() BalanceInfo",
-      "location": "desktop/app.go:6387",
+      "location": "desktop/app.go:6351",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -333,7 +333,7 @@
       "kind": "command",
       "name": "BalanceForTab",
       "detail": "(tabID string) BalanceInfo",
-      "location": "desktop/app.go:6391",
+      "location": "desktop/app.go:6355",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -349,7 +349,7 @@
       "kind": "command",
       "name": "Cancel",
       "detail": "()",
-      "location": "desktop/app.go:1323",
+      "location": "desktop/app.go:1287",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -357,7 +357,7 @@
       "kind": "command",
       "name": "CancelJob",
       "detail": "(jobID string) (bool, error)",
-      "location": "desktop/app.go:6481",
+      "location": "desktop/app.go:6445",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -365,7 +365,7 @@
       "kind": "command",
       "name": "CancelJobForTab",
       "detail": "(tabID string, jobID string) (bool, error)",
-      "location": "desktop/app.go:6487",
+      "location": "desktop/app.go:6451",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -405,7 +405,7 @@
       "kind": "command",
       "name": "CancelTab",
       "detail": "(tabID string)",
-      "location": "desktop/app.go:1327",
+      "location": "desktop/app.go:1291",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -429,7 +429,7 @@
       "kind": "command",
       "name": "CancelTask",
       "detail": "(taskID string, expectedVersion uint64, reason string, idemKey string) (taskmonitor.ControlResult, error)",
-      "location": "desktop/app.go:11604",
+      "location": "desktop/app.go:11568",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -445,7 +445,7 @@
       "kind": "command",
       "name": "CancelTaskForTab",
       "detail": "(tabID string, taskID string, expectedVersion uint64, reason string, idemKey string) (taskmonitor.ControlResult, error)",
-      "location": "desktop/app.go:11612",
+      "location": "desktop/app.go:11576",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -461,7 +461,7 @@
       "kind": "command",
       "name": "Capabilities",
       "detail": "() CapabilitiesView",
-      "location": "desktop/app.go:7109",
+      "location": "desktop/app.go:7073",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -485,7 +485,7 @@
       "kind": "command",
       "name": "CheckUpdate",
       "detail": "(selectedChannel string) (*UpdateInfo, error)",
-      "location": "desktop/updater_app.go:87",
+      "location": "desktop/updater_app.go:85",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -493,7 +493,7 @@
       "kind": "command",
       "name": "Checkpoints",
       "detail": "() []CheckpointMeta",
-      "location": "desktop/app.go:2358",
+      "location": "desktop/app.go:2322",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -501,7 +501,7 @@
       "kind": "command",
       "name": "CheckpointsForTab",
       "detail": "(tabID string) []CheckpointMeta",
-      "location": "desktop/app.go:2362",
+      "location": "desktop/app.go:2326",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -541,7 +541,7 @@
       "kind": "command",
       "name": "ClearGoal",
       "detail": "() error",
-      "location": "desktop/app.go:6769",
+      "location": "desktop/app.go:6733",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -549,7 +549,7 @@
       "kind": "command",
       "name": "ClearGoalForTab",
       "detail": "(tabID string) error",
-      "location": "desktop/app.go:6773",
+      "location": "desktop/app.go:6737",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -557,7 +557,7 @@
       "kind": "command",
       "name": "ClearMCPServerAuthentication",
       "detail": "(name string) error",
-      "location": "desktop/mcp_oauth.go:105",
+      "location": "desktop/mcp_oauth.go:103",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -597,7 +597,7 @@
       "kind": "command",
       "name": "CloseMainWindow",
       "detail": "()",
-      "location": "desktop/window_controls.go:32",
+      "location": "desktop/window_controls.go:30",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -645,7 +645,7 @@
       "kind": "command",
       "name": "Commands",
       "detail": "() []CommandInfo",
-      "location": "desktop/app.go:6876",
+      "location": "desktop/app.go:6840",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -661,7 +661,7 @@
       "kind": "command",
       "name": "CommitWorkspaceFileRevertForTab",
       "detail": "(tabID string, planID string, resolution string) RewindResultView",
-      "location": "desktop/app.go:2542",
+      "location": "desktop/app.go:2506",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -669,7 +669,7 @@
       "kind": "command",
       "name": "Compact",
       "detail": "() error",
-      "location": "desktop/app.go:1989",
+      "location": "desktop/app.go:1953",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -677,7 +677,7 @@
       "kind": "command",
       "name": "CompactForTab",
       "detail": "(tabID string) error",
-      "location": "desktop/app.go:1995",
+      "location": "desktop/app.go:1959",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -693,7 +693,7 @@
       "kind": "command",
       "name": "ConfirmAction",
       "detail": "(req NativeConfirmRequest) (bool, error)",
-      "location": "desktop/app.go:11703",
+      "location": "desktop/app.go:11667",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -717,7 +717,7 @@
       "kind": "command",
       "name": "ConnectKey",
       "detail": "(apiKey string) (string, error)",
-      "location": "desktop/app.go:11770",
+      "location": "desktop/app.go:11734",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -741,7 +741,7 @@
       "kind": "command",
       "name": "ContextUsage",
       "detail": "() ContextInfo",
-      "location": "desktop/app.go:6309",
+      "location": "desktop/app.go:6273",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -749,7 +749,7 @@
       "kind": "command",
       "name": "ContextUsageForTab",
       "detail": "(tabID string) ContextInfo",
-      "location": "desktop/app.go:6313",
+      "location": "desktop/app.go:6277",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -757,7 +757,7 @@
       "kind": "command",
       "name": "CopyThemePack",
       "detail": "(sourceID string, newID string, newName string) (ThemePackView, error)",
-      "location": "desktop/theme_app.go:554",
+      "location": "desktop/theme_app.go:552",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -765,7 +765,7 @@
       "kind": "command",
       "name": "CreateBlankProject",
       "detail": "(parentDir string, projectName string) (string, error)",
-      "location": "desktop/blank_project.go:32",
+      "location": "desktop/blank_project.go:30",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -813,7 +813,7 @@
       "kind": "command",
       "name": "CurrentTaskSessionID",
       "detail": "() string",
-      "location": "desktop/app.go:11526",
+      "location": "desktop/app.go:11490",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -837,7 +837,7 @@
       "kind": "command",
       "name": "DeleteRecoveryCopy",
       "detail": "(path string) error",
-      "location": "desktop/app.go:2970",
+      "location": "desktop/app.go:2934",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -861,7 +861,7 @@
       "kind": "command",
       "name": "DeleteSession",
       "detail": "(path string) error",
-      "location": "desktop/app.go:2962",
+      "location": "desktop/app.go:2926",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -877,7 +877,7 @@
       "kind": "command",
       "name": "DeleteThemePack",
       "detail": "(id string) error",
-      "location": "desktop/theme_app.go:531",
+      "location": "desktop/theme_app.go:529",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -917,7 +917,7 @@
       "kind": "command",
       "name": "DisableThemePack",
       "detail": "() error",
-      "location": "desktop/theme_app.go:294",
+      "location": "desktop/theme_app.go:292",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -941,7 +941,7 @@
       "kind": "command",
       "name": "Effort",
       "detail": "() EffortInfo",
-      "location": "desktop/app.go:9778",
+      "location": "desktop/app.go:9742",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -949,7 +949,7 @@
       "kind": "command",
       "name": "EffortForTab",
       "detail": "(tabID string) EffortInfo",
-      "location": "desktop/app.go:9782",
+      "location": "desktop/app.go:9746",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1013,7 +1013,7 @@
       "kind": "command",
       "name": "ExportScrollDiagnostics",
       "detail": "(payload string) (string, error)",
-      "location": "desktop/scroll_diagnostics_export.go:365",
+      "location": "desktop/scroll_diagnostics_export.go:363",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -1021,7 +1021,7 @@
       "kind": "command",
       "name": "ExportThemePack",
       "detail": "(id string, destPath string) (string, error)",
-      "location": "desktop/theme_app.go:712",
+      "location": "desktop/theme_app.go:710",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -1037,7 +1037,7 @@
       "kind": "command",
       "name": "ExternalOpeners",
       "detail": "() ExternalOpenersView",
-      "location": "desktop/external_opener.go:179",
+      "location": "desktop/external_opener.go:177",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1045,7 +1045,7 @@
       "kind": "command",
       "name": "ExternalOpenersForTab",
       "detail": "(tabID string) ExternalOpenersView",
-      "location": "desktop/external_opener.go:192",
+      "location": "desktop/external_opener.go:190",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1101,7 +1101,7 @@
       "kind": "command",
       "name": "Forget",
       "detail": "(name string) error",
-      "location": "desktop/app.go:11256",
+      "location": "desktop/app.go:11220",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1109,7 +1109,7 @@
       "kind": "command",
       "name": "ForgetForTab",
       "detail": "(tabID string, name string) error",
-      "location": "desktop/app.go:11260",
+      "location": "desktop/app.go:11224",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1125,7 +1125,7 @@
       "kind": "command",
       "name": "Fork",
       "detail": "(turn int) (TabMeta, error)",
-      "location": "desktop/app.go:2648",
+      "location": "desktop/app.go:2612",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1133,7 +1133,7 @@
       "kind": "command",
       "name": "ForkForTab",
       "detail": "(tabID string, turn int) (TabMeta, error)",
-      "location": "desktop/app.go:2655",
+      "location": "desktop/app.go:2619",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1149,7 +1149,7 @@
       "kind": "command",
       "name": "ForkWorktreeForTab",
       "detail": "(tabID string, turn int) (ForkWorktreeResultView, error)",
-      "location": "desktop/app.go:2661",
+      "location": "desktop/app.go:2625",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1157,7 +1157,7 @@
       "kind": "command",
       "name": "GetActiveThemePack",
       "detail": "() (ThemeActiveView, error)",
-      "location": "desktop/theme_app.go:112",
+      "location": "desktop/theme_app.go:110",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1253,7 +1253,7 @@
       "kind": "command",
       "name": "GetTask",
       "detail": "(taskID string) (*taskmonitor.TaskSnapshot, error)",
-      "location": "desktop/app.go:11569",
+      "location": "desktop/app.go:11533",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1269,7 +1269,7 @@
       "kind": "command",
       "name": "GetThemeExperience",
       "detail": "() (ThemeExperienceView, error)",
-      "location": "desktop/theme_app.go:151",
+      "location": "desktop/theme_app.go:149",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1365,7 +1365,7 @@
       "kind": "command",
       "name": "History",
       "detail": "() []HistoryMessage",
-      "location": "desktop/app.go:5204",
+      "location": "desktop/app.go:5168",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1373,7 +1373,7 @@
       "kind": "command",
       "name": "HistoryCheckpointTurnsForTab",
       "detail": "(tabID string) []int",
-      "location": "desktop/app.go:5361",
+      "location": "desktop/app.go:5325",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1389,7 +1389,7 @@
       "kind": "command",
       "name": "HistoryForTab",
       "detail": "(tabID string) []HistoryMessage",
-      "location": "desktop/app.go:5329",
+      "location": "desktop/app.go:5293",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1397,7 +1397,7 @@
       "kind": "command",
       "name": "HistoryPage",
       "detail": "(beforeTurn int, limit int) HistoryPage",
-      "location": "desktop/app.go:5208",
+      "location": "desktop/app.go:5172",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1405,7 +1405,7 @@
       "kind": "command",
       "name": "HistoryPageForTab",
       "detail": "(tabID string, beforeTurn int, limit int) HistoryPage",
-      "location": "desktop/app.go:5212",
+      "location": "desktop/app.go:5176",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1429,7 +1429,7 @@
       "kind": "command",
       "name": "ImportThemePack",
       "detail": "(sourcePath string, replace bool) (ThemeImportResult, error)",
-      "location": "desktop/theme_app.go:641",
+      "location": "desktop/theme_app.go:639",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -1461,7 +1461,7 @@
       "kind": "command",
       "name": "InstallMCPServer",
       "detail": "(in MCPServerInput) (plugin.MCPInstallResult, error)",
-      "location": "desktop/app.go:8546",
+      "location": "desktop/app.go:8510",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1509,7 +1509,7 @@
       "kind": "command",
       "name": "IsMainWindowMaximised",
       "detail": "() bool",
-      "location": "desktop/window_controls.go:23",
+      "location": "desktop/window_controls.go:21",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -1525,7 +1525,7 @@
       "kind": "command",
       "name": "Jobs",
       "detail": "() []JobView",
-      "location": "desktop/app.go:6470",
+      "location": "desktop/app.go:6434",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1533,7 +1533,7 @@
       "kind": "command",
       "name": "JobsForTab",
       "detail": "(tabID string) []JobView",
-      "location": "desktop/app.go:6474",
+      "location": "desktop/app.go:6438",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1541,7 +1541,7 @@
       "kind": "command",
       "name": "ListDir",
       "detail": "(rel string) []DirEntry",
-      "location": "desktop/app.go:10200",
+      "location": "desktop/app.go:10164",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1549,7 +1549,7 @@
       "kind": "command",
       "name": "ListDirForTab",
       "detail": "(tabID string, rel string) []DirEntry",
-      "location": "desktop/app.go:10205",
+      "location": "desktop/app.go:10169",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1605,7 +1605,7 @@
       "kind": "command",
       "name": "ListSessions",
       "detail": "() []SessionMeta",
-      "location": "desktop/app.go:2765",
+      "location": "desktop/app.go:2729",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1613,7 +1613,7 @@
       "kind": "command",
       "name": "ListSessionsForTab",
       "detail": "(tabID string) []SessionMeta",
-      "location": "desktop/app.go:2773",
+      "location": "desktop/app.go:2737",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1637,7 +1637,7 @@
       "kind": "command",
       "name": "ListTaskEvents",
       "detail": "(taskID string, afterSequence int) ([]taskmonitor.TaskEvent, error)",
-      "location": "desktop/app.go:11573",
+      "location": "desktop/app.go:11537",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1645,7 +1645,7 @@
       "kind": "command",
       "name": "ListTaskEventsForTab",
       "detail": "(tabID string, taskID string, afterSequence int) ([]taskmonitor.TaskEvent, error)",
-      "location": "desktop/app.go:11577",
+      "location": "desktop/app.go:11541",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1661,7 +1661,7 @@
       "kind": "command",
       "name": "ListTasks",
       "detail": "() ([]taskmonitor.TaskSnapshot, error)",
-      "location": "desktop/app.go:11519",
+      "location": "desktop/app.go:11483",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1669,7 +1669,7 @@
       "kind": "command",
       "name": "ListTasksForSession",
       "detail": "(sessionID string) ([]taskmonitor.TaskSnapshot, error)",
-      "location": "desktop/app.go:11537",
+      "location": "desktop/app.go:11501",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1677,7 +1677,7 @@
       "kind": "command",
       "name": "ListTasksForTab",
       "detail": "(tabID string) ([]taskmonitor.TaskSnapshot, error)",
-      "location": "desktop/app.go:11547",
+      "location": "desktop/app.go:11511",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1685,7 +1685,7 @@
       "kind": "command",
       "name": "ListThemePacks",
       "detail": "() ([]ThemePackView, error)",
-      "location": "desktop/theme_app.go:63",
+      "location": "desktop/theme_app.go:61",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1693,7 +1693,7 @@
       "kind": "command",
       "name": "ListTrashedSessions",
       "detail": "() []SessionMeta",
-      "location": "desktop/app.go:2813",
+      "location": "desktop/app.go:2777",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1701,7 +1701,7 @@
       "kind": "command",
       "name": "ListWorkspaces",
       "detail": "() []WorkspaceMeta",
-      "location": "desktop/app.go:4816",
+      "location": "desktop/app.go:4780",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1709,7 +1709,7 @@
       "kind": "command",
       "name": "MCPAppCallTool",
       "detail": "(instanceToken string, toolName string, args json.RawMessage) (string, error)",
-      "location": "desktop/mcp_apps_app.go:181",
+      "location": "desktop/mcp_apps_app.go:180",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1717,7 +1717,7 @@
       "kind": "command",
       "name": "MCPAppCallToolForTab",
       "detail": "(tabID string, instanceToken string, toolName string, args json.RawMessage) (string, error)",
-      "location": "desktop/mcp_apps_app.go:195",
+      "location": "desktop/mcp_apps_app.go:194",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1725,7 +1725,7 @@
       "kind": "command",
       "name": "MCPAppResourceDigest",
       "detail": "(instanceToken string) (string, error)",
-      "location": "desktop/mcp_apps_app.go:105",
+      "location": "desktop/mcp_apps_app.go:104",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1733,7 +1733,7 @@
       "kind": "command",
       "name": "MCPAppResourceDigestForTab",
       "detail": "(tabID string, instanceToken string) (string, error)",
-      "location": "desktop/mcp_apps_app.go:117",
+      "location": "desktop/mcp_apps_app.go:116",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1749,7 +1749,7 @@
       "kind": "command",
       "name": "MCPCloseAppInstance",
       "detail": "(instanceToken string)",
-      "location": "desktop/mcp_apps_app.go:126",
+      "location": "desktop/mcp_apps_app.go:125",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1757,7 +1757,7 @@
       "kind": "command",
       "name": "MCPCloseAppInstanceForTab",
       "detail": "(tabID string, instanceToken string) error",
-      "location": "desktop/mcp_apps_app.go:132",
+      "location": "desktop/mcp_apps_app.go:131",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1765,7 +1765,7 @@
       "kind": "command",
       "name": "MCPMarketplace",
       "detail": "(query string) (MCPMarketplaceView, error)",
-      "location": "desktop/app.go:7150",
+      "location": "desktop/app.go:7114",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1773,7 +1773,7 @@
       "kind": "command",
       "name": "MCPMarketplaceResolve",
       "detail": "(registryName string) (MCPMarketplaceEntryView, error)",
-      "location": "desktop/app.go:7171",
+      "location": "desktop/app.go:7135",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1781,7 +1781,7 @@
       "kind": "command",
       "name": "MCPOpenAppInstance",
       "detail": "(server string, tool string, generation uint64, callID string, resourceURI string) (*MCPAppInstanceView, error)",
-      "location": "desktop/mcp_apps_app.go:41",
+      "location": "desktop/mcp_apps_app.go:40",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1789,7 +1789,7 @@
       "kind": "command",
       "name": "MCPOpenAppInstanceForTab",
       "detail": "(tabID string, server string, tool string, generation uint64, callID string, resourceURI string) (*MCPAppInstanceView, error)",
-      "location": "desktop/mcp_apps_app.go:52",
+      "location": "desktop/mcp_apps_app.go:51",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1797,7 +1797,7 @@
       "kind": "command",
       "name": "MCPOpenAppLink",
       "detail": "(rawURL string) error",
-      "location": "desktop/mcp_apps_app.go:155",
+      "location": "desktop/mcp_apps_app.go:154",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -1805,7 +1805,7 @@
       "kind": "command",
       "name": "MCPOpenAppLinkForTab",
       "detail": "(tabID string, instanceToken string, rawURL string) error",
-      "location": "desktop/mcp_apps_app.go:167",
+      "location": "desktop/mcp_apps_app.go:166",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1813,7 +1813,7 @@
       "kind": "command",
       "name": "MCPServers",
       "detail": "() []ServerView",
-      "location": "desktop/app.go:7121",
+      "location": "desktop/app.go:7085",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1821,7 +1821,7 @@
       "kind": "command",
       "name": "Memory",
       "detail": "() MemoryView",
-      "location": "desktop/app.go:11127",
+      "location": "desktop/app.go:11091",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1829,7 +1829,7 @@
       "kind": "command",
       "name": "MemoryForTab",
       "detail": "(tabID string) MemoryView",
-      "location": "desktop/app.go:11137",
+      "location": "desktop/app.go:11101",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1837,7 +1837,7 @@
       "kind": "command",
       "name": "MemoryRevisions",
       "detail": "(ref string) []MemoryFact",
-      "location": "desktop/app.go:11337",
+      "location": "desktop/app.go:11301",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1845,7 +1845,7 @@
       "kind": "command",
       "name": "MemoryRevisionsForTab",
       "detail": "(tabID string, ref string) []MemoryFact",
-      "location": "desktop/app.go:11341",
+      "location": "desktop/app.go:11305",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1877,7 +1877,7 @@
       "kind": "command",
       "name": "Meta",
       "detail": "() Meta",
-      "location": "desktop/app.go:6605",
+      "location": "desktop/app.go:6569",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1885,7 +1885,7 @@
       "kind": "command",
       "name": "MetaForTab",
       "detail": "(tabID string) Meta",
-      "location": "desktop/app.go:6616",
+      "location": "desktop/app.go:6580",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1901,7 +1901,7 @@
       "kind": "command",
       "name": "MinimiseMainWindow",
       "detail": "()",
-      "location": "desktop/window_controls.go:6",
+      "location": "desktop/window_controls.go:4",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -1917,7 +1917,7 @@
       "kind": "command",
       "name": "Models",
       "detail": "() []ModelInfo",
-      "location": "desktop/app.go:9239",
+      "location": "desktop/app.go:9203",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1941,7 +1941,7 @@
       "kind": "command",
       "name": "NeedsOnboarding",
       "detail": "() bool",
-      "location": "desktop/app.go:11751",
+      "location": "desktop/app.go:11715",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1965,7 +1965,7 @@
       "kind": "command",
       "name": "OpenChannelSessionForTab",
       "detail": "(tabID string, path string) ([]HistoryMessage, error)",
-      "location": "desktop/app.go:3642",
+      "location": "desktop/app.go:3606",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1973,7 +1973,7 @@
       "kind": "command",
       "name": "OpenChannelSessionPageForTab",
       "detail": "(tabID string, path string, limit int) (HistoryPage, error)",
-      "location": "desktop/app.go:3664",
+      "location": "desktop/app.go:3628",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1981,7 +1981,7 @@
       "kind": "command",
       "name": "OpenDownloadPage",
       "detail": "()",
-      "location": "desktop/updater_app.go:129",
+      "location": "desktop/updater_app.go:127",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2005,7 +2005,7 @@
       "kind": "command",
       "name": "OpenLocalPathInExternalOpener",
       "detail": "(path string, id string) error",
-      "location": "desktop/external_opener.go:270",
+      "location": "desktop/external_opener.go:268",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2037,7 +2037,7 @@
       "kind": "command",
       "name": "OpenTaskSession",
       "detail": "(taskID string) (taskmonitor.ControlResult, error)",
-      "location": "desktop/app.go:11635",
+      "location": "desktop/app.go:11599",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2053,7 +2053,7 @@
       "kind": "command",
       "name": "OpenTaskSessionForTab",
       "detail": "(tabID string, taskID string) (taskmonitor.ControlResult, error)",
-      "location": "desktop/app.go:11639",
+      "location": "desktop/app.go:11603",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2077,7 +2077,7 @@
       "kind": "command",
       "name": "OpenWorkspaceInExternalOpener",
       "detail": "(id string) error",
-      "location": "desktop/external_opener.go:215",
+      "location": "desktop/external_opener.go:213",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2085,7 +2085,7 @@
       "kind": "command",
       "name": "OpenWorkspaceInExternalOpenerForTab",
       "detail": "(tabID string, id string) error",
-      "location": "desktop/external_opener.go:221",
+      "location": "desktop/external_opener.go:219",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2093,7 +2093,7 @@
       "kind": "command",
       "name": "OpenWorkspacePath",
       "detail": "(rel string) error",
-      "location": "desktop/app.go:10415",
+      "location": "desktop/app.go:10379",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2101,7 +2101,7 @@
       "kind": "command",
       "name": "OpenWorkspacePathForTab",
       "detail": "(tabID string, rel string) error",
-      "location": "desktop/app.go:10420",
+      "location": "desktop/app.go:10384",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2109,7 +2109,7 @@
       "kind": "command",
       "name": "PauseGoalForTab",
       "detail": "(tabID string) bool",
-      "location": "desktop/app.go:6801",
+      "location": "desktop/app.go:6765",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2133,7 +2133,7 @@
       "kind": "command",
       "name": "PickBlankProjectParent",
       "detail": "() (string, error)",
-      "location": "desktop/blank_project.go:14",
+      "location": "desktop/blank_project.go:12",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -2141,7 +2141,7 @@
       "kind": "command",
       "name": "PickExportFile",
       "detail": "(defaultFilename string, mimeType string) (string, error)",
-      "location": "desktop/app.go:10619",
+      "location": "desktop/app.go:10583",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -2149,7 +2149,7 @@
       "kind": "command",
       "name": "PickPluginFolder",
       "detail": "() (string, error)",
-      "location": "desktop/app.go:8261",
+      "location": "desktop/app.go:8225",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -2157,7 +2157,7 @@
       "kind": "command",
       "name": "PickRemoteIdentityFile",
       "detail": "() (string, error)",
-      "location": "desktop/remote_dialog.go:13",
+      "location": "desktop/remote_dialog.go:11",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -2165,7 +2165,7 @@
       "kind": "command",
       "name": "PickSkillFolder",
       "detail": "() (string, error)",
-      "location": "desktop/app.go:8243",
+      "location": "desktop/app.go:8207",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -2173,7 +2173,7 @@
       "kind": "command",
       "name": "PickThemeBackground",
       "detail": "() (string, error)",
-      "location": "desktop/theme_app.go:755",
+      "location": "desktop/theme_app.go:753",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -2181,7 +2181,7 @@
       "kind": "command",
       "name": "PickWorkspace",
       "detail": "() (string, error)",
-      "location": "desktop/app.go:4754",
+      "location": "desktop/app.go:4718",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -2245,7 +2245,7 @@
       "kind": "command",
       "name": "PreviewRewindForTab",
       "detail": "(tabID string, turn int, scope string) RewindPlanView",
-      "location": "desktop/app.go:2493",
+      "location": "desktop/app.go:2457",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2253,7 +2253,7 @@
       "kind": "command",
       "name": "PreviewSession",
       "detail": "(path string) ([]HistoryMessage, error)",
-      "location": "desktop/app.go:4231",
+      "location": "desktop/app.go:4195",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2261,7 +2261,7 @@
       "kind": "command",
       "name": "PreviewWorkspaceFileRevertForTab",
       "detail": "(tabID string, path string) RewindPlanView",
-      "location": "desktop/app.go:2520",
+      "location": "desktop/app.go:2484",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2269,7 +2269,7 @@
       "kind": "command",
       "name": "PurgeRecoveryCopy",
       "detail": "(path string) error",
-      "location": "desktop/app.go:3479",
+      "location": "desktop/app.go:3443",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2277,7 +2277,7 @@
       "kind": "command",
       "name": "PurgeTrashedSession",
       "detail": "(path string) error",
-      "location": "desktop/app.go:3473",
+      "location": "desktop/app.go:3437",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2293,7 +2293,7 @@
       "kind": "command",
       "name": "ReadFile",
       "detail": "(rel string) FilePreview",
-      "location": "desktop/app.go:10324",
+      "location": "desktop/app.go:10288",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2301,7 +2301,7 @@
       "kind": "command",
       "name": "ReadFileForTab",
       "detail": "(tabID string, rel string) FilePreview",
-      "location": "desktop/app.go:10329",
+      "location": "desktop/app.go:10293",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2365,7 +2365,7 @@
       "kind": "command",
       "name": "ReconnectMCPServer",
       "detail": "(name string) error",
-      "location": "desktop/app.go:8794",
+      "location": "desktop/app.go:8758",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2381,7 +2381,7 @@
       "kind": "command",
       "name": "RecoveryCheckpointEnabled",
       "detail": "() bool",
-      "location": "desktop/app.go:1710",
+      "location": "desktop/app.go:1674",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2389,7 +2389,7 @@
       "kind": "command",
       "name": "RecoveryCheckpointEnabledTab",
       "detail": "(_ string) bool",
-      "location": "desktop/app.go:1715",
+      "location": "desktop/app.go:1679",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2405,7 +2405,7 @@
       "kind": "command",
       "name": "RefreshSkills",
       "detail": "() error",
-      "location": "desktop/app.go:8342",
+      "location": "desktop/app.go:8306",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2421,7 +2421,7 @@
       "kind": "command",
       "name": "ReloadCommands",
       "detail": "() error",
-      "location": "desktop/app.go:8357",
+      "location": "desktop/app.go:8321",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2453,7 +2453,7 @@
       "kind": "command",
       "name": "Remember",
       "detail": "(scope string, note string) (string, error)",
-      "location": "desktop/app.go:11228",
+      "location": "desktop/app.go:11192",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2461,7 +2461,7 @@
       "kind": "command",
       "name": "RememberForTab",
       "detail": "(tabID string, scope string, note string) (string, error)",
-      "location": "desktop/app.go:11232",
+      "location": "desktop/app.go:11196",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2557,7 +2557,7 @@
       "kind": "command",
       "name": "RemoveMCPServer",
       "detail": "(name string) error",
-      "location": "desktop/app.go:8732",
+      "location": "desktop/app.go:8696",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2621,7 +2621,7 @@
       "kind": "command",
       "name": "RemoveSkillPath",
       "detail": "(path string) error",
-      "location": "desktop/app.go:8302",
+      "location": "desktop/app.go:8266",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2629,7 +2629,7 @@
       "kind": "command",
       "name": "RemoveWorkspace",
       "detail": "(dir string) error",
-      "location": "desktop/app.go:4840",
+      "location": "desktop/app.go:4804",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2669,7 +2669,7 @@
       "kind": "command",
       "name": "RenameSession",
       "detail": "(path string, title string) error",
-      "location": "desktop/app.go:3516",
+      "location": "desktop/app.go:3480",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2733,7 +2733,7 @@
       "kind": "command",
       "name": "ReplayPendingPrompts",
       "detail": "()",
-      "location": "desktop/app.go:1724",
+      "location": "desktop/app.go:1688",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2741,7 +2741,7 @@
       "kind": "command",
       "name": "ReplayPendingPromptsForTab",
       "detail": "(tabID string)",
-      "location": "desktop/app.go:1743",
+      "location": "desktop/app.go:1707",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2765,7 +2765,7 @@
       "kind": "command",
       "name": "ReportDesktopWebViewReady",
       "detail": "()",
-      "location": "desktop/app.go:1005",
+      "location": "desktop/app.go:969",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2773,7 +2773,7 @@
       "kind": "command",
       "name": "RequeueTask",
       "detail": "(taskID string, expectedVersion uint64, idemKey string) (taskmonitor.ControlResult, error)",
-      "location": "desktop/app.go:11623",
+      "location": "desktop/app.go:11587",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2789,7 +2789,7 @@
       "kind": "command",
       "name": "RequeueTaskForTab",
       "detail": "(tabID string, taskID string, expectedVersion uint64, idemKey string) (taskmonitor.ControlResult, error)",
-      "location": "desktop/app.go:11627",
+      "location": "desktop/app.go:11591",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2805,7 +2805,7 @@
       "kind": "command",
       "name": "ResetThemePack",
       "detail": "() error",
-      "location": "desktop/theme_app.go:318",
+      "location": "desktop/theme_app.go:316",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2829,7 +2829,7 @@
       "kind": "command",
       "name": "ResolvePlanDecision",
       "detail": "(id string, action string) error",
-      "location": "desktop/app.go:1667",
+      "location": "desktop/app.go:1631",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2837,7 +2837,7 @@
       "kind": "command",
       "name": "ResolvePlanDecisionTab",
       "detail": "(tabID string, id string, action string) error",
-      "location": "desktop/app.go:1677",
+      "location": "desktop/app.go:1641",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2861,7 +2861,7 @@
       "kind": "command",
       "name": "ResolveRecovery",
       "detail": "(id string, action string, feedback string) error",
-      "location": "desktop/app.go:1688",
+      "location": "desktop/app.go:1652",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2869,7 +2869,7 @@
       "kind": "command",
       "name": "ResolveRecoveryTab",
       "detail": "(tabID string, id string, action string, feedback string) error",
-      "location": "desktop/app.go:1693",
+      "location": "desktop/app.go:1657",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2909,7 +2909,7 @@
       "kind": "command",
       "name": "RestoreArchivedMemory",
       "detail": "(archivePath string) (MemoryFact, error)",
-      "location": "desktop/app.go:11284",
+      "location": "desktop/app.go:11248",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2917,7 +2917,7 @@
       "kind": "command",
       "name": "RestoreArchivedMemoryForTab",
       "detail": "(tabID string, archivePath string) (MemoryFact, error)",
-      "location": "desktop/app.go:11288",
+      "location": "desktop/app.go:11252",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2925,7 +2925,7 @@
       "kind": "command",
       "name": "RestoreGraphiteAppearance",
       "detail": "() error",
-      "location": "desktop/theme_app.go:304",
+      "location": "desktop/theme_app.go:302",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2933,7 +2933,7 @@
       "kind": "command",
       "name": "RestoreMemoryRevision",
       "detail": "(ref string, revision int) (MemoryFact, error)",
-      "location": "desktop/app.go:11367",
+      "location": "desktop/app.go:11331",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2941,7 +2941,7 @@
       "kind": "command",
       "name": "RestoreMemoryRevisionForTab",
       "detail": "(tabID string, ref string, revision int) (MemoryFact, error)",
-      "location": "desktop/app.go:11371",
+      "location": "desktop/app.go:11335",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2949,7 +2949,7 @@
       "kind": "command",
       "name": "RestoreSession",
       "detail": "(path string) error",
-      "location": "desktop/app.go:3399",
+      "location": "desktop/app.go:3363",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2957,7 +2957,7 @@
       "kind": "command",
       "name": "ResumeGoalForTab",
       "detail": "(tabID string) bool",
-      "location": "desktop/app.go:6779",
+      "location": "desktop/app.go:6743",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2973,7 +2973,7 @@
       "kind": "command",
       "name": "ResumeSession",
       "detail": "(path string) ([]HistoryMessage, error)",
-      "location": "desktop/app.go:3572",
+      "location": "desktop/app.go:3536",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2981,7 +2981,7 @@
       "kind": "command",
       "name": "ResumeSessionForTab",
       "detail": "(tabID string, path string) ([]HistoryMessage, error)",
-      "location": "desktop/app.go:3587",
+      "location": "desktop/app.go:3551",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2989,7 +2989,7 @@
       "kind": "command",
       "name": "ResumeSessionPage",
       "detail": "(path string, limit int) (HistoryPage, error)",
-      "location": "desktop/app.go:3576",
+      "location": "desktop/app.go:3540",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -2997,7 +2997,7 @@
       "kind": "command",
       "name": "ResumeSessionPageForTab",
       "detail": "(tabID string, path string, limit int) (HistoryPage, error)",
-      "location": "desktop/app.go:3580",
+      "location": "desktop/app.go:3544",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3029,7 +3029,7 @@
       "kind": "command",
       "name": "RevealPath",
       "detail": "(path string) error",
-      "location": "desktop/app.go:10444",
+      "location": "desktop/app.go:10408",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3037,7 +3037,7 @@
       "kind": "command",
       "name": "RevealWorkspacePath",
       "detail": "(rel string) error",
-      "location": "desktop/app.go:10430",
+      "location": "desktop/app.go:10394",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3045,7 +3045,7 @@
       "kind": "command",
       "name": "RevealWorkspacePathForTab",
       "detail": "(tabID string, rel string) error",
-      "location": "desktop/app.go:10435",
+      "location": "desktop/app.go:10399",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3061,7 +3061,7 @@
       "kind": "command",
       "name": "Rewind",
       "detail": "(turn int, scope string) error",
-      "location": "desktop/app.go:2476",
+      "location": "desktop/app.go:2440",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3069,7 +3069,7 @@
       "kind": "command",
       "name": "RewindForTab",
       "detail": "(tabID string, turn int, scope string) error",
-      "location": "desktop/app.go:2484",
+      "location": "desktop/app.go:2448",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3085,7 +3085,7 @@
       "kind": "command",
       "name": "RunShell",
       "detail": "(command string) error",
-      "location": "desktop/app.go:1187",
+      "location": "desktop/app.go:1151",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3093,7 +3093,7 @@
       "kind": "command",
       "name": "RunShellForTab",
       "detail": "(tabID string, command string) error",
-      "location": "desktop/app.go:1191",
+      "location": "desktop/app.go:1155",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3109,7 +3109,7 @@
       "kind": "command",
       "name": "SaveClipboardImage",
       "detail": "() (string, error)",
-      "location": "desktop/app.go:10604",
+      "location": "desktop/app.go:10568",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3117,7 +3117,7 @@
       "kind": "command",
       "name": "SaveDoc",
       "detail": "(path string, body string) (string, error)",
-      "location": "desktop/app.go:11399",
+      "location": "desktop/app.go:11363",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3125,7 +3125,7 @@
       "kind": "command",
       "name": "SaveDocForTab",
       "detail": "(tabID string, path string, body string) (string, error)",
-      "location": "desktop/app.go:11403",
+      "location": "desktop/app.go:11367",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3133,7 +3133,7 @@
       "kind": "command",
       "name": "SaveExportFile",
       "detail": "(path string, payload string, base64Encoded bool) error",
-      "location": "desktop/app.go:10643",
+      "location": "desktop/app.go:10607",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3141,7 +3141,7 @@
       "kind": "command",
       "name": "SaveExportImageFiles",
       "detail": "(path string, payloads []string) error",
-      "location": "desktop/app.go:10668",
+      "location": "desktop/app.go:10632",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3165,7 +3165,7 @@
       "kind": "command",
       "name": "SaveLocalPathAs",
       "detail": "(path string) (string, error)",
-      "location": "desktop/external_opener.go:300",
+      "location": "desktop/external_opener.go:298",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -3173,7 +3173,7 @@
       "kind": "command",
       "name": "SavePastedFile",
       "detail": "(name string, dataURL string) (string, error)",
-      "location": "desktop/app.go:10611",
+      "location": "desktop/app.go:10575",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3181,7 +3181,7 @@
       "kind": "command",
       "name": "SavePastedImage",
       "detail": "(dataURL string) (string, error)",
-      "location": "desktop/app.go:10596",
+      "location": "desktop/app.go:10560",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3237,7 +3237,7 @@
       "kind": "command",
       "name": "SaveThemePack",
       "detail": "(input ThemeSaveInput) (ThemePackView, error)",
-      "location": "desktop/theme_app.go:388",
+      "location": "desktop/theme_app.go:386",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3253,7 +3253,7 @@
       "kind": "command",
       "name": "ScanPromptHistory",
       "detail": "(rawRequest string) (PromptHistoryResult, error)",
-      "location": "desktop/app.go:4280",
+      "location": "desktop/app.go:4244",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3277,7 +3277,7 @@
       "kind": "command",
       "name": "SearchFileRefs",
       "detail": "(query string) []DirEntry",
-      "location": "desktop/app.go:10253",
+      "location": "desktop/app.go:10217",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3285,7 +3285,7 @@
       "kind": "command",
       "name": "SearchFileRefsForTab",
       "detail": "(tabID string, query string) []DirEntry",
-      "location": "desktop/app.go:10258",
+      "location": "desktop/app.go:10222",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3325,7 +3325,7 @@
       "kind": "command",
       "name": "SetAgentPreset",
       "detail": "(preset string) error",
-      "location": "desktop/app.go:9961",
+      "location": "desktop/app.go:9925",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3333,7 +3333,7 @@
       "kind": "command",
       "name": "SetAgentPresetForTab",
       "detail": "(tabID string, preset string) error",
-      "location": "desktop/app.go:9968",
+      "location": "desktop/app.go:9932",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3341,7 +3341,7 @@
       "kind": "command",
       "name": "SetAutoApproveTools",
       "detail": "(on bool)",
-      "location": "desktop/app.go:6815",
+      "location": "desktop/app.go:6779",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3389,7 +3389,7 @@
       "kind": "command",
       "name": "SetBypass",
       "detail": "(on bool)",
-      "location": "desktop/app.go:6824",
+      "location": "desktop/app.go:6788",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3405,7 +3405,7 @@
       "kind": "command",
       "name": "SetCollaborationMode",
       "detail": "(mode string)",
-      "location": "desktop/app.go:1864",
+      "location": "desktop/app.go:1828",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3413,7 +3413,7 @@
       "kind": "command",
       "name": "SetCollaborationModeForTab",
       "detail": "(tabID string, mode string)",
-      "location": "desktop/app.go:1923",
+      "location": "desktop/app.go:1887",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3429,7 +3429,7 @@
       "kind": "command",
       "name": "SetComposerProfileForTab",
       "detail": "(tabID string, collaborationMode string, toolApprovalMode string, goal string) ([]string, error)",
-      "location": "desktop/app.go:1872",
+      "location": "desktop/app.go:1836",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3565,7 +3565,7 @@
       "kind": "command",
       "name": "SetEffort",
       "detail": "(level string) error",
-      "location": "desktop/app.go:9798",
+      "location": "desktop/app.go:9762",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3573,7 +3573,7 @@
       "kind": "command",
       "name": "SetEffortForTab",
       "detail": "(tabID string, level string) error",
-      "location": "desktop/app.go:9802",
+      "location": "desktop/app.go:9766",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3589,7 +3589,7 @@
       "kind": "command",
       "name": "SetGoal",
       "detail": "(goal string) error",
-      "location": "desktop/app.go:6711",
+      "location": "desktop/app.go:6675",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3597,7 +3597,7 @@
       "kind": "command",
       "name": "SetGoalForTab",
       "detail": "(tabID string, goal string) error",
-      "location": "desktop/app.go:6720",
+      "location": "desktop/app.go:6684",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3613,7 +3613,7 @@
       "kind": "command",
       "name": "SetMCPServerEnabled",
       "detail": "(name string, enabled bool) error",
-      "location": "desktop/app.go:8838",
+      "location": "desktop/app.go:8802",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3621,7 +3621,7 @@
       "kind": "command",
       "name": "SetMCPServerTier",
       "detail": "(name string, tier string) error",
-      "location": "desktop/app.go:8942",
+      "location": "desktop/app.go:8906",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3653,7 +3653,7 @@
       "kind": "command",
       "name": "SetMode",
       "detail": "(mode string)",
-      "location": "desktop/app.go:1768",
+      "location": "desktop/app.go:1732",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3661,7 +3661,7 @@
       "kind": "command",
       "name": "SetModeForTab",
       "detail": "(tabID string, mode string) []string",
-      "location": "desktop/app.go:1776",
+      "location": "desktop/app.go:1740",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3669,7 +3669,7 @@
       "kind": "command",
       "name": "SetModel",
       "detail": "(name string) error",
-      "location": "desktop/app.go:9518",
+      "location": "desktop/app.go:9482",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3677,7 +3677,7 @@
       "kind": "command",
       "name": "SetModelForTab",
       "detail": "(tabID string, name string) error",
-      "location": "desktop/app.go:9567",
+      "location": "desktop/app.go:9531",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3701,7 +3701,7 @@
       "kind": "command",
       "name": "SetPlanMode",
       "detail": "(on bool)",
-      "location": "desktop/app.go:1752",
+      "location": "desktop/app.go:1716",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3725,7 +3725,7 @@
       "kind": "command",
       "name": "SetPreferredExternalOpener",
       "detail": "(id string) error",
-      "location": "desktop/external_opener.go:202",
+      "location": "desktop/external_opener.go:200",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3797,7 +3797,7 @@
       "kind": "command",
       "name": "SetRecoveryCheckpointEnabled",
       "detail": "(_ bool)",
-      "location": "desktop/app.go:1703",
+      "location": "desktop/app.go:1667",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3805,7 +3805,7 @@
       "kind": "command",
       "name": "SetRecoveryCheckpointEnabledTab",
       "detail": "(_ string, _ bool)",
-      "location": "desktop/app.go:1706",
+      "location": "desktop/app.go:1670",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3909,7 +3909,7 @@
       "kind": "command",
       "name": "SetSkillEnabled",
       "detail": "(name string, enabled bool) error",
-      "location": "desktop/app.go:8373",
+      "location": "desktop/app.go:8337",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3917,7 +3917,7 @@
       "kind": "command",
       "name": "SetSkillImplicitInvocation",
       "detail": "(enabled bool) error",
-      "location": "desktop/app.go:7559",
+      "location": "desktop/app.go:7523",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3925,7 +3925,7 @@
       "kind": "command",
       "name": "SetSkillPathEnabled",
       "detail": "(path string, enabled bool) error",
-      "location": "desktop/app.go:8324",
+      "location": "desktop/app.go:8288",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3981,7 +3981,7 @@
       "kind": "command",
       "name": "SetTokenMode",
       "detail": "(mode string) error",
-      "location": "desktop/app.go:9950",
+      "location": "desktop/app.go:9914",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3989,7 +3989,7 @@
       "kind": "command",
       "name": "SetTokenModeForTab",
       "detail": "(tabID string, mode string) error",
-      "location": "desktop/app.go:9955",
+      "location": "desktop/app.go:9919",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -3997,7 +3997,7 @@
       "kind": "command",
       "name": "SetToolApprovalMode",
       "detail": "(mode string)",
-      "location": "desktop/app.go:6828",
+      "location": "desktop/app.go:6792",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4005,7 +4005,7 @@
       "kind": "command",
       "name": "SetToolApprovalModeForTab",
       "detail": "(tabID string, mode string) []string",
-      "location": "desktop/app.go:6834",
+      "location": "desktop/app.go:6798",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4053,7 +4053,7 @@
       "kind": "command",
       "name": "SkillsSettings",
       "detail": "() SkillsSettingsView",
-      "location": "desktop/app.go:7498",
+      "location": "desktop/app.go:7462",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4093,7 +4093,7 @@
       "kind": "command",
       "name": "Steer",
       "detail": "(text string) error",
-      "location": "desktop/app.go:1334",
+      "location": "desktop/app.go:1298",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4101,7 +4101,7 @@
       "kind": "command",
       "name": "SteerForTab",
       "detail": "(tabID string, text string) error",
-      "location": "desktop/app.go:1341",
+      "location": "desktop/app.go:1305",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4141,7 +4141,7 @@
       "kind": "command",
       "name": "StopTask",
       "detail": "(taskID string, expectedVersion uint64, reason string, idemKey string) (taskmonitor.ControlResult, error)",
-      "location": "desktop/app.go:11585",
+      "location": "desktop/app.go:11549",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4157,7 +4157,7 @@
       "kind": "command",
       "name": "StopTaskForTab",
       "detail": "(tabID string, taskID string, expectedVersion uint64, reason string, idemKey string) (taskmonitor.ControlResult, error)",
-      "location": "desktop/app.go:11593",
+      "location": "desktop/app.go:11557",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4173,7 +4173,7 @@
       "kind": "command",
       "name": "Submit",
       "detail": "(input string) error",
-      "location": "desktop/app.go:1045",
+      "location": "desktop/app.go:1009",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4181,7 +4181,7 @@
       "kind": "command",
       "name": "SubmitDeliveryRecoveryToTab",
       "detail": "(tabID string, display string, input string) error",
-      "location": "desktop/app.go:1214",
+      "location": "desktop/app.go:1178",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4197,7 +4197,7 @@
       "kind": "command",
       "name": "SubmitDisplay",
       "detail": "(display string, input string) error",
-      "location": "desktop/app.go:1206",
+      "location": "desktop/app.go:1170",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4205,7 +4205,7 @@
       "kind": "command",
       "name": "SubmitDisplayToTab",
       "detail": "(tabID string, display string, input string) error",
-      "location": "desktop/app.go:1210",
+      "location": "desktop/app.go:1174",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4221,7 +4221,7 @@
       "kind": "command",
       "name": "SubmitEditedDisplayToTab",
       "detail": "(tabID string, display string, input string, original string) error",
-      "location": "desktop/app.go:1305",
+      "location": "desktop/app.go:1269",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4245,7 +4245,7 @@
       "kind": "command",
       "name": "SubmitInitialGoalToTab",
       "detail": "(tabID string, goal string, display string, input string, invocations []InvocationRequest, collaborationMode string, toolApprovalMode string) ([]string, error)",
-      "location": "desktop/app.go:1292",
+      "location": "desktop/app.go:1256",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4261,7 +4261,7 @@
       "kind": "command",
       "name": "SubmitInvocationsToTab",
       "detail": "(tabID string, display string, input string, invocations []InvocationRequest) error",
-      "location": "desktop/app.go:1235",
+      "location": "desktop/app.go:1199",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4293,7 +4293,7 @@
       "kind": "command",
       "name": "SubmitToTab",
       "detail": "(tabID string, input string) error",
-      "location": "desktop/app.go:1058",
+      "location": "desktop/app.go:1022",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4309,7 +4309,7 @@
       "kind": "command",
       "name": "SummarizeFrom",
       "detail": "(turn int) error",
-      "location": "desktop/app.go:2667",
+      "location": "desktop/app.go:2631",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4317,7 +4317,7 @@
       "kind": "command",
       "name": "SummarizeFromForTab",
       "detail": "(tabID string, turn int) error",
-      "location": "desktop/app.go:2671",
+      "location": "desktop/app.go:2635",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4333,7 +4333,7 @@
       "kind": "command",
       "name": "SummarizeUpTo",
       "detail": "(turn int) error",
-      "location": "desktop/app.go:2682",
+      "location": "desktop/app.go:2646",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4341,7 +4341,7 @@
       "kind": "command",
       "name": "SummarizeUpToForTab",
       "detail": "(tabID string, turn int) error",
-      "location": "desktop/app.go:2686",
+      "location": "desktop/app.go:2650",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4349,7 +4349,7 @@
       "kind": "command",
       "name": "SwitchWorkspace",
       "detail": "(dir string) (string, error)",
-      "location": "desktop/app.go:5030",
+      "location": "desktop/app.go:4994",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4405,7 +4405,7 @@
       "kind": "command",
       "name": "ToggleMaximiseMainWindow",
       "detail": "()",
-      "location": "desktop/window_controls.go:14",
+      "location": "desktop/window_controls.go:12",
       "class": "migrate-host",
       "owner": "business in Go; native step through nativeHost host/*"
     },
@@ -4413,7 +4413,7 @@
       "kind": "command",
       "name": "ToolResultForTab",
       "detail": "(tabID string, toolID string) *control.ToolResultData",
-      "location": "desktop/app.go:2460",
+      "location": "desktop/app.go:2424",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4485,7 +4485,7 @@
       "kind": "command",
       "name": "UpdateMCPServer",
       "detail": "(name string, in MCPServerInput) error",
-      "location": "desktop/app.go:8645",
+      "location": "desktop/app.go:8609",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4533,7 +4533,7 @@
       "kind": "command",
       "name": "Version",
       "detail": "() string",
-      "location": "desktop/updater_app.go:82",
+      "location": "desktop/updater_app.go:80",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -4604,434 +4604,186 @@
     {
       "kind": "native-call",
       "name": "runtime.BrowserOpenURL",
-      "detail": "in MCPOpenAppLink",
-      "location": "desktop/mcp_apps_app.go:160",
+      "detail": "in OpenExternal",
+      "location": "desktop/native_host_wails.go:39",
       "class": "migrate-host",
       "owner": "nativeHost → host/shell.openExternal"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.BrowserOpenURL",
-      "detail": "in openDownloadPage",
-      "location": "desktop/updater_app.go:145",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/shell.openExternal"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.EventsEmit",
-      "detail": "in createAppMenu",
-      "location": "desktop/menu.go:27",
-      "class": "migrate-host",
-      "owner": "nativeHost → desktop/event"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.EventsEmit",
-      "detail": "in emitProgress",
-      "location": "desktop/updater_app.go:535",
-      "class": "migrate-host",
-      "owner": "nativeHost → desktop/event"
     },
     {
       "kind": "native-call",
       "name": "runtime.Hide",
-      "detail": "in hideForBackground",
-      "location": "desktop/app.go:685",
+      "detail": "in HideApplication",
+      "location": "desktop/native_host_wails.go:19",
       "class": "migrate-host",
       "owner": "nativeHost → host/app.hide, host/window.show"
     },
     {
       "kind": "native-call",
       "name": "runtime.MessageDialog",
-      "detail": "in ConfirmAction",
-      "location": "desktop/app.go:11737",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/dialog.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.MessageDialog",
-      "detail": "in showCompatibilityFailure",
-      "location": "desktop/linux_renderer_recovery.go:251",
-      "class": "delete-shell",
-      "owner": "removed with the old shell"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.MessageDialog",
-      "detail": "in showWindowsWebView2RecoveryGuidance",
-      "location": "desktop/webview2_recovery_windows.go:12",
-      "class": "delete-shell",
-      "owner": "removed with the old shell"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.MessageDialog",
-      "detail": "in startWindowsWebView2StartupFallback",
-      "location": "desktop/webview2_startup.go:40",
-      "class": "delete-shell",
-      "owner": "removed with the old shell"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.MessageDialog",
-      "detail": "in showWindowRestoreFailure",
-      "location": "desktop/window_restore_diagnostics_linux.go:175",
-      "class": "delete-shell",
-      "owner": "removed with the old shell"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.OpenDirectoryDialog",
-      "detail": "in PickWorkspace",
-      "location": "desktop/app.go:4764",
+      "detail": "in MessageDialog",
+      "location": "desktop/native_host_wails.go:88",
       "class": "migrate-host",
       "owner": "nativeHost → host/dialog.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.OpenDirectoryDialog",
-      "detail": "in PickSkillFolder",
-      "location": "desktop/app.go:8248",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/dialog.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.OpenDirectoryDialog",
-      "detail": "in PickPluginFolder",
-      "location": "desktop/app.go:8269",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/dialog.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.OpenDirectoryDialog",
-      "detail": "in PickBlankProjectParent",
-      "location": "desktop/blank_project.go:24",
+      "detail": "in OpenDirectoryDialog",
+      "location": "desktop/native_host_wails.go:70",
       "class": "migrate-host",
       "owner": "nativeHost → host/dialog.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.OpenFileDialog",
-      "detail": "in PickRemoteIdentityFile",
-      "location": "desktop/remote_dialog.go:21",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/dialog.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.OpenFileDialog",
-      "detail": "in ImportThemePack",
-      "location": "desktop/theme_app.go:666",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/dialog.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.OpenFileDialog",
-      "detail": "in PickThemeBackground",
-      "location": "desktop/theme_app.go:759",
+      "detail": "in OpenFileDialog",
+      "location": "desktop/native_host_wails.go:74",
       "class": "migrate-host",
       "owner": "nativeHost → host/dialog.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.Quit",
-      "detail": "in quitApp",
-      "location": "desktop/app.go:680",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/app.quit"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.Quit",
-      "detail": "in requestCompatibilityRestart",
-      "location": "desktop/linux_renderer_recovery.go:227",
-      "class": "delete-shell",
-      "owner": "removed with the old shell"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.Quit",
-      "detail": "in showCompatibilityFailure",
-      "location": "desktop/linux_renderer_recovery.go:262",
-      "class": "delete-shell",
-      "owner": "removed with the old shell"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.Quit",
-      "detail": "in watchRemoteWindowOwner",
-      "location": "desktop/remote_window.go:475",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/app.quit"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.Quit",
-      "detail": "in domReadyRemoteWindow",
-      "location": "desktop/remote_window.go:583",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/app.quit"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.Quit",
-      "detail": "in domReadyRemoteWindow",
-      "location": "desktop/remote_window.go:588",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/app.quit"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.Quit",
-      "detail": "in requestRestart",
-      "location": "desktop/webview2_recovery.go:317",
-      "class": "delete-shell",
-      "owner": "removed with the old shell"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.Quit",
-      "detail": "in CloseMainWindow",
-      "location": "desktop/window_controls.go:40",
+      "detail": "in Quit",
+      "location": "desktop/native_host_wails.go:41",
       "class": "migrate-host",
       "owner": "nativeHost → host/app.quit"
     },
     {
       "kind": "native-call",
       "name": "runtime.SaveFileDialog",
-      "detail": "in PickExportFile",
-      "location": "desktop/app.go:10625",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/dialog.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.SaveFileDialog",
-      "detail": "in SaveLocalPathAs",
-      "location": "desktop/external_opener.go:315",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/dialog.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.SaveFileDialog",
-      "detail": "in ExportScrollDiagnostics",
-      "location": "desktop/scroll_diagnostics_export.go:374",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/dialog.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.SaveFileDialog",
-      "detail": "in ExportThemePack",
-      "location": "desktop/theme_app.go:729",
+      "detail": "in SaveFileDialog",
+      "location": "desktop/native_host_wails.go:78",
       "class": "migrate-host",
       "owner": "nativeHost → host/dialog.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.ScreenGetAll",
-      "detail": "in domReady",
-      "location": "desktop/app.go:944",
+      "detail": "in Screens",
+      "location": "desktop/native_host_wails.go:44",
       "class": "migrate-host",
       "owner": "nativeHost → host/screen.list"
     },
     {
       "kind": "native-call",
       "name": "runtime.Show",
-      "detail": "in applyDesktopPresentPlan",
-      "location": "desktop/desktop_shell.go:263",
+      "detail": "in ShowApplication",
+      "location": "desktop/native_host_wails.go:17",
       "class": "migrate-host",
       "owner": "nativeHost → host/app.hide, host/window.show"
     },
     {
       "kind": "native-call",
       "name": "runtime.WindowCenter",
-      "detail": "in domReady",
-      "location": "desktop/app.go:958",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/window.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.WindowCenter",
-      "detail": "in domReady",
-      "location": "desktop/app.go:961",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/window.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.WindowCenter",
-      "detail": "in domReadyRemoteWindow",
-      "location": "desktop/remote_window.go:596",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/window.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.WindowCenter",
-      "detail": "in secondInstanceRemoteWindow",
-      "location": "desktop/remote_window.go:616",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/window.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.WindowCenter",
-      "detail": "in applyRemoteWindowLaunchLocked",
-      "location": "desktop/remote_window.go:649",
+      "detail": "in CenterWindow",
+      "location": "desktop/native_host_wails.go:25",
       "class": "migrate-host",
       "owner": "nativeHost → host/window.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.WindowExecJS",
-      "detail": "in createAppMenu",
-      "location": "desktop/menu.go:32",
+      "detail": "in OpenDevTools",
+      "location": "desktop/native_host_wails.go:101",
       "class": "migrate-host",
       "owner": "nativeHost → host/remoteWindow.navigate, host/devtools.toggle"
     },
     {
       "kind": "native-call",
       "name": "runtime.WindowExecJS",
-      "detail": "in applyRemoteWindowLaunchLocked",
-      "location": "desktop/remote_window.go:644",
+      "detail": "in NavigateRemoteWindow",
+      "location": "desktop/native_host_wails.go:106",
       "class": "migrate-host",
       "owner": "nativeHost → host/remoteWindow.navigate, host/devtools.toggle"
     },
     {
       "kind": "native-call",
       "name": "runtime.WindowHide",
-      "detail": "in hideForBackground",
-      "location": "desktop/app.go:688",
+      "detail": "in HideWindow",
+      "location": "desktop/native_host_wails.go:18",
       "class": "migrate-host",
       "owner": "nativeHost → host/window.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.WindowIsMaximised",
-      "detail": "in IsMainWindowMaximised",
-      "location": "desktop/window_controls.go:27",
+      "detail": "in WindowIsMaximised",
+      "location": "desktop/native_host_wails.go:27",
       "class": "migrate-host",
       "owner": "nativeHost → host/window.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.WindowIsMinimised",
-      "detail": "in applyRemoteWindowLaunchLocked",
-      "location": "desktop/remote_window.go:646",
+      "detail": "in WindowIsMinimised",
+      "location": "desktop/native_host_wails.go:30",
       "class": "migrate-host",
       "owner": "nativeHost → host/window.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.WindowMaximise",
-      "detail": "in domReady",
-      "location": "desktop/app.go:970",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/window.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.WindowMaximise",
-      "detail": "in applyDesktopPresentPlan",
-      "location": "desktop/desktop_shell.go:265",
+      "detail": "in MaximiseWindow",
+      "location": "desktop/native_host_wails.go:20",
       "class": "migrate-host",
       "owner": "nativeHost → host/window.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.WindowMinimise",
-      "detail": "in MinimiseMainWindow",
-      "location": "desktop/window_controls.go:10",
+      "detail": "in MinimiseWindow",
+      "location": "desktop/native_host_wails.go:22",
       "class": "migrate-host",
       "owner": "nativeHost → host/window.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.WindowSetPosition",
-      "detail": "in domReady",
-      "location": "desktop/app.go:956",
+      "detail": "in SetWindowPosition",
+      "location": "desktop/native_host_wails.go:33",
       "class": "migrate-host",
       "owner": "nativeHost → host/window.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.WindowSetTitle",
-      "detail": "in applyRemoteWindowLaunchLocked",
-      "location": "desktop/remote_window.go:641",
+      "detail": "in SetWindowTitle",
+      "location": "desktop/native_host_wails.go:36",
       "class": "migrate-host",
       "owner": "nativeHost → host/window.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.WindowShow",
-      "detail": "in applyDesktopPresentPlan",
-      "location": "desktop/desktop_shell.go:267",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/window.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.WindowShow",
-      "detail": "in domReadyRemoteWindow",
-      "location": "desktop/remote_window.go:597",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/window.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.WindowShow",
-      "detail": "in secondInstanceRemoteWindow",
-      "location": "desktop/remote_window.go:617",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/window.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.WindowShow",
-      "detail": "in applyRemoteWindowLaunchLocked",
-      "location": "desktop/remote_window.go:650",
+      "detail": "in ShowWindow",
+      "location": "desktop/native_host_wails.go:16",
       "class": "migrate-host",
       "owner": "nativeHost → host/window.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.WindowToggleMaximise",
-      "detail": "in ToggleMaximiseMainWindow",
-      "location": "desktop/window_controls.go:18",
+      "detail": "in ToggleMaximiseWindow",
+      "location": "desktop/native_host_wails.go:24",
+      "class": "migrate-host",
+      "owner": "nativeHost → host/window.*"
+    },
+    {
+      "kind": "native-call",
+      "name": "runtime.WindowUnmaximise",
+      "detail": "in UnmaximiseWindow",
+      "location": "desktop/native_host_wails.go:21",
       "class": "migrate-host",
       "owner": "nativeHost → host/window.*"
     },
     {
       "kind": "native-call",
       "name": "runtime.WindowUnminimise",
-      "detail": "in applyDesktopPresentPlan",
-      "location": "desktop/desktop_shell.go:269",
+      "detail": "in UnminimiseWindow",
+      "location": "desktop/native_host_wails.go:23",
       "class": "migrate-host",
       "owner": "nativeHost → host/window.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.WindowUnminimise",
-      "detail": "in applyRemoteWindowLaunchLocked",
-      "location": "desktop/remote_window.go:647",
-      "class": "migrate-host",
-      "owner": "nativeHost → host/window.*"
-    },
-    {
-      "kind": "native-call",
-      "name": "runtime.WindowUnminimise",
-      "detail": "in showWindowRestoreFailure",
-      "location": "desktop/window_restore_diagnostics_linux.go:157",
-      "class": "delete-shell",
-      "owner": "removed with the old shell"
     },
     {
       "kind": "native-call",
@@ -5051,7 +4803,7 @@
     {
       "kind": "event",
       "name": "app:open-settings",
-      "location": "desktop/menu.go:27",
+      "location": "desktop/menu.go:25",
       "class": "keep-business",
       "owner": "desktop/event frame (seq + generation), same payload"
     },
@@ -5149,7 +4901,7 @@
     {
       "kind": "event",
       "name": "updater:progress",
-      "location": "desktop/updater_app.go:535",
+      "location": "desktop/updater_app.go:530",
       "class": "keep-business",
       "owner": "desktop/event frame (seq + generation), same payload"
     },
@@ -5541,14 +5293,14 @@
     {
       "kind": "persistence",
       "name": "linux-renderer-recovery.json",
-      "location": "desktop/linux_renderer_recovery.go:118",
+      "location": "desktop/linux_renderer_recovery.go:116",
       "class": "delete-shell",
       "owner": "no longer written; old files are left in place"
     },
     {
       "kind": "persistence",
       "name": "mcp-registry-v0.1.json",
-      "location": "desktop/app.go:7186",
+      "location": "desktop/app.go:7150",
       "class": "keep-business",
       "owner": "format unchanged; read by both shells"
     },
@@ -5569,7 +5321,7 @@
     {
       "kind": "persistence",
       "name": "webview2-recovery.jsonl",
-      "location": "desktop/webview2_recovery.go:118",
+      "location": "desktop/webview2_recovery.go:116",
       "class": "delete-shell",
       "owner": "no longer written; old files are left in place"
     },
@@ -5705,6 +5457,18 @@
       "name": "desktop/menu.go",
       "class": "migrate-host",
       "owner": "Electron application menu"
+    },
+    {
+      "kind": "shell-file",
+      "name": "desktop/native_host.go",
+      "class": "migrate-host",
+      "owner": "nativeHost boundary"
+    },
+    {
+      "kind": "shell-file",
+      "name": "desktop/native_host_wails.go",
+      "class": "migrate-host",
+      "owner": "nativeHost boundary"
     },
     {
       "kind": "shell-file",
