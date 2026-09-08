@@ -214,6 +214,11 @@ func rewriteDeepSeekProtocol(raw, kind, baseURL string, eligible func(*ProviderE
 			tomlReplacement{start: block.kindStart, end: block.kindEnd, value: strconv.Quote(kind)},
 			tomlReplacement{start: block.baseURLStart, end: block.baseURLEnd, value: strconv.Quote(baseURL)},
 		)
+		if kind == "openai" {
+			for _, span := range block.chatEndpoints {
+				replacements = append(replacements, tomlReplacement{start: span[0], end: span[1], value: strconv.Quote("https://api.deepseek.com/chat/completions")})
+			}
+		}
 	}
 	if len(replacements) == 0 {
 		return raw, false, nil
@@ -327,6 +332,7 @@ func providerTOMLBlocks(lines []string) []providerTOMLBlock {
 }
 
 type providerTOMLInlineBlock struct {
+	chatEndpoints            [][2]int
 	start, end               int
 	kindStart, kindEnd       int
 	baseURLStart, baseURLEnd int
@@ -495,6 +501,11 @@ func parseProviderTOMLInlineBlock(raw string, start, end int) (providerTOMLInlin
 			valueStart, valueEnd = trimTOMLWhitespace(raw, valueStart, valueEnd)
 		}
 		switch key {
+		case "request_url", "chat_url":
+			// Empty overrides are equivalent to omission and stay empty.
+			if raw[valueStart:valueEnd] != `""` && raw[valueStart:valueEnd] != `''` {
+				block.chatEndpoints = append(block.chatEndpoints, [2]int{valueStart, valueEnd})
+			}
 		case "kind":
 			block.kindStart, block.kindEnd = valueStart, valueEnd
 		case "base_url":
@@ -712,6 +723,12 @@ func rewriteDeepSeekProviderBlockAs(lines []string, block providerTOMLBlock, kin
 			continue
 		}
 		switch {
+		case kind == "openai" && (isTOMLKeyAssignment(lines[i], "request_url") || isTOMLKeyAssignment(lines[i], "chat_url")):
+			// Only reached for an eligible official endpoint.
+			_, value, _ := tomlKeyValue(lines[i])
+			if value != `""` && value != `''` {
+				lines[i] = replaceTOMLStringAssignment(lines[i], "https://api.deepseek.com/chat/completions")
+			}
 		case isTOMLKeyAssignment(lines[i], "kind"):
 			kindLine = i
 		case isTOMLKeyAssignment(lines[i], "base_url"):

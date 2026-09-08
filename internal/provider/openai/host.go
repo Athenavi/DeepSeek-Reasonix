@@ -146,6 +146,19 @@ func normalizeModelID(baseURL, model string) string {
 	return model
 }
 
+// Explicit official beta alias verified against Chat Completions. Keep
+// configuration identity exact; never case-fold arbitrary IDs or gateway calls.
+func deepSeekChatWireModel(endpoint, model string) string {
+	u, err := url.Parse(endpoint)
+	if err == nil && u.Scheme == "https" && u.Host == "api.deepseek.com" &&
+		u.User == nil && u.RawQuery == "" && u.Fragment == "" &&
+		(u.Path == "/chat/completions" || u.Path == "/v1/chat/completions") &&
+		model == "DeepSeek-V4.1-Flash-Expires-On-0910" {
+		return "deepseek-v4.1-flash-expires-on-0910"
+	}
+	return model
+}
+
 // IsMiniMax reports whether baseURL points at MiniMax's OpenAI-compatible
 // endpoint (api.minimaxi.com or any *.minimaxi.com subdomain).
 //

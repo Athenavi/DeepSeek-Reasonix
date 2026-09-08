@@ -246,7 +246,7 @@ func New(cfg provider.Config) (provider.Provider, error) {
 		prefixChatURL:   prefixChatURL,
 		headers:         cleanCustomHeaders(headers),
 		extraBody:       cleanExtraBody(extraBody),
-		model:           normalizeModelID(cfg.BaseURL, cfg.Model),
+		model:           deepSeekChatWireModel(chatURL, normalizeModelID(cfg.BaseURL, cfg.Model)),
 		deepseek:        deepseek,
 		minimax:         minimax,
 		zhipu:           zhipu,

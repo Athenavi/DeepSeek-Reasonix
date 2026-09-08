@@ -53,7 +53,11 @@ export function ProviderCatalogPicker({ choices, busy, onConnect, onView, onRese
     c.catalog.brandId === "token-rhythm" ? t("settings.addProvider.preset.tokenRhythmLabel") : c.catalog.brandLabel])).entries()], [choices, t]);
   if (!selected) return null;
   const genericFormat = (value: string) => value === "dashscope-responses" ? "responses" : value;
-  const format = formatDrafts[selected.id] ?? genericFormat(selected.catalog.format);
+  // The official DeepSeek connection starts with Chat Completions regardless
+  // of which protocol-specific preset supplied the brand's first catalog row.
+  const defaultFormat = selected.catalog.brandId === "deepseek" && selected.catalog.product === "api"
+    ? "openai" : genericFormat(selected.catalog.format);
+  const format = formatDrafts[selected.id] ?? defaultFormat;
   const protocols = protocolsForCatalog(selected.catalog);
   const defaultURL = protocols[format]?.baseUrl ?? selected.catalog.baseUrl ?? "";
   const baseURL = urlDrafts[selected.id] ?? defaultURL;
