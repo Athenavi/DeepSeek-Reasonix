@@ -2,7 +2,7 @@
 
 Reasonix 始终以会话 transcript、event log、metadata sidecar 和
 `desktop-projects.json` 作为唯一权威数据。桌面项目树读取位于
-`<缓存根目录>/session-catalog/v6.sqlite` 的一次性 SQLite 查询投影；删除该数据库
+`<缓存根目录>/session-catalog/v8.sqlite` 的一次性 SQLite 查询投影；删除该数据库
 不会删除或修改任何会话。早期的 `v1.sqlite` 至 `v5.sqlite` 缓存会保留，避免与仍在
 运行或降级后的旧版本进程交叉写同一投影。v6 引入文件系统感知的路径身份，首次启动
 会从权威文件重新建立；旧 v5 文件保留用于回滚，不会被新版本写入。同一 v6 索引的
@@ -47,7 +47,9 @@ catalog 只保存查询投影：
 - 项目排序、标题、颜色、置顶状态及 workspace root identity key；
 - topic 排序、聚合计数、活动时间、恢复、健康状态及 workspace root identity key；
 - session 访问路径及路径、目录和 workspace root identity key、preview、计数、指纹、
-  恢复和健康状态。
+  恢复和健康状态；
+- 对 schema 2 事件日志，还有日志格式、选中 head，以及每个 head 一行的
+  `catalog_heads`，来源是内核写出的 head 索引侧车与 `BranchMeta` 镜像，而不是重放日志。
 
 topic 分页使用 `(pinned, last_activity_at, topic_id)` keyset cursor。默认每页
 50 条，最多 200 条。目录对账每批最多提交 64 个 sidecar，并在让出调度前持久化
