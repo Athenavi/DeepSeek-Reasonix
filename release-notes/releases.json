@@ -2,6 +2,822 @@
   "schemaVersion": 1,
   "releases": [
     {
+      "version": "1.38.2",
+      "date": "2026-09-08",
+      "channel": "stable",
+      "targetingVersion": 1,
+      "title": {
+        "en": "Reasonix 1.38.2",
+        "zh": "Reasonix 1.38.2"
+      },
+      "summary": {
+        "en": "This release improves session reliability, provider configuration, and desktop performance. It introduces an append-only session log with version heads, independent web search model assignment, unified image understanding, and numerous fixes for navigation, cancellation, and CI stability.",
+        "zh": "此版本提升了会话可靠性、模型服务配置和桌面性能。引入了仅追加会话日志与版本 head、独立网页搜索模型分配、统一图片理解，并修复了导航、取消和 CI 稳定性等多项问题。"
+      },
+      "surfaces": [
+        "desktop",
+        "cli",
+        "service"
+      ],
+      "guides": [
+        {
+          "title": {
+            "en": "Remote Sessions Guide",
+            "zh": "远程会话指南"
+          },
+          "body": {
+            "en": "Learn how to configure hosts, use the reasonix remote CLI, manage session lifecycle, and troubleshoot remote connections.",
+            "zh": "了解如何配置主机、使用 reasonix remote CLI、管理会话生命周期以及排查远程连接问题。"
+          },
+          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/e1833ca83ae8258d8941ac6fe7c34e3eb9932608/docs/REMOTE_SESSIONS.md"
+        },
+        {
+          "title": {
+            "en": "Web Search Model Assignment",
+            "zh": "网页搜索模型分配"
+          },
+          "body": {
+            "en": "Configure an independent model for web search queries and understand routing and usage ownership.",
+            "zh": "为网页搜索查询配置独立模型，并了解路由和使用量归属。"
+          },
+          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/e1833ca83ae8258d8941ac6fe7c34e3eb9932608/docs/WEB_SEARCH.md"
+        },
+        {
+          "title": {
+            "en": "Local Image Paths",
+            "zh": "本地图片路径"
+          },
+          "body": {
+            "en": "Use view_image(path) to provide local images to your agent and understand limits and validation.",
+            "zh": "使用 view_image(path) 向代理提供本地图片，并了解限制与验证。"
+          },
+          "href": "https://github.com/esengine/DeepSeek-Reasonix/blob/e1833ca83ae8258d8941ac6fe7c34e3eb9932608/docs/local-image-paths.md"
+        }
+      ],
+      "highlights": [
+        {
+          "kind": "new",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Append-only session log with version heads",
+            "zh": "仅追加会话日志与版本 head"
+          },
+          "body": {
+            "en": "Sessions now use an append-only DAG log (schema 2) that records every change as a version head. Fork, rewind, and version selection happen in place without creating separate files, improving reliability and enabling concurrent writers.",
+            "zh": "会话现在使用仅追加 DAG 日志（schema 2），将每次更改记录为版本 head。分叉、回退和版本选择均在同一日志内完成，不再创建单独文件，提高了可靠性并支持并发写入。"
+          },
+          "refs": [
+            9908,
+            9910,
+            9912,
+            9913,
+            9916,
+            9917,
+            9919,
+            9921,
+            9922,
+            9924,
+            9925,
+            9926,
+            9939
+          ]
+        },
+        {
+          "kind": "improved",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Transcript renderer replacement",
+            "zh": "会话渲染器替换"
+          },
+          "body": {
+            "en": "The transcript now runs on the full DOM/windowed renderer with one scroll writer and one input-intent owner, replacing Virtuoso. Tail-follow intent and measured-height publication survive native scrolling, so visible content is no longer squeezed during fast scrolls.",
+            "zh": "会话记录改用 Full DOM/窗口化渲染器，由单一滚动写入者与输入意图所有者驱动，替代 Virtuoso。原生滚动中的尾部跟随意图与实测高度发布得以保留，快速滚动时可见内容不再被挤压。"
+          },
+          "refs": [
+            9893,
+            9895,
+            9896,
+            9897
+          ]
+        },
+        {
+          "kind": "new",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Independent web search model",
+            "zh": "独立网页搜索模型"
+          },
+          "body": {
+            "en": "You can now assign a dedicated connection and model for web search queries in Model preferences. Automatic remains the default, and explicit assignments respect the target connection's search switch.",
+            "zh": "现在可以在模型偏好中为网页搜索查询指定专用连接和模型。自动模式仍为默认，显式分配会遵循目标连接的搜索开关。"
+          },
+          "refs": [
+            9945
+          ]
+        },
+        {
+          "kind": "new",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Unified local and tool image understanding",
+            "zh": "统一本地图片与工具图片识别"
+          },
+          "body": {
+            "en": "Local image paths now have a built-in route to visual input via view_image(path), and images returned by tools share the existing image-summary service. Native vision remains the first choice.",
+            "zh": "本地图片路径现在通过 view_image(path) 内置支持视觉输入，工具返回的图片也共享现有的图片摘要服务。原生视觉仍为首选。"
+          },
+          "refs": [
+            9933
+          ]
+        },
+        {
+          "kind": "improved",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Unified settings selection controls",
+            "zh": "统一设置选择组件"
+          },
+          "body": {
+            "en": "Settings pages now share compact SettingsSelect and SettingsOptions components, providing consistent sizing, focus states, and keyboard behavior. Model preferences are grouped with runtime preferences for a clearer layout.",
+            "zh": "设置页面现在共享紧凑的 SettingsSelect 和 SettingsOptions 组件，提供一致的尺寸、焦点状态和键盘行为。模型偏好与运行时偏好分组，布局更清晰。"
+          },
+          "refs": [
+            9938
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Stop button now interrupts reliably",
+            "zh": "停止按钮现在可靠中断"
+          },
+          "body": {
+            "en": "Stop is now a session-level unconditional interrupt. Stale turn IDs no longer block cancellation, and the UI retries fence rejections automatically.",
+            "zh": "停止现在是会话级无条件中断。过期的回合 ID 不再阻止取消，界面会自动重试被拒绝的请求。"
+          },
+          "refs": [
+            9898
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Provider recovery waiting is bounded",
+            "zh": "模型服务恢复等待有上限"
+          },
+          "body": {
+            "en": "Turns no longer wait indefinitely on flaky networks. A 10-minute recovery budget ends the turn with a clear, actionable error instead of spinning forever.",
+            "zh": "回合不再在网络不稳定时无限等待。10 分钟的恢复预算会以清晰、可操作的错误结束回合，而不是一直旋转。"
+          },
+          "refs": [
+            9899
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Sessions stay visible after crashes",
+            "zh": "崩溃后会话保持可见"
+          },
+          "body": {
+            "en": "After a hard kill mid-turn, conversations no longer disappear from the sidebar. Last-known preview and turn counts are preserved while repair runs.",
+            "zh": "回合中途强制终止后，对话不再从侧栏消失。修复期间保留最后已知的预览和回合计数。"
+          },
+          "refs": [
+            9902
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Model services navigation restored",
+            "zh": "模型服务导航已恢复"
+          },
+          "body": {
+            "en": "Clicking Model services no longer opens Model preferences. The navigation store now preserves the requested page correctly.",
+            "zh": "点击“模型服务”不再打开“模型偏好”。导航存储现在能正确保留请求的页面。"
+          },
+          "refs": [
+            9951
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "DeepSeek protocol migration and model identity fixes",
+            "zh": "DeepSeek 协议迁移与模型标识修复"
+          },
+          "body": {
+            "en": "Custom model IDs are preserved exactly, and official DeepSeek connections now default to Chat Completions with a one-time migration for existing endpoints.",
+            "zh": "自定义模型 ID 被精确保留，官方 DeepSeek 连接现在默认使用 Chat Completions，并对现有端点执行一次性迁移。"
+          },
+          "refs": [
+            9947
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Provider protocol contracts enforced",
+            "zh": "模型服务协议契约强制执行"
+          },
+          "body": {
+            "en": "Changing a provider's API format no longer produces invalid routes. Conflicts are rejected with recommended endpoints, and failures show clear diagnostics.",
+            "zh": "更改模型服务的 API 格式不再产生无效路由。冲突会被拒绝并给出推荐端点，失败时显示清晰的诊断信息。"
+          },
+          "refs": [
+            9942
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Compaction un-stuck for thinking models and unnumbered overflows",
+            "zh": "思考型模型与无数字超窗的分段压缩已修复"
+          },
+          "body": {
+            "en": "Summaries from thinking models are now recognized, and provider overflows without token numbers trigger the chunked fallback correctly.",
+            "zh": "思考型模型的摘要现在能被识别，无 token 数字的模型服务超窗也能正确触发分段回退。"
+          },
+          "refs": [
+            9882
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Summary-request overflow recovery",
+            "zh": "摘要请求超窗恢复"
+          },
+          "body": {
+            "en": "Sessions that exceed the context window can now recover through a ladder of fallbacks, including truncation rescue, instead of failing repeatedly.",
+            "zh": "超出上下文窗口的会话现在可以通过一系列回退（包括截断救援）恢复，而不是反复失败。"
+          },
+          "refs": [
+            9879
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Parallel tool cancellation bounded",
+            "zh": "并行工具取消有界化"
+          },
+          "body": {
+            "en": "A tool that ignores cancellation no longer wedges the whole turn. After a 15-second grace period, the turn continues with an explicit interrupted result.",
+            "zh": "忽略取消的工具不再卡住整个回合。15 秒宽限期后，回合会以明确的中断结果继续。"
+          },
+          "refs": [
+            9901
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Rejected backend calls contained",
+            "zh": "后端调用失败被妥善处理"
+          },
+          "body": {
+            "en": "Errors in the recovery-lineage dialog no longer trigger a full-screen crash overlay. They are toasted and logged as ordinary errors.",
+            "zh": "恢复谱系对话框中的错误不再触发全屏崩溃遮罩。它们会作为普通错误提示并记录。"
+          },
+          "refs": [
+            9900
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Settings component layout ownership restored",
+            "zh": "设置组件布局所有权已恢复"
+          },
+          "body": {
+            "en": "The model assignment matrix no longer wraps incorrectly. Shared layout defaults have lower specificity so component layouts retain control.",
+            "zh": "模型分配矩阵不再错误换行。共享布局默认值降低了优先级，组件布局重新获得控制权。"
+          },
+          "refs": [
+            9914
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Memory screening baseline stabilized",
+            "zh": "内存筛查基线已稳定"
+          },
+          "body": {
+            "en": "The app-memory benchmark now settles its baseline before judging drift, preventing false positives from noisy first samples.",
+            "zh": "应用内存基准测试现在在判定漂移前会稳定基线，防止因首个样本噪声而产生误报。"
+          },
+          "refs": [
+            9950
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "service"
+          ],
+          "title": {
+            "en": "Windows CI queue no longer blocked",
+            "zh": "Windows CI 队列不再阻塞"
+          },
+          "body": {
+            "en": "The desktop-windows job now has a 45-minute timeout and bounded WebView2 smoke step, preventing hung processes from holding the concurrency group.",
+            "zh": "desktop-windows 作业现在有 45 分钟超时和有界的 WebView2 冒烟步骤，防止挂起的进程占用并发组。"
+          },
+          "refs": [
+            9948
+          ]
+        },
+        {
+          "kind": "improved",
+          "targets": [
+            "desktop",
+            "service"
+          ],
+          "title": {
+            "en": "Desktop CI checks shortened and release artifacts reused",
+            "zh": "桌面 CI 检查缩短并复用发版产物"
+          },
+          "body": {
+            "en": "Frontend bindings are built once and shared across jobs, and stable releases reuse signed artifacts from preflight, reducing CI time.",
+            "zh": "前端绑定只构建一次并在作业间共享，稳定版发版复用预检的签名产物，减少 CI 时间。"
+          },
+          "refs": [
+            9943
+          ]
+        },
+        {
+          "kind": "new",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Standard and Deep session display",
+            "zh": "Standard / Deep 会话展示设置"
+          },
+          "body": {
+            "en": "A single session-experience setting controls how much completed work stays visible: Standard collapses finished work, Deep keeps it expanded. The backend owns persistence and startup snapshots.",
+            "zh": "新增统一的会话展示设置：Standard 折叠已完成内容，Deep 保持展开；持久化与启动快照由后端权威管理。"
+          },
+          "refs": [
+            9894
+          ]
+        },
+        {
+          "kind": "improved",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Independent model connections and model preferences",
+            "zh": "独立模型连接与模型偏好"
+          },
+          "body": {
+            "en": "Model services are independent connections with stable identities, display names and separate credentials. Adding a connection selects a brand, product and protocol, and first-run setup opens this flow.",
+            "zh": "模型服务成为具有稳定标识、显示名称与独立凭据的独立连接；新增连接时选择品牌、产品与协议，首次启动设置即进入该流程。"
+          },
+          "refs": [
+            9907
+          ]
+        }
+      ],
+      "changes": {
+        "new": [
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Append-only session log with version heads",
+              "zh": "仅追加会话日志与版本 head"
+            },
+            "body": {
+              "en": "Sessions now use an append-only DAG log (schema 2) that records every change as a version head. Fork, rewind, and version selection happen in place without creating separate files, improving reliability and enabling concurrent writers.",
+              "zh": "会话现在使用仅追加 DAG 日志（schema 2），将每次更改记录为版本 head。分叉、回退和版本选择均在同一日志内完成，不再创建单独文件，提高了可靠性并支持并发写入。"
+            },
+            "refs": [
+              9908,
+              9910,
+              9912,
+              9913,
+              9916,
+              9917,
+              9919,
+              9921,
+              9922,
+              9924,
+              9925,
+              9926,
+              9939
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Independent web search model",
+              "zh": "独立网页搜索模型"
+            },
+            "body": {
+              "en": "You can now assign a dedicated connection and model for web search queries in Model preferences. Automatic remains the default, and explicit assignments respect the target connection's search switch.",
+              "zh": "现在可以在模型偏好中为网页搜索查询指定专用连接和模型。自动模式仍为默认，显式分配会遵循目标连接的搜索开关。"
+            },
+            "refs": [
+              9945
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Unified local and tool image understanding",
+              "zh": "统一本地图片与工具图片识别"
+            },
+            "body": {
+              "en": "Local image paths now have a built-in route to visual input via view_image(path), and images returned by tools share the existing image-summary service. Native vision remains the first choice.",
+              "zh": "本地图片路径现在通过 view_image(path) 内置支持视觉输入，工具返回的图片也共享现有的图片摘要服务。原生视觉仍为首选。"
+            },
+            "refs": [
+              9933
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Standard and Deep session display",
+              "zh": "Standard / Deep 会话展示设置"
+            },
+            "body": {
+              "en": "A single session-experience setting controls how much completed work stays visible: Standard collapses finished work, Deep keeps it expanded. The backend owns persistence and startup snapshots.",
+              "zh": "新增统一的会话展示设置：Standard 折叠已完成内容，Deep 保持展开；持久化与启动快照由后端权威管理。"
+            },
+            "refs": [
+              9894
+            ]
+          }
+        ],
+        "improved": [
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Unified settings selection controls",
+              "zh": "统一设置选择组件"
+            },
+            "body": {
+              "en": "Settings pages now share compact SettingsSelect and SettingsOptions components, providing consistent sizing, focus states, and keyboard behavior. Model preferences are grouped with runtime preferences for a clearer layout.",
+              "zh": "设置页面现在共享紧凑的 SettingsSelect 和 SettingsOptions 组件，提供一致的尺寸、焦点状态和键盘行为。模型偏好与运行时偏好分组，布局更清晰。"
+            },
+            "refs": [
+              9938
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "service"
+            ],
+            "title": {
+              "en": "Desktop CI checks shortened and release artifacts reused",
+              "zh": "桌面 CI 检查缩短并复用发版产物"
+            },
+            "body": {
+              "en": "Frontend bindings are built once and shared across jobs, and stable releases reuse signed artifacts from preflight, reducing CI time.",
+              "zh": "前端绑定只构建一次并在作业间共享，稳定版发版复用预检的签名产物，减少 CI 时间。"
+            },
+            "refs": [
+              9943
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Transcript renderer replacement",
+              "zh": "会话渲染器替换"
+            },
+            "body": {
+              "en": "The transcript now runs on the full DOM/windowed renderer with one scroll writer and one input-intent owner, replacing Virtuoso. Tail-follow intent and measured-height publication survive native scrolling, so visible content is no longer squeezed during fast scrolls.",
+              "zh": "会话记录改用 Full DOM/窗口化渲染器，由单一滚动写入者与输入意图所有者驱动，替代 Virtuoso。原生滚动中的尾部跟随意图与实测高度发布得以保留，快速滚动时可见内容不再被挤压。"
+            },
+            "refs": [
+              9893,
+              9895,
+              9896,
+              9897
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Independent model connections and model preferences",
+              "zh": "独立模型连接与模型偏好"
+            },
+            "body": {
+              "en": "Model services are independent connections with stable identities, display names and separate credentials. Adding a connection selects a brand, product and protocol, and first-run setup opens this flow.",
+              "zh": "模型服务成为具有稳定标识、显示名称与独立凭据的独立连接；新增连接时选择品牌、产品与协议，首次启动设置即进入该流程。"
+            },
+            "refs": [
+              9907
+            ]
+          }
+        ],
+        "fixed": [
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Stop button now interrupts reliably",
+              "zh": "停止按钮现在可靠中断"
+            },
+            "body": {
+              "en": "Stop is now a session-level unconditional interrupt. Stale turn IDs no longer block cancellation, and the UI retries fence rejections automatically.",
+              "zh": "停止现在是会话级无条件中断。过期的回合 ID 不再阻止取消，界面会自动重试被拒绝的请求。"
+            },
+            "refs": [
+              9898
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Provider recovery waiting is bounded",
+              "zh": "模型服务恢复等待有上限"
+            },
+            "body": {
+              "en": "Turns no longer wait indefinitely on flaky networks. A 10-minute recovery budget ends the turn with a clear, actionable error instead of spinning forever.",
+              "zh": "回合不再在网络不稳定时无限等待。10 分钟的恢复预算会以清晰、可操作的错误结束回合，而不是一直旋转。"
+            },
+            "refs": [
+              9899
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Sessions stay visible after crashes",
+              "zh": "崩溃后会话保持可见"
+            },
+            "body": {
+              "en": "After a hard kill mid-turn, conversations no longer disappear from the sidebar. Last-known preview and turn counts are preserved while repair runs.",
+              "zh": "回合中途强制终止后，对话不再从侧栏消失。修复期间保留最后已知的预览和回合计数。"
+            },
+            "refs": [
+              9902
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Model services navigation restored",
+              "zh": "模型服务导航已恢复"
+            },
+            "body": {
+              "en": "Clicking Model services no longer opens Model preferences. The navigation store now preserves the requested page correctly.",
+              "zh": "点击“模型服务”不再打开“模型偏好”。导航存储现在能正确保留请求的页面。"
+            },
+            "refs": [
+              9951
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "DeepSeek protocol migration and model identity fixes",
+              "zh": "DeepSeek 协议迁移与模型标识修复"
+            },
+            "body": {
+              "en": "Custom model IDs are preserved exactly, and official DeepSeek connections now default to Chat Completions with a one-time migration for existing endpoints.",
+              "zh": "自定义模型 ID 被精确保留，官方 DeepSeek 连接现在默认使用 Chat Completions，并对现有端点执行一次性迁移。"
+            },
+            "refs": [
+              9947
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Provider protocol contracts enforced",
+              "zh": "模型服务协议契约强制执行"
+            },
+            "body": {
+              "en": "Changing a provider's API format no longer produces invalid routes. Conflicts are rejected with recommended endpoints, and failures show clear diagnostics.",
+              "zh": "更改模型服务的 API 格式不再产生无效路由。冲突会被拒绝并给出推荐端点，失败时显示清晰的诊断信息。"
+            },
+            "refs": [
+              9942
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Compaction un-stuck for thinking models and unnumbered overflows",
+              "zh": "思考型模型与无数字超窗的分段压缩已修复"
+            },
+            "body": {
+              "en": "Summaries from thinking models are now recognized, and provider overflows without token numbers trigger the chunked fallback correctly.",
+              "zh": "思考型模型的摘要现在能被识别，无 token 数字的模型服务超窗也能正确触发分段回退。"
+            },
+            "refs": [
+              9882
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Summary-request overflow recovery",
+              "zh": "摘要请求超窗恢复"
+            },
+            "body": {
+              "en": "Sessions that exceed the context window can now recover through a ladder of fallbacks, including truncation rescue, instead of failing repeatedly.",
+              "zh": "超出上下文窗口的会话现在可以通过一系列回退（包括截断救援）恢复，而不是反复失败。"
+            },
+            "refs": [
+              9879
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Parallel tool cancellation bounded",
+              "zh": "并行工具取消有界化"
+            },
+            "body": {
+              "en": "A tool that ignores cancellation no longer wedges the whole turn. After a 15-second grace period, the turn continues with an explicit interrupted result.",
+              "zh": "忽略取消的工具不再卡住整个回合。15 秒宽限期后，回合会以明确的中断结果继续。"
+            },
+            "refs": [
+              9901
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Rejected backend calls contained",
+              "zh": "后端调用失败被妥善处理"
+            },
+            "body": {
+              "en": "Errors in the recovery-lineage dialog no longer trigger a full-screen crash overlay. They are toasted and logged as ordinary errors.",
+              "zh": "恢复谱系对话框中的错误不再触发全屏崩溃遮罩。它们会作为普通错误提示并记录。"
+            },
+            "refs": [
+              9900
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Settings component layout ownership restored",
+              "zh": "设置组件布局所有权已恢复"
+            },
+            "body": {
+              "en": "The model assignment matrix no longer wraps incorrectly. Shared layout defaults have lower specificity so component layouts retain control.",
+              "zh": "模型分配矩阵不再错误换行。共享布局默认值降低了优先级，组件布局重新获得控制权。"
+            },
+            "refs": [
+              9914
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Memory screening baseline stabilized",
+              "zh": "内存筛查基线已稳定"
+            },
+            "body": {
+              "en": "The app-memory benchmark now settles its baseline before judging drift, preventing false positives from noisy first samples.",
+              "zh": "应用内存基准测试现在在判定漂移前会稳定基线，防止因首个样本噪声而产生误报。"
+            },
+            "refs": [
+              9950
+            ]
+          },
+          {
+            "targets": [
+              "service"
+            ],
+            "title": {
+              "en": "Windows CI queue no longer blocked",
+              "zh": "Windows CI 队列不再阻塞"
+            },
+            "body": {
+              "en": "The desktop-windows job now has a 45-minute timeout and bounded WebView2 smoke step, preventing hung processes from holding the concurrency group.",
+              "zh": "desktop-windows 作业现在有 45 分钟超时和有界的 WebView2 冒烟步骤，防止挂起的进程占用并发组。"
+            },
+            "refs": [
+              9948
+            ]
+          }
+        ]
+      },
+      "upgrade": [],
+      "risks": [],
+      "contributors": [
+        "SivanCola",
+        "XTLine",
+        "Linearl"
+      ],
+      "links": {
+        "github": "https://github.com/esengine/DeepSeek-Reasonix/releases/tag/desktop-v1.38.2",
+        "compare": "https://github.com/esengine/DeepSeek-Reasonix/compare/desktop-v1.38.1...desktop-v1.38.2",
+        "download": "https://reasonix.io/?download=desktop&channel=stable#start"
+      },
+      "releaseId": "1.38.2",
+      "baseVersion": "1.38.2",
+      "status": "reviewed",
+      "previousRelease": "1.38.1",
+      "builds": {
+        "cli": "v1.38.2",
+        "desktop": "v1.38.2",
+        "npm": "1.38.2"
+      }
+    },
+    {
       "version": "1.38.1",
       "date": "2026-09-06",
       "channel": "stable",
