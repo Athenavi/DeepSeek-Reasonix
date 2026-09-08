@@ -4121,7 +4121,7 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
   }, [compactRatioCustomEditing, compactRatioPercent, compactRatioPreset]);
 
   const persistCompactRatio = async (ratio: number) => {
-    await apply(() => app.SetCompactRatio(ratio));
+    return await apply(() => app.SetCompactRatio(ratio));
   };
 
   const focusCompactRatioCustom = () => {
@@ -4154,7 +4154,7 @@ export function ModelsSection({ s, busy, apply, backgroundApply, subtab, onboard
       setCompactRatioCustomEditing(false);
       return;
     }
-    if (dirty) await persistCompactRatio(percent / 100);
+    if (dirty && !await persistCompactRatio(percent / 100)) return;
     setCompactRatioCustomEditing(false);
   };
 

@@ -340,6 +340,42 @@ eq(compactRatioCalls[3], 0.72, "ordinary blur persists the draft");
 await act(async () => { finishCompactSave?.(); await flushPromises(); });
 ok(customCompactButton.checked, "ordinary blur selects the saved custom threshold");
 
+// A rejected save retains the draft for retry while selection stays authoritative.
+let rejectCompactSave = true;
+window.go.main.App.SetCompactRatio = async (ratio: number) => {
+  compactRatioCalls.push(ratio);
+  if (rejectCompactSave) throw new Error("Compaction save rejected");
+  compactSettings = { ...compactSettings, agent: { ...compactSettings.agent, compactRatio: ratio } };
+};
+await act(async () => { customCompactInput.focus(); });
+await act(async () => { setCustomCompactInput(customCompactInput, "74"); });
+await act(async () => { customCompactInput.blur(); await flushPromises(); });
+eq(customCompactInput.value, "74", "failed save retains the custom draft");
+eq(compactSettings.agent.compactRatio, 0.72, "failed save preserves the persisted threshold");
+ok(compactRootEl.textContent?.includes("Compaction save rejected"), "failed save displays its error");
+rejectCompactSave = false;
+await act(async () => { customCompactInput.focus(); });
+await act(async () => {
+  customCompactInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await flushPromises();
+});
+eq(compactSettings.agent.compactRatio, 0.74, "Enter retries the retained draft successfully");
+eq(customCompactInput.value, "74", "successful retry keeps the saved custom value visible");
+ok(!compactRootEl.textContent?.includes("Compaction save rejected"), "successful retry clears the error");
+rejectCompactSave = true;
+await act(async () => { customCompactInput.focus(); });
+await act(async () => { setCustomCompactInput(customCompactInput, "76"); });
+await act(async () => { customCompactInput.blur(); await flushPromises(); });
+eq(customCompactInput.value, "76", "subsequent rejection also retains the draft");
+const callsBeforeCancel = compactRatioCalls.length;
+await act(async () => { customCompactInput.focus(); });
+await act(async () => {
+  customCompactInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await flushPromises();
+});
+eq(customCompactInput.value, "74", "Escape after failure restores the persisted value");
+eq(compactRatioCalls.length, callsBeforeCancel, "Escape after failure does not write");
+
 await act(async () => {
   compactRoot.unmount();
 });
