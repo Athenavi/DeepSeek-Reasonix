@@ -116,7 +116,15 @@ func (c *Coordinator) Observe(env tool.ReadResultEnvelope, activeMillis int64) (
 		c.byKey[ob.Key] = ob
 	}
 	if ob.State.Terminal() {
+		// A verified repeat is accounting, not a new incomplete requirement.
+		if ob.State == StateSatisfied && env.Source.Identity != "" && ob.Source == env.Source {
+			ob.Pages++
+			ob.ActiveTime += time.Duration(activeMillis) * time.Millisecond
+		}
 		return Transition{}, false
+	}
+	if env.Source.Identity != "" {
+		ob.Source = env.Source
 	}
 
 	c.sequence++
@@ -349,6 +357,9 @@ func missingFor(ob *Obligation) []tool.ReadRange {
 	case tool.ReadIntentRange:
 		return Subtract(ob.Requirement.Ranges, ob.Covered)
 	case tool.ReadIntentFull:
+		if ob.SourceEnd != nil {
+			return Subtract([]tool.ReadRange{{Start: 0, End: *ob.SourceEnd}}, ob.Covered)
+		}
 		if len(ob.Covered) == 0 {
 			return nil
 		}

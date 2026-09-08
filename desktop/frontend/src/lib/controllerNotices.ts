@@ -1,6 +1,15 @@
 import { asArray } from "./array";
 import { t, type DictKey } from "./i18n";
-import type { WireFinalReadiness } from "./types";
+import type { WireFinalReadiness, WireDecisionReceipt } from "./types";
+import type { Item } from "./useController";
+
+export function appendNoticeItem(items: Item[], seq: number, id: string, level: "info" | "warn", rawText: string, detail?: string, code?: string, decisionReceipt?: WireDecisionReceipt): { items: Item[]; seq: number } {
+  if (quietTranscriptNoticeKey(rawText, code)) return { items, seq };
+  const text = localizedNoticeText(rawText, code);
+  if (quietTranscriptNoticeKey(text, code)) return { items, seq };
+  const trimmedDetail = detail?.trim();
+  return { items: [...items, { kind: "notice", id, level, text, ...(trimmedDetail ? { detail: trimmedDetail } : {}), ...(code ? { code } : {}), ...(decisionReceipt ? { decisionReceipt } : {}) }], seq: seq + 1 };
+}
 
 export function errorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;

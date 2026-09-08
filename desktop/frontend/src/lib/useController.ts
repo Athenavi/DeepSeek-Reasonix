@@ -31,10 +31,9 @@ import { recordFrontendDiagnostic } from "./frontendDiagnosticBridge";
 import { uiPerfTracker } from "./uiPerf";
 import { getLocale, t } from "./i18n";
 import {
+  appendNoticeItem,
   deliveryReadinessDetail,
   errorMessage,
-  localizedNoticeText,
-  quietTranscriptNoticeKey,
   readinessMissingIds,
 } from "./controllerNotices";
 import { applyHydrateErrorState, hydratePlaceholderItems as resolveHydratePlaceholders } from "./hydrateErrorState";
@@ -55,6 +54,7 @@ import type { SearchSource } from "./searchSources";
 import { attachWebSearchOutput, historySearchAndAnswer } from "./searchTranscript";
 import { fileDiffFromWire, parseTodos, summarize, summarizeFileDiff, type ToolFileDiff } from "./tools";
 import { applyReadStatusEvent, type ReadStatusHost } from "./readStatus";
+import { upsertReadPause } from "./readPause";
 import { modeHasAutoApproveTools, normalizeMode, normalizeToolApprovalMode, type QualityFloor } from "./types";
 import type {
   BalanceInfo,
@@ -885,6 +885,10 @@ export function historyMessagesToItems(messages: HistoryMessage[], idPrefix: str
       continue;
     }
     if (m.role === "notice") {
+      if (m.code === "incomplete_read") {
+        items = upsertReadPause(items, m.readPause, `${idPrefix}${seq++}`);
+        continue;
+      }
       if (m.code === "protocol_recovery" && m.pending && m.protocolRecovery?.id) {
         items.push({kind:"notice",id:`${idPrefix}${seq++}`,level:"info",code:m.code,text:t("notice.protocolRecoveryBody"),action:"recover_context",recoveryId:m.protocolRecovery.id});
         continue;
@@ -1952,7 +1956,9 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       } else if (todoGapResolved) {
         items = finalized.filter((item) => item.kind !== "notice" || item.variant !== "delivery" || !todoOnlyMissing(item.missing));
       }
-      if (e.outcome === "final_readiness") {
+      if (e.outcome === "incomplete_read") {
+        items = upsertReadPause(finalized, e.readPause, `read-pause-${e.turnId ?? s.seq}`);
+      } else if (e.outcome === "final_readiness") {
         const previous = items.map((item) => item.kind === "notice" && item.variant === "delivery"
           ? { ...item, action: undefined }
           : item);
@@ -2474,18 +2480,6 @@ function latestTodosAllComplete(items: Item[]): boolean {
     }
   }
   return false;
-}
-
-function appendNoticeItem(items: Item[], seq: number, id: string, level: "info" | "warn", rawText: string, detail?: string, code?: string, decisionReceipt?: WireDecisionReceipt): { items: Item[]; seq: number } {
-  if (quietTranscriptNoticeKey(rawText, code)) {
-    return { items, seq };
-  }
-  const text = localizedNoticeText(rawText, code);
-  if (quietTranscriptNoticeKey(text, code)) {
-    return { items, seq };
-  }
-  const trimmedDetail = detail?.trim();
-  return { items: [...items, { kind: "notice", id, level, text, ...(trimmedDetail ? { detail: trimmedDetail } : {}), ...(code ? { code } : {}), ...(decisionReceipt ? { decisionReceipt } : {}) }], seq: seq + 1 };
 }
 
 function appendNoticeToState(s: State, level: "info" | "warn", text: string, detail?: string, code?: string, decisionReceipt?: WireDecisionReceipt): State {

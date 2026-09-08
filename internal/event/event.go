@@ -189,13 +189,6 @@ type StreamAttemptInfo struct {
 	Reason  string
 }
 
-const TurnOutcomeFinalReadiness = "final_readiness"
-
-// TurnOutcomeRecoveryPaused marks an Auto recovery Episode budget stop. New
-// clients show an informational status (not send-failed); older clients still
-// read Err text and ignore the unknown outcome.
-const TurnOutcomeRecoveryPaused = "recovery_paused"
-
 // Level classifies a Notice so sinks can style or filter it.
 type Level int
 
@@ -559,6 +552,7 @@ type Event struct {
 	RetryScope         RetryScope                // Retrying: optional "headers" | "stream"; empty for older emitters
 	StreamAttempt      StreamAttemptInfo         // StreamAttempt lifecycle
 	ReadStatus         *ReadStatusPayload        // ReadStatus: one logical read's delivery state
+	ReadPause          *provider.ReadPause       // TurnDone: durable display-only pause receipt
 	ItemID             string                    // correlates durable inbox events
 	SessionPath        string                    // routes Serve frames
 	SessionReset       bool                      // SessionChanged came from /new or /clear, not resume/recovery

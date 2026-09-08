@@ -386,6 +386,7 @@ export interface MemoryCitation {
 }
 
 export interface WireEvent extends RecoveryEventFields {
+	readPause?: import("./readPause").WireReadPause;
   kind: EventKind;
   readStatus?: WireReadStatus;
   /** session_changed: the transcript was replaced under the same path (head switch, clear). */
@@ -416,7 +417,7 @@ export interface WireEvent extends RecoveryEventFields {
   err?: string;
   checkpointTurn?: number; // Authoritative TurnDone rewind target; zero is valid.
   submissionId?: string; // Opaque correlation for the exact optimistic user submission.
-  outcome?: "completed" | "partial" | "blocked" | "final_readiness" | "recovery_paused" | "completion_uncertain";
+  outcome?: "completed" | "partial" | "blocked" | "final_readiness" | "recovery_paused" | "completion_uncertain" | "incomplete_read";
   readiness?: WireFinalReadiness;
   protocolRecovery?: { id: string };
   diagnostic?: { kind: string; status?: number; traceId?: string; providerId?: string; providerDisplayName?: string; protocol?: string; requestPath?: string };
@@ -801,6 +802,7 @@ export interface ChangedFileInfo {
 
 // Bound-method payloads (desktop/app.go).
 export interface HistoryMessage {
+	readPause?: import("./readPause").WireReadPause;
   role: string;
   content: string;
   detail?: string;

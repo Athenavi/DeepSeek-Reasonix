@@ -76,6 +76,7 @@ type Obligation struct {
 	// Version is the content version coverage belongs to. A delivery from a
 	// different version resets coverage instead of extending it.
 	Version string
+	Source  tool.ReadResultSource
 	// Covered is the union of delivered ranges on Version, in normalized order.
 	Covered []tool.ReadRange
 	// SawEOF reports that some delivery on Version reached the file's end.

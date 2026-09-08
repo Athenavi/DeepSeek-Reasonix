@@ -64,6 +64,8 @@ func (a *Agent) beginRunTurn(ctx context.Context, input string, pinned pinnedRev
 	a.turn.incompleteReads.legacyImplicitFullReads = a.legacyImplicitFullReads
 	a.reads.runGen++
 	a.reads.tasks = newReadTasks(a.sess.path, a.reads.runGen)
+	a.reads.deliveries = make(map[string]readDelivery)
+	a.reads.visible = nil
 	a.resetStructuralRunGuards()
 	scope, scoped := DeliveryExecutionScopeFromContext(ctx)
 	preserveEvidence, readinessRecovered := a.beginFinalReadinessRecovery()
@@ -171,7 +173,7 @@ func (a *Agent) beginRunTurn(ctx context.Context, input string, pinned pinnedRev
 // runToolLoop owns the main tool-round budget and dispatches each streamed
 // assistant turn into final-response or tool-round handling.
 func (a *Agent) runToolLoop(ctx context.Context, state *turnRuntime) (runErr error) {
-	defer a.closeReadStatuses()
+	defer func() { a.finishReadRun(runErr) }()
 	releaseMCPListObserver := a.activateMCPListObserver()
 	defer func() {
 		a.recordReadonlySoftBudgetSample(state, runErr)

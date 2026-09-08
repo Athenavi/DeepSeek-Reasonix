@@ -76,6 +76,8 @@ type toolOutcome struct {
 	recoveryStopReason string
 	readTaskID         string
 	readEnvelope       *tool.ReadResultEnvelope
+	finalReadEnvelope  *tool.ReadResultEnvelope
+	readReference      *readDelivery
 	readActiveMillis   int64
 	incompleteRead     *incompleteReadDeferred
 	subagentOutcome    *SubagentOutcome
@@ -178,6 +180,7 @@ func (a *Agent) executeBatch(ctx context.Context, turn *turnRuntime, calls []pro
 		}
 		committed[i] = true
 		a.finalizeIncompleteReadOutcome(outcomes[i].incompleteRead, &outcomes[i])
+		a.finalizeReadDelivery(ctx, calls[i], &outcomes[i])
 		results[i] = outcomes[i].output
 		a.commitBatchCallResolution(calls[i])
 		a.storeBatchToolResult(ctx, calls[i], outcomes[i])

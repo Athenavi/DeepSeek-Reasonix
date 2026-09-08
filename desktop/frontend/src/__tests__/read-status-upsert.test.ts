@@ -1,5 +1,6 @@
 import { initialState, reducer } from "../lib/useController";
 import { applyReadStatusFrame, readStatusLabel } from "../lib/readStatus";
+import { readPauseItem, upsertReadPause, type WireReadPause } from "../lib/readPause";
 
 function equal(actual: unknown, expected: unknown, message: string) {
   if (actual !== expected) throw new Error(`${message}: got ${String(actual)}, want ${String(expected)}`);
@@ -58,3 +59,14 @@ equal(reducer(live, { type: "event", e: { ...frame(99, "blocked"), turnId: "old"
 const done = reducer(live, { type: "event", e: { kind: "turn_done", turnId: "current" } });
 equal(done.readStatuses, undefined, "completion clears live status");
 equal(reducer(done, { type: "event", e: { ...frame(99, "blocked"), turnId: "current" } }).readStatuses, undefined, "late result cannot revive a completed turn");
+
+const receipt: WireReadPause = { id: "receipt", reads: [{ readId: "r", path: "file", reason: "page_budget", covered: [[0, 10]], missing: [[10, 20]] }] };
+const readDone = reducer(live, { type: "event", e: { kind: "turn_done", turnId: "current", outcome: "incomplete_read", readPause: receipt } });
+equal(readDone.turnActive, false, "a read pause releases the composer");
+equal(readDone.readStatuses, undefined, "live progress is cleared after retaining the receipt");
+equal(readDone.items.filter(it => it.kind === "notice" && it.code === "incomplete_read").length, 1, "one durable read pause");
+equal(upsertReadPause(readDone.items, receipt, "unused").length, readDone.items.length, "replayed pause is idempotent");
+const historyNotice = readPauseItem(receipt, "unused");
+equal(JSON.stringify(readDone.items.find(it => it.id === historyNotice.id)), JSON.stringify(historyNotice), "live and history use identical presentation");
+const nextTurn = reducer(readDone, { type: "event", e: { kind: "turn_started", turnId: "next", status: "in_progress" } });
+equal(reducer(nextTurn, { type: "event", e: { kind: "turn_done", turnId: "current", outcome: "incomplete_read", readPause: receipt } }), nextTurn, "stale terminal result cannot stop a new turn");

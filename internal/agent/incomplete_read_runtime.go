@@ -79,7 +79,17 @@ func (a *Agent) boundIncompleteReadAwareResult(plan *toolCallPlan, result string
 			_, readObserver = plan.execTool.(tool.ModelTextObserver)
 		}
 	}
-	body, truncMsg, original = a.boundProviderVisibleResult(result, plan.call.Name, plan.call.ID)
+	_, structuredReader := plan.execTool.(tool.ReadEnvelopeProvider)
+	if a.readPipelineActive() && structuredReader {
+		// Structured readers are deduplicated only in the ordered finalizer,
+		// against original text present in the frozen model request.
+		body, truncMsg = truncateToolOutputFor(result, plan.call.Name, plan.call.ID)
+		if body != result {
+			original = result
+		}
+	} else {
+		body, truncMsg, original = a.boundProviderVisibleResult(result, plan.call.Name, plan.call.ID)
+	}
 	readArgs, _ := parseReadFileArgs(plan.execArgs)
 	if a.readPipelineActive() && plan.evidenceName == "read_file" && (plan.readTaskID != "" || readArgs.fullRead()) {
 		budget := a.readAutoRecoveryBudgetFor()

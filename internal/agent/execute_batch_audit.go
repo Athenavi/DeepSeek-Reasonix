@@ -93,11 +93,12 @@ func (a *Agent) storeBatchToolResult(ctx context.Context, call provider.ToolCall
 	if o.rawOutput != "" && o.rawOutput != o.output {
 		msg.RawContent = o.rawOutput
 	}
-	if env, ok := a.readResultEnvelopeFor(ctx, call, o); ok {
+	if env, ok := a.finalizedReadEnvelope(ctx, call, o); ok {
 		if raw, err := json.Marshal(env); err == nil {
 			msg.ReadResult = raw
 		}
 		a.observeReadShadow(env, o.readActiveMillis)
+		a.rememberReadDelivery(call.ID, o.output, env)
 		if a.readPipelineActive() {
 			if observer, ok := tReadObserver(a, call); ok {
 				if observed, ok := observer.ObserveModelText(json.RawMessage(call.Arguments), o.output); ok {

@@ -28,6 +28,7 @@ type Event struct {
 	Level            string                           `json:"level,omitempty"`
 	Tool             *Tool                            `json:"tool,omitempty"`
 	ReadStatus       *ReadStatus                      `json:"readStatus,omitempty"`
+	ReadPause        *provider.ReadPause              `json:"readPause,omitempty"`
 	Usage            *Usage                           `json:"usage,omitempty"`
 	Approval         *Approval                        `json:"approval,omitempty"`
 	Ask              *Ask                             `json:"ask,omitempty"`
@@ -213,6 +214,7 @@ func ToWire(e event.Event) Event {
 		w.Extension = ToWireExtensionSurface(e.Extension)
 	case event.TurnDone:
 		w.Outcome = e.Outcome
+		w.ReadPause = e.ReadPause
 		w.CheckpointTurn = e.CheckpointTurn
 		w.Receipt = completionReceiptWire(e.Receipt)
 		w.ProtocolRecovery = e.ProtocolRecovery

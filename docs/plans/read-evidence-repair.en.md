@@ -44,3 +44,35 @@ There is no session-store migration. Old cursors must be re-read after a new run
 Local deterministic tests are distinct from native WebView2/WKWebView checks,
 real-provider success/token measurements, exact-head remote CI, and release
 availability. Those results must be reported separately.
+
+## Completed-read reuse and terminal receipts
+
+The follow-up separates historical requirement completion from original text
+available in the frozen model request. The ordered tool finalizer associates
+captures by workspace, canonical path, source kind, raw identity and snapshot.
+A satisfied requirement stays satisfied on a verified repeat; expansion keeps
+coverage and accounting and asks only for missing ranges. New runs own new
+registries and cursor bindings.
+
+Structured readers bypass generic string deduplication. A reference is allowed
+only to identical original text in the actual sampled request, and only for
+already covered ranges. References deliver no new source lines and cannot
+reference other references. Projection removal or extension rewriting causes
+bounded text delivery; it does not revoke an earlier completed requirement.
+Extension changes that remove parseable source text also invalidate identity.
+
+`incomplete_read` is a terminal pause outcome, not success or a transport retry.
+The optional `read_pause` LocalOnly receipt preserves up to 32 affected files
+and 64 ranges per field, without content or executable cursors. Desktop live
+and history views use the same idempotent notice. Old sessions omit the field;
+older readers ignore the sentinel through the existing LocalOnly tool identity.
+No migration or user setting is required. Existing write preconditions remain
+independent of this receipt. The follow-up changes no tool schemas or system
+prefixes; re-delivering text removed by compaction can increase an individual
+request's input usage.
+
+The paid matrix retains the original 64 cases and adds 32 targeted cases plus
+12 exact-write cases. Its HTTP relay caps all upstream attempts at 600, reserves
+128,000 tokens before each request, retains reservations when usage is unknown,
+and stops at 3 million tokens or four hours. It stores no credentials or request
+bodies. Model task failures and host invariant failures remain separate results.

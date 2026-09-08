@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -74,6 +75,38 @@ func TestReadPipelineBudgetActuallyStopsDispatch(t *testing.T) {
 			}
 			if !strings.Contains(toolResultByID(a.Session(), "blocked-next"), "automatic read is paused") {
 				t.Fatal("budget did not block execution")
+			}
+			if incomplete.Pause == nil || len(incomplete.Pause.Reads) != 1 || incomplete.Pause.Reads[0].Reason == "" {
+				t.Fatal("bounded pause lost its structured terminal receipt")
+			}
+			var stored int
+			for _, msg := range a.Session().Snapshot() {
+				if msg.ReadPause != nil {
+					stored++
+					if !msg.LocalOnly {
+						t.Fatal("pause was provider-visible")
+					}
+				}
+			}
+			if stored != 1 {
+				t.Fatalf("stored %d terminal receipts", stored)
+			}
+			archive := filepath.Join(t.TempDir(), "paused.jsonl")
+			if err := a.Session().SaveWithEphemeralWriter(archive, nil); err != nil {
+				t.Fatal(err)
+			}
+			reloaded, err := LoadSession(archive)
+			if err != nil {
+				t.Fatal(err)
+			}
+			found := false
+			for _, msg := range reloaded.Snapshot() {
+				if msg.ReadPause != nil && msg.ReadPause.ID == incomplete.Pause.ID {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatal("save/load lost the terminal receipt")
 			}
 		})
 	}

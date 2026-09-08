@@ -34,7 +34,7 @@ func (a *Agent) readResultEnvelopeFor(ctx context.Context, call provider.ToolCal
 	env, ok := reader.ReadEnvelope(ctx, json.RawMessage(call.Arguments), raw)
 	if o.readEnvelope != nil {
 		env, ok = *o.readEnvelope, true
-		if window, parsed := tool.ParseReadWindow(raw); parsed && tool.WindowDigest(env.Source.CanonicalPath, window) != env.WindowDigest {
+		if window, parsed := tool.ParseReadWindow(raw); (!parsed && len(env.DeliveredRanges) > 0) || (parsed && tool.WindowDigest(env.Source.CanonicalPath, window) != env.WindowDigest) {
 			// An extension changed source text after execution. It remains a tool
 			// result, but cannot inherit the reader's version or coverage proof.
 			env.Source.Snapshot = ""
@@ -63,7 +63,9 @@ func (a *Agent) readResultEnvelopeFor(ctx context.Context, call provider.ToolCal
 		}
 		env.NextCursor = tool.EncodeReadCursor(cursor)
 	}
-	a.reads.tasks.remember(env.ReadID, env, readPathArg(json.RawMessage(call.Arguments)))
+	if !a.readPipelineActive() {
+		a.reads.tasks.remember(env.ReadID, env, readPathArg(json.RawMessage(call.Arguments)))
+	}
 	return env, true
 }
 

@@ -100,6 +100,7 @@ type Message struct {
 	// ModelMessages removes it before provider serialization.
 	FinalReadinessRecovery *FinalReadinessRecovery `json:"final_readiness_recovery,omitempty"`
 	ProtocolRecovery       json.RawMessage         `json:"protocol_recovery,omitempty"`
+	ReadPause              *ReadPause              `json:"read_pause,omitempty"`
 	// ToolExecution is local shell UI metadata on tool-result messages. It ispersisted for
 	// Desktop/CLI/Servecards and stripped by
 	// ModelMessagesbeforeanyproviderrequestsotoolschemasandprompt-cacheprefixes stay stable.

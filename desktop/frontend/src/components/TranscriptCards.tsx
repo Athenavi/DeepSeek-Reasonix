@@ -72,7 +72,7 @@ export function NoticeCard({ item, onAction, onAccept, onOpenVerification, actio
   const showVerification = item.variant === "completion" && Boolean(item.completionSummary && onOpenVerification);
   const showActions = Boolean((item.action && onAction) || onAccept || showVerification);
   return (
-    <div className={`notice-line notice-line--${item.level}${item.variant ? ` notice-line--${item.variant}` : ""}`} data-entrance={item.id}>
+    <div className={`notice-line notice-line--${item.level}${item.variant ? ` notice-line--${item.variant}` : ""}`} data-entrance={item.id} role={item.code === "incomplete_read" ? "status" : undefined}>
       <StatusIcon className="notice-line__icon" size={14} aria-hidden="true" />
       <div className="notice-line__text">
         {item.decisionReceipt ? (
