@@ -71,5 +71,18 @@ await change("format","anthropic");
 assert.equal(rootEl.querySelector<HTMLInputElement>('input[id$="-url"]')!.value,"https://api.ppio.com/anthropic");
 await act(async () => { rootEl.querySelector<HTMLButtonElement>(".btn--primary")!.click(); });
 assert.equal(submittedFormat,"anthropic");
+// A legacy host can put the Anthropic preset first. New official connections
+// must still start with Chat Completions, while explicit choices survive refresh.
+const deepseekChoice = choices.find(c => c.catalog.brandId === "deepseek")!;
+await act(async () => {render(false, [{...deepseekChoice, catalog: {...deepseekChoice.catalog, format: "anthropic"}}]);});
+assert.equal(select("format").value, "openai");
+assert.equal(rootEl.querySelector<HTMLInputElement>('input[id$="-url"]')!.value, "https://api.deepseek.com/v1");
+assert.deepEqual(await settingsOptionValues(select("format")), ["openai", "responses", "anthropic"]);
+await act(async () => { rootEl.querySelector<HTMLButtonElement>(".btn--primary")!.click(); });
+assert.equal(submittedFormat, "openai");
+await change("format", "anthropic");
+await act(async () => {render(false, [deepseekChoice]);});
+assert.equal(select("format").value, "anthropic");
+assert.equal(rootEl.querySelector<HTMLInputElement>('input[id$="-url"]')!.value, "https://api.deepseek.com/anthropic");
 await act(async () => root.unmount());
 console.log("PASS provider catalog: grouping, constrained selection, exact install, refresh state, local setup");

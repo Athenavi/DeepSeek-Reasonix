@@ -1580,16 +1580,6 @@ func (e *ProviderEntry) modelOverrideForModel(model string) (ProviderModelOverri
 	if ov, ok := e.ModelOverrides[model]; ok {
 		return ov, true
 	}
-	keys := make([]string, 0, len(e.ModelOverrides))
-	for k := range e.ModelOverrides {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	for _, k := range keys {
-		if strings.EqualFold(strings.TrimSpace(k), model) {
-			return e.ModelOverrides[k], true
-		}
-	}
 	return ProviderModelOverride{}, false
 }
 
@@ -1810,7 +1800,7 @@ const LanguagePolicy = `Reply in the same language the user is using in their mo
 // Default returns the built-in default configuration.
 func Default() *Config {
 	return &Config{
-		ConfigVersion:    8,
+		ConfigVersion:    9,
 		DefaultModel:     "deepseek-flash",
 		CredentialsStore: CredentialsStoreAuto,
 		UI:               UIConfig{Theme: "auto", ShowTurnUsage: true},
