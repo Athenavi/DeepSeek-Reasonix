@@ -21,10 +21,12 @@ func rewriteDeepSeekProviderBlockAs(lines []string, block providerTOMLBlock, kin
 		}
 		switch {
 		case kind == "openai" && (isTOMLKeyAssignment(lines[i], "request_url") || isTOMLKeyAssignment(lines[i], "chat_url")):
-			// Only reached for an eligible official endpoint.
+			// Only reached for an eligible official endpoint. Clear the standard
+			// override so the derived endpoint applies and independent search
+			// stays enabled.
 			_, value, _ := tomlKeyValue(lines[i])
 			if value != `""` && value != `''` {
-				lines[i] = replaceTOMLStringAssignment(lines[i], "https://api.deepseek.com/chat/completions")
+				lines[i] = replaceTOMLStringAssignment(lines[i], "")
 			}
 		case isTOMLKeyAssignment(lines[i], "kind"):
 			kindLine = i
