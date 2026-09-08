@@ -165,6 +165,26 @@ func TestRuntimeStateHTTPStatusUsesRequestedDetachedController(t *testing.T) {
 	}
 }
 
+func TestOwnedRuntimeStatusCanonicalizesResponsePath(t *testing.T) {
+	dir := t.TempDir()
+	foreground := runtimeStateServeController(t, dir, "foreground", nil)
+	detached := runtimeStateServeController(t, dir, "detached", nil)
+	server := New(foreground, nil, config.ServeConfig{})
+	path := agent.CanonicalSessionPath(detached.SessionPath())
+	server.detached[path] = &detachedSession{path: path, ctrl: detached}
+	// A noncanonical spelling must not escape through the status response,
+	// even when lookup correctly resolves it to the detached owner.
+	raw := filepath.Dir(path) + string(filepath.Separator) + "." + string(filepath.Separator) + filepath.Base(path)
+	status, ok := server.ownedRuntimeStatusView(raw)
+	if !ok || status["sessionPath"] != path {
+		t.Fatalf("owned status did not preserve canonical identity: ok=%v path=%v want=%q", ok, status["sessionPath"], path)
+	}
+	state := status["runtimeState"].(event.RuntimeStateSnapshot)
+	if state.RuntimeEpoch != detached.RuntimeStateSnapshot().RuntimeEpoch {
+		t.Fatal("canonical response borrowed the foreground runtime")
+	}
+}
+
 func readRuntimeSSEFrame(t *testing.T, reader *bufio.Reader) eventwire.Event {
 	t.Helper()
 	for {
