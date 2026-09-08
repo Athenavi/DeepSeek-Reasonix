@@ -190,3 +190,29 @@ func TestCommitRewindInPlaceForksRewindHeadAndKeepsController(t *testing.T) {
 		t.Fatalf("heads = %+v err=%v", heads, err)
 	}
 }
+
+func TestBranchTreeMarksTheCurrentHead(t *testing.T) {
+	c, _, path := newSchemaTwoBranchController(t)
+	if got := c.CurrentBranchID(); got != agent.BranchID(path) {
+		t.Fatalf("CurrentBranchID on main = %q, want the file id %q", got, agent.BranchID(path))
+	}
+	head, err := c.Branch("experiment")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := c.CurrentBranchID(); got != head {
+		t.Fatalf("CurrentBranchID after Branch = %q, want the new head %q", got, head)
+	}
+	tree := c.BranchTreeText()
+	for line := range strings.SplitSeq(tree, "\n") {
+		if strings.Contains(line, "experiment") != strings.HasSuffix(line, "current") {
+			t.Fatalf("tree marks the wrong branch current:\n%s", tree)
+		}
+	}
+	if _, err := c.SwitchBranch(agent.BranchID(path)); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.CurrentBranchID(); got != agent.BranchID(path) {
+		t.Fatalf("CurrentBranchID back on main = %q", got)
+	}
+}
