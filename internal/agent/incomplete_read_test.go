@@ -370,11 +370,11 @@ func TestIncompleteReadRecoversParallelFilesBeforeFinal(t *testing.T) {
 	}
 }
 
-func TestImplicitReadContinuesSourcePagesToEOF(t *testing.T) {
+func TestExplicitFullReadContinuesSourcePagesToEOF(t *testing.T) {
 	const tailKey = "SOURCE_PAGE_KEY_2050"
 	path := makeShortPagedReadFixture(t, "more-than-default-limit.txt", 2105, 2050, tailKey)
 	read := incompleteReadBuiltin(t)
-	firstArgs := fmt.Sprintf(`{"path":%q}`, path)
+	firstArgs := fmt.Sprintf(`{"path":%q,"intent":"full"}`, path)
 	secondArgs := fmt.Sprintf(`{"path":%q,"offset":2000,"limit":2000}`, path)
 	first := expectedReadOutput(t, read, firstArgs)
 	if len(first) >= maxToolOutputBytes || !strings.Contains(first, "pass offset=2000") {
@@ -388,7 +388,7 @@ func TestImplicitReadContinuesSourcePagesToEOF(t *testing.T) {
 	var agent *Agent
 	prov := &inspectingProvider{inner: inner, before: func(round int, req provider.Request) {
 		if round == 1 && len(agent.task.ledger.TextObservations()) != 0 {
-			t.Error("the first source window was credited before the implicit whole-file read reached EOF")
+			t.Error("the first source window was credited before the explicit full read reached EOF")
 		}
 		if round == 2 && !requestHasText(req, tailKey) {
 			t.Error("the accepted final request did not contain the source tail page")
