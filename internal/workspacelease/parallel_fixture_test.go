@@ -35,7 +35,7 @@ func unrelatedTreePath(t *testing.T, blocker *Owner, base string) (string, strin
 
 func distinctPathSlotInDirectory(t *testing.T, owner *Owner, dir, blockedSlot string) string {
 	t.Helper()
-	for i := 0; i < pathLockStripes*2; i++ {
+	for i := range pathLockStripes * 2 {
 		path := filepath.Join(dir, fmt.Sprintf("parallel-%d.go", i))
 		if canonicalPathSlot(t, owner, path) != blockedSlot {
 			return path
