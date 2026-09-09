@@ -5376,10 +5376,6 @@ func historyCheckpointTurns(msgs []provider.Message, resolveUserContent func(str
 	return out
 }
 
-func historyMessages(msgs []provider.Message, resolveUserContent func(string) string) []HistoryMessage {
-	return historyMessagesWithPlannerDisplays(msgs, resolveUserContent, nil, nil)
-}
-
 func historyMessagesWithPlannerDisplays(msgs []provider.Message, resolveUserContent func(string) string, plannerTurns []plannerDisplayTurn, checkpointTurns map[int]int) []HistoryMessage {
 	replayedTodoArgs := historyTodoArgsWithCompleteSteps(msgs)
 	toolResults := historyToolResultsByID(msgs)
@@ -7873,13 +7869,6 @@ func (a *App) invalidateSkillRootsCache() {
 	a.skillRootsMu.Unlock()
 }
 
-func skillRootsView() []SkillRootView {
-	cwd, _ := os.Getwd()
-	cfg, _ := config.Load()
-	userCfg := config.LoadForEdit(config.UserConfigPath())
-	return skillRootsViewFrom(cwd, cfg, userCfg)
-}
-
 func skillRootsViewFrom(workspaceRoot string, cfg, userCfg *config.Config) []SkillRootView {
 	workspaceRoot = normalizeWorkspaceRoot(workspaceRoot)
 	var custom []string
@@ -8996,18 +8985,6 @@ func mcpConnected(ctrl control.SessionAPI, name string) bool {
 	}
 	for _, s := range ctrl.Host().Servers() {
 		if s.Name == name {
-			return true
-		}
-	}
-	return false
-}
-
-func mcpFailed(ctrl control.SessionAPI, name string) bool {
-	if ctrl == nil || ctrl.Host() == nil {
-		return false
-	}
-	for _, f := range ctrl.Host().Failures() {
-		if f.Name == name {
 			return true
 		}
 	}
@@ -10625,12 +10602,6 @@ func numberedExportPath(path string, partIndex, partCount int) string {
 	ext := filepath.Ext(path)
 	stem := strings.TrimSuffix(path, ext)
 	return fmt.Sprintf("%s-%d-of-%d%s", stem, partIndex+1, partCount, ext)
-}
-
-func saveExclusiveExportFiles(targets []string, payloads [][]byte) error {
-	return saveExclusiveExportPayloads(targets, len(payloads), func(index int) ([]byte, error) {
-		return payloads[index], nil
-	})
 }
 
 func saveExclusiveExportPayloads(targets []string, payloadCount int, payloadAt func(int) ([]byte, error)) error {
