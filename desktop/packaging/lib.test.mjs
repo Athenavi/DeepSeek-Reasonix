@@ -44,8 +44,8 @@ test("versions keep the full tag for identity and strip it for OS resources", ()
   for (const bad of ["1.2.3", "v1.2", "v01.2.3", "v1.2.3+meta", ""]) assert.throws(() => numericVersion(bad), /version must look like/);
 });
 
-test("the product identity comes from wails.json and keeps the Wails bundle id", () => {
-  const product = readProductIdentity(join(desktop, "wails.json"));
+test("the product identity is a frozen constant and keeps the Wails-era bundle id", () => {
+  const product = readProductIdentity();
   assert.equal(product.productName, "Reasonix");
   assert.equal(product.projectName, "reasonix-desktop");
   assert.equal(product.companyName, "Reasonix");

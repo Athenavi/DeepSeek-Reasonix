@@ -43,16 +43,15 @@ export function numericVersion(tag) {
   return versionTag(tag).slice(1).split("-")[0];
 }
 
-export function readProductIdentity(wailsJsonPath) {
-  const wails = JSON.parse(readFileSync(wailsJsonPath, "utf8"));
-  const info = wails.info ?? {};
-  for (const [key, value] of Object.entries({ name: wails.name, companyName: info.companyName, productName: info.productName, copyright: info.copyright })) {
-    if (typeof value !== "string" || value.trim() === "") throw new Error(`wails.json is missing ${key}`);
-  }
-  if (wails.name !== PRODUCT.serviceExecutable) throw new Error(`wails.json name ${wails.name} must be ${PRODUCT.serviceExecutable}`);
-  if (info.productName !== PRODUCT.name) throw new Error(`wails.json productName ${info.productName} must be ${PRODUCT.name}`);
-  if (`com.wails.${wails.name}` !== PRODUCT.bundleId) throw new Error(`bundle id ${PRODUCT.bundleId} no longer matches wails.json name ${wails.name}`);
-  return { projectName: wails.name, companyName: info.companyName, productName: info.productName, copyright: info.copyright };
+// The product identity lived in wails.json while the Wails shell was the build
+// entry point; with the shell retired it is a constant here.
+export function readProductIdentity() {
+  return {
+    projectName: PRODUCT.serviceExecutable,
+    companyName: "Reasonix",
+    productName: PRODUCT.name,
+    copyright: "Copyright © 2026 Reasonix Contributors",
+  };
 }
 
 export function shellIgnore(path) {

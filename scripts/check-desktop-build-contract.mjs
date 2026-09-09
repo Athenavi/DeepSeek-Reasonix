@@ -8,7 +8,6 @@ const read = (relativePath) =>
   fs.readFileSync(path.join(repoRoot, relativePath), "utf8");
 
 const frontendPackage = JSON.parse(read("desktop/frontend/package.json"));
-const wailsConfig = JSON.parse(read("desktop/wails.json"));
 const ciWorkflow = read(".github/workflows/ci.yml");
 const releaseWorkflow = read(".github/workflows/release-desktop.yml");
 const readme = read("README.md");
@@ -34,9 +33,9 @@ const nodeVersions = (workflow) =>
 assert.equal(read("desktop/frontend/.nvmrc").trim(), "24");
 assert.equal(frontendPackage.engines?.node, ">=24");
 assert.equal(frontendPackage.engines?.pnpm, ">=10 <11");
-assert.equal(
-  wailsConfig["frontend:install"],
-  "pnpm install --config.confirmModulesPurge=false",
+assert.ok(
+  !fs.existsSync(path.join(repoRoot, "desktop/wails.json")),
+  "desktop/wails.json must be retired with the Wails shell",
 );
 
 for (const jobName of ["desktop-prepare", "desktop-go", "desktop-frontend", "desktop-browser", "desktop-macos", "desktop-windows"]) {
@@ -66,11 +65,10 @@ for (const [name, content] of [
   ["desktop/README.md", desktopReadme],
 ]) {
   assert.match(content, /npm i(?:nstall)? -g pnpm@10/);
-  assert.match(content, /make wails-install/);
   assert.doesNotMatch(
     content,
-    /github\.com\/wailsapp\/wails\/v2\/cmd\/wails@/,
-    `${name} must use the shared Wails installer`,
+    /wails/i,
+    `${name} must not reference the retired Wails toolchain`,
   );
 }
 

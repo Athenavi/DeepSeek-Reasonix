@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Measure one desktop shell build the same way for Wails and Electron: launch
-# with a disposable data home, wait for the Go lifecycle diagnostics to reach
-# "healthy", then sample the full process tree (shell, renderer/GPU helpers and
-# the Go service) at fixed offsets. Output is one JSON document; compare runs
-# of this script only, never against a differently sampled figure.
+# Measure one desktop shell build: launch with a disposable data home, wait for
+# the Go lifecycle diagnostics to reach "healthy", then sample the full process
+# tree (shell, renderer/GPU helpers and the Go service) at fixed offsets.
+# Output is one JSON document; compare runs of this script only, never against
+# a differently sampled figure. The retired Wails shell's baseline runs live in
+# docs/desktop-migration/baseline/.
 #
 # Usage: scripts/desktop-shell-metrics.sh <executable> <label> <out.json> [idle_seconds]
-#   executable: the shell binary (Wails: Reasonix.app/Contents/MacOS/reasonix-desktop;
-#               Electron: the packaged app's main executable)
-#   label:      free text recorded in the output (e.g. wails-darwin-arm64)
+#   executable: the packaged app's main executable
+#   label:      free text recorded in the output (e.g. electron-darwin-arm64)
 set -euo pipefail
 
 exe="${1:?usage: desktop-shell-metrics.sh <executable> <label> <out.json> [idle_seconds]}"

@@ -150,12 +150,6 @@ service_ldflags="-X main.version=$VERSION -X main.channel=$CHANNEL $product_docs
 build_service() {
 	echo "==> go build Reasonix desktop service"
 	mkdir -p "$(dirname "$service_out")"
-	# Link cgo against WebKitGTK 4.1 while the Go module still links Wails: 4.0
-	# (libwebkit2gtk-4.0.so.37) is gone on Ubuntu 24.04+/Fedora 40+, while 4.1
-	# ships from Ubuntu 22.04 onward. ${tags[@]+...} keeps an empty array legal
-	# under set -u on bash 3.2 (the macOS default shell).
-	local tags=()
-	[ "$os" = linux ] && tags=(-tags webkit2_41)
 	if [ "$arch" = universal ]; then
 		service_tmp=$(mktemp -d)
 		GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w $service_ldflags" -o "$service_tmp/amd64" .
@@ -163,7 +157,7 @@ build_service() {
 		lipo -create "$service_tmp/amd64" "$service_tmp/arm64" -output "$service_out"
 		rm -rf "$service_tmp"
 	else
-		GOOS="$os" GOARCH="$arch" go build -trimpath ${tags[@]+"${tags[@]}"} -ldflags="-s -w $service_ldflags" -o "$service_out" .
+		GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags="-s -w $service_ldflags" -o "$service_out" .
 	fi
 }
 

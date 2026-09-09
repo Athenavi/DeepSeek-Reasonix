@@ -112,13 +112,14 @@ grep -Fq 'name: Smoke-test packaged Electron startup' "$repo_root/.github/workfl
 grep -Fq "if: matrix.platform == 'windows/amd64'" "$repo_root/.github/workflows/release-desktop.yml"
 grep -Fq 'node desktop/packaging/smoke.mjs' "$repo_root/.github/workflows/release-desktop.yml"
 grep -Fq -- '--service desktop/build/bin/reasonix-desktop.exe' "$repo_root/.github/workflows/release-desktop.yml"
-test -f "$repo_root/scripts/test-webview2-native-smoke.ps1"
 test ! -e "$repo_root/scripts/test-webview2-approval-smoke.ps1"
+# The Wails-era WebView2/WebKitGTK native smoke harnesses are retired with the
+# old shell; the packaged Electron startup smoke replaces them.
+test ! -e "$repo_root/scripts/test-webview2-native-smoke.ps1"
+test ! -e "$repo_root/scripts/test-transcript-selection-webview2.ps1"
+test ! -e "$repo_root/.github/workflows/transcript-native-smoke.yml"
 grep -Fq 'name: Package Electron shell for native startup smoke' "$repo_root/.github/workflows/ci.yml"
-grep -Fq 'name: Test WebView2 native smoke state machine' "$repo_root/.github/workflows/ci.yml"
-grep -Fq '../scripts/test-webview2-native-smoke.ps1 -SelfTest' "$repo_root/.github/workflows/ci.yml"
 grep -Fq 'name: Smoke-test Electron native startup' "$repo_root/.github/workflows/ci.yml"
-grep -Fq '../scripts/test-webview2-native-smoke.ps1' "$repo_root/.github/workflows/ci.yml"
 grep -Fq 'node packaging/package.mjs windows/amd64 v0.0.0-ci canary' \
 	"$repo_root/.github/workflows/ci.yml"
 grep -Fq 'node packaging/smoke.mjs build/electron/windows-amd64/app --service build/bin/reasonix-desktop.exe' \

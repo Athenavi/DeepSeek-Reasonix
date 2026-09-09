@@ -33,7 +33,7 @@ if (!spec || !version) {
 }
 const target = parseTarget(spec);
 versionTag(version);
-const identity = readProductIdentity(join(desktop, "wails.json"));
+const identity = readProductIdentity();
 const electronVersion = JSON.parse(readFileSync(join(desktop, "electron", "node_modules", "electron", "package.json"), "utf8")).version;
 const commit = (process.env.REASONIX_COMMIT ?? "").trim() || gitCommit();
 const buildTime = (process.env.REASONIX_BUILD_TIME ?? "").trim() || new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
