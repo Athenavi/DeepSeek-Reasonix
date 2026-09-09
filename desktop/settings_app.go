@@ -1998,6 +1998,7 @@ func (a *App) rebuildSettingTurnLockedWithModel(setting string, tab *WorkspaceTa
 	}
 	tab.Ctrl = ctrl
 	tab.modelApplication.failure = nil
+	clearedEffort := clearPendingEffortForModelLocked(tab, model)
 	tab.model = model
 	tab.Label = ctrl.Label()
 	applyNormalizedRuntimeToTabLocked(tab, restoredRuntime)
@@ -2014,6 +2015,7 @@ func (a *App) rebuildSettingTurnLockedWithModel(setting string, tab *WorkspaceTa
 	}
 	a.persistTabSessionPath(tab, path)
 	a.clearDeferredRebuildVersion(tab.ID, pendingSequence)
+	a.notifyEffortSelectionCleared(tab, clearedEffort)
 	a.notifyTabRuntimeRebuilt(tab)
 	a.emitReady(a.ctx)
 	return nil

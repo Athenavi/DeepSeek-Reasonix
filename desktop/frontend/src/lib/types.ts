@@ -1516,6 +1516,8 @@ export interface EffortInfo {
   options?: { id: string; name: string; description?: string }[];
   supported: boolean;
   current: string; // adapter-owned ID; "auto" inherits the configured default
+  pending?: string; // accepted selection for the next run; current stays truthful
+  canDefer?: boolean; // absent on older/remote runtimes: keep the running guard
   default: string;
   levels: string[];
 }

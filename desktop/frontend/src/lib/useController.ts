@@ -2505,6 +2505,8 @@ export function useController() {
   const liveListenersByTabRef = useRef(new Map<string, Set<() => void>>());
   const balanceRefreshSeqByTab = useRef(new Map<string, number>());
   const modelSwitchSeqByTab = useRef(new Map<string, number>());
+  const effortSwitchSeqByTab = useRef(new Map<string, number>());
+  const effortSwitchQueueByTab = useRef(new Map<string, Promise<void>>());
   const modelSwitchSuccessVersionByTab = useRef(new Map<string, number>());
   const modelSwitchQueueByTab = useRef(new Map<string, ModelSwitchQueueState>());
   const lastTurnActivityAtByTab = useRef(new Map<string, number>());
@@ -2656,14 +2658,9 @@ export function useController() {
   }, [dispatchTo]);
 
   const invalidateProviderStateForTab = useCallback((tabId: string): void => {
-    balanceRefreshSeqByTab.current.set(
-      tabId,
-      (balanceRefreshSeqByTab.current.get(tabId) ?? 0) + 1,
-    );
-    modelSwitchSeqByTab.current.set(
-      tabId,
-      (modelSwitchSeqByTab.current.get(tabId) ?? 0) + 1,
-    );
+    for (const sequences of [effortSwitchSeqByTab, balanceRefreshSeqByTab, modelSwitchSeqByTab]) {
+      sequences.current.set(tabId, (sequences.current.get(tabId) ?? 0) + 1);
+    }
   }, []);
 
   const refreshBalanceForTab = useCallback(async (
@@ -4485,6 +4482,7 @@ export function useController() {
 
   const { setModelForTab, setEffortForTab } = useMemo(() => createControllerModelCommands({
     statesRef, modelSwitchSeqByTab, modelSwitchSuccessVersionByTab, modelSwitchQueueByTab,
+    effortSwitchSeqByTab, effortSwitchQueueByTab,
     enqueueModelSwitch, clearBalanceForTab, dispatchTo, refreshBalanceForTab, refreshMetaForTab,
   }), [enqueueModelSwitch, clearBalanceForTab, dispatchTo, refreshBalanceForTab, refreshMetaForTab]);
   const setModel = useCallback((name: string) => activeTabId ? setModelForTab(activeTabId, name) : Promise.resolve(false), [activeTabId, setModelForTab]);

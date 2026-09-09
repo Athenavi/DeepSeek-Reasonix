@@ -149,8 +149,9 @@ type WorkspaceTab struct {
 
 	model            string // active model ref (for meta)
 	effort           *string
-	qualityFloor     string // standard|delivery; see desktop/quality_floor.go
-	mode             string // "normal" | "plan" | "yolo" | "plan-yolo"; yolo/full access is runtime-only
+	pendingEffort    *pendingEffortSelection // next-run selection; guarded by App.mu
+	qualityFloor     string                  // standard|delivery; see desktop/quality_floor.go
+	mode             string                  // "normal" | "plan" | "yolo" | "plan-yolo"; yolo/full access is runtime-only
 	goal             string
 	toolApprovalMode string
 	disabledMCP      map[string]ServerView
@@ -612,6 +613,7 @@ func cloneDetachedRuntimeTab(tab *WorkspaceTab, key, path string) *WorkspaceTab 
 		displayState:             tab.displayBufferState(),
 		model:                    tab.model,
 		effort:                   cloneStringPtr(tab.effort),
+		pendingEffort:            tab.pendingEffort,
 		qualityFloor:             tab.qualityFloor,
 		mode:                     tab.mode,
 		goal:                     tab.goal,
@@ -663,6 +665,10 @@ func (a *App) detachRuntimeForReplacementLocked(tab *WorkspaceTab) bool {
 	if detached == nil {
 		return false
 	}
+	// This source is being replaced with another session. Retire its pending
+	// selection in both wrappers; ordinary tab detach keeps its own profile.
+	detached.pendingEffort = nil
+	tab.pendingEffort = nil
 	// Transfer lease ownership through the locked helpers: a concurrent
 	// ensureSessionLease (blank-session boot, recovery callback) must never
 	// observe a torn pointer or have its freshly acquired lease clobbered.
@@ -722,6 +728,7 @@ func applyRuntimeTab(target, source *WorkspaceTab, path string, wailsCtx context
 	target.ActivityStatus = source.ActivityStatus
 	target.model = source.model
 	target.effort = cloneStringPtr(source.effort)
+	target.pendingEffort = source.pendingEffort
 	target.qualityFloor = source.qualityFloor
 	target.mode = source.mode
 	target.goal = source.goal
@@ -4723,9 +4730,9 @@ func desktopConfigDir() string {
 	return config.ReasonixHomeDir()
 }
 
-func (a *App) saveTabsLocked() {
+func (a *App) saveTabsLocked() error {
 	dir, entries, activeID, version := a.saveTabsCollectLocked()
-	a.saveTabsWrite(dir, entries, activeID, version)
+	return a.saveTabsWrite(dir, entries, activeID, version)
 }
 
 // saveTabsCollectLocked gathers the tab-snapshot data under the caller's lock
@@ -4750,15 +4757,15 @@ func (a *App) saveTabsCollectLocked() (string, []desktopTabEntry, string, uint64
 // saveTabsWrite writes the tab-snapshot to disk. It does not require a.mu, but
 // writes must be serialized because every save uses the same destination and
 // fixed .tmp path.
-func (a *App) saveTabsWrite(dir string, entries []desktopTabEntry, activeID string, version uint64) {
+func (a *App) saveTabsWrite(dir string, entries []desktopTabEntry, activeID string, version uint64) error {
 	a.tabsSaveMu.Lock()
 	defer a.tabsSaveMu.Unlock()
 	if version < a.tabsLastWrittenVersion {
-		return
+		return nil
 	}
 
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return
+		return err
 	}
 	localIDs := make([]string, 0, len(entries))
 	for _, entry := range entries {
@@ -4771,17 +4778,18 @@ func (a *App) saveTabsWrite(dir string, entries []desktopTabEntry, activeID stri
 	f := desktopTabsFile{Tabs: entries, ActiveTab: activeID, RemoteTabs: remoteEntries, RemoteTabOrder: remoteOrder, TabOrder: tabOrder}
 	b, err := json.MarshalIndent(f, "", "  ")
 	if err != nil {
-		return
+		return err
 	}
 	path := filepath.Join(dir, tabsFileName)
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, b, 0o644); err != nil {
-		return
+		return err
 	}
 	if err := fileutil.ReplaceFile(tmp, path); err != nil {
-		return
+		return err
 	}
 	a.tabsLastWrittenVersion = version
+	return nil
 }
 
 func (a *App) orderedTabIDsLocked() []string {
@@ -7065,6 +7073,7 @@ type tabRuntimeSnapshot struct {
 	sharedHostKey                 string
 	model                         string
 	effort                        *string
+	pendingEffort                 *pendingEffortSelection
 	tokenMode, qualityFloor, mode string
 	goal, toolApprovalMode        string
 }
@@ -7098,6 +7107,7 @@ func snapshotTabRuntimeLocked(tab *WorkspaceTab) tabRuntimeSnapshot {
 		sharedHostKey:    tab.SharedHostKey,
 		model:            tab.model,
 		effort:           cloneStringPtr(tab.effort),
+		pendingEffort:    tab.pendingEffort,
 		tokenMode:        currentTabTokenMode(tab),
 		qualityFloor:     tab.qualityFloor,
 		mode:             tab.mode,

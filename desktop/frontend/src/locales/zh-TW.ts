@@ -675,6 +675,7 @@ export const zhTW: Record<DictKey, string> = {
   "composer.queueGuidance": "加入引導佇列（{combo}）",
   "composer.steer": "追加到目前任務（Enter）",
   "composer.steerPlaceholder": "正在執行——輸入補充指示，{combo} 加入佇列",
+  "composer.effortSelectionCleared": "工作階段或模型已更換，原來的思考強度預選已撤銷。",
   "composer.runWaitingApproval": "等待你核准 — {tool}",
   "composer.runWaitingAsk": "等待你回答",
   "composer.runAnnounceRunning": "正在執行",

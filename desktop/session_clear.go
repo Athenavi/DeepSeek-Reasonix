@@ -79,6 +79,7 @@ func (a *App) bumpAndSnapshotSessionClear(tab *WorkspaceTab) SessionClearResult 
 	if tab == nil {
 		return SessionClearResult{}
 	}
+	a.discardPendingTabEffort(tab)
 	a.mu.Lock()
 	tab.SessionGeneration++
 	gen := tab.SessionGeneration
