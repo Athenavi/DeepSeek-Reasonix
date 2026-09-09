@@ -818,6 +818,7 @@ export interface ChangedFileInfo {
 export interface HistoryMessage {
 	completionReceipt?: WireCompletionReceipt;
 	completionSummary?: WireCompletionSummary;
+	readCompletion?: import("../generated/desktopContract.generated").ReadCompletion;
 	turnId?: string;
 	readPause?: import("./readPause").WireReadPause;
   role: string;

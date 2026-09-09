@@ -26,6 +26,14 @@ func (a *Agent) emitIncompleteReadNotice(code, text, detail string) {
 // commits validated receipts, and counts at most one violation per model round.
 func (a *Agent) resolveIncompleteReadToolRoundBoundary(ctx context.Context, state *turnRuntime, usage *provider.Usage) (cont bool, err error, handled bool) {
 	if a.readPipelineActive() {
+		round := state.incompleteReads.finishToolRound()
+		if round.pause != nil {
+			a.contextManager().ObserveUsage(usage)
+			return false, round.pause, true
+		}
+		for _, id := range round.resolvedIDs {
+			a.turn.readShadow.strategies[id] = true
+		}
 		instruction, err := a.readContinuation(false)
 		if instruction != "" {
 			a.sess.conversation.Add(HostGeneratedUserMessage(a.withTurnPreferences(instruction)))
@@ -144,6 +152,7 @@ func (a *Agent) finalizeIncompleteReadOutcome(ctx context.Context, deferred *inc
 			out.output, out.rawOutput = body, original
 			out.truncated, out.truncMsg = original != "", ""
 		}
+		a.finalizeDefaultReadStrategy(ctx, deferred)
 		return
 	}
 	if a == nil || deferred == nil || deferred.plan == nil || out == nil {
@@ -191,5 +200,29 @@ func (a *Agent) finalizeIncompleteReadOutcome(ctx context.Context, deferred *inc
 	}
 	if transition.completed {
 		a.emitIncompleteReadNotice(event.NoticeCodeReadCompleted, i18n.M.ReadCompleted, "read_id="+transition.readID)
+	}
+}
+
+func (a *Agent) finalizeDefaultReadStrategy(ctx context.Context, deferred *incompleteReadDeferred) {
+	if deferred == nil || deferred.plan == nil || !a.turn.incompleteReads.hasPending() {
+		return
+	}
+	plan := deferred.plan
+	var transition incompleteReadTransition
+	switch plan.incompleteReadAction {
+	case incompleteReadActionStrategySearch:
+		transition = a.turn.incompleteReads.observeStrategySearch(plan, deferred.rawOutput, deferred.visibleFull)
+	case incompleteReadActionStrategySource:
+		observed, ok := modelTextObservationFor(plan, deferred.rawOutput)
+		transition = a.turn.incompleteReads.observeReadFile(plan, deferred.rawOutput, deferred.rawOutput, observed, ok, a.estimatedReadResultTokens(deferred.rawOutput), a.readAutoRecoveryBudgetFor())
+	case incompleteReadActionStrategyReceipt:
+		if args, ok := parseReadStrategyReceiptArgs(plan.evidenceArgs); ok {
+			if _, err := a.turn.incompleteReads.submitStrategyReceipt(ctx, args); err == nil {
+				transition.completed = true
+			}
+		}
+	}
+	if transition.completed {
+		a.turn.readShadow.strategies[plan.incompleteReadRoot] = true
 	}
 }

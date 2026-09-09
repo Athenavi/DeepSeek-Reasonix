@@ -64,6 +64,24 @@ func (a *Agent) gateReadOperation(_ context.Context, plan *toolCallPlan) (string
 	if !a.readPipelineActive() {
 		return a.turn.incompleteReads.gate(plan)
 	}
+	if plan.evidenceName == "session_read_strategy_receipt" {
+		for key := range a.turn.readShadow.strategies {
+			if a.turn.readShadow.strategyPending(key) {
+				plan.incompleteReadRoot = key
+				plan.incompleteReadAction = incompleteReadActionStrategyReceipt
+				return "", false
+			}
+		}
+	}
+	if plan.evidenceName == "grep" {
+		for key := range a.turn.readShadow.strategies {
+			if a.turn.readShadow.strategyPending(key) {
+				plan.incompleteReadRoot = key
+				plan.incompleteReadAction = incompleteReadActionStrategySearch
+				return "", false
+			}
+		}
+	}
 	if plan.evidenceName != "read_file" {
 		return "", false
 	}
@@ -86,6 +104,10 @@ func (a *Agent) gateReadOperation(_ context.Context, plan *toolCallPlan) (string
 		if ob.State == readcoord.StateBlocked || ob.State == readcoord.StateNeedsScope {
 			args, _ := parseReadFileArgs(plan.execArgs)
 			if plan.readTaskID == "" && args.LimitExplicit {
+				if a.turn.readShadow.strategyPending(ob.Key) {
+					plan.incompleteReadRoot = ob.Key
+					plan.incompleteReadAction = incompleteReadActionStrategySource
+				}
 				return "", false
 			}
 			return "blocked: automatic read is paused; inspect an explicit range or report the unresolved full-file requirement", true
@@ -103,7 +125,7 @@ func (a *Agent) readContinuation(final bool) (string, error) {
 	reads := a.turn.readShadow.coord.Snapshot()
 	// Hard stops have priority over a continuation on another file.
 	for _, ob := range reads {
-		if !ob.State.Terminal() && ob.Stop != nil {
+		if !ob.State.Terminal() && ob.Stop != nil && !a.turn.readShadow.strategyPending(ob.Key) {
 			paused = append(paused, fmt.Sprintf("%s: %s; %s", ob.Scope.CanonicalPath, ob.Stop.Detail, ob.Stop.Recovery))
 		}
 	}
@@ -111,6 +133,16 @@ func (a *Agent) readContinuation(final bool) (string, error) {
 		return "", &IncompleteReadError{Reason: strings.Join(paused, "; ")}
 	}
 	for _, ob := range reads {
+		if ob.Stop != nil && !a.turn.readShadow.strategyPending(ob.Key) {
+			// A budget/policy Stop is terminal; strategy-armed reads are handled
+			// below as an explicit targeted recovery path.
+			continue
+		}
+		if ob.Stop != nil && a.turn.readShadow.strategyPending(ob.Key) {
+			if instruction := a.turn.incompleteReads.instructionFor(ob.Key); instruction != "" {
+				return instruction, nil
+			}
+		}
 		if ob.State.Terminal() {
 			continue
 		}

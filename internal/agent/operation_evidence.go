@@ -368,7 +368,11 @@ func (a *Agent) applyEvidenceGates(ctx context.Context, plan *toolCallPlan) (too
 		}
 		msg := fmt.Sprintf("blocked: [evidence required] %s cannot declare which files it changes while a read-evidence requirement is outstanding (%s); use the exact file tool for those paths",
 			plan.call.Name, strings.Join(outstanding, ", "))
-		return toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg)}, true
+		d := &tool.OperationDiagnostic{Code: tool.WriteEvidenceMissing, OperationID: plan.call.ID, Recovery: "declare the exact write paths or use the dedicated file tool"}
+		if len(outstanding) > 0 {
+			d.Path = outstanding[0]
+		}
+		return toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg), diagnostic: d}, true
 	}
 	a.turn.evidenceBlocked.record(check, call, boundary)
 	return blockedEvidenceOutcome(check, call), true
