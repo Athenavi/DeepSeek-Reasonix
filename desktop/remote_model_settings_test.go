@@ -551,3 +551,40 @@ func TestEnsureRemoteModelSettingsReprobesReplacedConnection(t *testing.T) {
 		t.Fatalf("verdict was not recorded on the current generation: unsupportedGen=%d gen=%d", tab.settings.unsupportedGen, tab.gen)
 	}
 }
+
+// The application status must not leave legacy generations pending forever:
+// a Serve without the protocol never applies snapshots, so the target reports
+// not_required and the receipt stops waiting and polling.
+func TestAppendRemoteModelSettingsReportsLegacyTargetNotRequired(t *testing.T) {
+	isolateDesktopUserDirs(t)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer upstream.Close()
+	app := NewApp()
+	defer app.closeCredentialProxy()
+	view := ProviderView{Name: "legacy", Kind: "openai", BaseURL: upstream.URL, Models: []string{"m"}, NoProxy: true}
+	if _, err := app.SaveProviderWithKey(view, "legacy-key"); err != nil {
+		t.Fatal(err)
+	}
+	if err := editUserConfig(func(c *config.Config) error {
+		return c.UpsertRemoteHost(config.RemoteHostEntry{Name: "legacy-host", Host: "127.0.0.1", CredentialMode: "local-proxy"})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	tab := &remoteTab{
+		id: "legacy-tab", ref: RemoteTabRef{HostID: "legacy-host", Workspace: "ws"},
+		model: "legacy/m", gen: 3,
+	}
+	tab.settings.unsupportedGen = 3
+	app.remoteTabs = map[string]*remoteTab{tab.id: tab}
+
+	result := emptyModelSettingsResult()
+	app.appendRemoteModelSettingsStatus(&result)
+	if len(result.Targets) != 1 || result.Targets[0].Application != "not_required" {
+		t.Fatalf("legacy target not reported as not_required: %+v", result.Targets)
+	}
+	if result.Application == "pending" {
+		t.Fatal("legacy target drove the receipt into a pending application")
+	}
+}

@@ -445,6 +445,14 @@ func (a *App) appendRemoteModelSettingsStatus(result *ModelSettingsResult) {
 			model = resolveNewSessionModel(cfg)
 		}
 		desired := cfg.ModelRuntimeFingerprint(model)
+		if tab.settings.unsupportedGen == tab.gen {
+			// The Serve predates the protocol and never applies snapshots in
+			// this generation, so the target does not participate: report it as
+			// not required instead of a pending application that would keep the
+			// Settings receipt waiting and polling forever.
+			result.Targets = append(result.Targets, ModelSettingsTarget{TabID: tab.id, Title: tab.topicTitle, Application: "not_required", AppliedRevision: tab.settings.revision, DesiredRevision: desired})
+			continue
+		}
 		state := "applied"
 		if tab.settings.revision != desired || tab.settings.generation != tab.gen || tab.settings.sessionPath != tab.routing.currentPath {
 			state = "pending"
