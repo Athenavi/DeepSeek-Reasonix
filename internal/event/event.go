@@ -114,6 +114,9 @@ const (
 	ContextMaintenanceEvent
 	// WorkspaceChanged reports a debounced host-side workspace mutation.
 	WorkspaceChanged
+	// ToolStarted is the durable execution barrier immediately before a tool
+	// begins. It is distinct from ToolDispatch, which only records intent.
+	ToolStarted
 	// TurnPhase reports a host-side work phase for the active turn (working |
 	// checking | verifying | reviewing). Content-free; Text holds the phase.
 	TurnPhase

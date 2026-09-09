@@ -22,6 +22,7 @@ export type EventKind =
   | "text"
   | "message"
   | "tool_dispatch"
+  | "tool_started"
   | "tool_result"
   | "tool_result_preview"
   | "turn_status"

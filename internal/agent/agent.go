@@ -2154,6 +2154,14 @@ func (a *Agent) emitFullToolDispatch(ctx context.Context, c provider.ToolCall, r
 	return event.EmitChecked(a.svc.sink, event.Event{Kind: event.ToolDispatch, Tool: ev})
 }
 
+func (a *Agent) emitToolStarted(c provider.ToolCall) error {
+	readOnly := false
+	if t, _, ambiguous := a.svc.tools.ResolveCall(c.Name); t != nil && len(ambiguous) == 0 {
+		readOnly = t.ReadOnly()
+	}
+	return event.EmitChecked(a.svc.sink, event.Event{Kind: event.ToolStarted, Tool: event.Tool{ID: c.ID, Name: c.Name, ReadOnly: readOnly}})
+}
+
 // emitResolvedToolDispatch upserts the real target classification of a stable
 // proxy call without changing the provider-visible Name/Args. Append-only sinks
 // ignore Refreshed events; stateful frontends replace the existing card by ID.

@@ -158,6 +158,11 @@ func (a *Agent) executeBatch(ctx context.Context, turn *turnRuntime, calls []pro
 		}
 		start := time.Now()
 		s.startedAt[i] = start.UnixMilli()
+		if err := a.emitToolStarted(s.calls[i]); err != nil {
+			s.outcomes[i] = toolOutcome{runState: provider.ToolRunUnknown, output: "cancelled: tool start was not durable", errMsg: err.Error()}
+			s.results[i] = s.outcomes[i].output
+			return
+		}
 		s.outcomes[i] = a.executeOne(ctx, turn, s.calls[i])
 		recordWorkspaceMutation(a.svc.sink, s.outcomes[i].workspaceMutation)
 		if s.outcomes[i].executed {
