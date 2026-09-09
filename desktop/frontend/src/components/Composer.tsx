@@ -107,7 +107,9 @@ export interface WorkspaceReference {
 const LONG_PASTE_MIN_CHARS = 2000;
 const LONG_PASTE_MIN_LINES = 20;
 const COMPOSER_MIN_HEIGHT = 104;
-const COMPOSER_DEFAULT_HEIGHT = 140;
+// Fresh installs open at the compact baseline; a manual resize still persists
+// and takes precedence over this default.
+const COMPOSER_DEFAULT_HEIGHT = 104;
 const COMPOSER_MAX_HEIGHT = 360;
 // Height reserved for the in-card run strip while a turn runs; applied via a
 // CSS calc so --composer-height always stays in "logical height" space.
