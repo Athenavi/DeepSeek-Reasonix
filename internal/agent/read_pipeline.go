@@ -65,20 +65,22 @@ func (a *Agent) gateReadOperation(_ context.Context, plan *toolCallPlan) (string
 		return a.turn.incompleteReads.gate(plan)
 	}
 	if plan.evidenceName == "session_read_strategy_receipt" {
-		for key := range a.turn.readShadow.strategies {
-			if a.turn.readShadow.strategyPending(key) {
-				plan.incompleteReadRoot = key
-				plan.incompleteReadAction = incompleteReadActionStrategyReceipt
-				return "", false
-			}
+		args, parsed := parseReadStrategyReceiptArgs(plan.evidenceArgs)
+		if parsed && a.turn.readShadow.strategyPending(args.ReadID) {
+			plan.incompleteReadRoot = args.ReadID
+			plan.incompleteReadAction = incompleteReadActionStrategyReceipt
+			return "", false
 		}
 	}
 	if plan.evidenceName == "grep" {
-		for key := range a.turn.readShadow.strategies {
-			if a.turn.readShadow.strategyPending(key) {
-				plan.incompleteReadRoot = key
-				plan.incompleteReadAction = incompleteReadActionStrategySearch
-				return "", false
+		args, parsed := parseIncompleteReadGrepArgs(plan.execArgs)
+		if parsed {
+			for _, key := range a.turn.readShadow.strategyKeys() {
+				if a.turn.readShadow.strategyPending(key) && a.strategyPathMatches(key, args.Path) {
+					plan.incompleteReadRoot = key
+					plan.incompleteReadAction = incompleteReadActionStrategySearch
+					return "", false
+				}
 			}
 		}
 	}
@@ -106,7 +108,7 @@ func (a *Agent) gateReadOperation(_ context.Context, plan *toolCallPlan) (string
 			if plan.readTaskID == "" && args.LimitExplicit {
 				if a.turn.readShadow.strategyPending(ob.Key) {
 					plan.incompleteReadRoot = ob.Key
-					plan.incompleteReadAction = incompleteReadActionStrategySource
+					plan.incompleteReadAction = incompleteReadActionStrategyRead
 				}
 				return "", false
 			}
@@ -116,6 +118,14 @@ func (a *Agent) gateReadOperation(_ context.Context, plan *toolCallPlan) (string
 		return "", false
 	}
 	return "", false
+}
+
+func (a *Agent) strategyPathMatches(key, path string) bool {
+	path = filepath.Clean(path)
+	a.turn.incompleteReads.mu.Lock()
+	defer a.turn.incompleteReads.mu.Unlock()
+	e := a.turn.incompleteReads.entries[key]
+	return e != nil && (filepath.Clean(e.path) == path || filepath.Clean(e.requestPath) == path)
 }
 
 // readContinuation owns the execution decision. Status rendering is only a
@@ -139,9 +149,14 @@ func (a *Agent) readContinuation(final bool) (string, error) {
 			continue
 		}
 		if ob.Stop != nil && a.turn.readShadow.strategyPending(ob.Key) {
-			if instruction := a.turn.incompleteReads.instructionFor(ob.Key); instruction != "" {
+			instruction, pause := a.strategyContinuation(final, ob.Key)
+			if pause != nil {
+				return "", pause
+			}
+			if instruction != "" {
 				return instruction, nil
 			}
+			continue
 		}
 		if ob.State.Terminal() {
 			continue
@@ -196,6 +211,14 @@ func (a *Agent) readContinuation(final bool) (string, error) {
 		return "", &IncompleteReadError{Reason: strings.Join(paused, "; ")}
 	}
 	return "", nil
+}
+
+func (a *Agent) strategyContinuation(final bool, key string) (string, *IncompleteReadError) {
+	if final {
+		instruction, pause := a.turn.incompleteReads.blockFinal()
+		return instruction, pause
+	}
+	return a.turn.incompleteReads.instructionFor(key), nil
 }
 
 func (a *Agent) closeReadStatuses() {

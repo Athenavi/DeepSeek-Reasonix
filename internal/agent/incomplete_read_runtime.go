@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -32,7 +33,7 @@ func (a *Agent) resolveIncompleteReadToolRoundBoundary(ctx context.Context, stat
 			return false, round.pause, true
 		}
 		for _, id := range round.resolvedIDs {
-			a.turn.readShadow.strategies[id] = true
+			a.turn.readShadow.markStrategy(id, true)
 		}
 		instruction, err := a.readContinuation(false)
 		if instruction != "" {
@@ -152,7 +153,7 @@ func (a *Agent) finalizeIncompleteReadOutcome(ctx context.Context, deferred *inc
 			out.output, out.rawOutput = body, original
 			out.truncated, out.truncMsg = original != "", ""
 		}
-		a.finalizeDefaultReadStrategy(ctx, deferred)
+		a.finalizeDefaultReadStrategy(ctx, deferred, out)
 		return
 	}
 	if a == nil || deferred == nil || deferred.plan == nil || out == nil {
@@ -162,7 +163,7 @@ func (a *Agent) finalizeIncompleteReadOutcome(ctx context.Context, deferred *inc
 	var transition incompleteReadTransition
 	switch plan.evidenceName {
 	case "read_file":
-		observed, ok := modelTextObservationFor(plan, deferred.rawOutput)
+		observed, ok := modelTextObservationFor(plan, out.output)
 		if ok && observed.Snapshot == "" {
 			// The legacy owner stamps the same source version the pipeline owner
 			// does, so the evidence gate never reads its windows as unversioned
@@ -173,7 +174,28 @@ func (a *Agent) finalizeIncompleteReadOutcome(ctx context.Context, deferred *inc
 		}
 		transition = a.turn.incompleteReads.observeReadFile(plan, deferred.rawOutput, out.output, observed, ok, a.estimatedReadResultTokens(deferred.rawOutput), a.readAutoRecoveryBudgetFor())
 	case "session_tool_result":
+		var readTool tool.ModelTextObserver
+		var readPath string
+		var readSnapshot string
+		a.turn.incompleteReads.mu.Lock()
+		if entry := a.turn.incompleteReads.entries[plan.incompleteReadRoot]; entry != nil {
+			readTool, _ = entry.readTool.(tool.ModelTextObserver)
+			readPath = entry.path
+			if len(entry.pendingObserved) > 0 {
+				readSnapshot = entry.pendingObserved[0].Snapshot
+			}
+		}
+		a.turn.incompleteReads.mu.Unlock()
 		transition = a.turn.incompleteReads.observeResultPage(plan, deferred.rawOutput, a.retainedReadPageMatches(plan, deferred.rawOutput))
+		if readTool != nil {
+			if _, body, ok := parseSessionToolResultPage(deferred.rawOutput); ok {
+				args, _ := json.Marshal(map[string]string{"path": readPath})
+				if observed, valid := readTool.ObserveModelText(args, body); valid {
+					observed.Snapshot = readSnapshot
+					transition.record = append(transition.record, observed)
+				}
+			}
+		}
 	case "grep":
 		transition = a.turn.incompleteReads.observeStrategySearch(plan, deferred.rawOutput, deferred.visibleFull)
 	default:
@@ -203,8 +225,8 @@ func (a *Agent) finalizeIncompleteReadOutcome(ctx context.Context, deferred *inc
 	}
 }
 
-func (a *Agent) finalizeDefaultReadStrategy(ctx context.Context, deferred *incompleteReadDeferred) {
-	if deferred == nil || deferred.plan == nil || !a.turn.incompleteReads.hasPending() {
+func (a *Agent) finalizeDefaultReadStrategy(ctx context.Context, deferred *incompleteReadDeferred, out *toolOutcome) {
+	if deferred == nil || deferred.plan == nil || out == nil || !a.turn.incompleteReads.hasPending() {
 		return
 	}
 	plan := deferred.plan
@@ -213,8 +235,8 @@ func (a *Agent) finalizeDefaultReadStrategy(ctx context.Context, deferred *incom
 	case incompleteReadActionStrategySearch:
 		transition = a.turn.incompleteReads.observeStrategySearch(plan, deferred.rawOutput, deferred.visibleFull)
 	case incompleteReadActionStrategySource:
-		observed, ok := modelTextObservationFor(plan, deferred.rawOutput)
-		transition = a.turn.incompleteReads.observeReadFile(plan, deferred.rawOutput, deferred.rawOutput, observed, ok, a.estimatedReadResultTokens(deferred.rawOutput), a.readAutoRecoveryBudgetFor())
+		observed, ok := modelTextObservationFor(plan, out.output)
+		transition = a.turn.incompleteReads.observeReadFile(plan, deferred.rawOutput, out.output, observed, ok, a.estimatedReadResultTokens(deferred.rawOutput), a.readAutoRecoveryBudgetFor())
 	case incompleteReadActionStrategyReceipt:
 		if args, ok := parseReadStrategyReceiptArgs(plan.evidenceArgs); ok {
 			if _, err := a.turn.incompleteReads.submitStrategyReceipt(ctx, args); err == nil {
@@ -223,6 +245,6 @@ func (a *Agent) finalizeDefaultReadStrategy(ctx context.Context, deferred *incom
 		}
 	}
 	if transition.completed {
-		a.turn.readShadow.strategies[plan.incompleteReadRoot] = true
+		a.turn.readShadow.markStrategy(plan.incompleteReadRoot, true)
 	}
 }

@@ -21,7 +21,7 @@ func (a *Agent) finishReadRun(err error) {
 		return
 	}
 	if !a.readPipelineActive() {
-		a.recordLegacyReadPause()
+		incomplete.Pause = a.recordLegacyReadPause()
 		return
 	}
 	pause := &provider.ReadPause{ID: a.reads.tasks.binding, Code: tool.ReadHardStop, Reads: []provider.PausedRead{}}
@@ -49,7 +49,7 @@ func (a *Agent) finishReadRun(err error) {
 	a.sess.conversation.Add(provider.Message{Role: provider.RoleTool, ToolCallID: provider.LocalOnlyToolID, Name: provider.LocalOnlyToolName, LocalOnly: true, ReadPause: pause})
 }
 
-func (a *Agent) recordLegacyReadPause() {
+func (a *Agent) recordLegacyReadPause() *provider.ReadPause {
 	s := &a.turn.incompleteReads
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -78,6 +78,7 @@ func (a *Agent) recordLegacyReadPause() {
 	if len(pause.Reads) > 0 {
 		a.sess.conversation.Add(provider.Message{Role: provider.RoleTool, ToolCallID: provider.LocalOnlyToolID, Name: provider.LocalOnlyToolName, LocalOnly: true, ReadPause: pause})
 	}
+	return pause
 }
 
 func (a *Agent) recordReadCompletion() {
