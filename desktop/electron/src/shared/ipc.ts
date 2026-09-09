@@ -17,6 +17,8 @@ export const IPC = {
   appZoomGet: "reasonix:native:app-zoom-get",
   appZoomSet: "reasonix:native:app-zoom-set",
   appZoomReset: "reasonix:native:app-zoom-reset",
+  graphicsGet: "reasonix:native:graphics-get",
+  graphicsSet: "reasonix:native:graphics-set",
   browserList: "reasonix:browser:list",
   browserOpen: "reasonix:browser:open",
   browserClose: "reasonix:browser:close",

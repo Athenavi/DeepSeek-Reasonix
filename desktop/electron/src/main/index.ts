@@ -29,6 +29,7 @@ import { claimShellInstance } from "./singleInstance.js";
 import { TrayHost } from "./tray.js";
 import { DEFAULT_GEOMETRY, MainWindow } from "./window.js";
 import { AppZoomStore } from "./zoomStore.js";
+import { GraphicsSettingsStore, loadGraphicsBootstrap } from "./graphics.js";
 
 const MAIN_WINDOW_PERMISSIONS = new Set(["clipboard-read", "clipboard-sanitized-write", "fullscreen", "notifications"]);
 const TAKEOVER_KINDS = new Set<string>(["mousedown", "keydown", "wheel", "touchstart", "pointerdown"]);
@@ -47,12 +48,20 @@ if (home === "") {
 } else if (!claimShellInstance(app, home, dev)) {
   app.quit();
 } else {
+  const graphics = loadGraphicsBootstrap(home, process.env, process.argv);
+  if (graphics.shouldDisable) app.disableHardwareAcceleration();
   bootstrap(home);
 }
 
 function bootstrap(dataHome: string): void {
+  const graphicsBootstrap = loadGraphicsBootstrap(dataHome, process.env, process.argv);
+  const graphics = new GraphicsSettingsStore(graphicsBootstrap.configPath, graphicsBootstrap);
   const logsDir = join(app.getPath("userData"), "logs");
   const log = createLogger(new RotatingFile(join(logsDir, "shell.log")), !app.isPackaged);
+  log.info(`graphics acceleration: saved=${graphics.current.hardwareAcceleration} startup=${graphics.current.startupEnabled} override=${graphics.current.override} warning=${graphics.current.warning ?? "none"}`);
+  app.on("gpu-info-update", () => {
+    try { log.info(`graphics feature status: ${JSON.stringify(app.getGPUFeatureStatus())}`); } catch (error) { log.warn(`graphics status unavailable: ${errorText(error)}`); }
+  });
   const serviceLog = new RotatingFile(join(logsDir, "service.log"));
   process.on("uncaughtException", (error) => log.error(`uncaught exception: ${errorText(error)}`));
   process.on("unhandledRejection", (reason) => log.error(`unhandled rejection: ${errorText(reason)}`));
@@ -308,6 +317,7 @@ function bootstrap(dataHome: string): void {
       invoke: (method, args) => service.invoke(method, args),
       serviceState: () => service.current,
       clipboard,
+      graphics,
       openExternal: (url) => shell.openExternal(url),
       browser: {
         list: () => browser.list(),

@@ -394,6 +394,7 @@ export function SettingsPanel({
       "settings.desktopLayoutStyle", "settings.language", "settings.currency", "settings.sessionExperience",
       "settings.closeBehavior",
       "settings.defaultToolApprovalMode", "settings.sound", "settings.statusBarStyle", "settings.statusBarItems",
+      "settings.hardwareAcceleration", "GPU", "白屏", "闪烁", "渲染",
     ].map((key) => t(key as DictKey)).join(" ") : "",
   })), [s, t]);
 
@@ -1653,6 +1654,21 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
   const [attentionPref, setAttentionPref] = useState<SoundWavPref>(getAttentionPreference());
   const [notificationVolume, setNotificationVolume] = useState(getNotificationVolume);
   const [soundExpanded, setSoundExpanded] = useState(false);
+  const [graphics, setGraphics] = useState<import("../lib/desktopHost").GraphicsSettingsState | null>(null);
+  const [graphicsBusy, setGraphicsBusy] = useState(false);
+  const [graphicsError, setGraphicsError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    const host = desktopHost();
+    if (host.kind === "electron") void host.native.graphics.get().then((value) => { if (active) setGraphics(value); }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+  const updateGraphics = (enabled: boolean) => {
+    const host = desktopHost();
+    if (host.kind !== "electron" || graphicsBusy) return;
+    setGraphicsBusy(true); setGraphicsError(null);
+    void host.native.graphics.setHardwareAcceleration(enabled).then((value) => { setGraphics(value); }).catch((error: unknown) => { setGraphicsError(error instanceof Error ? error.message : String(error)); }).finally(() => setGraphicsBusy(false));
+  };
   const statusBarStyle = normalizeStatusBarStyle(s.statusBarStyle);
   const statusBarItems = normalizeStatusBarItems(s.statusBarItems);
   const soundStatus = summarizeSoundStatus(genMusicPreset, soundPref, attentionPref, notificationVolume);
@@ -1726,6 +1742,14 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
       <SessionExperienceSettings snapshot={s} busy={busy} apply={apply} />
 
       <SettingsSection title={t("settings.general.sectionSystem")} description={t("settings.general.sectionSystemHint")}>
+      {graphics && <SettingsField label={t("settings.hardwareAcceleration")} hint={t("settings.hardwareAccelerationHint")} icon={<Monitor size={18} />}>
+        <div className="settings-graphics-control">
+          <ToggleSegment value={graphics.hardwareAcceleration} disabled={graphicsBusy || !graphics.writable || graphics.override !== "none"} onChange={updateGraphics} />
+          {graphics.override !== "none" && <div className="settings-inline-hint">{t("settings.hardwareAccelerationOverride")}</div>}
+          {graphics.restartRequired && graphics.override === "none" && <div className="settings-inline-hint">{t("settings.hardwareAccelerationRestart")}</div>}
+          {graphicsError && <div className="settings-inline-error" role="alert">{graphicsError}</div>}
+        </div>
+      </SettingsField>}
       <SettingsField label={t("settings.closeBehavior")} hint={<DesktopCloseBehaviorHint backgroundSelected={closeBehavior === "background"} hint={t("settings.closeBehaviorHint")} unavailableHint={t("settings.closeBehaviorUnavailable")} />} icon={<Power size={18} />}>
         <SettingsOptions layout="field" className="set-seg">
           {(["background", "quit"] as const).map((mode) => (
