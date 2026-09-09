@@ -363,3 +363,54 @@ func TestRemoteModelSettingsOldServeDoesNotReceiveMutation(t *testing.T) {
 		t.Fatal("old remote received a mutation")
 	}
 }
+
+// A Serve older than the model-settings protocol answers unknown GET paths
+// through its catch-all "GET /" route with status 200 and the HTML index, so
+// the status probe must classify that document as a capability rejection
+// instead of surfacing a JSON decode error (issue #9996).
+func TestRemoteModelSettingsLegacyServeHTMLIndexIsCapabilityRejection(t *testing.T) {
+	mutations := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("<!DOCTYPE html><html><body>Reasonix</body></html>"))
+			return
+		}
+		mutations++
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}))
+	defer server.Close()
+	for _, body := range []any{nil, map[string]any{"version": 1, "ref": "p/m", "settings": map[string]any{"revision": "r"}}} {
+		_, err := remoteModelSettingsRequest(context.Background(), server.Client(), server.URL, "session", body)
+		if err == nil || !strings.Contains(err.Error(), "newer remote Serve") {
+			t.Fatalf("capability error: %v", err)
+		}
+		if !isRemoteModelSettingsUnsupported(err) {
+			t.Fatalf("HTML index response was not classified as unsupported: %v", err)
+		}
+		if strings.Contains(err.Error(), "invalid character") {
+			t.Fatalf("raw JSON decode error escaped the capability probe: %v", err)
+		}
+	}
+	if mutations != 1 {
+		t.Fatalf("legacy serve received %d mutations", mutations)
+	}
+}
+
+// Only document-shaped bodies map to the legacy-Serve rejection; a corrupt or
+// truncated status payload from a capable Serve stays a decode error.
+func TestRemoteModelSettingsNonDocumentDecodeFailureStaysError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("not-json{"))
+	}))
+	defer server.Close()
+	_, err := remoteModelSettingsRequest(context.Background(), server.Client(), server.URL, "session", nil)
+	if err == nil || !strings.Contains(err.Error(), "decode remote model settings status") {
+		t.Fatalf("expected decode error, got %v", err)
+	}
+	if isRemoteModelSettingsUnsupported(err) {
+		t.Fatal("non-document payload was misclassified as an unsupported Serve")
+	}
+}
