@@ -2773,7 +2773,7 @@ export const zh: Record<DictKey, string> = {
   "settings.textSizeLarge": "大",
   "settings.textSizeXLarge": "特大",
   "settings.textSizeXXLarge": "超大",
-  "settings.displayZoom": "显示缩放（需重启生效）",
+  "settings.displayZoom": "显示缩放（立即生效）",
   "settings.displayZoomDecrease": "缩小显示缩放",
   "settings.displayZoomIncrease": "放大显示缩放",
   "settings.displayZoomReset": "恢复显示缩放到 100%",
