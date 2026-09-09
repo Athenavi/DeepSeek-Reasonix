@@ -1357,7 +1357,7 @@
       "kind": "command",
       "name": "HeartbeatGenerateID",
       "detail": "() string",
-      "location": "desktop/heartbeat.go:673",
+      "location": "desktop/heartbeat.go:669",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1365,7 +1365,7 @@
       "kind": "command",
       "name": "HeartbeatListTasks",
       "detail": "() []HeartbeatTask",
-      "location": "desktop/heartbeat.go:624",
+      "location": "desktop/heartbeat.go:620",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1373,7 +1373,7 @@
       "kind": "command",
       "name": "HeartbeatReloadConfig",
       "detail": "() HeartbeatConfigView",
-      "location": "desktop/heartbeat.go:640",
+      "location": "desktop/heartbeat.go:636",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1381,7 +1381,7 @@
       "kind": "command",
       "name": "HeartbeatReloadTasks",
       "detail": "() []HeartbeatTask",
-      "location": "desktop/heartbeat.go:632",
+      "location": "desktop/heartbeat.go:628",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1389,7 +1389,7 @@
       "kind": "command",
       "name": "HeartbeatSaveConfig",
       "detail": "(update HeartbeatConfigUpdate) (HeartbeatConfigView, error)",
-      "location": "desktop/heartbeat.go:657",
+      "location": "desktop/heartbeat.go:653",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1397,7 +1397,7 @@
       "kind": "command",
       "name": "HeartbeatSaveTasks",
       "detail": "(tasks []HeartbeatTask) error",
-      "location": "desktop/heartbeat.go:648",
+      "location": "desktop/heartbeat.go:644",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
@@ -1405,7 +1405,7 @@
       "kind": "command",
       "name": "HeartbeatTriggerNow",
       "detail": "(id string)",
-      "location": "desktop/heartbeat.go:665",
+      "location": "desktop/heartbeat.go:661",
       "class": "keep-business",
       "owner": "hostrpc desktop/invoke"
     },
