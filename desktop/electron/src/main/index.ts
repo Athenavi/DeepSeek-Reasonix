@@ -48,13 +48,13 @@ if (home === "") {
 } else if (!claimShellInstance(app, home, dev)) {
   app.quit();
 } else {
-  const graphics = loadGraphicsBootstrap(home, process.env, process.argv);
+  const graphics = loadGraphicsBootstrap(app.getPath("userData"), process.env, process.argv);
   if (graphics.shouldDisable) app.disableHardwareAcceleration();
   bootstrap(home);
 }
 
 function bootstrap(dataHome: string): void {
-  const graphicsBootstrap = loadGraphicsBootstrap(dataHome, process.env, process.argv);
+  const graphicsBootstrap = loadGraphicsBootstrap(app.getPath("userData"), process.env, process.argv);
   const graphics = new GraphicsSettingsStore(graphicsBootstrap.configPath, graphicsBootstrap);
   const logsDir = join(app.getPath("userData"), "logs");
   const log = createLogger(new RotatingFile(join(logsDir, "shell.log")), !app.isPackaged);

@@ -71,7 +71,12 @@ export class GraphicsSettingsStore {
     const write = this.writeQueue.catch(() => undefined).then(() => {
       mkdirSync(dirname(this.path), { recursive: true });
       const existing = parseStored(this.path);
-      if (existing.warning) renameSync(this.path, `${this.path}.invalid`);
+    if (existing.warning) {
+      let backup = `${this.path}.invalid`;
+      let suffix = 1;
+      while (existsSync(backup)) backup = `${this.path}.invalid.${suffix++}`;
+      renameSync(this.path, backup);
+    }
       const temp = `${this.path}.tmp`;
       writeFileSync(temp, `${JSON.stringify(next)}\n`, "utf8");
       renameSync(temp, this.path);

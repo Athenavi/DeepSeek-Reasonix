@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -41,4 +41,18 @@ test("preserves unknown fields and rejects unknown versions", async () => {
   const unknown = loadGraphicsBootstrap(root, {}, []);
   assert.equal(unknown.state.writable, false);
   await assert.rejects(() => new GraphicsSettingsStore(path, unknown).setHardwareAcceleration(true));
+});
+
+test("backs up repeated invalid files with unique names before recovery", async () => {
+  const root = home();
+  const path = join(root, "graphics.json");
+  writeFileSync(path, "not json");
+  const first = loadGraphicsBootstrap(root, {}, []);
+  await new GraphicsSettingsStore(path, first).setHardwareAcceleration(false);
+  writeFileSync(path, "still not json");
+  const second = loadGraphicsBootstrap(root, {}, []);
+  await new GraphicsSettingsStore(path, second).setHardwareAcceleration(true);
+  const backups = readdirSync(root).filter((name) => name.startsWith("graphics.json.invalid"));
+  assert.equal(backups.length, 2);
+  assert.equal(JSON.parse(readFileSync(path, "utf8")).hardwareAcceleration, true);
 });
