@@ -139,7 +139,7 @@ const (
 	// ReadStatus upserts one logical read's delivery state instead of per page.
 	ReadStatus
 	ToolStarted // Persisted after policy/validation and before execution.
-	KindCount // Follows all real event kinds.
+	KindCount   // Follows all real event kinds.
 )
 
 // TurnPhaseName is the machine-readable phase on TurnPhase events.
