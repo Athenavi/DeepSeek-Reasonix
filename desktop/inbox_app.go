@@ -474,11 +474,3 @@ func (a *App) InboxHasItems(tabID string) (bool, error) {
 	}
 	return len(ctrl.InboxSnapshot().Items) > 0, nil
 }
-
-// FormatInboxRecoveryNotice builds the recovery banner text.
-func FormatInboxRecoveryNotice(n int) string {
-	if n <= 0 {
-		return ""
-	}
-	return fmt.Sprintf("Recovered %d pending instruction(s). Inbox is paused — review before resuming.", n)
-}
