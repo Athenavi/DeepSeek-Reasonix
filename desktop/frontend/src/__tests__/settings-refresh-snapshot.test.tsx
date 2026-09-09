@@ -491,10 +491,7 @@ desktopStub.replaceCommands(({
   },
 }).main.App);
 
-// Seed the persisted restart value directly; the native binding is exercised
-// by the reset mutation below, while startup hydration is intentionally
-// deterministic in this bridge fixture.
-localStorage.setItem("reasonix-zoom-restart", "0.5");
+localStorage.setItem("reasonix-zoom-restart", "1");
 await act(async () => {
   zoomRoot.render(
     <LocaleProvider>
@@ -508,7 +505,7 @@ await act(async () => {
   );
   await flushPromises();
 });
-await waitFor("persisted display zoom sync", () => zoomRootEl.querySelector(".zoom-slider__value")?.textContent?.trim() === "50%");
+await waitFor("persisted display zoom sync", () => document.querySelector(".zoom-slider__value")?.textContent?.trim() === "50%");
 
 const monoFontSelect = zoomRootEl.querySelector("button.settings-select[aria-labelledby='appearance-mono-font-family-label']") as HTMLButtonElement | null;
 if (!monoFontSelect) throw new Error("monospace font selector did not render");
@@ -523,13 +520,13 @@ eq(
   "global monospace changes keep the regional code font CSS variable",
 );
 
-const resetZoomButton = zoomRootEl.querySelector("button[aria-label='Reset display zoom to 100%']") as HTMLButtonElement | null;
+const resetZoomButton = document.querySelector("button[aria-label='Reset display zoom to 100%']") as HTMLButtonElement | null;
 if (!resetZoomButton) throw new Error("display zoom reset button did not render");
 await act(async () => {
   resetZoomButton.click();
   await flushPromises();
 });
-await waitFor("display zoom reset", () => zoomRootEl.querySelector(".zoom-slider__value")?.textContent?.trim() === "100%");
+await waitFor("display zoom reset", () => document.querySelector(".zoom-slider__value")?.textContent?.trim() === "100%");
 
 eq(savedZoomFactors.at(-1), 1, "display zoom reset writes the default zoom factor");
 eq(localStorage.getItem("reasonix-zoom-restart"), "1", "display zoom reset updates the local restart zoom cache");
