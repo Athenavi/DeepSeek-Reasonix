@@ -5,7 +5,6 @@ import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { installPerformancePressureMonitor } from "./lib/crash";
 import { installGlobalCrashHandlers } from "./lib/globalCrashHandlers";
-import { installWailsNonFileDragErrorSuppression } from "./lib/bridge";
 import { desktopHost } from "./lib/desktopHost";
 import { installBreadcrumbConsoleHook } from "./lib/breadcrumbs";
 import { installMessageSelectionCopy } from "./lib/messageSelectionCopy";
@@ -21,7 +20,6 @@ import appShellStylesheetURL from "./styles.css?url";
 
 // Install first so startup/runtime failures paint a useful error instead of a
 // featureless webview background, with the recent console trail attached.
-if (desktopHost().kind === "wails") installWailsNonFileDragErrorSuppression();
 installGlobalCrashHandlers();
 installBreadcrumbConsoleHook();
 installPerformancePressureMonitor();

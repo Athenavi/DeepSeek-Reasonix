@@ -421,8 +421,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // against the 2398.0 KiB base; retain only the next one-decimal ceiling.
 // Shared availability, visible recovery and retry controls measure 2407.215 KiB
 // (+6.107 KiB, 0.25% over the prior welcome head). Retain the next tenth.
-// The desktop host adapter (Electron preload bridge beside the Wails bridge)
-// measures 2408.4 KiB; the Wails half leaves with the old shell. Next tenth.
+// The desktop host adapter (Electron preload bridge beside the then-live Wails
+// bridge) measured 2408.4 KiB. Next tenth.
 // The workspace dock's browser tab, the lazy panel import plumbing and the
 // overlay-gate markers add 0.6 KiB raw over the 2408.2 KiB base; the panel,
 // its copy and its store stay in the lazy chunk. Measured 2408.766 KiB;
@@ -430,6 +430,8 @@ const rawInitialBytes = [...initialJS, ...initialCSS, ...appShellCSS]
 // The phase D loopback browser broker adds 0.065 KiB of initial-path route
 // wiring over the 2408.766 KiB measurement (2408.831 KiB measured on the
 // darwin/arm64 packaging build); retain the next tenth.
-const rawInitialBudgetKiB = 2_408.9;
+// Phase F removed the Wails bridge half of the host adapter: the initial
+// bundle measures 2404.5 KiB. Retain the next tenth.
+const rawInitialBudgetKiB = 2_404.6;
 assertBudget("initial raw JavaScript and CSS", rawInitialBytes, rawInitialBudgetKiB * 1024);
 assertBudget("largest initial JavaScript chunk raw", largestInitialJSRaw, 1_000 * 1024);

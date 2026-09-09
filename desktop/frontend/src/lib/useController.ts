@@ -1996,7 +1996,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
         items = items.map(item => item.kind==="notice" && item.action==="recover_context" ? {...item,action:undefined} : item);
         items.push({kind:"notice",id:`e${s.seq}-protocol`,level:"info",code:"protocol_recovery",text:t("notice.protocolRecoveryBody"),action:"recover_context",recoveryId:e.protocolRecovery.id});
       }
-      // Plan approval can arrive before turn_done on some Wails event paths.
+      // Plan approval can arrive before turn_done on some bridge event paths.
       // Keep that gate visible instead of clearing the only UI that can answer it.
       const keepPlanApproval = s.approval?.tool === "exit_plan_mode";
       let next: State = {
@@ -2762,7 +2762,7 @@ export function useController() {
     transcriptSubscriptions.current.set(tabId, unsubscribe);
   }, [dispatchTo]);
   const releaseTranscriptState = useCallback((tabId: string) => {
-    // A released tab can still have an older-page request awaiting Wails. Keep
+    // A released tab can still have an older-page request awaiting the bridge. Keep
     // a tombstone generation so a later tab reusing the same id cannot make
     // that completion current again.
     historyOlderSeq.current.set(tabId, (historyOlderSeq.current.get(tabId) ?? 0) + 1);
@@ -2958,7 +2958,7 @@ export function useController() {
 
       // Phase 2: local ancillary data. It stays inside the same in-flight
       // promise so duplicate ready/startup hydrations coalesce, but it runs
-      // after hydrate_done so slow Wails calls don't keep the visible transcript
+      // after hydrate_done so slow bridge calls don't keep the visible transcript
       // in a loading state.
       await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
       if (!stillCurrent()) return;
@@ -3728,7 +3728,7 @@ export function useController() {
 
   // Stale-turn watchdog: keep reconciling while the frontend thinks the agent
   // is running but the event stream is quiet. The optimistic submit timestamp
-  // is evidence too: if Wails drops the entire turn stream (including
+  // is evidence too: if the bridge drops the entire turn stream (including
   // turn_started), waiting for a live event would leave the blank assistant
   // placeholder spinning forever. Re-arm after a still-running snapshot so a
   // later missed message + turn_done converges without a tab switch.

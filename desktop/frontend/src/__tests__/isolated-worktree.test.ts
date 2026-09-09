@@ -41,7 +41,7 @@ ok(/isolatedWorktree && <WorktreeBadge/.test(tabs), "tab strip identifies isolat
 ok(/node\.isolatedWorktree && <WorktreeBadge/.test(tree), "project tree identifies isolated worktrees");
 ok(/GitBranch/.test(badge) && /#6119/.test(badge), "shared badge preserves the credited #6119 design contribution");
 ok(/bindings\.ForkWorktreeForTab\(sourceTabId, turn\)/.test(forkAction) && /makeMockForkBindings/.test(bridge) && !/async ForkWorktreeForTab\(tabID, turn\)/.test(bridge), "isolated conversation fork and browser mock use the extracted two-argument binding");
-ok(!/ForkForTab\(sourceTabId, turn, isolate/.test(forkAction), "shared fork never sends an extra Wails argument");
+ok(!/ForkForTab\(sourceTabId, turn, isolate/.test(forkAction), "shared fork never sends an extra bridge argument");
 ok(/result\.sourceDirty[\s\S]*forkWorktreeDirtySource/.test(forkAction), "dirty sources are refused with actionable guidance");
 ok(/result\.fallbackToShared[\s\S]*forkWorktreeFallbackNotice/.test(forkAction), "backend fallback state reaches the user");
 ok(/scope === "fork" \|\| scope === "fork-worktree"/.test(message), "both fork modes require a conversation boundary");
@@ -54,8 +54,8 @@ ok(/aria-modal="true"/.test(mergeModal) && /event\.key === "Escape"/.test(mergeM
 ok(/WorktreeMergeModal\.css/.test(mergeModal) && mergeStyles.includes(".worktree-merge__body") && !/style=\{\{/.test(mergeModal), "lazy merge UI keeps layout rules out of inline styles");
 ok(/worktreeStateToken/.test(mergeModal) && /expectedWorktreeStateToken/.test(mergeModal), "merge confirmation binds the exact dirty worktree content token");
 ok(!/ModalCloseButton autoFocus/.test(mergeModal), "merge modal captures its trigger before moving focus so close restores the trigger");
-ok(/CloseMergedWorktreeTab\(request: CloseMergedWorktreeTabRequest\)/.test(bridge), "worktree close is a request-object Wails call");
-ok(/FinalizeWorktreeMerge\(request: WorktreeCleanupRequest\)/.test(bridge), "cleanup is a separate request-object Wails call");
+ok(/CloseMergedWorktreeTab\(request: CloseMergedWorktreeTabRequest\)/.test(bridge), "worktree close is a request-object bridge call");
+ok(/FinalizeWorktreeMerge\(request: WorktreeCleanupRequest\)/.test(bridge), "cleanup is a separate request-object bridge call");
 const fencedNavigationCalls = [
   ["const resumeSession", "app.ResumeSessionPage"],
   ["const openChannelSession", "app.OpenChannelSessionPageForTab"],
@@ -77,7 +77,7 @@ ok(fencedNavigationCalls.every(([startMarker, callMarker]) => {
   const call = controller.indexOf(callMarker, start);
   return start >= 0 && fence > start && call > fence;
 }), "navigation entry points await backend intent registration before switching");
-ok(/navigationIntentRegistrationTail\.then/.test(navigationFence) && /navigationIntentRegistrationTail = registered/.test(navigationFence), "navigation registrations preserve user-intent order across deferred Wails calls and remounts");
+ok(/navigationIntentRegistrationTail\.then/.test(navigationFence) && /navigationIntentRegistrationTail = registered/.test(navigationFence), "navigation registrations preserve user-intent order across deferred bridge calls and remounts");
 
 if (failed) process.exit(1);
 console.log("isolated worktree tests passed");

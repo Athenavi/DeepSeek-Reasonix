@@ -25,9 +25,9 @@ function buildChannel(): string {
   return process.env.REASONIX_CHANNEL || "stable";
 }
 
-// On macOS ≤ 12 (Safari 15 WebKit) a crossorigin module/stylesheet fetched over the
-// wails:// scheme is CORS-blocked (no Access-Control-Allow-Origin from the handler),
-// so the bundle never loads and the window paints blank; newer WebKit tolerates it.
+// A crossorigin module/stylesheet fetched over a custom app scheme is CORS-blocked
+// when the protocol handler sends no Access-Control-Allow-Origin, so the bundle
+// never loads and the window paints blank; plain HTTP origins tolerate it.
 function stripCrossorigin(): Plugin {
   return {
     name: "strip-crossorigin",
@@ -72,9 +72,10 @@ function archiveHiddenSourcemaps(commit: string): Plugin {
   };
 }
 
-// One stylesheet serves both shells: the Electron build rewrites the Wails
-// drag-region property to -webkit-app-region at bundle time (scripts/shell-css.mjs),
-// so the Wails bundle stays byte-identical and no rule is declared twice.
+// One stylesheet serves the browser and the Electron shell: the Electron build
+// rewrites the drag-region marker property to -webkit-app-region at bundle time
+// (scripts/shell-css.mjs), so the browser bundle stays byte-identical and no rule
+// is declared twice.
 function shellDragRegions(): Plugin {
   const shell = shellFromEnv();
   return {
@@ -117,8 +118,8 @@ const vendorMarkdown = new RegExp(
 );
 const vendorHighlight = new RegExp(`${nodeModulePath}highlight\\.js(?:[\\/]|$)`);
 
-// base: "./" so built asset URLs are relative. Wails serves the embedded dist from
-// the app root over the wails:// scheme, where absolute "/assets/..." URLs 404.
+// base: "./" so built asset URLs are relative: the shell serves dist from the app
+// root over its custom scheme, where absolute "/assets/..." URLs 404.
 export default defineConfig({
   // errorRecovery tells lightningcss to skip unparseable rules instead of
   // failing the whole build. Vite 8 + lightningcss 1.32.0 can reject valid
@@ -183,14 +184,15 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
   },
   server: {
-    // Bind IPv4 — unset host listens on ::1, and the Wails dev proxy's [::1]
-    // dial fails on Windows hosts where IPv6 loopback is filtered.
+    // Bind IPv4 — unset host listens on ::1, which fails for clients on Windows
+    // hosts where IPv6 loopback is filtered.
     host: "127.0.0.1",
     port: devPort,
     strictPort: true,
     fs: {
-      // Browser-dev theme mocks use the same embedded source assets as Wails.
-      // Keep the allow-list narrow while retaining Vite's workspace root.
+      // Browser-dev theme mocks use the same embedded source assets as the
+      // desktop build. Keep the allow-list narrow while retaining Vite's
+      // workspace root.
       allow: [searchForWorkspaceRoot(configDir), resolve(configDir, "../themes/official")],
     },
   },

@@ -2687,15 +2687,10 @@ export function Composer({
     return items.some((item) => getWebkitFileEntry(item) === null);
   };
 
-  const clearWailsDropTarget = () => {
-    document.querySelectorAll(".wails-drop-target-active").forEach((el) => el.classList.remove("wails-drop-target-active"));
-  };
-
   const stopNativeFileDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
-    clearWailsDropTarget();
   };
 
   const onFileDropCapture = (e: DragEvent<HTMLDivElement>) => {
@@ -3864,7 +3859,6 @@ export function Composer({
         decisionPending ? "composer-wrap--decision-pending" : "",
         heroMode ? "composer-wrap--hero" : "",
       ].filter(Boolean).join(" ")}
-      style={attachmentInputEnabled ? { "--wails-drop-target": "drop" } as CSSProperties : undefined}
       data-native-drop-target={attachmentInputEnabled ? "" : undefined}
       onDropCapture={onFileDropCapture}
     >

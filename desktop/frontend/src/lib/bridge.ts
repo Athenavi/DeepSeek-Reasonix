@@ -1,7 +1,6 @@
 import { mockProviderTemplate, mockPreset, mockBundlePreset, mockKimiAPIModels, mockLongCatModels, mockTokenRhythmModels, mockTokenRhythmModelOverrides, mockMiMoV25Models, mockMiniMaxModels, mockGLMAPIModels, mockGLMCodingModels, mockGLMAnthropicModels, mockQwenAPIModels, mockQwenPlanModels, mockQwenPlanVisionModels, mockStepFunModels, mockOpenCodeGoModels, mockNovitaModels, mockGMIModels, mockVercelModels, mockOllamaCloudModels } from "./mockProviderTemplates";
-// Wails and the browser mock share this React-to-Go contract.
-// @ts-ignore generated locally; fresh checkouts use the disabled drift check below.
-import type * as GeneratedApp from "../../wailsjs/go/main/App";
+// The Electron host and the browser mock share this React-to-Go contract.
+import type { DesktopCommandName } from "../generated/desktopContract.generated";
 import type { InvocationRequest } from "./invocationDisplay";
 import { addBreadcrumb } from "./breadcrumbs";
 import { maybeShare } from "./queryCoalesce";
@@ -153,7 +152,6 @@ import type {
 import { browserPreviewShellSupport } from "./shellSupportPreview";
 import { desktopHost } from "./desktopHost";
 export * from "./remoteTabEvents";
-export { installWailsNonFileDragErrorSuppression, isTransientWailsIPCError, isWailsNonFileDragError, isWailsNonFileDragErrorEvent } from "./wailsDragErrors";
 export const COMPACT_RATIO_MIN_PERCENT = 30, COMPACT_RATIO_MAX_PERCENT = 85;
 
 export interface DesktopShellStatusView {
@@ -174,10 +172,12 @@ function stripLegacyGoalBudgetFlags(arg: string): string {
   return parts.join(" ");
 }
 
-// AppBindings is derived from the Wails-generated Go → TS method signatures, so
-// the compiler catches drift between the Go binding surface and the frontend mock.
-// Run `wails generate module` after adding/renaming a bound method on App, then
-// `pnpm typecheck` to verify the mock still satisfies the contract.
+// AppBindings is checked against the generated desktop host contract (see
+// src/generated/desktopContract.generated.ts), so the compiler catches drift
+// between the Go binding surface and the frontend mock. After adding or
+// renaming a bound method on App, run `cd desktop && go run . -emit-contract
+// frontend/src/generated`, then `pnpm typecheck` to verify the mock still
+// satisfies the contract.
 //
 // Types for native-feel bindings, used only by AppBindings and the dev mock.
 interface NativeConfirmRequest {
@@ -567,7 +567,7 @@ export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganiza
   SetDefaultToolApprovalMode(mode: string): Promise<void>;
   SetDefaultAutoRecoveryCheckpoint(enabled: boolean): Promise<void>;
 
-  RenameProviderConnections: typeof GeneratedApp.RenameProviderConnections;
+  RenameProviderConnections(names: string[], displayName: string): Promise<void>;
   SaveProvider(p: ProviderView): Promise<void>;
   SetProviderWebSearch(names: string[], enabled: boolean): Promise<void>;
   SaveProviderModelCatalogs(updates: ProviderModelCatalogUpdate[]): Promise<string[]>;
@@ -652,7 +652,7 @@ export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganiza
   SetCompactRatio(ratio: number): Promise<void>;
   SetReasoningLanguage(lang: string): Promise<void>;
   SetTrayLocale(locale: "en" | "zh" | "zh-TW"): Promise<void>;
-  // SetBypass is the legacy Wails name for YOLO/full-access tool auto-approval
+  // SetBypass is the legacy desktop name for YOLO/full-access tool auto-approval
   // (ask questions and plan approvals still wait; deny rules still apply).
   // Runtime-only.
   SetBypass(on: boolean): Promise<void>;
@@ -757,21 +757,12 @@ export interface AppBindings extends SessionCatalogBindings, ProjectTreeOrganiza
 // from B. If that set is non-empty, AssertNever<non-never> fails with
 // "Type 'X' does not satisfy the constraint 'never'".
 // _CheckGenToApp errors mean a generated Go method has no TS counterpart.
-// These compare method *names* only; full signature checking isn't possible here
-// because local types (types.ts) use plain interfaces while generated types
-// (models.ts) use classes with a convertValues prototype method. The structural
-// mismatch would produce false positives. Method-arity and parameter-order drift
-// are caught at the call sites by tsc when components invoke app.<method>(...).
+// This compares method *names* only: the generated contract uses positional
+// arg0/arg1 parameters and its own DTO interfaces, so full signature
+// assignability would false-positive. Parameter drift is caught at the call
+// sites by tsc when components invoke app.<method>(...).
 type AssertNever<T extends never> = T;
-type GeneratedAppKeys = keyof typeof GeneratedApp;
-type GeneratedAppMissing =
-  string extends GeneratedAppKeys ? true :
-  number extends GeneratedAppKeys ? true :
-  symbol extends GeneratedAppKeys ? true :
-  false;
-export type _CheckGenToApp = AssertNever<
-  GeneratedAppMissing extends true ? never : Exclude<GeneratedAppKeys, keyof AppBindings>
->;
+export type _CheckGenToApp = AssertNever<Exclude<DesktopCommandName, keyof AppBindings>>;
 
 // Must match desktop/app.go's eventChannel constant.
 const EVENT_CHANNEL = "agent:event";
@@ -947,7 +938,7 @@ export function onRemoteServer(cb: (s: RemoteServerView) => void): () => void {
 }
 
 // Mock event fan-out so browser-dev and tsx tests can drive remote:* events
-// without a Wails runtime.
+// without a shell runtime.
 type MockRemoteChannel = "status" | "forwards" | "server";
 const mockRemoteListeners: Record<MockRemoteChannel, Set<(v: unknown) => void>> = {
   status: new Set(),
@@ -963,7 +954,8 @@ export function __emitMockRemote(ch: MockRemoteChannel, payload: unknown): void 
 }
 
 // app proxies each call to the live binding (or the dev mock only when truly
-// outside the shell), so a late-injected window.go is picked up transparently.
+// outside the shell), resolving the host at call time so a shell that attaches
+// late is picked up transparently.
 function bridgeBreadcrumb(method: string): string {
   if (method === "ReportCrash" || method === "RecordUIPerf") return "";
   if (/^(Submit|SubmitDisplay|RunShell|Steer|Cancel|Approve|AnswerQuestion|ReplayPendingPrompts)/.test(method))
@@ -1073,8 +1065,8 @@ function emitUpdater(p: UpdateProgress) {
   updaterListeners.forEach((l) => l(p));
 }
 
-// Test seam for the browser-dev updater state machine. Production Wails builds
-// receive the same payloads through runtime.EventsOn("updater:progress").
+// Test seam for the browser-dev updater state machine. The desktop shell
+// receives the same payloads through the host event stream.
 export function __emitMockUpdater(p: UpdateProgress): void {
   emitUpdater(p);
 }
@@ -1300,7 +1292,7 @@ function makeMockApp(): AppBindings {
   let mockHeartbeatTasks: unknown[] = [];
   // Vite rewrites these literal asset URLs in both dev and production builds.
   // Keeping them on the browser mock makes local visual acceptance match the
-  // Wails bridge, whose ListThemePacks response carries the same two URLs.
+  // desktop bridge, whose ListThemePacks response carries the same two URLs.
   const mockOfficialThemeAssets = {
     "official-rose-dawn": {
       previewUrl: new URL("../../../themes/official/official-rose-dawn/preview.webp", import.meta.url).href,
@@ -2752,7 +2744,7 @@ function makeMockApp(): AppBindings {
       const reply =
         `You said: **${input}**\n\n` +
         "This is the browser dev mock — the real reply comes from the kernel " +
-        "inside the Wails shell. Here's a fenced block to exercise the editor seam:\n\n" +
+        "inside the desktop shell. Here's a fenced block to exercise the editor seam:\n\n" +
         "```go\nfunc main() {\n    println(\"hello from the mock\")\n}\n```\n";
       for (const ch of reply) {
         if (cancelled) break;
@@ -3981,7 +3973,7 @@ function makeMockApp(): AppBindings {
     },
     async SearchFileRefs(query: string) {
       const q = query.toLowerCase();
-      return ["desktop/frontend/src/lib/bridge.ts", "frontend/wailsjs/runtime/runtime.js", "internal/control/refs.go"]
+      return ["desktop/frontend/src/lib/bridge.ts", "desktop/frontend/src/main.tsx", "internal/control/refs.go"]
         .filter((path) => path.split("/").pop()?.toLowerCase().includes(q))
         .map((name) => ({ name, isDir: false }));
     },

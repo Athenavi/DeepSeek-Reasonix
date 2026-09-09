@@ -5,6 +5,7 @@ import { JSDOM } from "jsdom";
 import type { AppBindings } from "../lib/bridge";
 import type { TabMeta } from "../lib/types";
 import type { RemoteSessionApi } from "../lib/useRemoteSession";
+import { installDesktopHostStub } from "./desktopHostStub";
 
 let passed = 0;
 let failed = 0;
@@ -76,7 +77,7 @@ let resolveRaceSnapshot: ((value: { history: unknown[]; status: unknown }) => vo
 const resolveStateRaceSnapshots: Array<(value: { history: unknown[]; status: unknown }) => void> = [];
 let rotationSnapshotCalls = 0;
 let resolveRotationReconcile: ((value: { history: unknown[]; status: unknown }) => void) | undefined;
-window.go = { main: { App: {
+installDesktopHostStub(({ main: { App: {
   async RegisterNavigationIntent(token: string) { tape.push(`navigation:${token}`); },
   async RemoteTabSnapshot(tabId: string) {
     tape.push(`snapshot:${tabId}`);
@@ -219,7 +220,7 @@ window.go = { main: { App: {
   async SetActiveTab(tabID: string) {
     tape.push(`setActive:${tabID}`);
   },
-} as Partial<AppBindings> as AppBindings } };
+} as Partial<AppBindings> as AppBindings } }).main.App);
 
 const [{ createRoot }, { RemoteSessionSurface }, { LocaleProvider }, { useRemoteSession }, { __emitMockRemoteTab }, { remoteRuntimeCommand }] = await Promise.all([
   import("react-dom/client"),

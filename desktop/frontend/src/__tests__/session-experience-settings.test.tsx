@@ -6,6 +6,7 @@ import { SessionExperienceSettings } from "../components/SessionExperienceSettin
 import { LocaleProvider } from "../lib/i18n";
 import { getSessionExperience } from "../lib/sessionExperience";
 import type { SettingsView } from "../lib/types";
+import { installDesktopHostStub } from "./desktopHostStub";
 
 const dom = new JSDOM("<div id='root'></div>", { url: "http://localhost" });
 Object.assign(globalThis, { window: dom.window, document: dom.window.document, localStorage: dom.window.localStorage,
@@ -14,12 +15,12 @@ let backend: SettingsView = { sessionExperience: "standard" } as SettingsView;
 let release!: () => void;
 let failed = false;
 const writes: string[] = [];
-Object.assign(window, { go: { main: { App: { SetSessionExperience: async (mode: string) => {
+installDesktopHostStub({ SetSessionExperience: async (mode: string) => {
   writes.push(mode);
   await new Promise<void>(resolve => { release = resolve; });
   if (failed) throw new Error("write failed");
   backend = { ...backend, sessionExperience: mode as "deep" | "standard" };
-} } } } });
+} });
 let completion: Promise<boolean>;
 let reload!: () => void;
 function SettingsHost() {

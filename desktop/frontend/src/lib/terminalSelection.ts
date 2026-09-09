@@ -137,8 +137,8 @@ export function handleTerminalCopyKey(input: {
   return { intercepted: true, text: input.getSelection() };
 }
 
-// Async clipboard reads need the webview's Clipboard API permission; the Wails
-// runtime bridge is the fallback, mirroring writeClipboardText's ladder.
+// Async clipboard reads need the webview's Clipboard API permission; the
+// desktop bridge is the fallback, mirroring writeClipboardText's ladder.
 export async function readTerminalClipboardText(): Promise<string> {
   try {
     if (typeof navigator !== "undefined" && navigator.clipboard?.readText) {

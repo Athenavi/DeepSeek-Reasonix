@@ -6,7 +6,6 @@ import { writeClipboardText } from "./clipboard";
 import { desktopHost } from "./desktopHost";
 import { t } from "./i18n";
 import { sessionPipelineDiagnostics, type SessionPipelineDiagnostics } from "./sessionDiagnostics";
-import { isWailsRuntimeOnlyCrashEvent } from "./wailsRuntimeCrash";
 declare const __BUILD_COMMIT__: string;
 declare const __BUILD_CHANNEL__: string;
 
@@ -275,7 +274,7 @@ export function topFrameFromStack(stack?: string): string {
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
-  return lines.find((l) => /\b(src|assets|wails|frontend)\b|\.tsx?:|\.jsx?:/.test(l)) ?? lines[1] ?? lines[0] ?? "";
+  return lines.find((l) => /\b(src|assets|frontend)\b|\.tsx?:|\.jsx?:/.test(l)) ?? lines[1] ?? lines[0] ?? "";
 }
 
 function currentView(): string {
@@ -818,7 +817,6 @@ export function shouldReportGlobalCrashEvent(e: GlobalCrashEventLike): boolean {
   if (e.defaultPrevented) return false;
   if (globalCrashEventMessages(e).some((message) => RESIZE_OBSERVER_LOOP_MESSAGE_RE.test(message) ||
     /Minified React error #520\b/.test(message) || message.includes("status was superseded by"))) return false;
-  if (isWailsRuntimeOnlyCrashEvent(e)) return false;
   return true;
 }
 

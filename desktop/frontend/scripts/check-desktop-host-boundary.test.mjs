@@ -29,16 +29,19 @@ try {
 
   const clean = desktopHostViolations(`
     // window.go and window.runtime are only mentioned in this comment.
-    import type * as GeneratedApp from "../../wailsjs/go/main/App";
-    import { type Only } from "../../wailsjs/go/models";
     const paths = ["frontend/wailsjs/runtime/runtime.js", "window.runtime"];
     const wails = window.wails;
     const phase = tab.runtime.phase;
     const goCount = stats.go;
     const host = shell.reasonixDesktop;
-    export type Keys = keyof typeof GeneratedApp;
   `, "clean.ts");
-  assert.deepEqual(clean, [], "comments, strings, type-only imports and unrelated members are not host access");
+  assert.deepEqual(clean, [], "comments, strings and unrelated members are not host access");
+
+  const typeOnly = desktopHostViolations(`
+    import type * as GeneratedApp from "../../wailsjs/go/main/App";
+  `, "type-only.ts");
+  assert.deepEqual(typeOnly.map((entry) => entry.replace(/^\d+: /, "")), ["import from ../../wailsjs/go/main/App"],
+    "retired shell modules are rejected even when imported type-only");
 
   write("lib/desktopHost.ts", "export const host = window.go?.main?.App && window.runtime;");
   write("__tests__/x.test.ts", "window.runtime = {};");

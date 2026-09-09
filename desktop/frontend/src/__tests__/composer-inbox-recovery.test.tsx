@@ -8,6 +8,7 @@ import { Composer } from "../components/Composer";
 import { LocaleProvider } from "../lib/i18n";
 import { ToastProvider } from "../lib/toast";
 import type { CollaborationMode, ToolApprovalMode } from "../lib/types";
+import { installDesktopHostStub } from "./desktopHostStub";
 
 let passed = 0;
 let failed = 0;
@@ -85,20 +86,16 @@ function installDom(language = "en-US") {
 }
 
 function installBridgeApp(methods: Record<string, unknown>) {
-  (window as unknown as { go: { main: { App: Record<string, unknown> } } }).go = {
-    main: {
-      App: {
-        Commands: async () => [],
-        Models: async () => [],
-        ModelsForTab: async () => [],
-        ListDir: async () => [],
-        ListDirForTab: async () => [],
-        SearchFileRefs: async () => [],
-        SearchFileRefsForTab: async () => [],
-        ...methods,
-      },
-    },
-  };
+  installDesktopHostStub({
+    Commands: async () => [],
+    Models: async () => [],
+    ModelsForTab: async () => [],
+    ListDir: async () => [],
+    ListDirForTab: async () => [],
+    SearchFileRefs: async () => [],
+    SearchFileRefsForTab: async () => [],
+    ...methods,
+  });
 }
 
 async function renderComposer(props: Partial<Parameters<typeof Composer>[0]> = {}, strictMode = false) {

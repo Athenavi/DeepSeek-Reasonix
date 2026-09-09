@@ -21,7 +21,7 @@
 //   - Generation binding: every in-flight slice/content request carries the
 //     session generation it started under. Switching away, evicting, or
 //     starting a newer load bumps the generation; late responses are
-//     discarded (Wails calls are not abortable).
+//     discarded (desktop bridge calls are not abortable).
 //   - Lazy content: entries carrying refs[] keep preview text inline;
 //     requestFullContent fetches and assembles HistoryContentForTab chunks on
 //     demand (and automatically for refs in the newest page). A stale chunk

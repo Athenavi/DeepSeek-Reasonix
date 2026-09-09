@@ -53,7 +53,7 @@ async function writeClipboardText(value: string): Promise<void> {
 }
 
 // CopyButton copies text to the clipboard on click and briefly flips to a check.
-// Clipboard writes are best-effort across browser dev, Wails, and webviews, so
+// Clipboard writes are best-effort across browser dev and the desktop shell, so
 // the visible acknowledgement stays tied to the user action.
 export function CopyButton({
   text,

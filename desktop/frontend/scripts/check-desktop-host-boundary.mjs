@@ -43,12 +43,9 @@ export function desktopHostViolations(code, file) {
       && HOST_GLOBALS.has(node.argumentExpression.text) && isWindowObject(node.expression)) {
       violations.push(`${line(tree, node)}: window["${node.argumentExpression.text}"]`);
     } else if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && shellModule(node.moduleSpecifier.text)) {
-      // The generated Wails binding types feed bridge.ts's drift check; only a
-      // runtime import of the shell toolkit crosses the boundary.
-      const clause = node.importClause;
-      const typeOnly = Boolean(clause?.isTypeOnly || (clause?.namedBindings && ts.isNamedImports(clause.namedBindings)
-        && clause.namedBindings.elements.length > 0 && clause.namedBindings.elements.every((entry) => entry.isTypeOnly)));
-      if (!typeOnly) violations.push(`${line(tree, node)}: import from ${node.moduleSpecifier.text}`);
+      // The Wails shell is retired; no import of its generated bindings or
+      // runtime package is legitimate anymore, type-only included.
+      violations.push(`${line(tree, node)}: import from ${node.moduleSpecifier.text}`);
     } else if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)
       && shellModule(node.moduleSpecifier.text) && !node.isTypeOnly) {
       violations.push(`${line(tree, node)}: export from ${node.moduleSpecifier.text}`);

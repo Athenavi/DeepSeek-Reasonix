@@ -1,11 +1,10 @@
-// desktopHost is the only module allowed to touch the shell globals: Electron's
-// window.reasonixDesktop (preload) and Wails' window.go / window.runtime.
-// scripts/check-desktop-host-boundary.mjs enforces that boundary.
+// desktopHost is the only module allowed to touch the shell global: Electron's
+// window.reasonixDesktop (preload). scripts/check-desktop-host-boundary.mjs
+// enforces that boundary.
 import type { AppBindings } from "./bridge";
 import type { DesktopBrowserHost } from "./browserHost";
-import { dataTransferLooksLikeFileDrag, installWailsNonFileDragErrorSuppression } from "./wailsDragErrors";
 
-export type DesktopHostKind = "electron" | "wails" | "none";
+export type DesktopHostKind = "electron" | "none";
 export type WindowTheme = "system" | "light" | "dark";
 
 export interface WindowBounds {
@@ -47,26 +46,8 @@ export interface ReasonixDesktopHost {
   browser: DesktopBrowserHost;
 }
 
-interface WailsRuntime {
-  EventsOn(name: string, cb: (...data: unknown[]) => void): () => void;
-  BrowserOpenURL(url: string): void;
-  WindowSetSystemDefaultTheme?(): void;
-  WindowSetLightTheme?(): void;
-  WindowSetDarkTheme?(): void;
-  WindowSetBackgroundColour?(r: number, g: number, b: number, a: number): void;
-  WindowGetSize?(): Promise<{ w: number; h: number }>;
-  WindowGetPosition?(): Promise<{ x: number; y: number }>;
-  WindowIsMaximised?(): Promise<boolean>;
-  ClipboardSetText?(text: string): Promise<boolean>;
-  ClipboardGetText?(): Promise<string>;
-  OnFileDrop?(cb: (x: number, y: number, paths: string[]) => void, useDropTarget: boolean): void;
-  OnFileDropOff?(): void;
-}
-
 declare global {
   interface Window {
-    runtime?: WailsRuntime;
-    go?: { main?: { App?: AppBindings } };
     reasonixDesktop?: ReasonixDesktopHost;
   }
 }
@@ -90,79 +71,59 @@ export interface DesktopHost {
   browser?: DesktopBrowserHost;
 }
 
+function dataTransferLooksLikeFileDrag(dt: DataTransfer | null): boolean {
+  if (!dt) return false;
+  if (dt.files?.length > 0) return true;
+  return Array.from(dt.types ?? []).includes("Files");
+}
+
 const noop = () => {};
 const win = () => (typeof window === "undefined" ? undefined : window);
-const wailsRuntime = () => win()?.runtime;
 
-// One object serves the Wails shell and the bare browser: every runtime call
-// degrades to a no-op when window.runtime is absent, and a bound App without
-// its runtime is the test seam (real commands, mocked events and native calls).
-const wailsLikeHost = (kind: "wails" | "none"): DesktopHost => ({
-  kind,
-  get app() {
-    return win()?.go?.main?.App;
-  },
-  events: { on: (name, cb) => wailsRuntime()?.EventsOn(name, cb) ?? noop },
+// The bare browser (Serve product, dev server, tests) has no shell: every
+// native call degrades to a no-op and there are no bound commands.
+const serverHost: DesktopHost = {
+  kind: "none",
+  app: undefined,
+  events: { on: () => noop },
   native: {
     openExternal: (url) => {
-      const rt = wailsRuntime();
-      if (rt?.BrowserOpenURL) rt.BrowserOpenURL(url);
-      else win()?.open(url, "_blank", "noopener");
+      win()?.open(url, "_blank", "noopener");
     },
-    clipboardWriteText: async (text) => (await wailsRuntime()?.ClipboardSetText?.(text)) === true,
-    clipboardReadText: async () => (await wailsRuntime()?.ClipboardGetText?.()) ?? "",
-    setWindowTheme: (theme) => {
-      const rt = wailsRuntime();
-      if (theme === "system") rt?.WindowSetSystemDefaultTheme?.();
-      else if (theme === "light") rt?.WindowSetLightTheme?.();
-      else rt?.WindowSetDarkTheme?.();
-    },
-    setWindowBackground: (r, g, b, a) => wailsRuntime()?.WindowSetBackgroundColour?.(r, g, b, a),
-    getWindowBounds: () => {
-      const rt = wailsRuntime();
-      if (!rt?.WindowGetSize || !rt.WindowGetPosition || !rt.WindowIsMaximised) return undefined;
-      return Promise.all([rt.WindowGetSize(), rt.WindowGetPosition(), rt.WindowIsMaximised()])
-        .then(([size, pos, maximised]) => ({ x: pos.x, y: pos.y, width: size.w, height: size.h, maximised }));
-    },
-    onFilesDropped: (cb) => {
-      const rt = wailsRuntime();
-      if (!rt?.OnFileDrop) return noop;
-      // Wails' ResolveFilePaths throws on non-file drags (e.g. the window icon);
-      // the suppression keeps that from surfacing as an app crash.
-      const uninstall = installWailsNonFileDragErrorSuppression();
-      rt.OnFileDrop((_x, _y, paths) => {
-        if (Array.isArray(paths) && paths.length > 0) cb(paths);
-      }, true);
-      return () => {
-        rt.OnFileDropOff?.();
-        uninstall();
-      };
-    },
+    clipboardWriteText: async () => false,
+    clipboardReadText: async () => "",
+    setWindowTheme: noop,
+    setWindowBackground: noop,
+    getWindowBounds: () => undefined,
+    onFilesDropped: () => noop,
     onServiceState: () => noop,
   },
-});
+};
 
-const serverHost = wailsLikeHost("none");
-const wailsHost = wailsLikeHost("wails");
 let electronHost: DesktopHost | undefined;
 let electronHostFor: ReasonixDesktopHost | undefined;
 const dropListeners = new Set<(paths: string[]) => void>();
-let dropHandlersInstalled = false;
 
 const insideDropTarget = (target: EventTarget | null) =>
-  target instanceof Element && target.closest("[data-native-drop-target]") !== null;
+  typeof (target as Element | null)?.closest === "function" &&
+  (target as Element).closest("[data-native-drop-target]") !== null;
 
 // Chromium hands the renderer real File objects; paths come from the preload.
-const installElectronDropHandlers = (host: ReasonixDesktopHost) => {
-  if (dropHandlersInstalled) return;
-  dropHandlersInstalled = true;
-  document.addEventListener("dragover", (e) => {
+// The handlers install per document (a reloaded renderer gets a fresh one) and
+// resolve the host at dispatch time so a service restart never goes stale.
+let dropHandlersInstalledOn: Document | undefined;
+const installElectronDropHandlers = () => {
+  const doc = win()?.document;
+  if (!doc || dropHandlersInstalledOn === doc) return;
+  dropHandlersInstalledOn = doc;
+  doc.addEventListener("dragover", (e) => {
     if (!dataTransferLooksLikeFileDrag(e.dataTransfer)) return;
     e.preventDefault();
     if (!insideDropTarget(e.target) && e.dataTransfer) e.dataTransfer.dropEffect = "none";
   });
-  document.addEventListener("drop", (e) => {
-    if (!dataTransferLooksLikeFileDrag(e.dataTransfer)) return;
+  doc.addEventListener("drop", (e) => {
+    const host = win()?.reasonixDesktop;
+    if (!host || !dataTransferLooksLikeFileDrag(e.dataTransfer)) return;
     e.preventDefault();
     if (!insideDropTarget(e.target) || !e.dataTransfer) return;
     const paths = Array.from(e.dataTransfer.files).map((file) => host.native.getPathForFile(file)).filter((path) => path !== "");
@@ -172,13 +133,14 @@ const installElectronDropHandlers = (host: ReasonixDesktopHost) => {
 
 const electronHostFrom = (host: ReasonixDesktopHost): DesktopHost => {
   if (electronHost && electronHostFor === host) return electronHost;
-  const commands = new Set(host.contract.commands);
   electronHostFor = host;
   electronHost = {
     kind: "electron",
+    // contract.commands is read live so a replaced preload (service restart)
+    // never leaves the proxy pointing at a stale command set.
     app: new Proxy({} as AppBindings, {
       get: (_target, prop) =>
-        typeof prop === "string" && commands.has(prop) ? (...args: unknown[]) => host.invoke(prop, args) : undefined,
+        typeof prop === "string" && host.contract.commands.includes(prop) ? (...args: unknown[]) => host.invoke(prop, args) : undefined,
     }),
     events: { on: (name, cb) => host.on(name, cb) },
     native: {
@@ -189,7 +151,7 @@ const electronHostFrom = (host: ReasonixDesktopHost): DesktopHost => {
       setWindowBackground: (r, g, b, a) => host.native.window.setBackgroundColour(r, g, b, a),
       getWindowBounds: () => host.native.window.getBounds(),
       onFilesDropped: (cb) => {
-        installElectronDropHandlers(host);
+        installElectronDropHandlers();
         dropListeners.add(cb);
         return () => {
           dropListeners.delete(cb);
@@ -203,12 +165,12 @@ const electronHostFrom = (host: ReasonixDesktopHost): DesktopHost => {
   return electronHost;
 };
 
-// Resolved at call time, never cached by callers: Wails can inject window.go
-// after this module first evaluates, and the browser dev mock must only win
-// when no shell is present.
+// Resolved at call time, never cached by callers: the preload may install
+// window.reasonixDesktop after this module first evaluates, and the browser
+// dev mock must only win when no shell is present.
 export function desktopHost(): DesktopHost {
   if (typeof window === "undefined") return serverHost;
   const electron = window.reasonixDesktop;
   if (electron) return electronHostFrom(electron);
-  return window.go?.main?.App && window.runtime ? wailsHost : serverHost;
+  return serverHost;
 }

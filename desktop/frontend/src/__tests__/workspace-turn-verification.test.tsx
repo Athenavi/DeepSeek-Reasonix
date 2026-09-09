@@ -8,6 +8,7 @@ import { WORKSPACE_TURN_VERIFICATION_ID, WorkspacePanel } from "../components/Wo
 import { LocaleProvider } from "../lib/i18n";
 import type { AppBindings } from "../lib/bridge";
 import type { WireCompletionSummary } from "../lib/types";
+import { installDesktopHostStub } from "./desktopHostStub";
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
@@ -88,7 +89,7 @@ type WorkspaceProps = Parameters<typeof WorkspacePanel>[0];
 
 async function createHarness(props: Partial<WorkspaceProps>) {
   const dom = installDom();
-  window.go = {
+  installDesktopHostStub(({
     main: {
       App: {
         ListDirForTab: async () => [],
@@ -99,7 +100,7 @@ async function createHarness(props: Partial<WorkspaceProps>) {
         ReadFileForTab: async (_tabID, path) => ({ path, body: "", size: 0, truncated: false, binary: false }),
       } as Partial<AppBindings> as AppBindings,
     },
-  };
+  }).main.App);
   const root = createRoot(document.getElementById("root")!);
   let currentProps: WorkspaceProps = {
     open: true,

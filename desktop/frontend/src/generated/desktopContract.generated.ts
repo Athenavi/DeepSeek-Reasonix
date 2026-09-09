@@ -3,7 +3,7 @@
 
 export const DESKTOP_PROTOCOL_VERSION = 1;
 
-export const DESKTOP_CONTRACT_DIGEST = "sha256:c944a3ea4b46f30471433978490834736cc0d25615e68236f5397e0971d54fa0";
+export const DESKTOP_CONTRACT_DIGEST = "sha256:18361fc2ba4cd76cba5fffdb3f8798eb5429dd7c66edd33c78f2c1bf3f3129aa";
 
 export const DESKTOP_COMMANDS = [
   "AIRenameSession",
@@ -587,7 +587,6 @@ export const DESKTOP_EVENTS = [
   "InboxChanged",
   "agent:event",
   "agent:ready",
-  "app:open-settings",
   "config:load-warnings",
   "desktop:shell-status",
   "history-index:changed-v1",

@@ -41,7 +41,8 @@ const fakeApp = {
     if (writeError) throw writeError;
   },
 };
-(globalThis.window as unknown as { go: unknown }).go = { main: { App: fakeApp } };
+const { installDesktopHostStub } = await import("./desktopHostStub");
+installDesktopHostStub(fakeApp);
 
 const { resetTerminalStoreForTests, useTerminalStore } = await import("../store/terminal");
 resetTerminalStoreForTests();
