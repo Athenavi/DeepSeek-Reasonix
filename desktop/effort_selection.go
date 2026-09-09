@@ -8,6 +8,7 @@ import (
 	"reasonix/internal/agent"
 	"reasonix/internal/boot"
 	"reasonix/internal/config"
+	"reasonix/internal/control"
 	"reasonix/internal/event"
 	"reasonix/internal/plugin"
 	"reasonix/internal/provider"
@@ -200,30 +201,7 @@ func (a *App) applySelectedEffortTurnLocked(tab *WorkspaceTab, selection *pendin
 		prevPath = sessionPathAfterSnapshot(oldCtrl, prevPath)
 		carried = oldCtrl.History()
 	}
-	sharedHost := a.lookupSharedHost(snap.sharedHostKey)
-	newCtrl, err := boot.Build(a.bootContext(), boot.Options{
-		Model:                    modelRef,
-		RequireKey:               false,
-		StatsSource:              "desktop",
-		TaskStore:                a.taskStore(),
-		OnConfigLoadWarnings:     a.configLoadWarningsHandler(),
-		Sink:                     snap.sink,
-		WorkspaceRoot:            snap.workspaceRoot,
-		SessionDir:               sessionDirForSnapshot(snap),
-		EffortOverride:           &effort,
-		SharedHost:               sharedHost,
-		MCPHostProfile:           plugin.HostProfileDesktopApps,
-		CleanupPendingReconciler: reconcileDesktopCleanupPending,
-		SubagentParentLive:       a.subagentParentProbeForBuild(tab),
-		SessionRecoveryMeta:      a.tabSessionRecoveryMeta(tab),
-		PinnedContextLoader:      pinnedContextLoader(snap.workspaceRoot),
-		OnSessionRecovered:       a.handleTabSessionRecovered(tab),
-		OnSessionTransition:      a.handleTabSessionTransition(tab),
-		BeforeInboxDispatch:      a.beforeInboxDispatch,
-		OnSessionTitleChanged:    a.onSessionTitleChanged,
-		// Keep the private temporary directory across effort switches (#7575).
-		SessionTemp: sessionTempFromController(oldCtrl),
-	})
+	newCtrl, err := boot.Build(a.bootContext(), a.effortRebuildBootOptions(tab, snap, oldCtrl, modelRef, effort))
 	if err != nil {
 		return err
 	}
@@ -283,4 +261,32 @@ func (a *App) applySelectedEffortTurnLocked(tab *WorkspaceTab, selection *pendin
 	a.persistTabSessionPath(tab, path)
 	a.notifyTabRuntimeRebuilt(tab)
 	return nil
+}
+
+// effortRebuildBootOptions keeps the effort-switch build inputs in one owner so
+// applySelectedEffortTurnLocked stays within the repo function-size budget.
+func (a *App) effortRebuildBootOptions(tab *WorkspaceTab, snap tabRuntimeSnapshot, oldCtrl control.SessionAPI, modelRef, effort string) boot.Options {
+	return boot.Options{
+		Model:                    modelRef,
+		RequireKey:               false,
+		StatsSource:              "desktop",
+		TaskStore:                a.taskStore(),
+		OnConfigLoadWarnings:     a.configLoadWarningsHandler(),
+		Sink:                     snap.sink,
+		WorkspaceRoot:            snap.workspaceRoot,
+		SessionDir:               sessionDirForSnapshot(snap),
+		EffortOverride:           &effort,
+		SharedHost:               a.lookupSharedHost(snap.sharedHostKey),
+		MCPHostProfile:           plugin.HostProfileDesktopApps,
+		CleanupPendingReconciler: reconcileDesktopCleanupPending,
+		SubagentParentLive:       a.subagentParentProbeForBuild(tab),
+		SessionRecoveryMeta:      a.tabSessionRecoveryMeta(tab),
+		PinnedContextLoader:      pinnedContextLoader(snap.workspaceRoot),
+		OnSessionRecovered:       a.handleTabSessionRecovered(tab),
+		OnSessionTransition:      a.handleTabSessionTransition(tab),
+		BeforeInboxDispatch:      a.beforeInboxDispatch,
+		OnSessionTitleChanged:    a.onSessionTitleChanged,
+		// Keep the private temporary directory across effort switches (#7575).
+		SessionTemp: sessionTempFromController(oldCtrl),
+	}
 }

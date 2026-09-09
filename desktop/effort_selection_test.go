@@ -394,6 +394,40 @@ func TestEffortSelectionPersistenceFailureRollsBack(t *testing.T) {
 	waitNotRunning(t, f.tab.Ctrl)
 }
 
+// A failure after the new controller is published must not leave the tab in a
+// half-applied state: the swapped controller stays live and usable, the applied
+// effort is visible immediately, and no pending selection survives.
+func TestEffortSelectionPersistenceFailureAfterPublication(t *testing.T) {
+	f := newEffortSelectionFixture(t)
+	old := f.tab.Ctrl
+	tmp := filepath.Join(desktopConfigDir(), tabsFileName+".tmp")
+	t.Cleanup(func() { _ = os.Remove(tmp) })
+	f.app.rebindCandidateHook = func(stage string) error {
+		if stage == "effort_before_authority" {
+			return os.Mkdir(tmp, 0o700)
+		}
+		return nil
+	}
+	err := f.app.SetEffortForTab(f.tab.ID, "max")
+	if err == nil || !strings.Contains(err.Error(), "could not persist tab settings") {
+		t.Fatalf("post-publication persistence error = %v, want tab settings failure", err)
+	}
+	f.app.rebindCandidateHook = nil
+	if f.app.controllerForTab(f.tab) == old {
+		t.Fatal("published controller was rolled back after the persistence failure")
+	}
+	f.assertEffort(t, "max", "")
+	if got := loadTabsFile().Tabs[0].Effort; got == nil || *got != "max" {
+		t.Fatalf("published effort was not saved: %v", got)
+	}
+	if err := f.tab.Ctrl.Snapshot(); err != nil {
+		t.Fatal("published controller is not usable:", err)
+	}
+	if err := os.Remove(tmp); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestEffortSelectionConcurrentRebuildLastAcceptedWins(t *testing.T) {
 	f := newEffortSelectionFixture(t)
 	entered, release := make(chan struct{}), make(chan struct{})

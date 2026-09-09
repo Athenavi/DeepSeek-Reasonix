@@ -879,6 +879,7 @@ export const en = {
   "composer.steer": "Add guidance to current turn (Enter)",
   "composer.steerPlaceholder": "Running — type guidance, {combo} adds it to the queue",
   "composer.effortSelectionCleared": "The session or model changed, so the previous reasoning effort selection was cleared.",
+  "composer.effortNextTurnHint": "Selected for the next task turn",
   "composer.runWaitingApproval": "Waiting for your approval — {tool}",
   "composer.runWaitingAsk": "Waiting for your answer",
   "composer.runAnnounceRunning": "Reasonix is working",

@@ -100,8 +100,10 @@ try {
   await click('[role="menuitemradio"][data-value="max"]');
   assert.deepEqual(selected, ["max"]);
   assert.match(document.querySelector(".composer-effort-control")?.textContent ?? "", /auto/i, "no optimistic selection before acknowledgement");
+  assert.equal(document.querySelector<HTMLButtonElement>(".composer-effort-control button")?.getAttribute("title"), null, "applied effort carries no next-turn hint");
   await rerender({ effort: { ...effort, pending: "max" } });
   assert.equal(document.querySelector(".composer-effort-control")?.textContent, "max", "the existing label displays the acknowledged choice without a new badge");
+  assert.equal(document.querySelector<HTMLButtonElement>(".composer-effort-control button")?.getAttribute("title"), "Selected for the next task turn", "pending effort explains it applies to the next task turn");
   await click(".composer-effort-control button");
   await click('[role="menuitemradio"][data-value="auto"]');
   assert.deepEqual(selected, ["max", "auto"], "selecting current value cancels a pending selection");
@@ -110,6 +112,7 @@ try {
   assert.equal(document.querySelector(".composer-effort-control")?.textContent, "max", "stopping does not clear the backend selection");
   await rerender({ effort: { ...effort, current: "max" } });
   assert.doesNotMatch(document.querySelector(".composer-effort-control")?.textContent ?? "", /Next turn/);
+  assert.equal(document.querySelector<HTMLButtonElement>(".composer-effort-control button")?.getAttribute("title"), null, "applied effort drops the next-turn hint");
 
   await rerender({ running: true, effort, remoteSession: true, attachmentInputEnabled: false });
   assert.equal(plus.disabled, true, "remote running content menu keeps its existing guard");

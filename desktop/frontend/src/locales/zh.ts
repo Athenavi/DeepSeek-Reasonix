@@ -880,6 +880,7 @@ export const zh: Record<DictKey, string> = {
   "composer.steer": "追加到当前任务（Enter）",
   "composer.steerPlaceholder": "正在运行——输入补充指示，{combo} 加入队列",
   "composer.effortSelectionCleared": "会话或模型已更换，原来的思考强度预选已撤销。",
+  "composer.effortNextTurnHint": "已选择，下一回合生效",
   "composer.runWaitingApproval": "等待你批准 — {tool}",
   "composer.runWaitingAsk": "等待你回答",
   "composer.runAnnounceRunning": "正在运行",

@@ -3735,6 +3735,7 @@ export function Composer({
   const effortLevels = effort?.options ? ["auto", ...effortOptions.map((option) => option.id)] : asArray(effort?.levels);
   const currentEffort = effort?.current || "auto";
   const selectedEffort = effort?.pending ?? currentEffort;
+  const effortPendingHint = effort?.pending ? t("composer.effortNextTurnHint") : undefined;
   const effortDeferredUnavailable = running && (remoteSession || effort?.canDefer !== true);
   const hasEffort = Boolean(effort?.supported && effortLevels.length > 0);
   const chooseEffortLevel = (level: string) => {
@@ -4632,7 +4633,7 @@ export function Composer({
               {hasEffort && !heroMode && <div className="composer-effort-control">
                 <ComposerChoice key={`effort-${draftKey}`} label={effortLabel(selectedEffort)}
                   ariaLabel={`${t("status.effortTitle")}: ${effortLabel(selectedEffort)}`}
-                  icon={<Brain size={16} />} showChevron
+                  icon={<Brain size={16} />} showChevron title={effortPendingHint}
                   value={selectedEffort} disabled={disabled || readOnly || effortDeferredUnavailable}
                   onPick={chooseEffortLevel}
                   options={effortLevels.map(level => ({ value: level, label: effortLabel(level) }))} />
