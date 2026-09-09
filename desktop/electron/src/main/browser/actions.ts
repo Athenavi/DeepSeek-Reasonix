@@ -1,10 +1,10 @@
 import { statSync } from "node:fs";
 import { isAbsolute } from "node:path";
-import type { DocumentBinding, DocumentRegistry } from "./documents.js";
+import type { DocumentBinding, DocumentRegistry, FrameBinding } from "./documents.js";
 import { noGrant, staleReference, takenOver } from "./errors.js";
-import type { GuestPage } from "./guestView.js";
+import type { GuestFrame, GuestPage } from "./guestView.js";
 import { chordEvents, parseKeySequence } from "./keys.js";
-import { IDENTITY_SCRIPT_SOURCE, scriptCall, SELECT_SCRIPT_SOURCE, type ResolvedElement, type SelectOutput } from "./pageScripts.js";
+import { FOCUS_SCRIPT_SOURCE, IDENTITY_SCRIPT_SOURCE, scriptCall, SELECT_SCRIPT_SOURCE, type ResolvedElement, type SelectOutput } from "./pageScripts.js";
 import { frameForRef, locateRef, resolveRef } from "./refResolver.js";
 import { ISOLATED_WORLD, REGISTRY_KEY, runInFrame } from "./snapshot.js";
 import type { BrowserSurfaceManager, BrowserTab } from "./surfaceManager.js";
@@ -127,7 +127,7 @@ export class ActionExecutor {
     if (tab.view.page.isDestroyed()) throw staleReference(`tab ${tab.id} has no page`);
   }
 
-  private async target(tab: BrowserTab, binding: DocumentBinding, ref: string, verify: () => void): Promise<{ ok: true; element: ResolvedElement; centre: Point } | { ok: false; reason: string }> {
+  private async target(tab: BrowserTab, binding: DocumentBinding, ref: string, verify: () => void): Promise<{ ok: true; element: ResolvedElement; centre: Point; frame: GuestFrame; binding: FrameBinding } | { ok: false; reason: string }> {
     if (ref === "") return { ok: false, reason: "this action needs a ref" };
     const resolved = await resolveRef(tab.view.page, binding, ref, true);
     if (!resolved.ok) return resolved;
@@ -135,7 +135,7 @@ export class ActionExecutor {
     const zoom = tab.view.page.getZoomFactor() || 1;
     const { element } = resolved.value;
     const centre = { x: Math.round((element.x + element.width / 2) * zoom), y: Math.round((element.y + element.height / 2) * zoom) };
-    return { ok: true, element, centre };
+    return { ok: true, element, centre, frame: resolved.value.frame, binding: resolved.value.binding };
   }
 
   private mouseClick(tab: BrowserTab, at: Point): void {
@@ -201,6 +201,13 @@ export class ActionExecutor {
         dispatch();
         this.mouseClick(tab, target.centre);
         await this.sleep(30);
+        this.checkpoint(tab, binding, verify);
+      } else {
+        this.checkpoint(tab, binding, verify);
+        const focused = await runInFrame(tab.view.page, target.frame, scriptCall(FOCUS_SCRIPT_SOURCE, {
+          key: REGISTRY_KEY, snapshotId: binding.snapshotId, docId: target.binding.docId, ref: request.ref,
+        }));
+        if (focused !== true) return { executed: false, reason: "element could not be focused" };
         this.checkpoint(tab, binding, verify);
       }
     }

@@ -146,6 +146,7 @@ export class BrowserSurfaceManager {
     const partition = options.temporary ? `temp:${id}` : SHARED_PARTITION;
     const view = this.deps.views.create(partition);
     const tab = this.register(id, view, options.taskId, partition, options.temporary);
+    if (this.layout) view.setBounds(this.layout);
     // The application renderer owns selection. Agent opens must not replace
     // another task's visible page while its address bar still names that task.
     this.broadcast();
@@ -364,7 +365,7 @@ export class BrowserSurfaceManager {
   private applyVisibility(): void {
     for (const tab of this.tabs.values()) {
       const visible = !this.overlay && this.layout !== null && tab.id === this.activeId && this.layout.width > 0 && this.layout.height > 0;
-      if (visible && this.layout) tab.view.setBounds(this.layout);
+      if (this.layout) tab.view.setBounds(this.layout);
       tab.view.setVisible(visible);
     }
   }

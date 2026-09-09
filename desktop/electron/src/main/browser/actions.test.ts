@@ -175,6 +175,15 @@ test("press sends chords, scroll sends inverted wheel deltas, select runs in the
   await assert.rejects(s.actions.act(s.tab, s.request({ action: "select", documentToken: "tok-4" }), s.verify), code(BROWSER_ERR_STALE_REFERENCE));
 });
 
+test("press focuses a non-editable ref before sending keys", async () => {
+  const s = await setup();
+  s.answers.resolve = { ok: true, x: 0, y: 0, width: 10, height: 10, tag: "button", type: "", disabled: false, editable: false, frameOffsetKnown: true };
+  s.page.run = (source) => source.startsWith("(function pageFocus") ? true : source.startsWith("(function pageIdentity") ? true : s.answers.resolve;
+  const result = await s.actions.act(s.tab, s.request({ action: "press", ref: "e1", keys: "Enter" }), s.verify);
+  assert.equal(result.executed, true);
+  assert.equal(s.page.inputs.filter((event) => event.type === "keyDown").length, 1);
+});
+
 test("upload validates files and sets them through the DevTools protocol", async () => {
   const s = await setup();
   assert.equal((await s.actions.act(s.tab, s.request({ action: "upload" }), s.verify)).reason, "upload needs files");

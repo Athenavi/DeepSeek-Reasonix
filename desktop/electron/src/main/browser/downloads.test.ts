@@ -125,6 +125,17 @@ test("will-download routes the file into the task directory with a unique name",
   assert.equal(other.savePath, "/downloads/task-2/f.bin", "tasks without a scratch directory use the shell default");
 });
 
+test("concurrent downloads reserve the same filename before either reaches disk", () => {
+  const { tracker } = setup();
+  const first = new FakeDownloadItem("https://a.test/one", "report.txt", 10);
+  const second = new FakeDownloadItem("https://a.test/two", "report.txt", 10);
+  tracker.setTaskDirectory("task-1", "/scratch");
+  tracker.handleWillDownload(first, 7);
+  tracker.handleWillDownload(second, 7);
+  assert.equal(first.savePath, "/scratch/report.txt");
+  assert.equal(second.savePath, "/scratch/report-1.txt");
+});
+
 test("progress and terminal states are tracked and non-progressing rows are forgotten", () => {
   const { tracker } = setup();
   const item = new FakeDownloadItem("https://a.test/f.zip", "f.zip", 10);

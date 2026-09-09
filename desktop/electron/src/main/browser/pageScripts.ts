@@ -130,6 +130,15 @@ export function pageSelect(input: SelectInput): SelectOutput {
   return { ok: true, selected: chosen.map((option) => option.value) };
 }
 
+export function pageFocus(input: RefInput): boolean {
+  const registry = (window as unknown as Record<string, unknown>)[input.key] as Registry | undefined;
+  if (!registry || registry.docId !== input.docId || registry.snapshotId !== input.snapshotId) return false;
+  const target = registry.refs.get(input.ref);
+  if (!target || !target.isConnected) return false;
+  (target as HTMLElement).focus({ preventScroll: true });
+  return document.activeElement === target;
+}
+
 export type LocateOutput = { ok: true; tag: string; type: string; path: string } | ResolveFailure;
 
 // Locates a ref without visibility checks: uploads target hidden file inputs
@@ -165,6 +174,7 @@ export function pageIdentity(input: IdentityInput): boolean {
 
 export const RESOLVE_SCRIPT_SOURCE = pageResolve.toString();
 export const SELECT_SCRIPT_SOURCE = pageSelect.toString();
+export const FOCUS_SCRIPT_SOURCE = pageFocus.toString();
 export const IDENTITY_SCRIPT_SOURCE = pageIdentity.toString();
 export const LOCATE_SCRIPT_SOURCE = pageLocate.toString();
 

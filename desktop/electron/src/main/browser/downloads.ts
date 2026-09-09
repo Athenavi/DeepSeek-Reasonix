@@ -42,6 +42,7 @@ export class DownloadTracker {
   private readonly downloads = new Map<string, BrowserDownloadView>();
   private readonly taskDirectories = new Map<string, string>();
   private readonly waiters = new Set<Waiter>();
+  private readonly reservedPaths = new Set<string>();
   private counter = 0;
 
   constructor(private readonly deps: DownloadTrackerDeps) {}
@@ -66,6 +67,7 @@ export class DownloadTracker {
       this.deps.log.warn(`download directory ${directory} unavailable: ${String(error)}`);
     }
     const path = this.uniquePath(directory, item.getFilename());
+    this.reservedPaths.add(path);
     item.setSavePath(path);
     this.counter += 1;
     const id = `dl-${this.counter}`;
@@ -135,6 +137,7 @@ export class DownloadTracker {
       record.filename = basename(savePath);
     }
     this.deps.onUpdate({ ...record });
+    if (record.state === "cancelled" || record.state === "interrupted") this.reservedPaths.delete(record.path);
   }
 
   private settle(): void {
@@ -149,7 +152,7 @@ export class DownloadTracker {
     const ext = extname(safe);
     const stem = ext ? safe.slice(0, -ext.length) : safe;
     let candidate = join(directory, safe);
-    for (let n = 1; exists(candidate); n += 1) candidate = join(directory, `${stem}-${n}${ext}`);
+    for (let n = 1; exists(candidate) || this.reservedPaths.has(candidate); n += 1) candidate = join(directory, `${stem}-${n}${ext}`);
     return candidate;
   }
 }
