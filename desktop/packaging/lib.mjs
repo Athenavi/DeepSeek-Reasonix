@@ -1,5 +1,20 @@
 import { closeSync, fstatSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
+import { spawnSync } from "node:child_process";
+
+// These package scripts are Node entry points. Starting Node directly keeps
+// paths and arguments out of cmd.exe quoting, including trailing backslashes,
+// embedded quotes and shell metacharacters in checkout paths.
+export function runBuildScript(directory, script, args = [], env = {}) {
+  const result = spawnSync(process.execPath, [join(directory, "scripts", script), ...args], {
+    cwd: directory,
+    env: { ...process.env, ...env },
+    stdio: "inherit",
+    shell: false,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`${script} exited with ${result.status ?? result.signal}`);
+}
 
 export const PRODUCT = Object.freeze({
   name: "Reasonix",

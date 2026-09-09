@@ -13,7 +13,7 @@ if (!env.REASONIX_DESKTOP_SERVICE) {
   env.REASONIX_DESKTOP_SERVICE = resolve(root, "../build/bin", process.platform === "win32" ? "reasonix-desktop-service.exe" : "reasonix-desktop-service");
 }
 if (!existsSync(env.REASONIX_DESKTOP_SERVICE)) {
-  console.error(`desktop service binary not found: ${env.REASONIX_DESKTOP_SERVICE}\nbuild it with: cd desktop && go build -o build/bin/reasonix-desktop-service .`);
+  console.error("desktop service binary not found; check REASONIX_DESKTOP_SERVICE or build it with: cd desktop && go build -o build/bin/reasonix-desktop-service .");
   process.exit(1);
 }
 if (dev) {

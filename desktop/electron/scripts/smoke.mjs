@@ -124,7 +124,7 @@ try {
   check("no crash overlay is showing", !errors);
 
   const tab = await page.evaluate(() => window.reasonixDesktop.browser.open("example.com", { temporary: true }));
-  check("browser opens a website view", typeof tab.id === "string" && tab.url.startsWith("https://example.com"), `${tab.id} ${tab.url}`);
+  check("browser opens a website view", typeof tab.id === "string" && new URL(tab.url).origin === "https://example.com", `${tab.id} ${tab.url}`);
   const title = await page.evaluate(async (tabId) => {
     for (let attempt = 0; attempt < 50; attempt += 1) {
       const tabs = await window.reasonixDesktop.browser.list();

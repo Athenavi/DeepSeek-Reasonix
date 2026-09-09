@@ -6,7 +6,7 @@
 //
 // usage: node desktop/packaging/package.mjs <os/arch> <version> [channel]
 import { defaultSanitizePackageJson, packager } from "@electron/packager";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -18,6 +18,7 @@ import {
   parseTarget,
   PRODUCT,
   readProductIdentity,
+  runBuildScript,
   sanitizeShellPackageJson,
   signingFileList,
   versionTag,
@@ -46,18 +47,6 @@ function gitCommit() {
   }
 }
 
-function quote(arg) {
-  return /[\s"]/.test(arg) ? `"${arg.replace(/"/g, '\\"')}"` : arg;
-}
-
-function run(command, args, env = {}) {
-  const merged = { ...process.env, ...env };
-  const result = process.platform === "win32"
-    ? spawnSync([command, ...args].map(quote).join(" "), { stdio: "inherit", env: merged, shell: true })
-    : spawnSync(command, args, { stdio: "inherit", env: merged });
-  if (result.status !== 0) throw new Error(`${command} ${args.join(" ")} exited with ${result.status ?? result.signal}`);
-}
-
 function require(path, what) {
   if (!existsSync(path)) throw new Error(`${what} is missing: ${path}`);
 }
@@ -67,12 +56,12 @@ if (process.env.REASONIX_PACKAGE_REUSE_FRONTEND === "1" && existsSync(join(front
   console.log(`==> reusing ${frontendDist}`);
 } else {
   console.log(`==> frontend build:electron (channel ${channel})`);
-  run("pnpm", ["--dir", join(desktop, "frontend"), "build:electron"], { REASONIX_CHANNEL: channel });
+  runBuildScript(join(desktop, "frontend"), "build-for-shell.mjs", ["electron"], { REASONIX_CHANNEL: channel });
 }
 require(join(frontendDist, "index.html"), "frontend dist");
 
 console.log("==> shell build");
-run("pnpm", ["--dir", join(desktop, "electron"), "build"]);
+runBuildScript(join(desktop, "electron"), "build.mjs");
 const shellDist = join(desktop, "electron", "dist");
 for (const name of ["main.cjs", "preload.cjs"]) require(join(shellDist, name), "shell bundle");
 if (!existsSync(join(shellDist, "desktopContract.json")) && process.env.REASONIX_ELECTRON_ALLOW_MISSING_CONTRACT !== "1") {

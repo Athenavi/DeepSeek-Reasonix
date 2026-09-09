@@ -84,6 +84,15 @@ ok(
   "Workspace dock owns the lazy browser panel import without an eager runtime edge",
 );
 ok(
+  lazyRuntimeImport("../lib/controllerEventRecovery.ts", "./controllerEventRecoveryWorker"),
+  "Recovery worker stays behind the synchronous resync listener without an eager runtime edge",
+);
+ok(
+  lazyRuntimeImport("../lib/useController.ts", "./controllerSwitchNotices") &&
+    !readFileSync(resolve(here, "../lib/bridge.ts"), "utf8").includes('from "./forkWorktree"'),
+  "Fork actions load with message actions while the bridge imports only their mock implementation",
+);
+ok(
   settingsEntrySource.includes('import "./CompactRatioSettings.css"') &&
     settingsEntrySource.includes('from "./SettingsPanel"') &&
     !settingsSource.includes('import "./CompactRatioSettings.css"'),

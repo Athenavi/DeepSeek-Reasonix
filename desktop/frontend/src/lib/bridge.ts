@@ -12,7 +12,7 @@ import { makeMockTaskCatalogBindings, type TaskCatalogBindings } from "./taskCat
 import { makeMockBlankProjectBindings, type BlankProjectBindings } from "./blankProjectBridge";
 import { makeMockQualityFloorBindings, type QualityFloorBindings } from "./deliveryFloorBridge";
 import { t } from "./i18n";
-import { makeMockForkBindings } from "./forkWorktree";
+import { makeMockForkBindings } from "./mockForkWorktree";
 import { makeMockWorktreeMergeBindings } from "./worktreeMergeMock";
 import { providerIsConfigured, providerRequiresKey, removeProviderAccessesForMock } from "./providerModels";
 import { DEFAULT_STATUS_BAR_ITEMS } from "./statusBarItems";

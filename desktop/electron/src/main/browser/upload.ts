@@ -5,6 +5,15 @@ import { REGISTRY_KEY } from "./snapshot.js";
 
 const OBJECT_GROUP = "reasonix-upload";
 
+// The executable source is fixed. Snapshot metadata crosses the CDP boundary
+// only as call arguments, never as JavaScript source text.
+const FIND_UPLOAD_NODE = `function (key, docId, snapshotId, ref) {
+  const registry = globalThis[key];
+  if (!registry || registry.docId !== docId || registry.snapshotId !== snapshotId) return null;
+  const element = registry.refs.get(ref);
+  return element && element.isConnected && element.tagName === 'INPUT' && element.type === 'file' ? element : null;
+}`;
+
 interface ExecutionContext {
   id: number;
   auxData?: { isDefault?: boolean; frameId?: string };
@@ -37,12 +46,12 @@ async function executionContexts(dbg: GuestDebugger): Promise<ExecutionContext[]
 // main frame's isolated world. A CSS path would silently select a replacement
 // input after a rerender or a navigation.
 async function findObjectId(dbg: GuestDebugger, located: LocatedRef): Promise<string | null> {
-  const lookup = `(() => { const r = window[${JSON.stringify(REGISTRY_KEY)}]; if (!r || r.docId !== ${JSON.stringify(located.binding.docId)} || r.snapshotId !== ${JSON.stringify(located.snapshotId)}) return null; const e = r.refs.get(${JSON.stringify(located.ref)}); return e && e.isConnected && e.tagName === 'INPUT' && e.type === 'file' ? e : null; })()`;
+  const args = [REGISTRY_KEY, located.binding.docId, located.snapshotId, located.ref].map((value) => ({ value }));
   try {
     for (const context of await executionContexts(dbg)) {
       if (located.isMainFrame && context.auxData?.isDefault) continue;
       try {
-        const objectId = objectIdOf(await dbg.sendCommand("Runtime.evaluate", { expression: lookup, contextId: context.id, objectGroup: OBJECT_GROUP }));
+        const objectId = objectIdOf(await dbg.sendCommand("Runtime.callFunctionOn", { functionDeclaration: FIND_UPLOAD_NODE, executionContextId: context.id, arguments: args, objectGroup: OBJECT_GROUP }));
         if (objectId) return objectId;
       } catch {
         // A context that vanished mid-walk is simply not the one we want.

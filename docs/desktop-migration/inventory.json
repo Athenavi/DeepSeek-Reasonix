@@ -1,5 +1,5 @@
 {
-  "baseline": "7717f3eeab47f66560ea85cc7dbe27426c3adf47",
+  "baseline": "fa018e4109268c912063c8cc619302fccdb57d74",
   "entries": [
     {
       "kind": "command",
@@ -4833,7 +4833,7 @@
     {
       "kind": "frontend-event",
       "name": "desktop:resync",
-      "location": "desktop/frontend/src/lib/controllerEventRecovery.ts:27",
+      "location": "desktop/frontend/src/lib/controllerEventRecovery.ts:32",
       "class": "keep-business",
       "owner": "desktopHost().events.on, same payload"
     },

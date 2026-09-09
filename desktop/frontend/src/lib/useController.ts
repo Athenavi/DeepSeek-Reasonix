@@ -14,7 +14,6 @@ import { metaFromTab } from "./controllerTabMeta";
 export { metaFromTab } from "./controllerTabMeta";
 import { invalidateCache } from "./composerHistory";
 import { formatInboxCancelError } from "./inboxError";
-import { settleForkConversationForTab } from "./forkWorktree";
 import type { MessageActionScope, MessageActionState } from "./messageActions";
 import { mergeRateBand, type AggregatedRateBand } from "./costRateBand";
 import { requestSessionCancel, type CancelOutcome } from "./inboxCancel";
@@ -4533,7 +4532,7 @@ export function useController() {
     const forkNavigationSeq = activeNavigationSeqRef.current;
     await waitForTabReady(sourceTabId);
     const actionScope = (["fork", "fork-worktree", "summ-from", "summ-upto", "conversation", "code", "both"].includes(scope) ? scope : "both") as MessageActionScope;
-    const { messageActionBusyText } = await import("./controllerSwitchNotices");
+    const { messageActionBusyText, settleForkConversationForTab } = await import("./controllerSwitchNotices");
     dispatchTo(sourceTabId, { type: "message_action_start", action: { turn, scope: actionScope } });
     dispatchTo(sourceTabId, { type: "local_notice", level: "info", text: messageActionBusyText(actionScope) });
     try {

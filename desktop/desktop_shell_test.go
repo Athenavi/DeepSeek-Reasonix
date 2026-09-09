@@ -6,11 +6,11 @@ import (
 	"time"
 )
 
-func TestDesktopPresentPlanUsesGtkPresentOnlyOnLinux(t *testing.T) {
-	if got, want := desktopPresentPlanFor("linux", true), []desktopPresentAction{desktopPresentUnminimise}; !reflect.DeepEqual(got, want) {
+func TestDesktopPresentPlanShowsHiddenElectronWindowOnLinux(t *testing.T) {
+	if got, want := desktopPresentPlanFor("linux", true), []desktopPresentAction{desktopPresentMaximise, desktopPresentWindowShow}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("linux present actions = %v, want %v", got, want)
 	}
-	if got, want := desktopPresentPlanFor("linux", false), []desktopPresentAction{desktopPresentUnminimise}; !reflect.DeepEqual(got, want) {
+	if got, want := desktopPresentPlanFor("linux", false), []desktopPresentAction{desktopPresentWindowShow, desktopPresentUnminimise}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("linux normal present actions = %v, want %v", got, want)
 	}
 }

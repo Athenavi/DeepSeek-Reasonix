@@ -53,3 +53,24 @@ func TestShellFileRules(t *testing.T) {
 		}
 	}
 }
+
+func TestInventoryWithoutGit(t *testing.T) {
+	// Source archives and shallow CI checkouts must render the same frozen
+	// baseline as a developer checkout, without depending on available refs.
+	t.Setenv("PATH", t.TempDir())
+	inv, err := build(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, got, err := render(inv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := os.ReadFile(filepath.Join("..", "..", "docs", "desktop-migration", "inventory.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatal("inventory depends on local Git availability")
+	}
+}

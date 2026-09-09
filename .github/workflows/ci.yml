@@ -376,7 +376,9 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: ${{ needs.desktop-prepare.outputs.artifact_name }}
-          path: desktop/frontend
+          path: desktop/frontend/dist
+      - name: Verify frontend artifact layout
+        run: test -f frontend/dist/index.html
       - name: Verify CI test coverage and runner
         run: node --test frontend/scripts/ci-test-plan.test.mjs
       - name: Check the Electron shell
@@ -411,7 +413,9 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: ${{ needs.desktop-prepare.outputs.artifact_name }}
-          path: desktop/frontend
+          path: desktop/frontend/dist
+      - name: Verify frontend artifact layout
+        run: test -f frontend/dist/index.html
       - name: Install browser runtimes
         run: PLAYWRIGHT_BROWSERS_PATH=.pw-browsers pnpm --dir frontend exec playwright install --with-deps chromium webkit
       - name: Test desktop browser contracts
@@ -522,7 +526,9 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: ${{ needs.desktop-prepare.outputs.artifact_name }}
-          path: desktop/frontend
+          path: desktop/frontend/dist
+      - name: Verify frontend artifact layout
+        run: test -f frontend/dist/index.html
       - run: pnpm --dir frontend install --frozen-lockfile
 
       - name: vet

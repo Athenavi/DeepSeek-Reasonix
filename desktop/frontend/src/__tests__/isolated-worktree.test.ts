@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { messageActionLabelKey } from "../lib/messageActions";
+import type { TabMeta } from "../lib/types";
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const source = (path: string) => readFileSync(resolve(dir, path), "utf8");
@@ -78,6 +79,28 @@ ok(fencedNavigationCalls.every(([startMarker, callMarker]) => {
   return start >= 0 && fence > start && call > fence;
 }), "navigation entry points await backend intent registration before switching");
 ok(/navigationIntentRegistrationTail\.then/.test(navigationFence) && /navigationIntentRegistrationTail = registered/.test(navigationFence), "navigation registrations preserve user-intent order across deferred bridge calls and remounts");
+
+const { makeMockForkBindings } = await import("../lib/mockForkWorktree");
+const { settleForkConversationForTab } = await import("../lib/controllerSwitchNotices");
+const original = { id: "source", active: true, workspaceRoot: "/project", topicTitle: "Source" } as TabMeta;
+let mockTabs = [original];
+const mockFork = makeMockForkBindings(() => mockTabs, tabs => { mockTabs = tabs; }, "Untitled");
+const isolated = await mockFork.ForkWorktreeForTab(original.id, 3);
+ok(isolated.isolated && isolated.tab.workspaceRoot === "/project-worktree" && mockTabs[0].active === false,
+  "separate mock bindings retain isolated-worktree and activation behavior");
+const forkCalls: string[] = [];
+const bindings = {
+  ForkForTab: async (id: string, turn: number) => { forkCalls.push(`shared:${id}:${turn}`); return isolated.tab; },
+  ForkWorktreeForTab: async (id: string, turn: number) => { forkCalls.push(`isolated:${id}:${turn}`); return { ...isolated, sourceDirty: true }; },
+};
+const adopt = async () => { forkCalls.push("adopt"); };
+const sync = async () => { forkCalls.push("sync"); };
+const notice = () => { forkCalls.push("notice"); };
+const sharedResult = await settleForkConversationForTab(bindings, original.id, 4, false, notice, adopt, sync);
+ok(sharedResult.ok && forkCalls.join(",") === "shared:source:4,adopt", "lazy action entry retains exact shared-fork arguments and adoption");
+forkCalls.length = 0;
+const dirtyResult = await settleForkConversationForTab(bindings, original.id, 5, true, notice, adopt, sync);
+ok(!dirtyResult.ok && forkCalls.join(",") === "isolated:source:5,notice,sync", "lazy action entry preserves dirty-worktree refusal without adoption");
 
 if (failed) process.exit(1);
 console.log("isolated worktree tests passed");

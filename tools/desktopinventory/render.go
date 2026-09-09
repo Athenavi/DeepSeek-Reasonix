@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"strings"
 )
 
@@ -27,8 +26,14 @@ var kindTitle = map[string]string{
 	kindCIJob:          "CI and release jobs",
 }
 
+// migrationBaseline is the deliberately frozen main-v2 checkpoint. Do not
+// derive it from checkout refs: shallow CI clones and synthetic PR merge
+// commits have different histories despite containing identical source files.
+// Advance this checkpoint explicitly when integrating another mainline baseline.
+const migrationBaseline = "fa018e4109268c912063c8cc619302fccdb57d74"
+
 func build(root string) (*inventory, error) {
-	inv := &inventory{Baseline: baselineSHA(root)}
+	inv := &inventory{Baseline: migrationBaseline}
 	if err := scanGo(root, inv); err != nil {
 		return nil, err
 	}
@@ -40,18 +45,6 @@ func build(root string) (*inventory, error) {
 	}
 	inv.Entries = inv.sorted()
 	return inv, nil
-}
-
-// baselineSHA records the frozen main-v2 merge base so the inventory names
-// the exact code it describes; a detached checkout falls back to HEAD.
-func baselineSHA(root string) string {
-	for _, ref := range []string{"origin/main-v2", "HEAD"} {
-		out, err := exec.Command("git", "-C", root, "merge-base", "HEAD", ref).Output()
-		if err == nil {
-			return strings.TrimSpace(string(out))
-		}
-	}
-	return "unknown"
 }
 
 func render(inv *inventory) (markdown, jsonOut []byte, err error) {

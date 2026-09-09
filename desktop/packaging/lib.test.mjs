@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
@@ -16,6 +16,7 @@ import {
   PRODUCT,
   readProductIdentity,
   requiredMembers,
+  runBuildScript,
   sanitizeShellPackageJson,
   shellIgnore,
   signingFileList,
@@ -26,6 +27,27 @@ import {
 const desktop = dirname(dirname(fileURLToPath(import.meta.url)));
 const read = (path) => readFileSync(join(desktop, path), "utf8");
 const identity = { projectName: "reasonix-desktop", companyName: "Reasonix", productName: "Reasonix", copyright: "Copyright © 2026 Reasonix Contributors" };
+
+test("build scripts preserve paths, arguments and environment without shell encoding", (t) => {
+  const directory = mkdtempSync(join(tmpdir(), "reasonix build & 中文 "));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  mkdirSync(join(directory, "scripts"));
+  const output = join(directory, "result.json");
+  writeFileSync(join(directory, "scripts", "fixture.mjs"), `
+    import { writeFileSync } from "node:fs";
+    writeFileSync(process.env.REASONIX_BUILD_TEST_OUTPUT, JSON.stringify({
+      args: process.argv.slice(2), cwd: process.cwd(), channel: process.env.REASONIX_CHANNEL,
+    }));
+  `);
+  const args = ["", "a b", 'a"b', "C:\\build path\\", 'C:\\path\\"quoted"\\', "a&b|c<d>e^f%PATH%!x!", "$(echo unwanted)", "中文"];
+  runBuildScript(directory, "fixture.mjs", args, { REASONIX_CHANNEL: "preview", REASONIX_BUILD_TEST_OUTPUT: output });
+  const actual = JSON.parse(readFileSync(output, "utf8"));
+  assert.deepEqual(actual.args, args);
+  assert.equal(actual.channel, "preview");
+  assert.equal(readFileSync(join(actual.cwd, "result.json"), "utf8"), readFileSync(output, "utf8"));
+  writeFileSync(join(directory, "scripts", "failure.mjs"), "process.exit(17);\n");
+  assert.throws(() => runBuildScript(directory, "failure.mjs"), /failure\.mjs exited with 17/);
+});
 
 test("targets map Go platform names onto packager platform and arch", () => {
   assert.deepEqual(parseTarget("darwin/universal"), { os: "darwin", arch: "universal", packagerPlatform: "darwin", packagerArch: "universal", spec: "darwin/universal", key: "darwin-universal" });

@@ -5,6 +5,8 @@ package instanceidentity
 import (
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"sync"
 
 	"golang.org/x/sys/windows"
@@ -56,7 +58,11 @@ func ListenEndpoint(id string) (func(), error) {
 				mu.Unlock()
 				return false
 			}
-			windows.ResetEvent(event)
+			if err := windows.ResetEvent(event); err != nil {
+				mu.Unlock()
+				slog.Warn("desktop identity endpoint: reset completion event", "err", err)
+				return false
+			}
 			ov := windows.Overlapped{HEvent: event}
 			err := call(&ov)
 			mu.Unlock()
@@ -71,7 +77,10 @@ func ListenEndpoint(id string) (func(), error) {
 			// The client acknowledges only after querying its server PID, so the
 			// connection remains bound during identity inspection.
 			submit(func(ov *windows.Overlapped) error { return windows.ReadFile(pipe, buf[:], &read, ov) })
-			windows.DisconnectNamedPipe(pipe)
+			if err := windows.DisconnectNamedPipe(pipe); err != nil && !errors.Is(err, windows.ERROR_PIPE_NOT_CONNECTED) {
+				slog.Warn("desktop identity endpoint: disconnect client", "err", err)
+				return
+			}
 		}
 	}()
 	var once sync.Once
@@ -79,7 +88,12 @@ func ListenEndpoint(id string) (func(), error) {
 		once.Do(func() {
 			mu.Lock()
 			stopped = true
-			windows.CancelIoEx(pipe, nil)
+			// No pending I/O is normal between submissions. On any other
+			// failure, retain the handles and OVERLAPPED until the worker
+			// finishes; cancellation failure cannot prove I/O completion.
+			if err := windows.CancelIoEx(pipe, nil); err != nil && !errors.Is(err, windows.ERROR_NOT_FOUND) {
+				slog.Warn("desktop identity endpoint: cancel pending I/O", "err", err)
+			}
 			mu.Unlock()
 			<-done
 			windows.CloseHandle(pipe)
@@ -122,8 +136,11 @@ func EndpointImage(id string) (string, error) {
 		return "", fmt.Errorf("desktop endpoint process exited")
 	}
 	var written uint32
-	if err := windows.WriteFile(pipe, []byte{1}, &written, nil); err != nil || written != 1 {
-		return "", fmt.Errorf("desktop endpoint closed during inspection: %v", err)
+	if err := windows.WriteFile(pipe, []byte{1}, &written, nil); err != nil {
+		return "", fmt.Errorf("desktop endpoint closed during inspection: %w", err)
+	}
+	if written != 1 {
+		return "", fmt.Errorf("desktop endpoint acknowledgement: %w", io.ErrShortWrite)
 	}
 	return windows.UTF16ToString(buffer[:size]), nil
 }

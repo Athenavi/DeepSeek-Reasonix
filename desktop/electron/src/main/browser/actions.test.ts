@@ -182,11 +182,11 @@ test("upload validates files and sets them through the DevTools protocol", async
   assert.match((await s.actions.act(s.tab, s.request({ action: "upload", files: ["/tmp/missing.bin"] }), s.verify)).reason ?? "", /not found/);
   s.page.debugger.respond = (method) => {
     if (method === "Runtime.enable") s.page.debugger.emit("Runtime.executionContextCreated", { context: { id: 9, auxData: { isDefault: false } } });
-    return method === "Runtime.evaluate" ? { result: { objectId: "obj-9" } } : {};
+    return method === "Runtime.callFunctionOn" ? { result: { objectId: "obj-9" } } : {};
   };
   const result = await s.actions.act(s.tab, s.request({ action: "upload", files: ["/tmp/a.txt"] }), s.verify);
   assert.deepEqual(result, { executed: true, documentToken: "tok-2" });
-  assert.deepEqual(s.page.debugger.commands.map((command) => command.method), ["Runtime.enable", "Runtime.evaluate", "Runtime.disable", "DOM.setFileInputFiles", "Runtime.releaseObjectGroup"]);
+  assert.deepEqual(s.page.debugger.commands.map((command) => command.method), ["Runtime.enable", "Runtime.callFunctionOn", "Runtime.disable", "DOM.setFileInputFiles", "Runtime.releaseObjectGroup"]);
   assert.deepEqual(s.page.debugger.commands[3].params, { objectId: "obj-9", files: ["/tmp/a.txt"] });
   assert.equal(s.page.debugger.attached, false, "the debugger is detached afterwards");
   s.answers.locate = { ok: true, tag: "input", type: "text", path: "html" };
@@ -220,7 +220,7 @@ test("upload verifies takeover and grant after CDP lookup, before attaching file
     const s = await setup();
     s.page.debugger.respond = (method) => {
       if (method === "Runtime.enable") s.page.debugger.emit("Runtime.executionContextCreated", { context: { id: 9, auxData: { isDefault: false } } });
-      if (method === "Runtime.evaluate") {
+      if (method === "Runtime.callFunctionOn") {
         if (invalidate === "takeover") s.manager.takeover(s.tab.id, "user");
         if (invalidate === "revoke") s.revoke();
         if (invalidate === "navigation") s.view.fire().onNavigate("https://other.test", false);

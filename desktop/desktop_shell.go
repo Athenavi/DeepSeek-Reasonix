@@ -216,13 +216,10 @@ const (
 	desktopPresentUnminimise
 )
 
-// desktopPresentPlanFor deliberately emits only the unminimise/present action
-// on Linux. Preceding it with a show breaks maximised -> minimised restoration
-// on GNOME (#7552); the shell's unminimise maps to gtk_window_present.
+// Electron's restore only unminimises a window; unlike the retired GTK
+// gtk_window_present path it does not present a hidden Linux window. Every
+// platform must explicitly show it, preserving maximised state when requested.
 func desktopPresentPlanFor(goos string, wasMaximised bool) []desktopPresentAction {
-	if goos == "linux" {
-		return []desktopPresentAction{desktopPresentUnminimise}
-	}
 	actions := make([]desktopPresentAction, 0, 3)
 	if goos == "darwin" {
 		actions = append(actions, desktopPresentApplicationShow)
