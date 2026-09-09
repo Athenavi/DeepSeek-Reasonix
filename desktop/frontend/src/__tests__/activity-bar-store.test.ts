@@ -59,7 +59,7 @@ check("openEntry switches back to the reused tab", useActivityBarStore.getState(
 resetStore();
 useActivityBarStore.getState().openEntry("file", "Files");
 useActivityBarStore.getState().openEntry("changed", "Changes");
-useActivityBarStore.getState().openEntry("terminal", "Terminal");
+useActivityBarStore.getState().openEntry("browser", "Browser");
 const ids = useActivityBarStore.getState().tabs.map((tab) => tab.id);
 check("opening a tab expands the container", useActivityBarStore.getState().activityBarOpen === true, "expected expanded");
 // Closing a non-active tab leaves the active tab untouched.
@@ -105,7 +105,6 @@ resetStore();
 useActivityBarStore.getState().addTab("file", "a.ts", { path: "/a.ts" });
 const fileA = useActivityBarStore.getState().tabs[0].id;
 useActivityBarStore.getState().addTab("file", "b.ts", { path: "/b.ts" });
-const fileB = useActivityBarStore.getState().tabs[1].id;
 useActivityBarStore.getState().activateTab(fileA);
 useActivityBarStore.getState().updateTab(fileA, "c.ts", { path: "/c.ts" });
 check("updateTab rewrites label", useActivityBarStore.getState().tabs[0].label === "c.ts", "label mismatch");
@@ -114,10 +113,10 @@ check("updateTab leaves the other tab untouched", useActivityBarStore.getState()
 check("updateTab keeps the active tab", useActivityBarStore.getState().activeTabId === fileA, "activeTabId changed");
 check("updateTab adds no tabs", useActivityBarStore.getState().tabs.length === 2, "expected still 2 tabs");
 check("updateTab persists", JSON.parse(localStorage.getItem("reasonix.dock.tabs") ?? "{}").tabs[0].meta?.path === "/c.ts", "not persisted");
-check("updateTab with empty meta clears the path", () => {
-  useActivityBarStore.getState().updateTab(fileA, "files", {});
-  return useActivityBarStore.getState().tabs[0].meta?.path === undefined && useActivityBarStore.getState().tabs.length === 2;
-}, "path not cleared");
+useActivityBarStore.getState().updateTab(fileA, "files", {});
+check("updateTab with empty meta clears the path",
+  useActivityBarStore.getState().tabs[0].meta?.path === undefined && useActivityBarStore.getState().tabs.length === 2,
+  "path not cleared");
 
 // --- fresh tab ids never collide with restored/persisted ones ---
 // New tabs must always receive a unique id (React key uniqueness relies on
