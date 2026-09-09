@@ -389,12 +389,21 @@ func (a *App) ensureRemoteModelSettings(tabID string) (string, error) {
 				// The Serve predates the model-settings protocol, so no snapshot
 				// can ever apply in this generation. Admit the turn without a
 				// revision instead of failing every send against a reused Serve
-				// that credential mode itself still supports.
+				// that credential mode itself still supports — but only when the
+				// verdict was recorded on the connection the probe ran against.
 				a.remoteTabMu.Lock()
-				if current := a.remoteTabs[tabID]; current == tab && current.gen == generation && current.routing.currentPath == path {
+				current := a.remoteTabs[tabID]
+				recorded := current == tab && current.gen == generation && current.routing.currentPath == path
+				if recorded {
 					current.settings.unsupportedGen = generation
 				}
 				a.remoteTabMu.Unlock()
+				if !recorded {
+					// A reconnect replaced the probe's target mid-flight; the
+					// replacement Serve may speak the protocol, so re-probe it
+					// instead of admitting against the retired fence.
+					continue
+				}
 				return "", nil
 			}
 			a.remoteTabMu.Lock()

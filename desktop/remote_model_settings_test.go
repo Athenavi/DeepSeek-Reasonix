@@ -484,3 +484,70 @@ func TestEnsureRemoteModelSettingsAdmitsLegacyServeTurns(t *testing.T) {
 		t.Fatalf("new generation did not re-probe the protocol: revision=%q err=%v switches=%d", revision, err, kernel.switches)
 	}
 }
+
+type reconnectingUnsupportedKernel struct {
+	remoteKernel
+	switches  int
+	reconnect func()
+}
+
+func (k *reconnectingUnsupportedKernel) SwitchCredentialProxyModel(context.Context, string, string, string, string, string) error {
+	k.switches++
+	if k.reconnect != nil {
+		reconnect := k.reconnect
+		k.reconnect = nil
+		reconnect()
+	}
+	return &remoteModelSettingsRejection{message: remoteModelSettingsUpgradeHint, unsupported: true}
+}
+
+// A reconnect that replaces the probe target mid-flight must not admit against
+// the retired fence: the replacement Serve may speak the protocol, so the
+// unsupported verdict is only remembered when the probed connection is still
+// current, and a replaced generation is re-probed instead.
+func TestEnsureRemoteModelSettingsReprobesReplacedConnection(t *testing.T) {
+	isolateDesktopUserDirs(t)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer upstream.Close()
+	app := NewApp()
+	defer app.closeCredentialProxy()
+	view := ProviderView{Name: "legacy", Kind: "openai", BaseURL: upstream.URL, Models: []string{"m"}, NoProxy: true}
+	if _, err := app.SaveProviderWithKey(view, "legacy-key"); err != nil {
+		t.Fatal(err)
+	}
+	if err := editUserConfig(func(c *config.Config) error {
+		return c.UpsertRemoteHost(config.RemoteHostEntry{Name: "legacy-host", Host: "127.0.0.1", CredentialMode: "local-proxy"})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	tab := &remoteTab{
+		id: "legacy-tab", ref: RemoteTabRef{HostID: "legacy-host", Workspace: "ws"},
+		state: "ready", client: &http.Client{}, model: "legacy/m", gen: 1,
+		routing: remoteTabSessionRouting{currentPath: "/proj/session"},
+	}
+	app.remoteTabs = map[string]*remoteTab{tab.id: tab}
+	kernel := &reconnectingUnsupportedKernel{reconnect: func() {
+		app.remoteTabMu.Lock()
+		tab.gen++
+		app.remoteTabMu.Unlock()
+	}}
+	app.remoteMu.Lock()
+	app.remoteRuntime = kernel
+	app.remoteMu.Unlock()
+
+	revision, err := app.ensureRemoteModelSettings(tab.id)
+	if err != nil || revision != "" {
+		t.Fatalf("replaced connection admission failed: revision=%q err=%v", revision, err)
+	}
+	if kernel.switches != 2 {
+		t.Fatalf("expected the replacement generation to be re-probed, switches=%d", kernel.switches)
+	}
+	app.remoteTabMu.Lock()
+	recorded := tab.settings.unsupportedGen == 2
+	app.remoteTabMu.Unlock()
+	if !recorded {
+		t.Fatalf("verdict was not recorded on the current generation: unsupportedGen=%d gen=%d", tab.settings.unsupportedGen, tab.gen)
+	}
+}
