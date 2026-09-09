@@ -39,6 +39,9 @@ export interface ReasonixDesktopHost {
       minimise(): void;
       toggleMaximise(): void;
       close(): void;
+      getAppZoom(): Promise<number>;
+      setAppZoom(factor: number): Promise<number>;
+      resetAppZoom(): Promise<number>;
     };
     getPathForFile(file: File): string;
     onServiceState(cb: (state: ServiceState) => void): () => void;
@@ -63,6 +66,9 @@ export interface DesktopHost {
     setWindowTheme(theme: WindowTheme): void;
     setWindowBackground(r: number, g: number, b: number, a: number): void;
     getWindowBounds(): Promise<WindowBounds> | undefined;
+    getAppZoom(): Promise<number>;
+    setAppZoom(factor: number): Promise<number>;
+    resetAppZoom(): Promise<number>;
     onFilesDropped(cb: (paths: string[]) => void): () => void;
     getPathForFile?(file: File): string;
     onServiceState(cb: (state: ServiceState) => void): () => void;
@@ -97,6 +103,9 @@ const serverHost: DesktopHost = {
     getWindowBounds: () => undefined,
     onFilesDropped: () => noop,
     onServiceState: () => noop,
+    getAppZoom: async () => 1,
+    setAppZoom: async () => 1,
+    resetAppZoom: async () => 1,
   },
 };
 
@@ -150,6 +159,9 @@ const electronHostFrom = (host: ReasonixDesktopHost): DesktopHost => {
       setWindowTheme: (theme) => host.native.window.setTheme(theme),
       setWindowBackground: (r, g, b, a) => host.native.window.setBackgroundColour(r, g, b, a),
       getWindowBounds: () => host.native.window.getBounds(),
+      getAppZoom: () => host.native.window.getAppZoom(),
+      setAppZoom: (factor) => host.native.window.setAppZoom(factor),
+      resetAppZoom: () => host.native.window.resetAppZoom(),
       onFilesDropped: (cb) => {
         installElectronDropHandlers();
         dropListeners.add(cb);

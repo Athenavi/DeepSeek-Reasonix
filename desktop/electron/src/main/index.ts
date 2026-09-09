@@ -28,6 +28,7 @@ import { ServiceSupervisor } from "./service.js";
 import { claimShellInstance } from "./singleInstance.js";
 import { TrayHost } from "./tray.js";
 import { DEFAULT_GEOMETRY, MainWindow } from "./window.js";
+import { AppZoomStore } from "./zoomStore.js";
 
 const MAIN_WINDOW_PERMISSIONS = new Set(["clipboard-read", "clipboard-sanitized-write", "fullscreen", "notifications"]);
 const TAKEOVER_KINDS = new Set<string>(["mousedown", "keydown", "wheel", "touchstart", "pointerdown"]);
@@ -71,6 +72,7 @@ function bootstrap(dataHome: string): void {
   const distRoot = resolveDistRoot({ env: process.env, appPath: app.getAppPath(), resourcesPath: process.resourcesPath, packaged: app.isPackaged });
   const devURL = (process.env.REASONIX_ELECTRON_DEV_URL ?? "").trim();
   const appURL = devURL !== "" ? devURL : APP_INDEX_URL;
+  const zoomStore = new AppZoomStore(join(dataHome, "electron-app-zoom.json"), join(dataHome, "desktop-zoom.json"));
   const icons = iconCandidates({ platform: process.platform, appPath: app.getAppPath(), resourcesPath: process.resourcesPath, packaged: app.isPackaged });
   const windowIcon = process.platform === "darwin" ? undefined : (firstExisting(icons.window) ?? undefined);
   const serviceBinary = (process.env.REASONIX_DESKTOP_SERVICE ?? "").trim()
@@ -110,6 +112,7 @@ function bootstrap(dataHome: string): void {
       else if (action === "restart") void service.restart().catch(() => undefined);
       else lifecycle.approve();
     },
+    zoomStore,
   });
 
   const downloads = new DownloadTracker({
@@ -244,9 +247,17 @@ function bootstrap(dataHome: string): void {
           documents.clear();
         }
       },
-      onReady: (hello: HelloResult) => {
+      onReady: async (hello: HelloResult) => {
         log.info(`desktop service ready: generation ${hello.runtimeGeneration}, pid ${hello.service.pid}`);
-        if (!mainWindow.browserWindow) mainWindow.create(hello.window);
+        if (!mainWindow.browserWindow) {
+          try {
+            await zoomStore.load();
+            mainWindow.create(hello.window);
+          } catch (error) {
+            log.warn(`app zoom initialization failed: ${errorText(error)}`);
+            mainWindow.create(DEFAULT_GEOMETRY);
+          }
+        }
         // Reattach the surviving renderer after a service restart. Reloading
         // would destroy unsent composer drafts; desktop:resync repairs reads.
         if (!mainWindow.reattachApp()) void mainWindow.loadApp();
@@ -328,6 +339,9 @@ function bootstrap(dataHome: string): void {
       toggleDevTools: () => mainWindow.toggleDevTools(),
       showWindow: () => mainWindow.show("menu"),
       quit: () => lifecycle.requestQuit(),
+      zoomIn: () => { void mainWindow.stepAppZoom(1); },
+      zoomOut: () => { void mainWindow.stepAppZoom(-1); },
+      resetZoom: () => { void mainWindow.resetAppZoom(); },
     });
     log.info(`shell starting: service ${serviceBinary}, ui ${appURL}, dist ${distRoot}, home ${dataHome}`);
     return service.start().catch(() => undefined);
