@@ -238,7 +238,7 @@ func (a *App) openForkedSessionTabWithWorkspace(sourceTab *WorkspaceTab, newPath
 	if activateFork {
 		a.activeTabID = newTabID
 	}
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	meta := a.tabMeta(tab, activateFork)
 	a.mu.Unlock()
 

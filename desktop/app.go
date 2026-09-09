@@ -817,7 +817,7 @@ func (a *App) restoreOrBuildTabs() {
 				a.activeTabID = ordered[0]
 			}
 		}
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 		a.mu.Unlock()
 		for _, tab := range toBuild {
 			a.startTabControllerBuild(tab)
@@ -1277,7 +1277,7 @@ func (a *App) submitInitialGoalToLocalTab(
 	tab.toolApprovalMode = toolApprovalMode
 	tab.goal = goal
 	tab.mode = tabModeFromAxes(false, toolApprovalMode == control.ToolApprovalYolo)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 
 	ctrl.SetPlanMode(false)
@@ -1608,7 +1608,7 @@ func (a *App) ensureTabControllerWorkspace(tab *WorkspaceTab) error {
 			tab.sink = &tabEventSink{tabID: tab.ID, app: a, ctx: a.ctx}
 		}
 		hostKey = takeTabSharedHostKey(tab)
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	if hostKey != "" {
@@ -1807,7 +1807,7 @@ func (a *App) SetModeForTab(tabID, mode string) []string {
 	drained = append(drained, applyTabToolApprovalModeToController(ctrl, approvalMode)...)
 	a.mu.Lock()
 	if a.tabs[tabIDForSave] == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	return drained
@@ -1917,7 +1917,7 @@ func (a *App) SetComposerProfileForTab(tabID, collaborationMode, toolApprovalMod
 
 	a.mu.Lock()
 	if a.tabs[tabIDForSave] == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	if drained == nil {
@@ -1961,7 +1961,7 @@ func (a *App) SetCollaborationModeForTab(tabID, mode string) {
 	}
 	a.mu.Lock()
 	if a.tabs[tabIDForSave] == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 }
@@ -2087,7 +2087,7 @@ func (a *App) assignFreshSessionTopic(tab *WorkspaceTab) {
 	tab.TopicTitle = defaultTopicTitle
 	tab.topicTitleSource = topicTitleSourceAuto
 	if current := a.tabs[tab.ID]; current == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	if strings.TrimSpace(scope) == "global" {
@@ -2118,7 +2118,7 @@ func (a *App) ensureTabTopicIndexedForUserTurn(tab *WorkspaceTab) {
 	tab.TopicTitle = defaultTopicTitle
 	tab.topicTitleSource = topicTitleSourceAuto
 	if current := a.tabs[tab.ID]; current == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	if strings.TrimSpace(scope) == "global" {
@@ -2274,7 +2274,7 @@ func (a *App) clearActiveSessionRuntime(tab *WorkspaceTab, oldCtrl control.Sessi
 	// was just destroyed, and finishing later would pass the generation
 	// check and overwrite this controller.
 	a.supersedeTabBuildLocked(tab)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 	// Same contract as ClearSession's non-running path: the replacement
 	// session starts with zero spend.
@@ -3087,7 +3087,7 @@ func (a *App) removeSessionRuntimeBindings(dir, sessionPath string) ([]removedSe
 	dir, entries, activeID, version := a.saveTabsCollectLocked()
 	a.mu.Unlock()
 
-	a.saveTabsWrite(dir, entries, activeID, version)
+	_ = a.saveTabsWrite(dir, entries, activeID, version)
 
 	return removed, fallback
 }
@@ -3348,7 +3348,7 @@ func (a *App) openTransientBlankRuntime(scope, workspaceRoot string) error {
 	a.tabs[tab.ID] = tab
 	a.tabOrder = append(a.tabOrder, tab.ID)
 	a.activeTabID = tab.ID
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 
 	a.startTabControllerBuild(tab)
@@ -3957,7 +3957,7 @@ func (a *App) rebindTabToLoadedSessionPath(tab *WorkspaceTab, sessionPath string
 		a.newSessionRuntimeLocked(tab, transition.targetKey)
 	}
 	newEpoch := a.advanceSessionRuntimeEpochLocked(tab)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	candidate.ctrl = nil
 	candidate.sink = nil
 	committed = true
@@ -4057,7 +4057,7 @@ func (a *App) reattachDetachedSessionRuntimeForRebind(
 
 	delete(a.detachedSessions, key)
 	applyRuntimeTab(tab, detached, sessionPath, a.ctx, a)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	attachedCtrl := tab.Ctrl
 	attachedSink := tab.sink
 	attachedEpoch := a.runtimeEpochForTabLocked(tab)
@@ -4958,7 +4958,7 @@ func (a *App) RemoveWorkspace(dir string) error {
 				a.activeTabID = ordered[0]
 			}
 		}
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 		a.mu.Unlock()
 
 		for _, tab := range closeTabs {
@@ -6761,7 +6761,7 @@ func (a *App) SetGoalForTab(tabID, goal string) error {
 	}
 	a.mu.Lock()
 	if a.tabs[tabIDForSave] == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	return nil
@@ -6806,7 +6806,7 @@ func (a *App) ResumeGoalForTab(tabID string) bool {
 	a.mu.Lock()
 	if a.tabs[tab.ID] == tab {
 		tab.goal = strings.TrimSpace(ctrl.Goal())
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	return true
@@ -6869,7 +6869,7 @@ func (a *App) SetToolApprovalModeForTab(tabID, mode string) []string {
 	drained := applyTabToolApprovalModeToController(ctrl, mode)
 	a.mu.Lock()
 	if a.tabs[tabIDForSave] == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	return drained
@@ -9764,7 +9764,7 @@ func (a *App) SetModelForTab(tabID, name string) (retErr error) {
 	// Supersede any in-flight startup build: it would otherwise finish later,
 	// overwrite this controller, and release/steal the tab's session lease.
 	a.supersedeTabBuildLocked(tab)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 	if oldCtrl != nil {
 		oldCtrl.Close()
@@ -9872,7 +9872,7 @@ func (a *App) persistTabTokenMode(tab *WorkspaceTab) {
 		return
 	}
 	a.mu.Lock()
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 	_ = a.saveTabSessionMetaForCurrentSession(tab)
 }

@@ -65,7 +65,7 @@ func (a *App) discardPendingTabEffort(tab *WorkspaceTab) {
 	cleared := tab != nil && tab.pendingEffort != nil
 	if cleared {
 		tab.pendingEffort = nil
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	a.notifyEffortSelectionCleared(tab, cleared)
@@ -268,7 +268,13 @@ func (a *App) applySelectedEffortTurnLocked(tab *WorkspaceTab, selection *pendin
 	clearTabStartupError(tab)
 	tab.Ready = true
 	a.supersedeTabBuildLocked(tab)
-	a.saveTabsLocked()
+	if err := a.saveTabsLocked(); err != nil {
+		a.mu.Unlock()
+		if oldCtrl != nil {
+			oldCtrl.Close()
+		}
+		return fmt.Errorf("reasoning effort applied but could not persist tab settings: %w", err)
+	}
 	a.mu.Unlock()
 	if oldCtrl != nil {
 		oldCtrl.Close()

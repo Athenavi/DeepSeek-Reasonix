@@ -151,7 +151,7 @@ func (a *App) handleTabSessionTransition(tab *WorkspaceTab) func(control.Session
 		}
 		tab.SessionPath = canonicalTabSessionPath(info.TargetPath)
 		if a.tabs[tab.ID] == tab {
-			a.saveTabsLocked()
+			_ = a.saveTabsLocked()
 		}
 		a.mu.Unlock()
 		if oldLease != nil {

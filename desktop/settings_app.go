@@ -2007,7 +2007,7 @@ func (a *App) rebuildSettingTurnLockedWithModel(setting string, tab *WorkspaceTa
 	// Supersede any in-flight startup build: it would otherwise finish later,
 	// pass its generation check, and overwrite the controller just installed.
 	a.supersedeTabBuildLocked(tab)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 	// True subgraph rebuilds reuse the same controller pointer — never Close it.
 	if oldCtrl != nil && oldCtrl != ctrl {

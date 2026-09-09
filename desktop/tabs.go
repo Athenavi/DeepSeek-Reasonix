@@ -825,7 +825,7 @@ func (a *App) attachExistingSessionRuntimeCore(tab *WorkspaceTab, path string, w
 		delete(a.detachedSessions, key)
 		applyRuntimeTab(tab, detached, path, wailsCtx, a)
 		if current := a.tabs[tab.ID]; current == tab {
-			a.saveTabsLocked()
+			_ = a.saveTabsLocked()
 		}
 		attachedCtrl := tab.Ctrl
 		attachedSink := tab.sink
@@ -865,7 +865,7 @@ func (a *App) attachExistingSessionRuntimeCore(tab *WorkspaceTab, path string, w
 		a.activeTabID = tab.ID
 	}
 	applyRuntimeTab(tab, source, path, wailsCtx, a)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	attachedCtrl := tab.Ctrl
 	attachedSink := tab.sink
 	attachedEpoch := a.runtimeEpochForTabLocked(tab)
@@ -2228,7 +2228,7 @@ func (a *App) syncTabWorkspaceRootSpellings() {
 		changed = syncRuntimeWorkspaceRootSpelling(tab, projects) || changed
 	}
 	if changed {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	if changed {
@@ -2305,7 +2305,7 @@ func (a *App) openTopicTabWithActivation(scope, workspaceRoot, topicID, sessionP
 					a.activeTabID = tab.ID
 				}
 				meta := a.tabMeta(tab, tab.ID == a.activeTabID)
-				a.saveTabsLocked()
+				_ = a.saveTabsLocked()
 				a.mu.Unlock()
 				return enrichTabMeta(meta), nil
 			}
@@ -2319,7 +2319,7 @@ func (a *App) openTopicTabWithActivation(scope, workspaceRoot, topicID, sessionP
 			}
 			sameSession := targetKey == "" || sessionRuntimeKey(tab.currentSessionPath()) == targetKey
 			meta := a.tabMeta(tab, tab.ID == a.activeTabID)
-			a.saveTabsLocked()
+			_ = a.saveTabsLocked()
 			a.mu.Unlock()
 			if sameSession || a.skipContinuationRebind(tab, sessionPath) {
 				return enrichTabMeta(meta), nil
@@ -2372,7 +2372,7 @@ func (a *App) openTopicTabWithActivation(scope, workspaceRoot, topicID, sessionP
 	if activate {
 		a.activeTabID = tabID
 	}
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	meta := a.tabMeta(tab, tab.ID == a.activeTabID)
 	a.mu.Unlock()
 
@@ -2571,7 +2571,7 @@ func (a *App) ensureBlankTab(scope, workspaceRoot string) (TabMeta, error) {
 		}
 		a.activeTabID = reusable.ID
 		meta := a.tabMeta(reusable, true)
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 		a.mu.Unlock()
 		return enrichTabMeta(meta), nil
 	}
@@ -2638,7 +2638,7 @@ func (a *App) ensureBlankTab(scope, workspaceRoot string) (TabMeta, error) {
 			return TabMeta{}, err
 		}
 		created.SessionPath = prePath
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 		meta := a.tabMeta(created, true)
 		a.mu.Unlock()
 
@@ -2690,7 +2690,7 @@ func (a *App) ensureBlankTab(scope, workspaceRoot string) (TabMeta, error) {
 		return TabMeta{}, err
 	}
 	created.SessionPath = prePath
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	meta := a.tabMeta(created, true)
 	a.mu.Unlock()
 
@@ -2764,7 +2764,7 @@ func (a *App) alignReusableBlankTabModel(tab *WorkspaceTab, model string) error 
 	tab.Label = model
 	tab.Ready = false
 	clearTabStartupError(tab)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 	a.startTabControllerBuild(tab)
 	return nil
@@ -3046,7 +3046,7 @@ func (a *App) ReorderTabs(tabIDs []string) error {
 	a.tabOrder = next
 	dir, entries, activeID, version := a.saveTabsCollectLocked()
 	a.mu.Unlock()
-	a.saveTabsWrite(dir, entries, activeID, version)
+	_ = a.saveTabsWrite(dir, entries, activeID, version)
 	return nil
 }
 
@@ -3136,7 +3136,7 @@ func (a *App) closeTabRuntime(tabID string, allowDetach bool) error {
 			a.activeTabID = a.tabOrder[nextIndex]
 		}
 	}
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	// Snapshot the teardown targets while still holding the lock: the tab is
 	// no longer reachable from a.tabs after this section, but locked writers
 	// holding stale pointers (rememberTabSessionPath, applySessionBindingToTab)
@@ -3253,7 +3253,7 @@ func (a *App) keepOnlyVisibleTab(tabID string) (TabMeta, error) {
 			a.removeTabOrderLocked(id)
 		}
 		a.tabOrder = []string{tabID}
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 		meta := a.tabMeta(active, true)
 		a.mu.Unlock()
 
@@ -3721,7 +3721,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 	buildToolApprovalMode := tab.toolApprovalMode
 	buildGoal := tab.goal
 	buildSink := tab.sink
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 	buildRuntime := (tabRuntimeSnapshot{
 		tokenMode:        buildTokenMode,
@@ -4105,7 +4105,7 @@ func (a *App) applySessionBindingToTab(tab *WorkspaceTab, binding sessionBinding
 		tab.TopicTitle = topicTitle
 	}
 	if changed && current == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	sink := tab.sink
 	a.mu.Unlock()
@@ -7729,7 +7729,7 @@ func (a *App) rememberTabSessionPath(tab *WorkspaceTab, path string) {
 	a.mu.Lock()
 	if current := a.tabs[tab.ID]; current == tab {
 		tab.SessionPath = path
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	} else {
 		tab.SessionPath = path
 	}

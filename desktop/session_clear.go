@@ -111,7 +111,7 @@ func (a *App) clearTabGoal(tab *WorkspaceTab) {
 	a.mu.Lock()
 	tab.goal = ""
 	if current := a.tabs[tab.ID]; current == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 }
