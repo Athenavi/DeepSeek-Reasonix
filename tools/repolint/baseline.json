@@ -1207,7 +1207,7 @@
       "complexity": 53,
       "essay": 25,
       "file-size": 543,
-      "function-size": 180,
+      "function-size": 181,
       "struct-state": 9
     },
     "internal/provider/openai/openai_test.go": {
