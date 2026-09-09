@@ -107,6 +107,7 @@ export interface WireShellExecution {
 }
 
 export interface WireTool {
+  diagnostic?: import("./readStatus").OperationDiagnostic;
 	verifying?: boolean;
   id?: string;
   name: string;
