@@ -592,6 +592,8 @@ export function useAppSessionComposition(input: AppSessionCompositionInput) {
     creation: desktopLayoutStyle === "creation", visible: surfaceWorkspacePanelRenderable,
     closeOverlays: closeTransientOverlays, clearLiveWidth: setLiveWorkspacePanelRenderWidth,
     availableWidth: workspacePanelAvailableWidth, clampTreeWidth: rightDockTreeWidthClamp, setTreeWidth: setRightDockTreeWidth,
+    gridOpen: surfaceWorkspacePanelGridOpen,
+    t,
   });
   const { openRightDockMode } = workspacePanelCommands;
 

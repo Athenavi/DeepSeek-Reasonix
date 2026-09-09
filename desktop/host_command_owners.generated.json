@@ -2408,6 +2408,20 @@
       ]
     }
   },
+  "GitCreateBranch": {
+    "domain": "desktop/workspace_changes.go",
+    "owner": "App.GitCreateBranch",
+    "sources": [
+      "desktop/workspace_changes.go"
+    ],
+    "scope": {
+      "kind": "owner-inputs",
+      "resolver": "App.GitCreateBranch",
+      "inputs": [
+        "name"
+      ]
+    }
+  },
   "HeartbeatGenerateID": {
     "domain": "desktop/heartbeat.go",
     "owner": "App.HeartbeatGenerateID",

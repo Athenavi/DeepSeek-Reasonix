@@ -1,4 +1,4 @@
-import { lazy, useMemo, type CSSProperties } from "react";
+import { lazy, Suspense, useMemo, type CSSProperties } from "react";
 import { ShellExpandProvider } from "../lib/shellExpand";
 import { RemoteNavigationContext } from "../lib/remoteNavigationCommands";
 import { UpdaterProvider } from "../lib/useUpdater";
@@ -23,6 +23,7 @@ import { SidebarRegion } from "./SidebarRegion";
 import { TopicbarRegion } from "./TopicbarRegion";
 import { buildTopicbarView, TopicbarActionsStack } from "./TopicbarActionsStack";
 import { DockToggleButton } from "./DockToggleButton";
+import { LauncherToggleButton } from "./LauncherToggleButton";
 import { SessionStatusBanners } from "./SessionStatusBanners";
 import { ChatPaneRegion } from "./ChatPaneRegion";
 import { DecisionFooterRegion } from "./DecisionFooterRegion";
@@ -35,6 +36,7 @@ import { buildOverlayHostProps } from "./overlayBuilders";
 import { buildComposerSurface, buildDecisionFooterSurface, buildFooterTodo, buildFooterUndo } from "./decisionFooterBuilders";
 
 const WindowsWindowControls = lazy(() => import("./WindowsWindowControls").then((module) => ({ default: module.WindowsWindowControls })));
+const DockLauncher = lazy(() => import("../components/DockLauncher").then((module) => ({ default: module.DockLauncher })));
 
 const WORKSPACE_RESIZER_WIDTH = 8;
 const SHOW_CONTEXT_DOCK = true;
@@ -294,6 +296,12 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
               onOpenTaskSession={navigationCommands.openTaskMonitorSession}
               creation={sidebarCreation}
               dockToggle={<DockToggleButton renderable={surfaceWorkspacePanelRenderable} t={t} onToggle={session.workspacePanelCommands.toggleWorkspacePanel} />}
+              launcherToggle={<LauncherToggleButton
+                visible={session.workspacePanelCommands.launcherCard.visible}
+                renderable={session.workspacePanelCommands.launcherCard.renderable}
+                t={t}
+                onToggle={session.workspacePanelCommands.toggleLauncherCard}
+              />}
             />
           </TopicbarRegion>
 
@@ -321,6 +329,15 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
               onOpenSession: (connection) => void navigationCommands.openSidebarImConnectionSession(connection),
             } : null}
             remote={activeTab?.remote ? { tab: activeTab, session: core.remoteSession } : undefined}
+            launcher={session.workspacePanelCommands.launcherCard.visible && !core.remoteSurfaceActive ? (
+              <Suspense fallback={null}>
+                <DockLauncher
+                  onSelect={session.workspacePanelCommands.openDockEntry}
+                  gitBranch={state.meta?.gitBranch}
+                  onSpaceModeChange={session.workspacePanelCommands.setLauncherSpaceMode}
+                />
+              </Suspense>
+            ) : null}
             transcript={{
               state,
               items: session.transcript.visibleTranscriptItems,
@@ -414,7 +431,6 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
         <WorkspaceDockRegion {...buildWorkspaceDockProps({
           surface: { renderable: surfaceWorkspacePanelRenderable, overlay: surfaceWorkspacePanelOverlay, gridOpen: surfaceWorkspacePanelGridOpen },
           creation: sidebarCreation,
-          remoteAvailable: shell.remoteHosts.length > 0,
           showContext: SHOW_CONTEXT_DOCK,
           remote: core.remoteSurfaceActive,
           t,

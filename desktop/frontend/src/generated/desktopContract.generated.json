@@ -4479,6 +4479,28 @@
     },
     {
       "cancellation": "before-dispatch",
+      "domain": "desktop/workspace_changes.go",
+      "name": "GitCreateBranch",
+      "owner": "App.GitCreateBranch",
+      "params": [
+        {
+          "kind": "string"
+        }
+      ],
+      "returnsError": true,
+      "scope": {
+        "inputs": [
+          "name"
+        ],
+        "kind": "owner-inputs",
+        "resolver": "App.GitCreateBranch"
+      },
+      "sources": [
+        "desktop/workspace_changes.go"
+      ]
+    },
+    {
+      "cancellation": "before-dispatch",
       "domain": "desktop/heartbeat.go",
       "name": "HeartbeatGenerateID",
       "owner": "App.HeartbeatGenerateID",
@@ -32808,6 +32830,20 @@
           "optional": true,
           "type": {
             "kind": "string"
+          }
+        },
+        {
+          "name": "added",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "removed",
+          "optional": true,
+          "type": {
+            "kind": "integer"
           }
         }
       ]

@@ -1240,6 +1240,8 @@ export interface WorkspaceChangesView {
   gitAvailable: boolean;
   gitErr?: string;
   gitBranch?: string;
+  added?: number;
+  removed?: number;
 }
 
 export interface WorkspaceChangeDetailView {

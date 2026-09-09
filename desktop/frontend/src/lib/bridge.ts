@@ -493,6 +493,7 @@ export interface AppBindings extends ToolRecoveryBindings, ModelSettingsBindings
   TurnCheckLog(tabID: string, sessionPath: string, toolID: string, resultID: string): Promise<{ output: string; truncated: boolean } | null>;
   GitBranches(): Promise<string[]>;
   GitCheckout(branch: string): Promise<void>;
+  GitCreateBranch(name: string): Promise<void>;
   WorkspaceGitHistory(tabID: string, path: string): Promise<GitCommitView[]>;
   WorkspaceGitCommitDetail(tabID: string, hash: string, path: string): Promise<GitCommitDetailView>;
   OpenWorkspacePathForTab(tabID: string, rel: string): Promise<void>;
@@ -4013,6 +4014,9 @@ function makeMockApp(): AppBindings {
     },
     async GitCheckout(_branch: string) {
       console.info("mock GitCheckout", _branch);
+    },
+    async GitCreateBranch(_name: string) {
+      console.info("mock GitCreateBranch", _name);
     },
     async WorkspaceGitHistory(_tabID: string, path: string) {
       return [

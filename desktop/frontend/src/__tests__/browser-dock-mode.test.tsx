@@ -8,12 +8,14 @@ import { WorkspaceDockRegion, type WorkspaceDockRegionProps } from "../app-shell
 import type { DesktopBrowserHost } from "../lib/browserHost";
 import type { ReasonixDesktopHost } from "../lib/desktopHost";
 import { LocaleProvider, type Translator } from "../lib/i18n";
+import { availableDockEntries } from "../lib/dockEntries";
 import { useLayoutStore, type RightDockMode } from "../store/layout";
+import { useActivityBarStore } from "../store/activityBar";
 
 const dom = new JSDOM("<div id='root'></div>", { url: "http://localhost", pretendToBeVisual: true });
-Object.assign(globalThis, { window: dom.window, document: dom.window.document, localStorage: dom.window.localStorage,
-  IS_REACT_ACT_ENVIRONMENT: true });
 class TestResizeObserver { observe() {} unobserve() {} disconnect() {} }
+Object.assign(globalThis, { window: dom.window, document: dom.window.document, localStorage: dom.window.localStorage,
+  IS_REACT_ACT_ENVIRONMENT: true, ResizeObserver: TestResizeObserver });
 (dom.window as unknown as { ResizeObserver: unknown }).ResizeObserver = TestResizeObserver;
 
 const noop = () => {};
@@ -41,9 +43,8 @@ const electron: ReasonixDesktopHost = {
 
 const modes: RightDockMode[] = [];
 const props = (mode: RightDockMode): WorkspaceDockRegionProps => ({
-  visible: true, overlay: false, mode, creation: false, remoteAvailable: false, showContext: true,
+  visible: true, overlay: false, mode, creation: false, showContext: true,
   t: ((key: string) => key) as Translator,
-  onMode: (next) => { modes.push(next); }, onRemote: noop,
   remote: {} as WorkspaceDockRegionProps["remote"], context: {} as WorkspaceDockRegionProps["context"],
   workspace: { tabId: "A" } as WorkspaceDockRegionProps["workspace"], workspaceKey: "k",
 });
@@ -55,31 +56,34 @@ const settle = () => act(async () => { await new Promise((resolve) => setTimeout
 console.log("\nbrowser dock mode");
 try {
   await paint("files");
-  assert.deepEqual(tabLabels(), ["rightDock.overview", "workspace.filesTab", "workspace.changedTab"], "no shell host: no browser tab");
+  assert.deepEqual(tabLabels(), [], "an empty tab list renders no dock tabs");
+  assert.equal(availableDockEntries(false).some((entry) => entry.defaultTab === "browser"), false,
+    "no shell host: the browser entry is not offered");
+  assert.deepEqual(modes, [], "an empty dock issues no mode command");
 
   window.reasonixDesktop = electron;
-  await paint("files");
-  await settle();
-  assert.deepEqual(tabLabels(), ["rightDock.overview", "workspace.filesTab", "workspace.changedTab", "Browser"], "the Electron host adds the browser tab");
-  const browserTab = [...document.querySelectorAll<HTMLButtonElement>("[role='tab']")].find((el) => el.textContent === "Browser")!;
-  assert.equal(browserTab.getAttribute("aria-selected"), "false");
-  await act(async () => browserTab.click());
-  assert.deepEqual(modes, ["browser"], "the tab requests the browser dock mode through the shared mode command");
-  assert.equal(document.querySelector(".browser-panel"), null, "files mode does not mount the browser panel");
+  assert.equal(availableDockEntries(true).some((entry) => entry.defaultTab === "browser"), true,
+    "the Electron host offers the browser entry");
 
+  await act(async () => { useActivityBarStore.getState().addTab("browser", "Browser"); });
   await paint("browser");
   await settle();
-  assert.equal([...document.querySelectorAll("[role='tab']")].find((el) => el.textContent === "Browser")?.getAttribute("aria-selected"), "true");
-  assert.ok(document.querySelector(".browser-panel"), "browser mode mounts the lazy panel in the dock body");
+  assert.deepEqual(tabLabels(), ["Browser"], "the browser tab renders in the dock");
+  assert.ok(document.querySelector(".browser-panel"), "the browser tab mounts the lazy panel in the dock body");
   assert.ok(document.querySelector(".workbench-dock--browser"), "the dock carries the mode modifier");
 
   useLayoutStore.getState().setRightDockMode("browser");
   assert.equal(useLayoutStore.getState().rightDockMode, "browser", "the layout store accepts the browser dock mode");
-  useLayoutStore.getState().setRightDockMode("context");
+
+  const browserTabId = useActivityBarStore.getState().tabs[0].id;
+  await act(async () => { useActivityBarStore.getState().closeTab(browserTabId); });
+  await paint("files");
+  await settle();
+  assert.equal(document.querySelector(".browser-panel"), null, "closing the browser tab unmounts the panel");
 
   delete window.reasonixDesktop;
   await act(async () => root.unmount());
-  console.log("browser dock mode: gating, mode switch and lazy mount passed");
+  console.log("browser dock mode: gating, tab render and lazy mount passed");
 } finally {
   dom.window.close();
 }

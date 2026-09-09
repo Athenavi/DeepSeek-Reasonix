@@ -1,8 +1,8 @@
 import { lazy, Suspense, type ComponentProps, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
-import { Activity, FileText, GitBranch, Server } from "lucide-react";
-import { desktopHost } from "../lib/desktopHost";
 import type { Translator } from "../lib/i18n";
 import type { RightDockMode } from "../store/layout";
+import type { TabItem } from "../store/activityBar";
+import { TabContainer } from "../components/TabContainer/TabContainer";
 
 const ContextPanel = lazy(() => import("../components/ContextPanel").then((module) => ({ default: module.ContextPanel })));
 const RemotePanel = lazy(() => import("../components/RemotePanel").then((module) => ({ default: module.RemotePanel })));
@@ -20,11 +20,8 @@ export type WorkspaceDockRegionProps = {
   overlay: boolean;
   mode: RightDockMode;
   creation: boolean;
-  remoteAvailable: boolean;
   showContext: boolean;
   t: Translator;
-  onMode: (mode: RightDockMode) => void;
-  onRemote: () => void;
   remote: ComponentProps<typeof RemotePanel>;
   context: ComponentProps<typeof ContextPanel>;
   workspace: ComponentProps<typeof WorkspacePanel>;
@@ -41,8 +38,28 @@ export type WorkspaceDockRegionProps = {
 
 /** Shared workbench/creation dock; layout variants change data, not component identity. */
 export function WorkspaceDockRegion(props: WorkspaceDockRegionProps) {
-  const { visible, overlay, mode, creation, remoteAvailable, showContext, t, onMode, onRemote } = props;
-  const browser = desktopHost().browser !== undefined;
+  const { visible, overlay, mode, creation, showContext, t } = props;
+
+  const renderTab = (tab: TabItem): ReactNode => {
+    switch (tab.type) {
+      case "context":
+        if (showContext && !creation) return <ContextPanel {...props.context} />;
+        return <WorkspacePanel key={`${props.workspaceKey}::${tab.id}`} {...props.workspace} />;
+      case "remote":
+        return <RemotePanel {...props.remote} />;
+      case "browser":
+        return <BrowserSurface surface="panel" taskId={props.workspace.tabId} />;
+      default:
+        return (
+          <WorkspacePanel
+            key={`${props.workspaceKey}::${tab.id}`}
+            {...props.workspace}
+            initialViewMode={tab.type === "changed" ? "changed" : "files"}
+          />
+        );
+    }
+  };
+
   return (
     <>
       {props.resizer && (
@@ -56,37 +73,13 @@ export function WorkspaceDockRegion(props: WorkspaceDockRegionProps) {
       )}
       {visible && (
         <aside className={["workbench-dock", `workbench-dock--${mode}`, overlay ? "workbench-dock--overlay" : ""].join(" ")} aria-label={t("rightDock.workbench")}>
-          <div className="workbench-dock__tools">
-            <div className="workbench-dock__tabs" role="tablist" aria-label={t("rightDock.views")}>
-              {showContext && !creation && <DockTab active={mode === "context"} onClick={() => onMode("context")} icon={<Activity size={13} />} label={t("rightDock.overview")} />}
-              <DockTab active={mode === "files"} onClick={() => onMode("files")} icon={<FileText size={13} />} label={t("workspace.filesTab")} />
-              <DockTab active={mode === "changed"} onClick={() => onMode("changed")} icon={<GitBranch size={13} />} label={t("workspace.changedTab")} />
-              {browser && (
-                <Suspense fallback={null}>
-                  <BrowserSurface surface="tab" active={mode === "browser"} onSelect={() => onMode("browser")} />
-                </Suspense>
-              )}
-              {remoteAvailable && <DockTab active={mode === "remote"} onClick={onRemote} icon={<Server size={13} />} label={t("rightDock.remote")} />}
-            </div>
-          </div>
-          <div className="workbench-dock__body">
+          <div className="workbench-dock__panel">
             <Suspense fallback={null}>
-              {mode === "remote" ? <RemotePanel {...props.remote} />
-                : mode === "browser" ? <BrowserSurface surface="panel" taskId={props.workspace.tabId} />
-                : mode === "context" && !creation ? <ContextPanel {...props.context} />
-                : <WorkspacePanel key={props.workspaceKey} {...props.workspace} />}
+              <TabContainer renderTab={renderTab} workspaceTabId={props.workspace.tabId} />
             </Suspense>
           </div>
         </aside>
       )}
     </>
-  );
-}
-
-function DockTab({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: ReactNode; label: string }) {
-  return (
-    <button type="button" role="tab" aria-selected={active} className={`workbench-dock__tab${active ? " workbench-dock__tab--active" : ""}`} onClick={onClick}>
-      {icon}<span className="workbench-dock__tab-label">{label}</span>
-    </button>
   );
 }

@@ -3,7 +3,7 @@
 
 export const DESKTOP_PROTOCOL_VERSION = 1;
 
-export const DESKTOP_CONTRACT_DIGEST = "sha256:da756f0aad931a798a0e8ed7322e306fefa1e493afeb643742a2dd45ab96fe6b";
+export const DESKTOP_CONTRACT_DIGEST = "sha256:35c328f4617b175ddbbe4eccd93e56343ab09543387808e6f214e095a30e6f92";
 
 export const DESKTOP_COMMANDS = [
   "AIRenameSession",
@@ -169,11 +169,11 @@ export const DESKTOP_COMMANDS = [
   "GetTask",
   "GetTaskCatalogStatus",
   "GetThemeExperience",
-  "GetToolRecoveryForTab",
   "GetTopicSummary",
   "GetWorktreeStatus",
   "GitBranches",
   "GitCheckout",
+  "GitCreateBranch",
   "HeartbeatGenerateID",
   "HeartbeatListTasks",
   "HeartbeatReloadConfig",
@@ -364,7 +364,6 @@ export const DESKTOP_COMMANDS = [
   "ResolveRecoveryTab",
   "ResolveRecoveryTabForTurn",
   "ResolveRemoteTabPlanDecision",
-  "ResolveToolRecoveryForTab",
   "ResolveWorkspacePathForTab",
   "RestartApplication",
   "RestoreArchivedMemory",
@@ -614,14 +613,6 @@ export type DesktopCommandName = (typeof DESKTOP_COMMANDS)[number];
 
 export type DesktopEventName = (typeof DESKTOP_EVENTS)[number];
 
-export interface ToolRecoveryStatistics {
-  unknown: number;
-  confirmed: number;
-  retried: number;
-  rejected: number;
-  blocked: number;
-}
-
 export interface CostQuote {
   original: Money;
   originalTotals?: Money[];
@@ -863,25 +854,6 @@ export interface ProviderProtocolEndpoint {
   responsesMode?: string;
 }
 
-export interface ToolRecoveryRequest {
-  sessionPath: string;
-  runtimeEpoch: string;
-  revision: string;
-  attemptId: string;
-  inspectionId: string;
-  action: string;
-}
-
-export interface ToolRecoverySnapshot {
-  silent: boolean;
-  statistics: ToolRecoveryStatistics;
-  sessionPath: string;
-  runtimeEpoch: string;
-  revision: string;
-  calls: ToolCallRecord[];
-  retryEnabled: boolean;
-}
-
 export interface ToolResultData {
   args: string;
   output: string;
@@ -895,11 +867,6 @@ export interface event_FinalReadiness {
 }
 
 export interface RecoveryStatus {
-  state?: string;
-  call_id?: string;
-  attempt_id?: string;
-  requires_user_decision?: boolean;
-  read_only?: boolean;
   phase?: string;
   reason?: string;
   next_attempt_at?: number;
@@ -1180,7 +1147,6 @@ export interface Profile {
 }
 
 export interface ReadStatus {
-  verdict?: string;
   readId: string;
   generation?: number;
   seq?: number;
@@ -1272,8 +1238,6 @@ export interface StreamAttempt {
 }
 
 export interface Tool {
-  runState?: string;
-  diagnostic?: unknown;
   verifying?: boolean;
   id?: string;
   name: string;
@@ -2003,7 +1967,6 @@ export interface HistoryMessage {
   decisionReceipt?: provider_DecisionReceipt | null;
   readiness?: event_FinalReadiness | null;
   readPause?: ReadPause | null;
-  readCompletion?: ReadCompletion | null;
   protocolRecovery?: ProtocolRecoveryAction | null;
   diagnostic?: FailureDiagnostic | null;
   serverSearch?: ServerSearchCall[];
@@ -3848,6 +3811,8 @@ export interface WorkspaceChangesView {
   gitAvailable: boolean;
   gitErr?: string;
   gitBranch?: string;
+  added?: number;
+  removed?: number;
 }
 
 export interface WorkspaceConflictView {
@@ -3917,26 +3882,6 @@ export interface CompatibilityIssue {
   reason: string;
 }
 
-export interface ActionIdentity {
-  session_id?: string;
-  turn_id?: string;
-  attempt_id?: string;
-  call_id?: string;
-  canonical_tool?: string;
-  argument_digest?: string;
-  resource_scope?: string;
-}
-
-export interface CompletedRead {
-  read_id: string;
-  path: string;
-  snapshot?: string;
-  intent: string;
-  verdict: string;
-  covered: number[][];
-  source_end?: number | null;
-}
-
 export interface provider_DecisionReceipt {
   id: string;
   kind: string;
@@ -3975,7 +3920,6 @@ export interface provider_MemoryCitation {
 }
 
 export interface PausedRead {
-  snapshot?: string;
   readId: string;
   path: string;
   intent?: string;
@@ -3988,14 +3932,7 @@ export interface ProtocolRecoveryAction {
   id: string;
 }
 
-export interface ReadCompletion {
-  id: string;
-  reads: CompletedRead[];
-  omitted?: number;
-}
-
 export interface ReadPause {
-  code?: string;
   id: string;
   reads: PausedRead[];
   omitted?: number;
@@ -4018,24 +3955,6 @@ export interface ServerSearchCall {
 export interface ServerSearchHit {
   title?: string;
   url?: string;
-}
-
-export interface ToolCallRecord {
-  identity: ActionIdentity;
-  arguments?: unknown;
-  state: string;
-  read_only: boolean;
-  idempotency_key?: string;
-  started_at?: number;
-  finished_at?: number;
-  result_digest?: string;
-  effect_summary?: string;
-  resolution?: string;
-  resolved_at?: number;
-  resolution_source?: string;
-  inspection_id?: string;
-  inspection_state?: string;
-  superseded_by?: string;
 }
 
 export interface ToolExecution {
@@ -4407,11 +4326,11 @@ export interface GeneratedDesktopCommands {
   GetTask(arg0: string): Promise<TaskSnapshot | null>;
   GetTaskCatalogStatus(): Promise<taskcatalog_Status>;
   GetThemeExperience(): Promise<ThemeExperienceView>;
-  GetToolRecoveryForTab(arg0: string): Promise<ToolRecoverySnapshot>;
   GetTopicSummary(arg0: ProjectTopicKey): Promise<ProjectNode>;
   GetWorktreeStatus(arg0: string): Promise<MergeInspection>;
   GitBranches(): Promise<string[]>;
   GitCheckout(arg0: string): Promise<void>;
+  GitCreateBranch(arg0: string): Promise<void>;
   HeartbeatGenerateID(): Promise<string>;
   HeartbeatListTasks(): Promise<HeartbeatTask[]>;
   HeartbeatReloadConfig(): Promise<HeartbeatConfigView>;
@@ -4602,7 +4521,6 @@ export interface GeneratedDesktopCommands {
   ResolveRecoveryTab(arg0: string, arg1: string, arg2: string, arg3: string): Promise<void>;
   ResolveRecoveryTabForTurn(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string, arg5: string): Promise<void>;
   ResolveRemoteTabPlanDecision(arg0: string, arg1: string, arg2: string, arg3: string): Promise<void>;
-  ResolveToolRecoveryForTab(arg0: string, arg1: ToolRecoveryRequest): Promise<ToolRecoverySnapshot>;
   ResolveWorkspacePathForTab(arg0: string, arg1: string): Promise<string>;
   RestartApplication(): Promise<void>;
   RestoreArchivedMemory(arg0: string): Promise<MemoryFact>;
