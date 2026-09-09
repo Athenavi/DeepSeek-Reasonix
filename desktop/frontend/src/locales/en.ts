@@ -2400,7 +2400,7 @@ export const en = {
   "settings.textSizeLarge": "Large",
   "settings.textSizeXLarge": "Extra large",
   "settings.textSizeXXLarge": "Huge",
-  "settings.displayZoom": "Display zoom (restart required)",
+  "settings.displayZoom": "Display zoom (applies immediately)",
   "settings.displayZoomDecrease": "Decrease display zoom",
   "settings.displayZoomIncrease": "Increase display zoom",
   "settings.displayZoomReset": "Reset display zoom to 100%",

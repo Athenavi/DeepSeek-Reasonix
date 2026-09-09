@@ -190,6 +190,10 @@ phase.
 | `host/remoteWindow.navigate` | `{"hostKey","url","title"}` | `{}` |
 | `host/remoteWindow.focus` `close` | `{"hostKey"}` | `{}` |
 | `host/tray.ensure` | `{"openTitle","openTooltip","quitTitle","quitTooltip","tooltip"}` | `{"ready":bool,"reason":string}` |
+
+`host/shell.openExternal` accepts only `http:`, `https:`, and `mailto:` URLs.
+Other schemes, including `file:`, `javascript:`, and `data:`, are rejected at
+the Electron host boundary before the system opener is invoked.
 | `host/tray.destroy` | `{}` | `{}` |
 | `host/browser.grant` `revoke` | `{"grantId","tabId","sessionId"}` / `{"grantId"}` | `{}` |
 | `host/browser.tabs.list` | `{"grantId"}` | `{"tabs":[{"id","url","title","loading","temporary"}]}` |

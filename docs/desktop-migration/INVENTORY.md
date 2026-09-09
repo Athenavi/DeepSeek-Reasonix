@@ -191,13 +191,13 @@ Every entry carries one class: `keep-business` keeps its Go implementation and c
 | `GetWorktreeStatus` | `(tabID string) (worktree.MergeInspection, error)` | desktop/delivery_worktree.go:161 | keep-business (保留业务实现) | hostrpc desktop/invoke |
 | `GitBranches` | `() ([]string, error)` | desktop/workspace_changes.go:548 | keep-business (保留业务实现) | hostrpc desktop/invoke |
 | `GitCheckout` | `(branch string) error` | desktop/workspace_changes.go:564 | keep-business (保留业务实现) | hostrpc desktop/invoke |
-| `HeartbeatGenerateID` | `() string` | desktop/heartbeat.go:673 | keep-business (保留业务实现) | hostrpc desktop/invoke |
-| `HeartbeatListTasks` | `() []HeartbeatTask` | desktop/heartbeat.go:624 | keep-business (保留业务实现) | hostrpc desktop/invoke |
-| `HeartbeatReloadConfig` | `() HeartbeatConfigView` | desktop/heartbeat.go:640 | keep-business (保留业务实现) | hostrpc desktop/invoke |
-| `HeartbeatReloadTasks` | `() []HeartbeatTask` | desktop/heartbeat.go:632 | keep-business (保留业务实现) | hostrpc desktop/invoke |
-| `HeartbeatSaveConfig` | `(update HeartbeatConfigUpdate) (HeartbeatConfigView, error)` | desktop/heartbeat.go:657 | keep-business (保留业务实现) | hostrpc desktop/invoke |
-| `HeartbeatSaveTasks` | `(tasks []HeartbeatTask) error` | desktop/heartbeat.go:648 | keep-business (保留业务实现) | hostrpc desktop/invoke |
-| `HeartbeatTriggerNow` | `(id string)` | desktop/heartbeat.go:665 | keep-business (保留业务实现) | hostrpc desktop/invoke |
+| `HeartbeatGenerateID` | `() string` | desktop/heartbeat.go:669 | keep-business (保留业务实现) | hostrpc desktop/invoke |
+| `HeartbeatListTasks` | `() []HeartbeatTask` | desktop/heartbeat.go:620 | keep-business (保留业务实现) | hostrpc desktop/invoke |
+| `HeartbeatReloadConfig` | `() HeartbeatConfigView` | desktop/heartbeat.go:636 | keep-business (保留业务实现) | hostrpc desktop/invoke |
+| `HeartbeatReloadTasks` | `() []HeartbeatTask` | desktop/heartbeat.go:628 | keep-business (保留业务实现) | hostrpc desktop/invoke |
+| `HeartbeatSaveConfig` | `(update HeartbeatConfigUpdate) (HeartbeatConfigView, error)` | desktop/heartbeat.go:653 | keep-business (保留业务实现) | hostrpc desktop/invoke |
+| `HeartbeatSaveTasks` | `(tasks []HeartbeatTask) error` | desktop/heartbeat.go:644 | keep-business (保留业务实现) | hostrpc desktop/invoke |
+| `HeartbeatTriggerNow` | `(id string)` | desktop/heartbeat.go:661 | keep-business (保留业务实现) | hostrpc desktop/invoke |
 | `History` | `() []HistoryMessage` | desktop/app.go:5123 | keep-business (保留业务实现) | hostrpc desktop/invoke |
 | `HistoryCheckpointTurnsForTab` | `(tabID string) []int` | desktop/app.go:5280 | keep-business (保留业务实现) | hostrpc desktop/invoke |
 | `HistoryContentForTab` | `(tabID string, ref HistoryContentRef, chunkIndex int) HistoryContentChunk` | desktop/history_slice.go:1285 | keep-business (保留业务实现) | hostrpc desktop/invoke |
