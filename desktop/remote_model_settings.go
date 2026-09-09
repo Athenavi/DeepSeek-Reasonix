@@ -368,7 +368,11 @@ func (a *App) ensureRemoteModelSettings(tabID string) (string, error) {
 		}
 		model, applied, generation, path := tab.model, tab.settings.revision, tab.gen, tab.routing.currentPath
 		valid := tab.settings.generation == generation && tab.settings.sessionPath == path
+		unsupported := tab.settings.unsupportedGen == generation
 		a.remoteTabMu.Unlock()
+		if unsupported {
+			return "", nil
+		}
 		if model == "" {
 			model = resolveNewSessionModel(cfg)
 		}
@@ -381,6 +385,18 @@ func (a *App) ensureRemoteModelSettings(tabID string) (string, error) {
 			err = a.SetRemoteTabModel(tabID, next)
 		}
 		if err != nil {
+			if isRemoteModelSettingsUnsupported(err) {
+				// The Serve predates the model-settings protocol, so no snapshot
+				// can ever apply in this generation. Admit the turn without a
+				// revision instead of failing every send against a reused Serve
+				// that credential mode itself still supports.
+				a.remoteTabMu.Lock()
+				if current := a.remoteTabs[tabID]; current == tab && current.gen == generation && current.routing.currentPath == path {
+					current.settings.unsupportedGen = generation
+				}
+				a.remoteTabMu.Unlock()
+				return "", nil
+			}
 			a.remoteTabMu.Lock()
 			if current := a.remoteTabs[tabID]; current == tab && current.gen == generation && current.routing.currentPath == path {
 				current.settings.failure = modelSettingsIssue("apply_failed", err).Message
@@ -442,6 +458,11 @@ type remoteModelApplicationState struct {
 	failureRevision string
 	generation      uint64
 	sessionPath     string
+	// unsupportedGen records the tab generation at which the remote Serve was
+	// found to predate the model-settings protocol. Turn admission then runs
+	// without a revision, like a Serve-only credential session, until a newer
+	// generation (reconnect or serve replacement) probes the protocol again.
+	unsupportedGen uint64
 }
 
 func applyRemoteModelSettingsSnapshot(ctx context.Context, client *http.Client, base, expectedPath, remoteRef string, bundle *config.ModelRuntimeSettings, status remoteModelSettingsStatus) (remoteModelSettingsStatus, error) {

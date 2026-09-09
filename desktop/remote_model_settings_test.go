@@ -414,3 +414,73 @@ func TestRemoteModelSettingsNonDocumentDecodeFailureStaysError(t *testing.T) {
 		t.Fatal("non-document payload was misclassified as an unsupported Serve")
 	}
 }
+
+type unsupportedModelSettingsKernel struct {
+	remoteKernel
+	switches int
+}
+
+func (k *unsupportedModelSettingsKernel) SwitchCredentialProxyModel(context.Context, string, string, string, string, string) error {
+	k.switches++
+	return &remoteModelSettingsRejection{message: remoteModelSettingsUpgradeHint, unsupported: true}
+}
+
+// Turn admission must not fail every send against a reused legacy Serve that
+// credential mode itself still supports: the unsupported protocol is recorded
+// per tab generation and the run is admitted without a revision, until a
+// reconnect or serve replacement probes the protocol again.
+func TestEnsureRemoteModelSettingsAdmitsLegacyServeTurns(t *testing.T) {
+	isolateDesktopUserDirs(t)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer upstream.Close()
+	app := NewApp()
+	defer app.closeCredentialProxy()
+	view := ProviderView{Name: "legacy", Kind: "openai", BaseURL: upstream.URL, Models: []string{"m"}, NoProxy: true}
+	if _, err := app.SaveProviderWithKey(view, "legacy-key"); err != nil {
+		t.Fatal(err)
+	}
+	if err := editUserConfig(func(c *config.Config) error {
+		return c.UpsertRemoteHost(config.RemoteHostEntry{Name: "legacy-host", Host: "127.0.0.1", CredentialMode: "local-proxy"})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	tab := &remoteTab{
+		id: "legacy-tab", ref: RemoteTabRef{HostID: "legacy-host", Workspace: "ws"},
+		state: "ready", client: &http.Client{}, model: "legacy/m", gen: 1,
+		routing: remoteTabSessionRouting{currentPath: "/proj/session"},
+	}
+	app.remoteTabs = map[string]*remoteTab{tab.id: tab}
+	kernel := &unsupportedModelSettingsKernel{}
+	app.remoteMu.Lock()
+	app.remoteRuntime = kernel
+	app.remoteMu.Unlock()
+
+	revision, err := app.ensureRemoteModelSettings(tab.id)
+	if err != nil || revision != "" {
+		t.Fatalf("legacy Serve turn admission failed: revision=%q err=%v", revision, err)
+	}
+	if kernel.switches != 1 {
+		t.Fatalf("expected one protocol probe, got %d", kernel.switches)
+	}
+	app.remoteTabMu.Lock()
+	recorded, failed := tab.settings.unsupportedGen == 1, tab.settings.failure
+	app.remoteTabMu.Unlock()
+	if !recorded || failed != "" {
+		t.Fatalf("unsupported generation not recorded cleanly: gen=%d failure=%q", tab.settings.unsupportedGen, failed)
+	}
+
+	// The remembered verdict admits later turns without re-probing the Serve.
+	if revision, err = app.ensureRemoteModelSettings(tab.id); err != nil || revision != "" || kernel.switches != 1 {
+		t.Fatalf("repeat admission re-probed legacy Serve: revision=%q err=%v switches=%d", revision, err, kernel.switches)
+	}
+
+	// A new tab generation (reconnect or replaced Serve) probes once more.
+	app.remoteTabMu.Lock()
+	tab.gen = 2
+	app.remoteTabMu.Unlock()
+	if revision, err = app.ensureRemoteModelSettings(tab.id); err != nil || revision != "" || kernel.switches != 2 {
+		t.Fatalf("new generation did not re-probe the protocol: revision=%q err=%v switches=%d", revision, err, kernel.switches)
+	}
+}
