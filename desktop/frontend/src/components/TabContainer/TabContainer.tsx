@@ -18,9 +18,11 @@ interface TabContainerProps {
   /** Active session tab id — forwarded to the tab bar for workspace-scoped
    *  file operations in the file-tab context menu. */
   workspaceTabId?: string;
+  /** Opens (or activates) the view a tab-picker entry stands for. */
+  onPickEntry: (entryId: string) => void;
 }
 
-export function TabContainer({ renderTab, workspaceTabId }: TabContainerProps) {
+export function TabContainer({ renderTab, workspaceTabId, onPickEntry }: TabContainerProps) {
   const tabs = useActivityBarStore((s) => s.tabs);
   const activeTabId = useActivityBarStore((s) => s.activeTabId);
   const addMenuOpen = useActivityBarStore((s) => s.addMenuOpen);
@@ -57,7 +59,7 @@ export function TabContainer({ renderTab, workspaceTabId }: TabContainerProps) {
       />
       {addMenuOpen && <TabAddMenu anchorRef={addButtonRef} onPick={handlePickTab} onClose={() => setAddMenuOpen(false)} />}
       <div className="tab-container__content">
-        <TabContent activeTab={activeTab} renderTab={renderTab} />
+        <TabContent activeTab={activeTab} renderTab={renderTab} onPickEntry={onPickEntry} />
       </div>
     </div>
   );

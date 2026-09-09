@@ -33,7 +33,7 @@ function check(name: string, condition: boolean, detail = "") {
 
 function resetStore(): void {
   localStorage.clear();
-  useActivityBarStore.setState({ tabs: [], activeTabId: null, addMenuOpen: false });
+  useActivityBarStore.setState({ tabs: [], activeTabId: null, addMenuOpen: false, recentlyClosed: [] });
 }
 
 // --- persistence contract: store reads/writes localStorage under one key ---
@@ -154,5 +154,32 @@ check("moveTab keeps the active tab", useActivityBarStore.getState().activeTabId
 useActivityBarStore.getState().moveTab(afterRight[0], afterRight[0], "left");
 check("moveTab same id is a no-op", useActivityBarStore.getState().tabs.map((tab) => tab.id).join(",") === afterRight.join(","), "order changed");
 
-console.log(`\nactivity-bar-store: ${passed} passed, ${failed} failed`);
+// --- recently closed tabs are recorded and can be reopened ---
+resetStore();
+useActivityBarStore.getState().addTab("file", "a");
+useActivityBarStore.getState().addTab("changed", "b");
+const closedId = useActivityBarStore.getState().tabs[1].id;
+useActivityBarStore.getState().closeTab(closedId);
+const closedList = useActivityBarStore.getState().recentlyClosed;
+check("closeTab records the closed tab", closedList.length === 1 && closedList[0].tab.id === closedId && closedList[0].tab.label === "b",
+  `recentlyClosed=${JSON.stringify(closedList)}`);
+check("closeTab stamps the close time", typeof closedList[0].closedAt === "number" && closedList[0].closedAt > 0, "no closedAt");
+check("the closed tab is gone from the list", useActivityBarStore.getState().tabs.every((tab) => tab.id !== closedId), "still open");
+useActivityBarStore.getState().reopenTab(closedId);
+check("reopenTab restores the tab", useActivityBarStore.getState().tabs.some((tab) => tab.id === closedId), "not restored");
+check("reopenTab activates it", useActivityBarStore.getState().activeTabId === closedId, "not active");
+check("reopenTab drops it from the closed list", useActivityBarStore.getState().recentlyClosed.length === 0, "still listed");
+check("reopenTab persists the restored tab", JSON.parse(localStorage.getItem("reasonix.dock.tabs") ?? "{}").tabs.some((t: { id: string }) => t.id === closedId), "not persisted");
+// Closing several tabs keeps newest first and is bounded.
+for (let index = 0; index < 12; index += 1) {
+  useActivityBarStore.getState().addTab("file", `f${index}`);
+  const id = useActivityBarStore.getState().tabs[useActivityBarStore.getState().tabs.length - 1].id;
+  useActivityBarStore.getState().closeTab(id);
+}
+check("recently closed is bounded to 10 newest first",
+  useActivityBarStore.getState().recentlyClosed.length === 10 && useActivityBarStore.getState().recentlyClosed[0].tab.label === "f11",
+  `len=${useActivityBarStore.getState().recentlyClosed.length}`);
+
+console.log(`
+activity-bar-store: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

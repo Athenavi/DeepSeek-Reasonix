@@ -42,9 +42,11 @@ const electron: ReasonixDesktopHost = {
 };
 
 const modes: RightDockMode[] = [];
+const picks: string[] = [];
 const props = (mode: RightDockMode): WorkspaceDockRegionProps => ({
   visible: true, overlay: false, mode, creation: false, showContext: true,
   t: ((key: string) => key) as Translator,
+  onPickEntry: (entryId: string) => { picks.push(entryId); },
   remote: {} as WorkspaceDockRegionProps["remote"], context: {} as WorkspaceDockRegionProps["context"],
   workspace: { tabId: "A" } as WorkspaceDockRegionProps["workspace"], workspaceKey: "k",
 });
@@ -60,6 +62,15 @@ try {
   assert.equal(availableDockEntries(false).some((entry) => entry.defaultTab === "browser"), false,
     "no shell host: the browser entry is not offered");
   assert.deepEqual(modes, [], "an empty dock issues no mode command");
+
+  // With no tab open the dock offers the tab picker instead of a blank panel.
+  const picker = document.querySelector(".tab-picker");
+  assert.ok(picker, "an empty dock renders the tab picker");
+  const pickerEntries = [...picker!.querySelectorAll<HTMLButtonElement>(".tab-picker__item")];
+  assert.deepEqual(pickerEntries.map((button) => button.textContent), ["Overview", "Files", "Changes"],
+    "the picker lists every openable view, browser excluded without a shell host");
+  await act(async () => pickerEntries[0].click());
+  assert.deepEqual(picks, ["context"], "picking an entry opens that view through the shared command");
 
   window.reasonixDesktop = electron;
   assert.equal(availableDockEntries(true).some((entry) => entry.defaultTab === "browser"), true,

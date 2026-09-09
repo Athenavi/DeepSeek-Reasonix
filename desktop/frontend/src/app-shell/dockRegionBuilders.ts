@@ -59,6 +59,7 @@ export function buildWorkspaceDockProps(input: {
     creation: input.creation,
     showContext: input.showContext,
     t: input.t,
+    onPickEntry: panels.openDockEntry,
     remote: { onClose: panels.closeWorkspacePanel },
     context: {
       ...input.context, sessionTurns: input.sessionTurns,

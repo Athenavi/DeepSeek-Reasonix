@@ -1,23 +1,24 @@
 // TabContent renders the active tab's panel inside the tab container. Panel
-// content needs App's props (context, usage, workspace state…), so the
-// component takes a renderer callback: App provides `renderTab(tab)`, and
-// TabContent just routes the active tab through it, falling back to the
-// empty-state hint when no tab is active.
+// content needs the shell's props (context, usage, workspace state…), so the
+// component takes a renderer callback: the shell provides `renderTab(tab)`,
+// and TabContent routes the active tab through it, falling back to the tab
+// picker when the dock holds no tab at all.
 
 import type { ReactNode } from "react";
-import { useT } from "../../lib/i18n";
+import { DockTabPicker } from "./DockTabPicker";
 import type { TabItem } from "../../store/activityBar";
 
 interface TabContentProps {
   activeTab: TabItem | null;
   /** App-provided panel renderer for the active tab. */
   renderTab: (tab: TabItem) => ReactNode;
+  /** Opens (or activates) the view an empty-state entry stands for. */
+  onPickEntry: (entryId: string) => void;
 }
 
-export function TabContent({ activeTab, renderTab }: TabContentProps) {
-  const t = useT();
+export function TabContent({ activeTab, renderTab, onPickEntry }: TabContentProps) {
   if (!activeTab) {
-    return <div className="tab-container__empty">{t("rightDock.empty")}</div>;
+    return <DockTabPicker onSelect={onPickEntry} />;
   }
   return <>{renderTab(activeTab)}</>;
 }

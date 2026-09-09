@@ -18,7 +18,18 @@ export interface TabItem {
   type: TabType;
   label: string;
   meta?: Record<string, unknown>;
+  /** Epoch ms the tab was opened; absent on tabs restored from an older
+   *  persisted snapshot, which then simply show no relative time. */
+  openedAt?: number;
 }
+
+/** A tab the user closed, kept for the tab overview's reopen list. */
+export interface ClosedTabRecord {
+  tab: TabItem;
+  closedAt: number;
+}
+
+const CLOSED_TAB_LIMIT = 10;
 
 const STORAGE_KEY = "reasonix.dock.tabs";
 
@@ -87,6 +98,8 @@ export type ActivityBarState = {
    *  keeps the tabs so re-expanding restores them. */
   activityBarOpen: boolean;
   addMenuOpen: boolean;
+  /** Most recently closed tabs, newest first. Session-local. */
+  recentlyClosed: ClosedTabRecord[];
   /** Open the entry's default tab, switching to it when one of that type exists. */
   openEntry: (type: TabType, label: string, meta?: Record<string, unknown>) => void;
   /** Append a new tab of the given type and activate it. */
@@ -95,6 +108,8 @@ export type ActivityBarState = {
    *  its title from 文件 to the file name). */
   updateTab: (tabId: string, label: string, meta?: Record<string, unknown>) => void;
   closeTab: (tabId: string) => void;
+  /** Re-open a tab from the recently-closed list. */
+  reopenTab: (tabId: string) => void;
   activateTab: (tabId: string) => void;
   /** Move a tab so it lands on the left/right side of another tab. */
   moveTab: (fromId: string, toId: string, side: "left" | "right") => void;
@@ -111,6 +126,7 @@ export const useActivityBarStore = create<ActivityBarState>((set) => ({
   activeTabId: initial.activeTabId,
   activityBarOpen: initial.tabs.length > 0,
   addMenuOpen: false,
+  recentlyClosed: [],
   openEntry: (type, label, meta) =>
     set((state) => {
       const existing = state.tabs.find((tab) => tab.type === type);
@@ -118,14 +134,14 @@ export const useActivityBarStore = create<ActivityBarState>((set) => ({
         persist(state.tabs, existing.id);
         return { activeTabId: existing.id, activityBarOpen: true };
       }
-      const tab: TabItem = { id: nextTabId(), type, label, meta };
+      const tab: TabItem = { id: nextTabId(), type, label, meta, openedAt: Date.now() };
       const tabs = [...state.tabs, tab];
       persist(tabs, tab.id);
       return { tabs, activeTabId: tab.id, activityBarOpen: true };
     }),
   addTab: (type, label, meta) =>
     set((state) => {
-      const tab: TabItem = { id: nextTabId(), type, label, meta };
+      const tab: TabItem = { id: nextTabId(), type, label, meta, openedAt: Date.now() };
       const tabs = [...state.tabs, tab];
       persist(tabs, tab.id);
       return { tabs, activeTabId: tab.id, activityBarOpen: true };
@@ -141,6 +157,9 @@ export const useActivityBarStore = create<ActivityBarState>((set) => ({
       const index = state.tabs.findIndex((tab) => tab.id === tabId);
       if (index < 0) return state;
       const tabs = state.tabs.filter((tab) => tab.id !== tabId);
+      const closed = state.tabs[index];
+      const recentlyClosed = [{ tab: closed, closedAt: Date.now() }, ...state.recentlyClosed]
+        .slice(0, CLOSED_TAB_LIMIT);
       let activeTabId = state.activeTabId;
       if (state.activeTabId === tabId) {
         // Fall back to the neighbor on the left, then the right, then null.
@@ -148,7 +167,21 @@ export const useActivityBarStore = create<ActivityBarState>((set) => ({
       }
       persist(tabs, activeTabId);
       // Closing the last tab collapses the container back to the activity bar.
-      return { tabs, activeTabId, activityBarOpen: tabs.length > 0 };
+      return { tabs, activeTabId, recentlyClosed, activityBarOpen: tabs.length > 0 };
+    }),
+  reopenTab: (tabId) =>
+    set((state) => {
+      const record = state.recentlyClosed.find((entry) => entry.tab.id === tabId);
+      if (!record) return state;
+      if (state.tabs.some((tab) => tab.id === tabId)) return state;
+      const tabs = [...state.tabs, record.tab];
+      persist(tabs, tabId);
+      return {
+        tabs,
+        activeTabId: tabId,
+        activityBarOpen: true,
+        recentlyClosed: state.recentlyClosed.filter((entry) => entry.tab.id !== tabId),
+      };
     }),
   activateTab: (tabId) =>
     set((state) => {

@@ -1,8 +1,9 @@
-// DockLauncher is the floating card shown over the transcript's top-right
-// corner while the right dock is collapsed. It lists the dock's entry points
-// (overview / files / changed); clicking one expands the dock to that tab.
-// Once the dock is open the card is replaced by it, so the menu only ever
-// appears in the collapsed state.
+// DockLauncher is the floating card over the transcript's top-right corner. It
+// lists the dock's entry points (overview / files / changed) and the active
+// git branch; clicking an entry expands the dock to that tab. Its own toggle
+// owns the card only — the dock panel has a separate button — so the card can
+// be summoned whether or not the panel is open; over an open panel it overlays
+// the transcript instead of taking layout space from it.
 //
 // The interaction logic lives in lib/ hooks — useDockLauncherSpace (space
 // yield), useWorkspaceDiffStats (changed-row totals) and useBranchSwitcher
@@ -12,25 +13,15 @@
 // out a new branch from whatever is typed.
 
 import { useRef } from "react";
-import { Activity, Check, ChevronRight, FileDiff, FileText, GitBranch, Plus, Search } from "lucide-react";
-import type { ComponentType } from "react";
+import { Check, ChevronRight, GitBranch, Plus, Search } from "lucide-react";
 import { useT } from "../lib/i18n";
 import { availableDockEntries } from "../lib/dockEntries";
+import { DOCK_ENTRY_ICONS } from "./dockEntryIcons";
 import { desktopHost } from "../lib/desktopHost";
 import type { SpaceMode } from "../lib/launcherCardState";
 import { useBranchSwitcher } from "../lib/useBranchSwitcher";
 import { useDockLauncherSpace } from "../lib/useDockLauncherSpace";
 import { useWorkspaceDiffStats } from "../lib/useWorkspaceDiffStats";
-import type { TabType } from "../store/activityBar";
-
-const ENTRY_ICONS: Record<TabType, ComponentType<{ size?: number | string; className?: string }>> = {
-  file: FileText,
-  changed: FileDiff,
-  context: Activity,
-  remote: FileText,
-  browser: FileText,
-};
-
 interface DockLauncherProps {
   onSelect: (entryId: string) => void;
   /** Current git branch for the active workspace; omitted when unknown. */
@@ -38,9 +29,12 @@ interface DockLauncherProps {
   /** Reports the space-yield mode whenever it changes, so the App-level
    *  launcher toggle can mirror whether the card is actually on screen. */
   onSpaceModeChange?: (mode: SpaceMode) => void;
+  /** True while the dock panel is open: the card then overlays the transcript
+   *  rather than competing for the chat column, so the yield rule is skipped. */
+  overlay?: boolean;
 }
 
-export function DockLauncher({ onSelect, gitBranch, onSpaceModeChange }: DockLauncherProps) {
+export function DockLauncher({ onSelect, gitBranch, onSpaceModeChange, overlay }: DockLauncherProps) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const spaceMode = useDockLauncherSpace(rootRef, onSpaceModeChange);
@@ -55,7 +49,7 @@ export function DockLauncher({ onSelect, gitBranch, onSpaceModeChange }: DockLau
     .filter((entry) => entry.id !== "changed" || isGitProject);
   const showDiffStats = (diffStats?.added ?? 0) + (diffStats?.removed ?? 0) > 0;
 
-  if (spaceMode === "hidden") return null;
+  if (!overlay && spaceMode === "hidden") return null;
 
   return (
     <div
@@ -66,7 +60,7 @@ export function DockLauncher({ onSelect, gitBranch, onSpaceModeChange }: DockLau
     >
       <div className="dock-launcher__header">{t("rightDock.launcherTitle")}</div>
       {entries.map((entry) => {
-        const Icon = ENTRY_ICONS[entry.defaultTab];
+        const Icon = DOCK_ENTRY_ICONS[entry.defaultTab];
         const isChanged = entry.id === "changed";
         return (
           <button

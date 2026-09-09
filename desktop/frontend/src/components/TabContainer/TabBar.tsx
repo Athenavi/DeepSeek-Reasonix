@@ -26,6 +26,7 @@ import type { ExternalOpenersView } from "../../lib/types";
 import type { TabItem } from "../../store/activityBar";
 import { ContextMenu, contextMenuPointFromEvent, type ContextMenuItem, type ContextMenuPoint } from "../ContextMenu";
 import { useDockTabDrag } from "../../lib/useDockTabDrag";
+import { TabOverviewMenu } from "./TabOverviewMenu";
 
 // Type icon map: every tab type gets a leading icon so the tab kind is
 // identifiable (mirrors the launcher's icon assignment).
@@ -231,6 +232,7 @@ export function TabBar({ tabs, activeTabId, onActivate, onClose, onMoveTab, onAd
 
   return (
     <div className="workbench-dock__tools">
+      <TabOverviewMenu />
       <div
         ref={tabsRef}
         className={["workbench-dock__tabs", tabsOverflow ? "workbench-dock__tabs--overflow" : ""].filter(Boolean).join(" ")}

@@ -2,7 +2,11 @@ import { lazy, Suspense, type ComponentProps, type KeyboardEvent, type PointerEv
 import type { Translator } from "../lib/i18n";
 import type { RightDockMode } from "../store/layout";
 import type { TabItem } from "../store/activityBar";
-import { TabContainer } from "../components/TabContainer/TabContainer";
+
+// The tab strip, its drag state machine and the add menu are a deferred
+// surface: the dock is closed on most launches, so keep them out of the
+// initial bundle.
+const TabContainer = lazy(() => import("../components/TabContainer/TabContainer").then((module) => ({ default: module.TabContainer })));
 
 const ContextPanel = lazy(() => import("../components/ContextPanel").then((module) => ({ default: module.ContextPanel })));
 const RemotePanel = lazy(() => import("../components/RemotePanel").then((module) => ({ default: module.RemotePanel })));
@@ -22,6 +26,8 @@ export type WorkspaceDockRegionProps = {
   creation: boolean;
   showContext: boolean;
   t: Translator;
+  /** Opens (or activates) the dock view a tab-picker entry stands for. */
+  onPickEntry: (entryId: string) => void;
   remote: ComponentProps<typeof RemotePanel>;
   context: ComponentProps<typeof ContextPanel>;
   workspace: ComponentProps<typeof WorkspacePanel>;
@@ -75,7 +81,7 @@ export function WorkspaceDockRegion(props: WorkspaceDockRegionProps) {
         <aside className={["workbench-dock", `workbench-dock--${mode}`, overlay ? "workbench-dock--overlay" : ""].join(" ")} aria-label={t("rightDock.workbench")}>
           <div className="workbench-dock__panel">
             <Suspense fallback={null}>
-              <TabContainer renderTab={renderTab} workspaceTabId={props.workspace.tabId} />
+              <TabContainer renderTab={renderTab} workspaceTabId={props.workspace.tabId} onPickEntry={props.onPickEntry} />
             </Suspense>
           </div>
         </aside>

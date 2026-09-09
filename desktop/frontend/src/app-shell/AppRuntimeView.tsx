@@ -18,6 +18,7 @@ import { WindowChromeLifecycle } from "../app-runtime/WindowChromeLifecycle";
 import { StartupGateLifecycle } from "../app-runtime/StartupGateLifecycle";
 import { AppRuntimeEffects } from "../app-runtime/AppRuntimeEffects";
 import { ThemeBackground } from "../components/ThemeBackground";
+import { useTopicbarHeightVar } from "../lib/useTopicbarHeightVar";
 import { AppChrome } from "../components/AppChrome";
 import { SidebarRegion } from "./SidebarRegion";
 import { TopicbarRegion } from "./TopicbarRegion";
@@ -92,6 +93,7 @@ export type AppRuntimeViewProps = {
  * beyond value memoization live here; ownership stays in the compositions.
  */
 export function AppRuntimeView(props: AppRuntimeViewProps) {
+  useTopicbarHeightVar();
   const { core, shell, session, navigation, runtime, local } = props;
   const { state, activeTab, activeTabId, t, locale } = core;
   const { sidebarWorkbench, sidebarCreation, windowsFramelessChrome, managementActive, mainWindowMaximised } = shell;
@@ -298,7 +300,6 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
               dockToggle={<DockToggleButton renderable={surfaceWorkspacePanelRenderable} t={t} onToggle={session.workspacePanelCommands.toggleWorkspacePanel} />}
               launcherToggle={<LauncherToggleButton
                 visible={session.workspacePanelCommands.launcherCard.visible}
-                renderable={session.workspacePanelCommands.launcherCard.renderable}
                 t={t}
                 onToggle={session.workspacePanelCommands.toggleLauncherCard}
               />}
@@ -329,12 +330,13 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
               onOpenSession: (connection) => void navigationCommands.openSidebarImConnectionSession(connection),
             } : null}
             remote={activeTab?.remote ? { tab: activeTab, session: core.remoteSession } : undefined}
-            launcher={session.workspacePanelCommands.launcherCard.visible && !core.remoteSurfaceActive ? (
+            launcher={session.workspacePanelCommands.launcherCardMounted && !core.remoteSurfaceActive ? (
               <Suspense fallback={null}>
                 <DockLauncher
                   onSelect={session.workspacePanelCommands.openDockEntry}
                   gitBranch={state.meta?.gitBranch}
                   onSpaceModeChange={session.workspacePanelCommands.setLauncherSpaceMode}
+                  overlay={session.workspacePanelCommands.launcherCardOverlay}
                 />
               </Suspense>
             ) : null}

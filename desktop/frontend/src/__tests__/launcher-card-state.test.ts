@@ -4,7 +4,8 @@
 // protects: the card's render condition and the toggle's pressed state must
 // never diverge). Two layers:
 //   1. Truth-table over resolveLauncherCardState — every combination of
-//      gridOpen × spaceMode × dismissed.
+//      spaceMode × dismissed. The card is independent of the dock panel's
+//      open state: the panel has its own toggle.
 //   2. Source contracts — App must drive the toggle through the shared
 //      resolver (not inline the condition again), and DockLauncher must keep
 //      reporting its space-yield mode upward.
@@ -31,17 +32,15 @@ function eq<T>(actual: T, expected: T, label: string) {
 const modes: SpaceMode[] = ["full", "hidden"];
 
 // ---- 1. Truth table -------------------------------------------------------
-process.stdout.write("truth table: gridOpen × spaceMode × dismissed\n");
-for (const gridOpen of [false, true]) {
-  for (const spaceMode of modes) {
-    for (const dismissed of [false, true]) {
-      const { renderable, visible } = resolveLauncherCardState({ gridOpen, spaceMode, dismissed });
-      const tag = `g=${gridOpen} m=${spaceMode} d=${dismissed}`;
-      eq(renderable, !gridOpen && spaceMode === "full", `renderable ${tag}`);
-      eq(visible, !gridOpen && spaceMode === "full" && !dismissed, `visible ${tag}`);
-      // A visible card is always renderable (consistency invariant).
-      assert.ok(!visible || renderable, `invariant: visible implies renderable ${tag}`);
-    }
+process.stdout.write("truth table: spaceMode × dismissed\n");
+for (const spaceMode of modes) {
+  for (const dismissed of [false, true]) {
+    const { renderable, visible } = resolveLauncherCardState({ spaceMode, dismissed });
+    const tag = `m=${spaceMode} d=${dismissed}`;
+    eq(renderable, spaceMode === "full", `renderable ${tag}`);
+    eq(visible, spaceMode === "full" && !dismissed, `visible ${tag}`);
+    // A visible card is always renderable (consistency invariant).
+    assert.ok(!visible || renderable, `invariant: visible implies renderable ${tag}`);
   }
 }
 
@@ -54,7 +53,7 @@ const toggleSource = readFileSync(resolve(testDir, "../app-shell/LauncherToggleB
 
 assert.match(
   commandsSource,
-  /const launcherCard = resolveLauncherCardState\(\{ gridOpen: input\.gridOpen, spaceMode: launcherSpaceMode, dismissed: launcherDismissed \}\);/,
+  /const launcherCard = resolveLauncherCardState\(\{ spaceMode: launcherCardSpaceMode, dismissed: launcherDismissed \}\);/,
   "the dock command owner drives the card through the shared resolver",
 );
 assert.doesNotMatch(
@@ -64,8 +63,8 @@ assert.doesNotMatch(
 );
 assert.match(
   commandsSource,
-  /if \(!launcherCard\.renderable\) return;/,
-  "the toggle is inert while the card cannot show",
+  /if \(launcherCardSpaceMode === "hidden"\) return;/,
+  "the toggle stays inert only while the surface is too narrow for the card",
 );
 assert.match(
   spaceSource,

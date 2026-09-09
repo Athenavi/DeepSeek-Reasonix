@@ -16,8 +16,8 @@ type Input = {
   availableWidth: number;
   clampTreeWidth: (width: number, availableWidth: number) => number;
   setTreeWidth: (width: number) => void;
-  /** True while the dock column occupies grid space (the launcher card's
-   *  replacement); the card can only show when this is false. */
+  /** True while the dock column occupies grid space: the card then overlays
+   *  the transcript instead of taking layout space from it. */
   gridOpen: boolean;
   t: Translator;
 };
@@ -45,8 +45,17 @@ function tabForDockMode(mode: RightDockMode): TabType {
   }
 }
 
+// Remote and browser tabs have no launcher entry, so they carry their own
+// label keys; every other tab type is labelled by its DOCK_ENTRIES entry.
+function labelKeyForTab(type: TabType): string {
+  if (type === "remote") return "rightDock.remote";
+  if (type === "browser") return "rightDock.browser";
+  return DOCK_ENTRIES.find(entry => entry.defaultTab === type)?.labelKey ?? "workspace.filesTab";
+}
+
 /** One project-scoped preference owner, with no mirrored layout state. */
 export function useWorkspacePanelCommands(input: Input) {
+  const t = input.t;
   const mode = useLayoutStore(state => state.rightDockMode);
   const explorerOpen = useRemoteStore(state => state.explorerOpen);
   const hostCount = useRemoteStore(state => state.hosts.length);
@@ -57,11 +66,19 @@ export function useWorkspacePanelCommands(input: Input) {
   // pressed state.
   const [launcherDismissed, setLauncherDismissed] = useState(false);
   const [launcherSpaceMode, setLauncherSpaceMode] = useState<SpaceMode>("full");
-  const launcherCard = resolveLauncherCardState({ gridOpen: input.gridOpen, spaceMode: launcherSpaceMode, dismissed: launcherDismissed });
-  const toggleLauncherCard = useCallback(() => {
-    if (!launcherCard.renderable) return;
-    setLauncherDismissed((dismissed) => !dismissed);
-  }, [launcherCard.renderable]);
+  // The narrow-surface yield only matters while the card takes layout space
+  // from the chat column; over an open dock it overlays and never squeezes.
+  const launcherCardSpaceMode = input.gridOpen ? "full" : launcherSpaceMode;
+  const launcherCard = resolveLauncherCardState({ spaceMode: launcherCardSpaceMode, dismissed: launcherDismissed });
+  // The card stays mounted whenever it could be shown, even while the space
+  // mode hides it: only the mounted card measures its host, so unmounting on
+  // "hidden" would leave the toggle permanently unable to bring it back.
+  const launcherCardMounted = !launcherDismissed;
+  // Opening the panel replaces the card on screen; the toggle can still summon
+  // it back over the panel afterwards.
+  useEffect(() => {
+    if (input.gridOpen) setLauncherDismissed(true);
+  }, [input.gridOpen]);
   const openRightDockMode = useCommittedCommand((requestedMode?: RightDockMode) => {
     input.closeOverlays();
     const layout = useLayoutStore.getState();
@@ -69,6 +86,10 @@ export function useWorkspacePanelCommands(input: Input) {
     if (next === "context" || next !== layout.rightDockMode) layout.setWorkspacePreviewActive(false);
     layout.setRightDockMode(next);
     layout.setWorkspacePanelMaximized(false);
+    // The tab list decides what the dock renders, so every caller of this
+    // command must leave a matching tab behind — otherwise the panel opens
+    // empty (the tab model has no "mode" to fall back to).
+    useActivityBarStore.getState().openEntry(tabForDockMode(next), t(labelKeyForTab(tabForDockMode(next)) as never));
     if (layout.workspacePanelOpen && !layout.workspacePanelMaximized) return;
     layout.setWorkspacePanelOpen(true);
     saveWorkspacePanelOpen(true, input.workspaceRoot);
@@ -82,6 +103,13 @@ export function useWorkspacePanelCommands(input: Input) {
     layout.setWorkspacePanelOpen(false);
     saveWorkspacePanelOpen(false, input.workspaceRoot);
   });
+  // The toggle owns the card and nothing else — the dock panel has its own
+  // button. It is inert only while the surface is too narrow for the card to
+  // occupy space at all.
+  const toggleLauncherCard = useCallback(() => {
+    if (launcherCardSpaceMode === "hidden") return;
+    setLauncherDismissed((dismissed) => !dismissed);
+  }, [launcherCardSpaceMode]);
   const prepareBlankWorkspace = useCommittedCommand((workspaceRoot = input.workspaceRoot) => {
     input.closeOverlays();
     input.clearLiveWidth(null);
@@ -91,31 +119,28 @@ export function useWorkspacePanelCommands(input: Input) {
     // Seed the destination preference before project restoration can run.
     saveWorkspacePanelOpen(false, workspaceRoot);
   });
-  // Opening a launcher entry: switch the mirrored mode, expand the panel and
-  // open (or activate) the matching tab. The tab list — not the mode enum —
-  // decides what the dock renders.
+  // Opening a launcher entry expands the dock to that entry's tab.
   const openDockEntry = useCommittedCommand((entryId: string) => {
     const entry = DOCK_ENTRIES.find(candidate => candidate.id === entryId);
     if (!entry) return;
     openRightDockMode(dockModeForTab(entry.defaultTab));
-    useActivityBarStore.getState().openEntry(entry.defaultTab, input.t(entry.labelKey as never));
   });
   const openDockTab = useCommittedCommand((type: TabType, label: string, meta?: Record<string, unknown>) => {
     openRightDockMode(dockModeForTab(type));
     useActivityBarStore.getState().addTab(type, label, meta);
   });
+  // Plain open/close: expanding restores whatever tabs the project had and
+  // leaves an empty dock to the tab picker instead of seeding a view the user
+  // did not ask for. openRightDockMode stays the "open this view" command.
   const toggleWorkspacePanel = useCommittedCommand(() => {
     const layout = useLayoutStore.getState();
     if (layout.workspacePanelOpen) { closeWorkspacePanel(); return; }
+    input.closeOverlays();
     const activity = useActivityBarStore.getState();
-    if (activity.tabs.length === 0) {
-      // Seed the previously active view so the panel is never empty on expand.
-      const entry = DOCK_ENTRIES.find(candidate => candidate.defaultTab === tabForDockMode(layout.rightDockMode));
-      if (entry) activity.openEntry(entry.defaultTab, input.t(entry.labelKey as never));
-    } else {
-      activity.setActivityBarOpen(true);
-    }
-    openRightDockMode(input.creation ? (layout.rightDockMode === "changed" ? "changed" : "files") : layout.rightDockMode);
+    if (activity.tabs.length > 0) activity.setActivityBarOpen(true);
+    layout.setWorkspacePanelMaximized(false);
+    layout.setWorkspacePanelOpen(true);
+    saveWorkspacePanelOpen(true, input.workspaceRoot);
   });
   const toggleWorkspaceMaximized = useCommittedCommand(() => {
     input.closeOverlays();
@@ -169,6 +194,7 @@ export function useWorkspacePanelCommands(input: Input) {
     openRightDockMode, closeWorkspacePanel, prepareBlankWorkspace, openDockEntry, openDockTab,
     toggleWorkspacePanel, toggleWorkspaceMaximized, handleWorkspacePreviewModeChange,
     openRemoteDock, restoreWorkspaceDockWidths,
-    launcherCard, launcherDismissed, toggleLauncherCard, setLauncherSpaceMode,
+    launcherCard, launcherCardMounted, launcherCardOverlay: input.gridOpen,
+    toggleLauncherCard, setLauncherSpaceMode,
   };
 }
