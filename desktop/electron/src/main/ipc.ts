@@ -14,6 +14,7 @@ import { isAllowedCommand, type LoadedContract } from "./contract.js";
 import { errorText, type Logger } from "./log.js";
 import { bool, finite, record, str } from "./params.js";
 import { RpcError } from "./rpc.js";
+import type { GraphicsSettingsStore } from "./graphics.js";
 
 export interface RendererWindowApi {
   isTrustedSender(sender: IpcMainEvent["sender"], frame: IpcMainEvent["senderFrame"]): boolean;
@@ -52,6 +53,7 @@ export interface RendererIpcDeps {
   invoke(method: string, args: unknown[]): Promise<unknown>;
   serviceState(): ServiceState;
   clipboard: { writeText(text: string): Promise<void> | void; readText(): Promise<string> | string };
+  graphics?: GraphicsSettingsStore;
   openExternal(url: string): Promise<void>;
   browser?: BrowserRendererApi;
   log: Logger;
@@ -132,6 +134,12 @@ export function registerRendererIpc(deps: RendererIpcDeps): void {
   handle(IPC.appZoomGet, () => deps.window.getAppZoom());
   handle(IPC.appZoomSet, (factor) => deps.window.setAppZoom(finite(factor, Number.NaN)));
   handle(IPC.appZoomReset, () => deps.window.resetAppZoom());
+  handle(IPC.graphicsGet, () => deps.graphics?.current ?? { hardwareAcceleration: true, startupEnabled: true, override: "none", restartRequired: false, writable: false, warning: null });
+  handle(IPC.graphicsSet, (enabled) => {
+    if (typeof enabled !== "boolean") throw new Error("hardwareAcceleration must be boolean");
+    if (!deps.graphics) throw new Error("graphics settings unavailable");
+    return deps.graphics.setHardwareAcceleration(enabled);
+  });
 
   const browser = deps.browser;
   if (!browser) return;
