@@ -106,6 +106,35 @@ func TestDefaultBudgetStopOffersValidatedStrategy(t *testing.T) {
 	}
 }
 
+func TestDefaultStrategyBindsPathAndReceiptID(t *testing.T) {
+	a := newIncompleteReadTestAgent(&scriptedProvider{}, incompleteReadBuiltin(t), NewSession("sys"), event.Discard)
+	a.turn.readShadow = newReadShadowState(true)
+	a.reads.tasks = newReadTasks("test", 1)
+	for _, id := range []string{"r-a", "r-b"} {
+		path := "/w/" + id
+		a.armDefaultReadStrategy(id, tool.ReadResultEnvelope{ReadID: id, Source: tool.ReadResultSource{CanonicalPath: path, Identity: id, Snapshot: id}, Intent: tool.ReadIntentFull})
+	}
+	grep := &toolCallPlan{evidenceName: "grep", execArgs: json.RawMessage(`{"path":"/w/r-b","pattern":"x"}`)}
+	if _, blocked := a.gateReadOperation(context.Background(), grep); blocked || grep.incompleteReadRoot != "r-b" {
+		t.Fatalf("grep root=%q blocked=%v", grep.incompleteReadRoot, blocked)
+	}
+	receipt := &toolCallPlan{evidenceName: "session_read_strategy_receipt", evidenceArgs: json.RawMessage(`{"read_id":"r-b"}`)}
+	if _, blocked := a.gateReadOperation(context.Background(), receipt); blocked || receipt.incompleteReadRoot != "r-b" {
+		t.Fatalf("receipt root=%q blocked=%v", receipt.incompleteReadRoot, blocked)
+	}
+}
+
+func TestLegacyIncompleteReadErrorCarriesPauseReceipt(t *testing.T) {
+	path := makeIncompleteReadFixture(t, "legacy-pause.txt", 430, 96, 362, incompleteReadKeyRule)
+	args := fmt.Sprintf(`{"path":%q,"intent":"full"}`, path)
+	p := &scriptedProvider{turns: [][]provider.Chunk{{toolCallChunk("read", "read_file", args), {Type: provider.ChunkDone}}, textTurn("premature"), textTurn("premature")}}
+	a := newLegacyIncompleteReadTestAgentWithOptions(p, incompleteReadBuiltin(t), NewSession("sys"), event.Discard, Options{ContextWindow: 256_000})
+	var pause *IncompleteReadError
+	if err := a.Run(context.Background(), "Read the complete file."); !errors.As(err, &pause) || pause.Pause == nil || len(pause.Pause.Reads) == 0 {
+		t.Fatalf("legacy pause=%+v err=%v", pause, err)
+	}
+}
+
 func TestReadReferenceAfterWriteRedeliversCurrentEvidence(t *testing.T) {
 	a, env, body := deliveryFixture(t)
 	a.task.ledger = evidence.NewLedger()
