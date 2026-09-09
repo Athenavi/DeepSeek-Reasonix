@@ -69,6 +69,11 @@ try {
   const draftAfterModel = await composer.inputValue();
   assert(draftAfterModel === 'layout-owned draft' && JSON.stringify(transcriptAfterModel) === JSON.stringify(transcriptBeforeModel),
     'real model selection preserves source transcript, Composer draft and writable readiness');
+  // A fresh profile opens the dock with no tab, so the Files view comes from
+  // the tab picker; a restored profile already carries the tab.
+  if (await page.getByRole('tab', { name: 'Files', exact: true }).count() === 0) {
+    await page.locator('.tab-picker__item', { hasText: 'Files' }).first().click();
+  }
   await page.getByRole('tab', { name: 'Files', exact: true }).click();
   await page.locator('[data-workspace-path="README.md"]').click();
   await page.waitForFunction(() => document.querySelector('.workspace-preview__body')?.textContent?.includes('Browser-dev workspace preview.'));

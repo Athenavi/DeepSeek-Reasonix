@@ -267,6 +267,7 @@ export function TabBar({ tabs, activeTabId, onActivate, onClose, onMoveTab, onAd
               }}
               role="tab"
               aria-selected={active}
+              aria-label={tab.label}
               className={[
                 "workbench-dock__tab",
                 active ? "workbench-dock__tab--active" : "",
