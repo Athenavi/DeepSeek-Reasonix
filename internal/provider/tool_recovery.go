@@ -47,7 +47,7 @@ type ToolCallRecord struct {
 
 func ToolResultRunState(m Message) ToolRunState {
 	switch m.ToolRunState {
-	case ToolRunCompleted, ToolRunNotStarted, ToolRunUnknown:
+	case ToolRunPending, ToolRunStarted, ToolRunRunning, ToolRunCompleted, ToolRunFailed, ToolRunCancelled, ToolRunNotStarted, ToolRunUnknown:
 		return m.ToolRunState
 	case "":
 	default:

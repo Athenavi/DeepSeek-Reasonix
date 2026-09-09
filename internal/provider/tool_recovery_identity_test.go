@@ -22,3 +22,11 @@ func TestToolCallRecordPersistsStableIdentityAndRecoveryStates(t *testing.T) {
 		t.Fatalf("record round trip = %+v", got)
 	}
 }
+
+func TestToolResultRunStatePreservesDurableTerminalStates(t *testing.T) {
+	for _, state := range []ToolRunState{ToolRunPending, ToolRunStarted, ToolRunRunning, ToolRunFailed, ToolRunCancelled} {
+		if got := ToolResultRunState(Message{ToolRunState: state}); got != state {
+			t.Fatalf("state %q classified as %q", state, got)
+		}
+	}
+}
