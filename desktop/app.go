@@ -1094,12 +1094,6 @@ func (a *App) submitUserTurnToTabWithSink(tabID, input string, forwarder event.S
 	return started
 }
 
-// RunShell executes a shell command directly (bypassing the model) and streams
-// output as events on eventChannel.
-func (a *App) RunShell(command string) error {
-	return a.RunShellForTab("", command)
-}
-
 func (a *App) RunShellForTab(tabID, command string) error {
 	admission, ctrl, err := a.beginTabTurn(tabID, true)
 	if err != nil {
@@ -1771,10 +1765,6 @@ func normalizeCollaborationMode(mode string) string {
 	default:
 		return "normal"
 	}
-}
-
-func (a *App) SetCollaborationMode(mode string) {
-	a.SetCollaborationModeForTab("", mode)
 }
 
 // SetComposerProfileForTab applies the controller-facing profile axes under one
@@ -6224,11 +6214,6 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-// ContextUsage returns the latest context-window gauge numbers.
-func (a *App) ContextUsage() ContextInfo {
-	return a.ContextUsageForTab("")
-}
-
 func (a *App) ContextUsageForTab(tabID string) ContextInfo {
 	a.mu.RLock()
 	tab := a.tabByIDLocked(tabID)
@@ -6683,10 +6668,6 @@ func syncTabGoalToController(ctrl control.SessionAPI, goal string) {
 		return
 	}
 	ctrl.SetGoal(goal)
-}
-
-func (a *App) ClearGoal() error {
-	return a.SetGoal("")
 }
 
 func (a *App) ClearGoalForTab(tabID string) error {
@@ -10326,12 +10307,6 @@ func (a *App) ReadFileForTab(tabID, rel string) FilePreview {
 	return out
 }
 
-// OpenWorkspacePath opens a workspace or authorized external-ref file/folder in
-// the OS default app.
-func (a *App) OpenWorkspacePath(rel string) error {
-	return a.OpenWorkspacePathForTab("", rel)
-}
-
 // OpenWorkspacePathForTab opens a path resolved against the requested tab.
 func (a *App) OpenWorkspacePathForTab(tabID, rel string) error {
 	path, ok, err := a.workspaceOrExternalPathForTab(tabID, rel)
@@ -10339,12 +10314,6 @@ func (a *App) OpenWorkspacePathForTab(tabID, rel string) error {
 		return os.ErrInvalid
 	}
 	return openWorkspacePath(path)
-}
-
-// RevealWorkspacePath shows a workspace or authorized external-ref file in the
-// native file manager.
-func (a *App) RevealWorkspacePath(rel string) error {
-	return a.RevealWorkspacePathForTab("", rel)
 }
 
 // RevealWorkspacePathForTab reveals a path resolved against the requested tab.
@@ -11486,10 +11455,6 @@ func (a *App) GetTask(taskID string) (*taskmonitor.TaskSnapshot, error) {
 	return a.taskStore().GetTask(a.ctx, a.projectDir(), taskID)
 }
 
-func (a *App) ListTaskEvents(taskID string, afterSequence int) ([]taskmonitor.TaskEvent, error) {
-	return a.taskStore().ListEvents(a.ctx, a.projectDir(), taskID, afterSequence)
-}
-
 func (a *App) ListTaskEventsForTab(tabID, taskID string, afterSequence int) ([]taskmonitor.TaskEvent, error) {
 	target, err := a.taskMonitorTargetForTab(tabID)
 	if err != nil {
@@ -11536,20 +11501,12 @@ func (a *App) CancelTaskForTab(tabID, taskID string, expectedVersion uint64, rea
 	)
 }
 
-func (a *App) RequeueTask(taskID string, expectedVersion uint64, idemKey string) (taskmonitor.ControlResult, error) {
-	return a.taskControl().RequeueTask(a.ctx, a.projectDir(), taskID, expectedVersion, idemKey)
-}
-
 func (a *App) RequeueTaskForTab(tabID, taskID string, expectedVersion uint64, idemKey string) (taskmonitor.ControlResult, error) {
 	target, err := a.taskMonitorTargetForTab(tabID)
 	if err != nil {
 		return taskmonitor.ControlResult{}, err
 	}
 	return a.taskControl().RequeueTask(a.ctx, target.projectDir, taskID, expectedVersion, idemKey)
-}
-
-func (a *App) OpenTaskSession(taskID string) (taskmonitor.ControlResult, error) {
-	return a.taskControl().OpenTaskSession(a.ctx, a.projectDir(), taskID)
 }
 
 func (a *App) OpenTaskSessionForTab(tabID, taskID string) (taskmonitor.ControlResult, error) {

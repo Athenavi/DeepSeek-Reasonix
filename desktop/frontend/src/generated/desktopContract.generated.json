@@ -1899,22 +1899,6 @@
     {
       "cancellation": "before-dispatch",
       "domain": "desktop/app.go",
-      "name": "ClearGoal",
-      "owner": "App.ClearGoal",
-      "params": [],
-      "returnsError": true,
-      "scope": {
-        "inputs": [],
-        "kind": "owner-state",
-        "resolver": "App.ClearGoal"
-      },
-      "sources": [
-        "desktop/app.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
-      "domain": "desktop/app.go",
       "name": "ClearGoalForTab",
       "owner": "App.ClearGoalForTab",
       "params": [
@@ -2496,25 +2480,6 @@
       },
       "sources": [
         "desktop/tabs.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
-      "domain": "desktop/app.go",
-      "name": "ContextUsage",
-      "owner": "App.ContextUsage",
-      "params": [],
-      "result": {
-        "kind": "object",
-        "ref": "main.ContextInfo"
-      },
-      "scope": {
-        "inputs": [],
-        "kind": "owner-state",
-        "resolver": "App.ContextUsage"
-      },
-      "sources": [
-        "desktop/app.go"
       ]
     },
     {
@@ -5579,39 +5544,6 @@
     {
       "cancellation": "before-dispatch",
       "domain": "desktop/app.go",
-      "name": "ListTaskEvents",
-      "owner": "App.ListTaskEvents",
-      "params": [
-        {
-          "kind": "string"
-        },
-        {
-          "kind": "integer"
-        }
-      ],
-      "result": {
-        "elem": {
-          "kind": "object",
-          "ref": "taskmonitor.TaskEvent"
-        },
-        "kind": "array"
-      },
-      "returnsError": true,
-      "scope": {
-        "inputs": [
-          "taskID",
-          "afterSequence"
-        ],
-        "kind": "owner-inputs",
-        "resolver": "App.ListTaskEvents"
-      },
-      "sources": [
-        "desktop/app.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
-      "domain": "desktop/app.go",
       "name": "ListTaskEventsForTab",
       "owner": "App.ListTaskEventsForTab",
       "params": [
@@ -5854,39 +5786,6 @@
     {
       "cancellation": "before-dispatch",
       "domain": "desktop/mcp_apps_app.go",
-      "name": "MCPAppCallTool",
-      "owner": "App.MCPAppCallTool",
-      "params": [
-        {
-          "kind": "string"
-        },
-        {
-          "kind": "string"
-        },
-        {
-          "kind": "any"
-        }
-      ],
-      "result": {
-        "kind": "string"
-      },
-      "returnsError": true,
-      "scope": {
-        "inputs": [
-          "instanceToken",
-          "toolName",
-          "args"
-        ],
-        "kind": "owner-inputs",
-        "resolver": "App.MCPAppCallTool"
-      },
-      "sources": [
-        "desktop/mcp_apps_app.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
-      "domain": "desktop/mcp_apps_app.go",
       "name": "MCPAppCallToolForTab",
       "owner": "App.MCPAppCallToolForTab",
       "params": [
@@ -5997,27 +5896,6 @@
     {
       "cancellation": "before-dispatch",
       "domain": "desktop/mcp_apps_app.go",
-      "name": "MCPCloseAppInstance",
-      "owner": "App.MCPCloseAppInstance",
-      "params": [
-        {
-          "kind": "string"
-        }
-      ],
-      "scope": {
-        "inputs": [
-          "instanceToken"
-        ],
-        "kind": "owner-inputs",
-        "resolver": "App.MCPCloseAppInstance"
-      },
-      "sources": [
-        "desktop/mcp_apps_app.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
-      "domain": "desktop/mcp_apps_app.go",
       "name": "MCPCloseAppInstanceForTab",
       "owner": "App.MCPCloseAppInstanceForTab",
       "params": [
@@ -6096,51 +5974,6 @@
     {
       "cancellation": "before-dispatch",
       "domain": "desktop/mcp_apps_app.go",
-      "name": "MCPOpenAppInstance",
-      "owner": "App.MCPOpenAppInstance",
-      "params": [
-        {
-          "kind": "string"
-        },
-        {
-          "kind": "string"
-        },
-        {
-          "kind": "integer"
-        },
-        {
-          "kind": "string"
-        },
-        {
-          "kind": "string"
-        }
-      ],
-      "result": {
-        "elem": {
-          "kind": "object",
-          "ref": "main.MCPAppInstanceView"
-        },
-        "kind": "nullable"
-      },
-      "returnsError": true,
-      "scope": {
-        "inputs": [
-          "server",
-          "tool",
-          "generation",
-          "callID",
-          "resourceURI"
-        ],
-        "kind": "owner-inputs",
-        "resolver": "App.MCPOpenAppInstance"
-      },
-      "sources": [
-        "desktop/mcp_apps_app.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
-      "domain": "desktop/mcp_apps_app.go",
       "name": "MCPOpenAppInstanceForTab",
       "owner": "App.MCPOpenAppInstanceForTab",
       "params": [
@@ -6182,28 +6015,6 @@
         ],
         "kind": "owner-inputs",
         "resolver": "App.MCPOpenAppInstanceForTab"
-      },
-      "sources": [
-        "desktop/mcp_apps_app.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
-      "domain": "desktop/mcp_apps_app.go",
-      "name": "MCPOpenAppLink",
-      "owner": "App.MCPOpenAppLink",
-      "params": [
-        {
-          "kind": "string"
-        }
-      ],
-      "returnsError": true,
-      "scope": {
-        "inputs": [
-          "rawURL"
-        ],
-        "kind": "owner-inputs",
-        "resolver": "App.MCPOpenAppLink"
       },
       "sources": [
         "desktop/mcp_apps_app.go"
@@ -6936,32 +6747,6 @@
     },
     {
       "cancellation": "before-dispatch",
-      "domain": "desktop/app.go",
-      "name": "OpenTaskSession",
-      "owner": "App.OpenTaskSession",
-      "params": [
-        {
-          "kind": "string"
-        }
-      ],
-      "result": {
-        "kind": "object",
-        "ref": "taskmonitor.ControlResult"
-      },
-      "returnsError": true,
-      "scope": {
-        "inputs": [
-          "taskID"
-        ],
-        "kind": "owner-inputs",
-        "resolver": "App.OpenTaskSession"
-      },
-      "sources": [
-        "desktop/app.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
       "domain": "desktop/task_catalog.go",
       "name": "OpenTaskSessionByKey",
       "owner": "App.OpenTaskSessionByKey",
@@ -7074,28 +6859,6 @@
     {
       "cancellation": "before-dispatch",
       "domain": "desktop/external_opener.go",
-      "name": "OpenWorkspaceInExternalOpener",
-      "owner": "App.OpenWorkspaceInExternalOpener",
-      "params": [
-        {
-          "kind": "string"
-        }
-      ],
-      "returnsError": true,
-      "scope": {
-        "inputs": [
-          "id"
-        ],
-        "kind": "owner-inputs",
-        "resolver": "App.OpenWorkspaceInExternalOpener"
-      },
-      "sources": [
-        "desktop/external_opener.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
-      "domain": "desktop/external_opener.go",
       "name": "OpenWorkspaceInExternalOpenerForTab",
       "owner": "App.OpenWorkspaceInExternalOpenerForTab",
       "params": [
@@ -7117,28 +6880,6 @@
       },
       "sources": [
         "desktop/external_opener.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
-      "domain": "desktop/app.go",
-      "name": "OpenWorkspacePath",
-      "owner": "App.OpenWorkspacePath",
-      "params": [
-        {
-          "kind": "string"
-        }
-      ],
-      "returnsError": true,
-      "scope": {
-        "inputs": [
-          "rel"
-        ],
-        "kind": "owner-inputs",
-        "resolver": "App.OpenWorkspacePath"
-      },
-      "sources": [
-        "desktop/app.go"
       ]
     },
     {
@@ -9201,40 +8942,6 @@
     },
     {
       "cancellation": "before-dispatch",
-      "domain": "desktop/app.go",
-      "name": "RequeueTask",
-      "owner": "App.RequeueTask",
-      "params": [
-        {
-          "kind": "string"
-        },
-        {
-          "kind": "integer"
-        },
-        {
-          "kind": "string"
-        }
-      ],
-      "result": {
-        "kind": "object",
-        "ref": "taskmonitor.ControlResult"
-      },
-      "returnsError": true,
-      "scope": {
-        "inputs": [
-          "taskID",
-          "expectedVersion",
-          "idemKey"
-        ],
-        "kind": "owner-inputs",
-        "resolver": "App.RequeueTask"
-      },
-      "sources": [
-        "desktop/app.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
       "domain": "desktop/task_catalog.go",
       "name": "RequeueTaskByKey",
       "owner": "App.RequeueTaskByKey",
@@ -10176,28 +9883,6 @@
     {
       "cancellation": "before-dispatch",
       "domain": "desktop/app.go",
-      "name": "RevealWorkspacePath",
-      "owner": "App.RevealWorkspacePath",
-      "params": [
-        {
-          "kind": "string"
-        }
-      ],
-      "returnsError": true,
-      "scope": {
-        "inputs": [
-          "rel"
-        ],
-        "kind": "owner-inputs",
-        "resolver": "App.RevealWorkspacePath"
-      },
-      "sources": [
-        "desktop/app.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
-      "domain": "desktop/app.go",
       "name": "RevealWorkspacePathForTab",
       "owner": "App.RevealWorkspacePathForTab",
       "params": [
@@ -10331,28 +10016,6 @@
       },
       "sources": [
         "desktop/remote_tab.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
-      "domain": "desktop/app.go",
-      "name": "RunShell",
-      "owner": "App.RunShell",
-      "params": [
-        {
-          "kind": "string"
-        }
-      ],
-      "returnsError": true,
-      "scope": {
-        "inputs": [
-          "command"
-        ],
-        "kind": "owner-inputs",
-        "resolver": "App.RunShell"
-      },
-      "sources": [
-        "desktop/app.go"
       ]
     },
     {
@@ -11385,27 +11048,6 @@
       },
       "sources": [
         "desktop/settings_preferences.go"
-      ]
-    },
-    {
-      "cancellation": "before-dispatch",
-      "domain": "desktop/app.go",
-      "name": "SetCollaborationMode",
-      "owner": "App.SetCollaborationMode",
-      "params": [
-        {
-          "kind": "string"
-        }
-      ],
-      "scope": {
-        "inputs": [
-          "mode"
-        ],
-        "kind": "owner-inputs",
-        "resolver": "App.SetCollaborationMode"
-      },
-      "sources": [
-        "desktop/app.go"
       ]
     },
     {
