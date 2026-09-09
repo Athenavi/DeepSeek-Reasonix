@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"log/slog"
 	"maps"
 	"os"
@@ -774,7 +773,7 @@ func (a *App) detachRuntimeForReplacementLocked(tab *WorkspaceTab) bool {
 // applyRuntimeTab moves source's runtime (controller, sink, lease, telemetry)
 // onto target. path is the real session path for display/persistence; the
 // case-folded runtime key must never be written into SessionPath.
-func applyRuntimeTab(target, source *WorkspaceTab, path string, wailsCtx context.Context, app *App) {
+func applyRuntimeTab(target, source *WorkspaceTab, path string, appCtx context.Context, app *App) {
 	if target == nil || source == nil {
 		return
 	}
@@ -792,7 +791,7 @@ func applyRuntimeTab(target, source *WorkspaceTab, path string, wailsCtx context
 	if source.sink != nil {
 		source.sink.setBinding(target.ID, app)
 		source.sink.setSessionGeneration(target.SessionGeneration)
-		source.sink.setContext(wailsCtx)
+		source.sink.setContext(appCtx)
 	}
 
 	target.Ctrl = source.Ctrl
@@ -846,7 +845,7 @@ func applyRuntimeTab(target, source *WorkspaceTab, path string, wailsCtx context
 	}
 }
 
-func (a *App) attachExistingSessionRuntimeCore(tab *WorkspaceTab, path string, wailsCtx context.Context) bool {
+func (a *App) attachExistingSessionRuntimeCore(tab *WorkspaceTab, path string, appCtx context.Context) bool {
 	key := sessionRuntimeKey(path)
 	if tab == nil || key == "" {
 		return false
@@ -900,7 +899,7 @@ func (a *App) attachExistingSessionRuntimeCore(tab *WorkspaceTab, path string, w
 			return false
 		}
 		delete(a.detachedSessions, key)
-		applyRuntimeTab(tab, detached, path, wailsCtx, a)
+		applyRuntimeTab(tab, detached, path, appCtx, a)
 		if current := a.tabs[tab.ID]; current == tab {
 			a.saveTabsLocked()
 		}
@@ -941,7 +940,7 @@ func (a *App) attachExistingSessionRuntimeCore(tab *WorkspaceTab, path string, w
 	if a.activeTabID == source.ID {
 		a.activeTabID = tab.ID
 	}
-	applyRuntimeTab(tab, source, path, wailsCtx, a)
+	applyRuntimeTab(tab, source, path, appCtx, a)
 	a.saveTabsLocked()
 	attachedCtrl := tab.Ctrl
 	attachedSink := tab.sink
@@ -1885,15 +1884,15 @@ type runtimeEventEnvelope struct {
 	payload []any
 }
 
-// asyncRuntimeEmitter decouples Wails' runtime event bridge from agent emission.
-// runtime.EventsEmit can block when the single webview event channel backs up;
-// callers enqueue in-order work and return without holding the agent event lock.
+// asyncRuntimeEmitter decouples the host event bridge from agent emission.
+// Emit can block when the event channel backs up; callers enqueue in-order
+// work and return without holding the agent event lock.
 // runtimeEventsEmitFallback is the emit used when no per-instance override is
-// installed. Production keeps the real Wails bridge; the test binary swaps in
-// a no-op via TestMain, because Wails EventsEmit log.Fatals outside a running
-// Wails app and would kill the whole test process from any code path that
-// emits a runtime event with a plain Background context.
-var runtimeEventsEmitFallback runtimeEventEmitFunc = runtime.EventsEmit
+// installed. Production replaces it with the host RPC server emit in
+// runHostRPC; the test binary swaps in a no-op via TestMain.
+var runtimeEventsEmitFallback runtimeEventEmitFunc = func(_ context.Context, name string, _ ...any) {
+	slog.Debug("desktop: runtime event dropped without a host shell", "name", name)
+}
 
 type asyncRuntimeEmitter struct {
 	mu                     sync.Mutex
@@ -3805,7 +3804,7 @@ func clearTabStartupError(tab *WorkspaceTab) {
 	tab.StartupErrLeaseHeld = false
 }
 
-func (a *App) recordTabStartupFailure(tab *WorkspaceTab, buildGeneration uint64, wailsCtx context.Context, err error) {
+func (a *App) recordTabStartupFailure(tab *WorkspaceTab, buildGeneration uint64, appCtx context.Context, err error) {
 	a.mu.Lock()
 	if a.tabBuildSupersededLocked(tab, buildGeneration) {
 		a.mu.Unlock()
@@ -3826,7 +3825,7 @@ func (a *App) recordTabStartupFailure(tab *WorkspaceTab, buildGeneration uint64,
 		alreadyBlocked := rt != nil && rt.Phase == sessionRuntimeLeaseBlocked && rt.Issue != nil && rt.Issue.Code == "session_lease_held"
 		a.mu.RUnlock()
 		if alreadyBlocked {
-			a.emitReady(wailsCtx, tab.ID)
+			a.emitReady(appCtx, tab.ID)
 			return
 		}
 		// A failed startup emits no agent events, so the frontend's tabMetas
@@ -3840,7 +3839,7 @@ func (a *App) recordTabStartupFailure(tab *WorkspaceTab, buildGeneration uint64,
 			a.emitRuntimeEvent(tabMetaRefreshEventChannel, TabMetaRefreshEvent{TabID: tabID, Meta: a.MetaForTab(tabID)})
 		})
 	}
-	a.emitReady(wailsCtx, tab.ID)
+	a.emitReady(appCtx, tab.ID)
 }
 
 // closeTabBuildDone signals waiters (topic-activation completions) that the
@@ -3881,7 +3880,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 		// builds so the test can observe every build it started.
 		hook(tab.ID)
 	}
-	wailsCtx := a.ctx
+	appCtx := a.ctx
 	if a.tabBuildSuperseded(tab, buildGeneration) {
 		return
 	}
@@ -3925,7 +3924,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 	_ = config.MigrateLegacyCredentialsForRoot(root)
 	cfg, err := config.LoadForRoot(root)
 	if err != nil {
-		a.recordTabStartupFailure(tab, buildGeneration, wailsCtx, err)
+		a.recordTabStartupFailure(tab, buildGeneration, appCtx, err)
 		return
 	}
 
@@ -3933,7 +3932,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 		return
 	}
 	if tabSink != nil {
-		tabSink.setContext(wailsCtx)
+		tabSink.setContext(appCtx)
 	}
 
 	sessionDir := desktopSessionDir(root)
@@ -3986,7 +3985,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 		} else {
 			resolved, _, ok := cfg.ResolveDesktopNewSessionModel()
 			if !ok {
-				a.recordTabStartupFailure(tab, buildGeneration, wailsCtx, errNoDesktopChatModel)
+				a.recordTabStartupFailure(tab, buildGeneration, appCtx, errNoDesktopChatModel)
 				return
 			}
 			model = resolved
@@ -4067,7 +4066,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 		OnSessionTransition:      a.handleTabSessionTransition(tab),
 		OnSessionTitleChanged:    a.onSessionTitleChanged,
 	})
-	if a.handleTabControllerBootError(tab, registration, rootKey, buildGeneration, wailsCtx, err) {
+	if a.handleTabControllerBootError(tab, registration, rootKey, buildGeneration, appCtx, err) {
 		return
 	}
 	if a.tabBuildSuperseded(tab, buildGeneration) {
@@ -4136,7 +4135,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 			if leaseHeld {
 				a.scheduleDeferredStartupBuild(tab.ID)
 			}
-			a.emitReady(wailsCtx, tab.ID)
+			a.emitReady(appCtx, tab.ID)
 			return
 		}
 		if path == "" {
@@ -4147,7 +4146,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 			if a.claimSessionRuntime(tab, path, buildCtx) {
 				ctrl.Close()
 				a.releaseSharedHost(rootKey)
-				a.emitReady(wailsCtx, tab.ID)
+				a.emitReady(appCtx, tab.ID)
 				return
 			}
 			preLeaseKey := tab.sessionLeaseRuntimeKey()
@@ -4173,7 +4172,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 				if leaseHeld {
 					a.scheduleDeferredStartupBuild(tab.ID)
 				}
-				a.emitReady(wailsCtx, tab.ID)
+				a.emitReady(appCtx, tab.ID)
 				return
 			}
 			// Remember which lease THIS build bound: if the build is later
@@ -4214,7 +4213,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 				if leaseHeld {
 					a.scheduleDeferredStartupBuild(tab.ID)
 				}
-				a.emitReady(wailsCtx, tab.ID)
+				a.emitReady(appCtx, tab.ID)
 				return
 			}
 			a.persistTabSessionPath(tab, path)
@@ -4259,7 +4258,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 	}
 	// Commit the scope while the final tab-generation check is still guarded.
 	// It only takes the plugin Host leaf lock and cannot call back into App.
-	if !a.commitStartupWriteAuthorityLocked(tab, ctrl, registration, rootKey, acquiredLeaseKey, wailsCtx) {
+	if !a.commitStartupWriteAuthorityLocked(tab, ctrl, registration, rootKey, acquiredLeaseKey, appCtx) {
 		return
 	}
 	tab.Ctrl = ctrl
@@ -4279,7 +4278,7 @@ func (a *App) buildTabControllerWithContextCore(tab *WorkspaceTab, loadedSession
 		go a.adoptSessionFromLocalServe(tab.ID, path)
 	}
 	recoverPendingTurnProjections(tab, ctrl)
-	a.emitReady(wailsCtx, tab.ID)
+	a.emitReady(appCtx, tab.ID)
 }
 
 type sessionBinding struct {
@@ -6401,7 +6400,7 @@ type ProjectNode struct {
 	RecoveryBranchCount          int    `json:"recoveryBranchCount,omitempty"`
 	RecoveryUnresolvedCount      int    `json:"recoveryUnresolvedCount,omitempty"`
 	RecoveryCleanupEligibleCount int    `json:"recoveryCleanupEligibleCount,omitempty"`
-	// RecoveryCopyCount is retained for Wails compatibility with older desktop
+	// RecoveryCopyCount is retained for compatibility with older desktop
 	// frontends. Ordinary project-tree payloads intentionally leave it at zero:
 	// physical recovery copies are an internal persistence detail.
 	RecoveryCopyCount int           `json:"recoveryCopyCount,omitempty"`

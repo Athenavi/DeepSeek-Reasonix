@@ -154,7 +154,7 @@ func (r *Registry) Commands() []Command { return slices.Clone(r.commands) }
 
 // Invoke decodes args into the method's parameters, calls it, and returns
 // its result (nil for void) or its error. Missing trailing arguments decode
-// as zero values, as Wails tolerated; extra ones are rejected.
+// as zero values, matching the retired shell's tolerance; extra ones are rejected.
 func (r *Registry) Invoke(ctx context.Context, name string, args []json.RawMessage) (result any, err error) {
 	m, ok := r.methods[name]
 	if !ok {

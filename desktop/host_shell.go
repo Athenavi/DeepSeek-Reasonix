@@ -150,20 +150,18 @@ func (b *hostShellBridge) beforeClose(ctx context.Context, reason string) bool {
 	return b.app.beforeClose(ctx)
 }
 
-// startNativeShellSupport starts the watchdogs and hooks that only make sense
-// when this process owns a native UI thread; the Electron shell owns those.
+// startNativeShellSupport repairs the installed bundle's icon integration.
+// Under the Electron shell the service owns no native UI thread, so the shell
+// owns the window-level hooks; this runs only for a bare service launch.
 func (a *App) startNativeShellSupport() {
 	if a.hostMode() {
 		return
 	}
-	installSystemQuitHook()
 	a.goSafe("repairDesktopIconIntegration", func() {
 		if err := repairDesktopIconIntegration(); err != nil {
 			slog.Debug("desktop: repair native icon integration", "err", err)
 		}
 	})
-	a.goSafe("applyWindowIconsFromExecutable", applyWindowIconsFromExecutable)
-	a.startMainThreadWatchdog()
 }
 
 // relaunch asks the shell to restart the whole application; the shell then

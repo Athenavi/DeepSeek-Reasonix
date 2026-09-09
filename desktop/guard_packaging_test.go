@@ -80,7 +80,7 @@ func TestDesktopPackagesPreserveNativePlatformLaunchers(t *testing.T) {
 		`./cmd/reasonix`,
 		`./cmd/reasonix-legacy-migrator`,
 		`./cmd/reasonix-launcher`,
-		`cp "$cli_out" "$app/Contents/MacOS/$CLINAME"`,
+		`cp "$cli_out" "$app/Contents/Resources/service/$CLINAME"`,
 		`macOS bundle must not include $GUARDNAME`,
 		`[ "$bundle_executable" = "$APPNAME" ]`,
 		`Print :CFBundleIconFile`,

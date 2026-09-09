@@ -198,7 +198,3 @@ func (h rpcNativeHost) Quit(ctx context.Context) { h.fire(ctx, "host/app.quit", 
 func (h rpcNativeHost) OpenDevTools(ctx context.Context) {
 	h.fire(ctx, "host/devtools.toggle", struct{}{})
 }
-
-func (h rpcNativeHost) NavigateRemoteWindow(ctx context.Context, url string) {
-	h.fire(ctx, "host/remoteWindow.navigate", map[string]string{"url": url})
-}

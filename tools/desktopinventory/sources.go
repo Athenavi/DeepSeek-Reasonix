@@ -15,12 +15,10 @@ var ciJobs = map[string]struct {
 	"ci.yml/desktop":                              {classKeepBusiness, "aggregate gate, unchanged"},
 	"ci.yml/desktop-frontend":                     {classKeepBusiness, "React gates unchanged"},
 	"ci.yml/desktop-browser":                      {classKeepBusiness, "Playwright browser gates unchanged"},
-	"ci.yml/desktop-prepare":                      {classMigrateHost, "wails generate module → go run . -emit-contract; pnpm workspace root"},
-	"ci.yml/desktop-go":                           {classMigrateHost, "drops WebKitGTK smoke; adds hostrpc + electron shell tests"},
-	"ci.yml/desktop-linux-webkit41":               {classDeleteShell, "no WebKitGTK toolchain matrix under Chromium"},
-	"ci.yml/desktop-macos":                        {classMigrateHost, "Electron packaging smoke replaces wails build"},
-	"ci.yml/desktop-windows":                      {classMigrateHost, "Electron packaging smoke replaces wails build"},
-	"transcript-native-smoke.yml/macos-wkwebview": {classMigrateHost, "native transcript smoke runs inside the Electron window"},
+	"ci.yml/desktop-prepare":                      {classKeepBusiness, "go run . -emit-contract drift gate; pnpm workspace root"},
+	"ci.yml/desktop-go":                           {classKeepBusiness, "hostrpc + module tests; no WebKitGTK toolchain"},
+	"ci.yml/desktop-macos":                        {classKeepBusiness, "Electron packaging smoke"},
+	"ci.yml/desktop-windows":                      {classKeepBusiness, "Electron packaging smoke"},
 	"app-memory.yml/app-memory":                   {classKeepBusiness, "browser memory screening unchanged"},
 	"app-memory.yml/prepare":                      {classKeepBusiness, "browser memory screening unchanged"},
 	"app-memory.yml/shard":                        {classKeepBusiness, "browser memory screening unchanged"},
@@ -28,11 +26,11 @@ var ciJobs = map[string]struct {
 	"release-desktop.yml/resolve":                 {classKeepBusiness, "version/channel resolution unchanged"},
 	"release-desktop.yml/orchestration-guard":     {classKeepBusiness, "unchanged"},
 	"release-desktop.yml/release-gate":            {classKeepBusiness, "unchanged"},
-	"release-desktop.yml/signing-contract":        {classMigrateHost, "payload list gains the Electron executables and native modules"},
+	"release-desktop.yml/signing-contract":        {classKeepBusiness, "payload list covers the Electron executables and native modules"},
 	"release-desktop.yml/cache-guard":             {classKeepBusiness, "unchanged"},
-	"release-desktop.yml/build":                   {classMigrateHost, "desktop-build.sh packages the Electron app with the same NSIS/nfpm/signing steps"},
+	"release-desktop.yml/build":                   {classKeepBusiness, "desktop-build.sh packages the Electron app with the same NSIS/nfpm/signing steps"},
 	"release-desktop.yml/publish":                 {classKeepBusiness, "manifest, minisign and mirror unchanged"},
-	"release-desktop.yml/attest-signing-contract": {classMigrateHost, "attests the extended payload list"},
+	"release-desktop.yml/attest-signing-contract": {classKeepBusiness, "attests the extended payload list"},
 	"release-desktop.yml/mirror":                  {classKeepBusiness, "unchanged"},
 }
 
@@ -59,7 +57,7 @@ func scanSources(root string, inv *inventory) error {
 			Owner:    "same file name and installer identity; Electron payload inside",
 		})
 	}
-	for _, workflow := range []string{"ci.yml", "transcript-native-smoke.yml", "app-memory.yml", "release-desktop.yml"} {
+	for _, workflow := range []string{"ci.yml", "app-memory.yml", "release-desktop.yml"} {
 		text, err := readFile(root, ".github/workflows/"+workflow)
 		if err != nil {
 			return err

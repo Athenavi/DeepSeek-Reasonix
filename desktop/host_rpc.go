@@ -39,7 +39,7 @@ const (
 func hostRPCRequested(args []string) bool { return slices.Contains(args, hostRPCFlag) }
 
 // exitIfHostLaunchMode runs -emit-contract or --host-rpc and exits with its
-// code; a normal Wails launch returns to the caller.
+// code; any other launch returns to the caller.
 func exitIfHostLaunchMode(args []string) {
 	if dir, ok := emitContractDir(args); ok {
 		os.Exit(runEmitContract(dir))
@@ -106,7 +106,7 @@ func runHostRPC(app *App, stdin io.Reader, stdout io.Writer) int {
 		return 2
 	}
 	// Lifecycle evidence and the probationary-update identity are claimed
-	// before any request, exactly as the Wails main did before wails.Run.
+	// before any request, before the shell connects.
 	prepareDesktopDiagnostics(app)
 	capturePendingUpdateHealthIdentity(app)
 	defer app.releaseDesktopDiagnosticsOwnership()
@@ -158,12 +158,12 @@ func runHostRPC(app *App, stdin io.Reader, stdout io.Writer) int {
 	return 0
 }
 
-// hostRPCHooks binds the lifecycle requests to the App hooks Wails used to
-// call, always with the service-lifetime context the App stores.
+// hostRPCHooks binds the shell's lifecycle requests to the App hooks, always
+// with the service-lifetime context the App stores.
 func hostRPCHooks(ctx context.Context, app *App, bridge *hostShellBridge, resources hostrpc.Resources) hostrpc.Hooks {
 	return hostrpc.Hooks{
 		Hello: func(hostrpc.HelloParams) (hostrpc.HelloResult, error) {
-			width, height := initialDesktopWindowSize(false)
+			width, height := initialDesktopWindowSize()
 			return hostrpc.HelloResult{
 				Resources: resources,
 				Window: &hostrpc.WindowGeometry{
@@ -171,7 +171,7 @@ func hostRPCHooks(ctx context.Context, app *App, bridge *hostShellBridge, resour
 					Height:     height,
 					MinWidth:   desktopWindowMinWidth,
 					MinHeight:  desktopWindowMinHeight,
-					Frameless:  desktopWindowFrameless(goruntime.GOOS, false),
+					Frameless:  desktopWindowFrameless(goruntime.GOOS),
 					ZoomFactor: initialDesktopZoomFactor(),
 				},
 			}, nil
@@ -219,7 +219,6 @@ func startResourceOrigin(app *App, token string) (origin string, stop func(), er
 	}
 	handler := http.NotFoundHandler()
 	chain := []func(http.Handler) http.Handler{
-		app.remoteWindowAssetMiddleware(),
 		app.jsProfilingMiddleware(),
 		app.remoteMarkdownImageMiddleware(),
 		app.workspaceMediaMiddleware(),

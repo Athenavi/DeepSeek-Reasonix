@@ -99,17 +99,7 @@ func TestBootstrapShellStartsDetachedShellWithServiceEnvAndArgs(t *testing.T) {
 	}
 }
 
-func TestBootstrapShellSkipsWhenWailsShellForced(t *testing.T) {
-	exe, shell := writeShellBootstrapFixture(t, runtime.GOOS)
-	if err := os.MkdirAll(filepath.Dir(shell), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(shell, []byte("#!/bin/sh\nexit 3\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if handled, _ := bootstrapShell(exe, runtime.GOOS, nil, []string{shellModeEnv + "=Wails"}); handled {
-		t.Fatal("REASONIX_DESKTOP_SHELL=wails must keep the in-process shell")
-	}
+func TestBootstrapShellSkipsWithoutShellBesideBinary(t *testing.T) {
 	if handled, _ := bootstrapShell(filepath.Join(t.TempDir(), "missing"), runtime.GOOS, nil, nil); handled {
 		t.Fatal("bootstrap handled a binary without a shell beside it")
 	}

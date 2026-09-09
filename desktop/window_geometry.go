@@ -8,9 +8,9 @@ func (a *App) restoreWindowGeometry() {
 	host := a.nativeHost()
 	state, ok := loadWindowState()
 	if ok {
-		// Wails v2 exposes no per-screen origin, so only a basic sanity check is
-		// possible. Windows border insets (commonly x=-8,y=-8) are legal; large
-		// off-screen positions (unplugged external display) re-center.
+		// The host screen list carries sizes but no per-screen origin, so only a
+		// basic sanity check is possible. Windows border insets (commonly x=-8,
+		// y=-8) are legal; off-screen positions (unplugged display) re-center.
 		maxW, maxH := 0, 0
 		screens, err := host.Screens(a.ctx)
 		if err == nil {

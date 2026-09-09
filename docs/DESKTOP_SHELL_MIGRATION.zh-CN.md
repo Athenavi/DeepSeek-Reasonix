@@ -177,14 +177,28 @@ configuration 指纹已变化），以及 Windows/Linux runner 验证。
 `Contents/MacOS/`；`.app` 替换路径不变。实现说明：`installlayout.Member` 的名字是
 版本目录下的正斜杠路径，要么是白名单内的文件名，要么是 `app/...`（不允许 `..`、绝对
 路径、反斜杠与符号链接）；清单读取端同时接受 schema 1（扁平列表）和 schema 2（扁平
-列表加 `app/`）；`REASONIX_DESKTOP_SHELL=wails` 让旁边已有 `app/` 的二进制继续使用
-进程内 shell；在 shell 下，macOS 交接子进程等待的是 Electron 进程（服务的父进程，
+列表加 `app/`）；迁移期的 `REASONIX_DESKTOP_SHELL=wails` 进程内回退已随阶段 F 删除；
+在 shell 下，macOS 交接子进程等待的是 Electron 进程（服务的父进程，
 通过 `-owner-pid` 传入），替换后用 `open -n` 重新打开 bundle，shell 本身只退出。
 
 ### F. 全矩阵验收并删除旧实现
 
 CI 切换到新构建、契约生成和原生测试入口；删除 Wails 入口、依赖、生成绑定、WebView2
 恢复与壳补丁；原型故障用例进入正式测试；删除迁移别名、重复 DTO 和临时适配。
+
+状态：删除已实现并通过本地测试。Wails 入口（`wails.Run`、`native_host_wails.go`、
+`wails.json`、生成的 `wailsjs` 绑定、进程内远程窗口子进程）已删除，随之删除的还有
+WebView2/WebKitGTK 恢复协调器、诊断观察者、原生冒烟工具（`cmd/transcript-native-smoke`、
+`cmd/transcript-selection-smoke`）、vendored go-webview2 分支、`webkit2_41` 构建标签和 CI
+的 WebKitGTK 工具链步骤。desktop 模块的 `go list -m all` 已无 Wails；前端只访问
+`window.reasonixDesktop`（由 `check-desktop-host-boundary.mjs` 强制），测试桩改为
+Electron 宿主 stub。`REASONIX_DESKTOP_SHELL=wails` 已不存在：未安装壳时直接启动会以
+安装提示退出。原型的崩溃故障用例（派发前崩溃取消动作、派发后崩溃按已执行结算且不重放、
+恢复保留登录分区）已成为 `desktop/electron/src/main/browser/` 的正式测试。有意保留：
+`startNativeShellSupport` 下的 fyne systray 进程内回退（壳下不可达，但仍是裸服务路径）、
+旧崩溃报告解码字段、`com.wails.reasonix-desktop` 包标识、更新助手的 `wails-app-`
+单实例查找（用于从 Wails 版升级的检测）。待办：四平台验收矩阵、与 Wails 基线的交互
+p95 对比、Windows/Linux CI runner 验证。
 
 退出条件：最终构建图中没有 Wails；业务代码没有旧桥接全局对象；全部矩阵项与门槛闭合。
 

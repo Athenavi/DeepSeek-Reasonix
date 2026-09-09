@@ -348,12 +348,12 @@ type App struct {
 	remoteMu      sync.Mutex
 	remoteRuntime remoteKernel
 
-	// Remote web windows (SSH Serve child processes). The main process tracks
-	// the live child plus transient handoff processes for each host. Host-scoped
-	// lifecycle operations are generation-fenced and serialized so an overlapping
-	// disconnect/stop cannot miss a window that is still being spawned. Closing a
-	// window releases only its registration, while the remote Serve and the SSH
-	// connection keep running. The child deliberately skips local runtimes.
+	// Remote web windows (SSH Serve pages). The Electron shell owns one
+	// BrowserWindow per host; the bridge tracks which host keys are open.
+	// Host-scoped lifecycle operations are generation-fenced and serialized so
+	// an overlapping disconnect/stop cannot miss a window that is still being
+	// opened. Closing a window never stops the remote Serve or the SSH
+	// connection.
 	remoteWindows          *remoteWindowRegistry
 	remoteWindowLifecycles remoteWindowLifecycleRegistry
 	remoteWindowOpener     func(remoteWindowLaunch) error // test-only injection
@@ -377,24 +377,6 @@ type App struct {
 	// through SSH reverse tunnels; per-generation tokens isolate hosts.
 	browserBrokerMu sync.Mutex
 	browserBroker   *browserBroker
-	// remoteWindowTicket/remoteWindowHostKey are set from argv before Wails
-	// starts in a child process. They gate the blank-shell middleware and the
-	// startup branches so the child never initializes local runtimes.
-	remoteWindowTicket  string
-	remoteWindowHostKey string
-	// remoteWindowOwnerID scopes child single-instance locks to one primary
-	// Desktop process. remoteWindowParentPID is set only in children and lets
-	// them exit when that owner (and therefore its SSH tunnel) disappears.
-	remoteWindowOwnerID   string
-	remoteWindowParentPID int
-	// remoteWindowMu serializes ticket consumption and navigation in a child
-	// process so a handoff arriving before domReady cannot be overridden by the
-	// initial ticket (or vice versa). remoteWindowTicketConsumed makes the
-	// initial handoff idempotent because WebKit fires OnDomReady again after the
-	// shell navigates to the remote Serve page.
-	remoteWindowMu             sync.Mutex
-	remoteWindowTicketConsumed bool
-	remoteWindow               *remoteWindowLaunch
 
 	// promptHistoryTape is a lazy, cursor-addressed view of prompt history. It
 	// stores session order and per-session parsed entries only after that session is
@@ -418,10 +400,9 @@ type App struct {
 	// never a rewritten or later same-version retry.
 	healthyUpdateCreatedAt     string
 	healthyUpdateTransactionID string
-	// startupReady records that React rendered and the Wails bridge heartbeat
+	// startupReady records that React rendered and the host bridge heartbeat
 	// succeeded. DOM navigation alone is not application health.
-	startupReady     atomic.Bool
-	webView2Recovery *webView2RecoveryCoordinator
+	startupReady atomic.Bool
 	// hostShell is non-nil only under the Electron shell (--host-rpc).
 	hostShell *hostShellBridge
 	// browserExecutors are per-tab browser grants over the shell; browserOps is
@@ -432,10 +413,9 @@ type App struct {
 }
 
 type desktopShellRuntimeState struct {
-	coordinator   *desktopShellCoordinator
-	linuxRecovery *linuxWebKitRecoveryCoordinator
-	trayState     string
-	trayReason    string
+	coordinator *desktopShellCoordinator
+	trayState   string
+	trayReason  string
 }
 
 type skillRootsCache struct {
@@ -446,8 +426,8 @@ type skillRootsCache struct {
 
 // jsProfilingMiddleware opts every asset response into the JS Self-Profiling
 // document policy so the frontend performance monitor can attach sampled stacks
-// to long-task reports. Chromium WebViews (WebView2) honor it; WebKit ignores
-// both the header and the API, so the frontend degrades to unattributed reports.
+// to long-task reports. Chromium honors both the header and the API; other
+// engines degrade to unattributed reports.
 func (a *App) jsProfilingMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -461,7 +441,6 @@ func (a *App) jsProfilingMiddleware() func(http.Handler) http.Handler {
 // last session's desktop-tabs.json.
 func NewApp() *App {
 	a := &App{
-		host:                 wailsNativeHost{},
 		tabs:                 map[string]*WorkspaceTab{},
 		runtimeByID:          map[string]*desktopSessionRuntime{},
 		runtimeBySessionKey:  map[string]*desktopSessionRuntime{},
@@ -471,7 +450,6 @@ func NewApp() *App {
 		botInstalls:          map[string]*botInstallSession{},
 		botRuntime:           newDesktopBotRuntime(),
 		remoteWindows:        newRemoteWindowRegistry(),
-		remoteWindowOwnerID:  newRemoteWindowOwnerID(),
 		topicState:           desktopTopicState,
 		worktreeReservations: worktreeRuntimeReservations{
 			cleanup: map[string]struct{}{},
@@ -479,8 +457,6 @@ func NewApp() *App {
 		},
 	}
 	a.desktopShell.trayState = "probing"
-	a.webView2Recovery = newWebView2RecoveryCoordinator(a)
-	a.desktopShell.linuxRecovery = newLinuxWebKitRecoveryCoordinator(a)
 	a.desktopShell.coordinator = newDesktopShellCoordinator(a)
 	a.workspaceHub = newWorkspaceChangeHub(a)
 	a.terminals = newTerminalManager(a)
@@ -501,29 +477,17 @@ func (a *App) Platform() string {
 	return goruntime.GOOS
 }
 
-// startup runs once the webview process is up, before the frontend can issue any
-// bound call. It captures the Wails context (needed for EventsEmit), then kicks
-// off the initialization in a background goroutine so the webview loads immediately.
+// startup runs once the shell's renderer is up, before the frontend can issue
+// any bound call. It stores the service-lifetime context, then kicks off the
+// initialization in a background goroutine so the page loads immediately.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.shuttingDown.Store(false)
-	// Only the process that claimed the pre-Wails diagnostics lock consumes
-	// lifecycle evidence. This remains correct on Linux where Wails invokes
-	// OnStartup before its DBus single-instance handoff.
+	// Only the process that claimed the pre-shell diagnostics lock consumes
+	// lifecycle evidence.
 	initializeLifecycleDiagnostics(a)
-	if !a.hostMode() {
-		a.startWindowsWebView2StartupFallback(ctx)
-		a.webView2Recovery.startGuidance(ctx)
-	}
 	a.desktopShell.coordinator.start(ctx)
 	a.lifecycle.tracker.markAsync("ready")
-	if a.remoteWindowTicket != "" {
-		// Remote web window child: no local tabs, tray, heartbeat, providers,
-		// or remote manager. domReady consumes the ticket and navigates; the
-		// owner watcher closes the window if the primary Desktop disappears.
-		a.watchRemoteWindowOwner(ctx)
-		return
-	}
 	a.startNativeShellSupport()
 	a.enableDeferredRebuildRetry()
 	a.startHistoryIndexMigration()
@@ -533,7 +497,6 @@ func (a *App) startup(ctx context.Context) {
 		a.recordSettingsMetricsSnapshot(cfg)
 	}
 	a.recordPreviousRunDiagnostics()
-	a.observeIncompleteWindowRestore()
 
 	a.heartbeat = newHeartbeatEngine(a)
 	a.heartbeat.Start()
@@ -554,12 +517,6 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) beforeClose(ctx context.Context) bool {
-	if a.remoteWindowTicket != "" {
-		// A remote web window closes immediately — nothing to snapshot, lease,
-		// or hide. Closing it must not stop the remote Serve or the main
-		// process's SSH connection.
-		return false
-	}
 	if a.forceQuit.Swap(false) || consumeSystemQuitRequested() {
 		return false
 	}
@@ -911,10 +868,6 @@ func (a *App) snapshotAllTabs() {
 
 // shutdown snapshots all tabs, saves the final window geometry, and closes tabs.
 func (a *App) shutdown(context.Context) {
-	if a.remoteWindowTicket != "" {
-		// Remote web window child has no local state to stop.
-		return
-	}
 	// Freeze publication, then cancel off-barrier history, catalog, and plugin
 	// work so normal quit never waits for background I/O.
 	a.shuttingDown.Store(true)
@@ -923,20 +876,11 @@ func (a *App) shutdown(context.Context) {
 	completeDesktopShutdown(a.lifecycle.tracker, a.shutdownBody)
 }
 
-// domReady is called (via OnDomReady) after the webview finishes loading its DOM
-// but before the StartHidden window is presented. It restores saved geometry,
-// then delegates presentation to the platform-aware shell coordinator.
+// domReady is called (via the shell's DOMReady hook) after the renderer
+// finishes loading its DOM but before the hidden window is presented. It
+// restores saved geometry, then delegates presentation to the shell
+// coordinator.
 func (a *App) domReady(_ context.Context) {
-	// JSC has installed its lazy signal handlers by this point. Restore the
-	// SA_ONSTACK flags required by Go; this is a no-op outside Linux.
-	if !a.hostMode() {
-		repairWebKitSignalHandlers()
-	}
-
-	if a.remoteWindowTicket != "" {
-		a.domReadyRemoteWindow()
-		return
-	}
 	if a.desktopShell.coordinator != nil {
 		a.desktopShell.coordinator.markDOMReady()
 	}
@@ -970,26 +914,19 @@ func (a *App) completeFrontendStartup() {
 	})
 }
 
-// ReportDesktopWebViewReady is the content-process heartbeat. OnDomReady proves
-// native navigation completed; this bound call additionally proves that React
-// and the Wails bridge are responsive after a renderer reload.
+// ReportDesktopWebViewReady is the content-process heartbeat. DOMReady proves
+// navigation completed; this bound call additionally proves that React and the
+// host bridge are responsive after a renderer reload.
 func (a *App) ReportDesktopWebViewReady() {
 	if a == nil || a.shuttingDown.Load() || a.forceQuit.Load() {
 		return
 	}
-	if a.webView2Recovery != nil {
-		a.webView2Recovery.reportReady()
-	}
-	a.reportLinuxWebKitFrontendReady()
 	if a.desktopShell.coordinator != nil {
 		first, healthy := a.desktopShell.coordinator.markFrontendHeartbeat(time.Now())
 		if first {
 			a.goSafe("startDesktopTrayAfterFrontendReady", func() { a.startTray() })
 		}
 		if healthy {
-			if a.desktopShell.linuxRecovery != nil {
-				a.desktopShell.linuxRecovery.frontendHealthy()
-			}
 			a.completeFrontendStartup()
 		}
 	}

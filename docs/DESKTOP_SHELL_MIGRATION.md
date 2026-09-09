@@ -237,8 +237,9 @@ bundle's main executable is Electron and the Go service lives in
 `installlayout.Member` names are forward-slash paths under the version
 directory, either a whitelisted base name or `app/...` (no `..`, absolute
 paths, backslashes or symlinks); manifest readers accept schema 1 (flat list)
-and schema 2 (flat list plus `app/`); `REASONIX_DESKTOP_SHELL=wails` keeps the
-in-process shell for a binary that has `app/` beside it; under the shell the
+and schema 2 (flat list plus `app/`); the migration window's
+`REASONIX_DESKTOP_SHELL=wails` in-process fallback left with phase F; under the
+shell the
 macOS hand-off waits for the Electron process (the service's parent, passed
 as `-owner-pid`) and reopens the swapped bundle with `open -n` while the shell
 only quits.
@@ -249,6 +250,27 @@ CI on the new build, contract generation and native test entry points; Wails
 entry, dependencies, generated bindings, WebView2 recovery and shell patches
 removed; prototype fault cases promoted into real tests; migration aliases,
 duplicate DTOs and temporary adapters deleted.
+
+Status: the removal is implemented and locally tested. The Wails entry
+(`wails.Run`, `native_host_wails.go`, `wails.json`, the generated `wailsjs`
+bindings, the in-process remote-window child processes) is gone, and with it
+the WebView2/WebKitGTK recovery coordinators, diagnostics observers, native
+smoke harnesses (`cmd/transcript-native-smoke`, `cmd/transcript-selection-smoke`),
+the vendored go-webview2 fork, the `webkit2_41` build tag and the CI WebKitGTK
+toolchain steps. The desktop module's `go list -m all` is Wails-free; the
+frontend reaches only `window.reasonixDesktop` (enforced by
+`check-desktop-host-boundary.mjs`) and the test seam is an Electron host stub.
+`REASONIX_DESKTOP_SHELL=wails` no longer exists: a plain launch without an
+installed shell exits with an install hint. The prototype's crash fault cases
+(renderer crash before dispatch cancels the act; crash after dispatch settles
+executed without replay; recovery keeps the login partition) run as real tests
+in `desktop/electron/src/main/browser/`. Kept on purpose: the fyne systray
+in-process fallback behind `startNativeShellSupport` (unreachable under the
+shell but still the bare-service path), the legacy crash-report decode fields,
+the `com.wails.reasonix-desktop` bundle identity, and the update helper's
+`wails-app-` single-instance lookup (upgrade-from-Wails detection). Open: the
+four-platform acceptance matrix, the interaction p95 comparison against the
+Wails baseline, and CI runner verification on Windows/Linux.
 
 Exit condition: no Wails in the final build graph; no old bridge globals in
 business code; every matrix item and gate closed.

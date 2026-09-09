@@ -16,7 +16,8 @@ var handoffUser32 = windows.NewLazySystemDLL("user32.dll")
 var findInstanceWindow = handoffUser32.NewProc("FindWindowExW")
 var instanceWindowPID = handoffUser32.NewProc("GetWindowThreadProcessId")
 
-// These names match Wails v2's Windows single-instance backend. HWND_MESSAGE
+// These names match the retired Wails v2 single-instance backend so an
+// update helper can still find a running pre-Electron app. HWND_MESSAGE
 // is required: ordinary top-level window enumeration does not include them.
 func desktopEndpointImage(id string) (string, error) {
 	name := "wails-app-" + id

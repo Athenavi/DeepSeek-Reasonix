@@ -25,7 +25,8 @@ React renderer ──typed IPC (preload)──▶ Electron main ──stdio JSON
 - Limits: 64 MiB per inbound frame on both sides, 512 concurrent inbound
   handlers on the service, 30 s write-stall watchdog. Large binary payloads never
   travel in frames; they use the resource origin below.
-- Every request the shell makes runs on its own goroutine, exactly as Wails
+- Every request the shell makes runs on its own goroutine, exactly as the
+  retired in-process shell
   bound calls did. Ordering is only guaranteed for `desktop/event` frames,
   which the service writes from one queue.
 
@@ -98,7 +99,8 @@ called, so an abrupt shell death never leaves a headless Go process behind.
 ```
 
 `method` must name an exported method of the Go `App` value that the contract
-registry accepted. Signatures follow the Wails rules: any JSON-serialisable
+registry accepted. Signatures follow the rules the retired shell used: any
+  JSON-serialisable
 parameters and a result of `()`, `(T)`, `(error)` or `(T, error)`. The
 registry rejects anything else at build time, so the surface can never gain a
 method the shell cannot call. The shell validates `method` against the

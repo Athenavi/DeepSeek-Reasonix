@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	macBundleID         = "com.wails.reasonix-desktop"
+	macBundleID         = "com.wails.reasonix-desktop" // frozen bundle identity; renaming it would orphan installed apps
 	macUpdateHandoffArg = "--reasonix-mac-update-handoff"
 	macHandoffReadyFD   = 3
 	macHandoffProceedFD = 4
@@ -230,7 +230,7 @@ func reportMacHandoffStartupFailure(cfg macUpdateHandoffConfig, phase string, er
 	})
 }
 
-// maybeRunMacUpdateHandoff handles the detached self-update child before Wails setup.
+// maybeRunMacUpdateHandoff handles the detached self-update child before the shell starts.
 func maybeRunMacUpdateHandoff(args []string) (handled bool, exitCode int) {
 	if len(args) == 0 || args[0] != macUpdateHandoffArg {
 		return false, 0
@@ -247,7 +247,7 @@ type macUpdateHandoffConfig struct {
 	ToVersion     string
 	CreatedAt     string
 	TransactionID string
-	// OwnerPID must exit before the bundle swap: the desktop under Wails, the shell parent otherwise.
+	// OwnerPID must exit before the bundle swap: the shell parent process under Electron.
 	OwnerPID  int
 	ReadyFD   int
 	ProceedFD int

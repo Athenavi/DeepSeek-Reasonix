@@ -95,10 +95,6 @@ func (h *recordingNativeHost) OpenExternal(_ context.Context, url string) {
 	h.record("OpenExternal:" + url)
 }
 
-func (h *recordingNativeHost) NavigateRemoteWindow(_ context.Context, url string) {
-	h.record("NavigateRemoteWindow:" + url)
-}
-
 func newRecordingHostApp(t *testing.T) (*App, *recordingNativeHost) {
 	t.Helper()
 	app := NewApp()
@@ -115,9 +111,9 @@ func assertHostCalls(t *testing.T, host *recordingNativeHost, want ...string) {
 	}
 }
 
-func TestNewAppUsesWailsHostAndBareAppUsesNoop(t *testing.T) {
-	if _, ok := NewApp().nativeHost().(wailsNativeHost); !ok {
-		t.Fatal("NewApp must attach the Wails host")
+func TestBareAppUsesNoopHost(t *testing.T) {
+	if _, ok := NewApp().nativeHost().(noopNativeHost); !ok {
+		t.Fatal("a fresh App must fall back to the no-op host until the shell attaches")
 	}
 	if _, ok := (&App{}).nativeHost().(noopNativeHost); !ok {
 		t.Fatal("an App without a host must fall back to the no-op host")
@@ -230,9 +226,6 @@ func TestRestoreWindowGeometryMaximisedFollowsPlatformOrdering(t *testing.T) {
 }
 
 func TestDOMReadyRestoresGeometryBeforePresenting(t *testing.T) {
-	if windowRestoreDiagnosticsSupported() {
-		t.Skip("window restore diagnostics poll the native window on this platform")
-	}
 	seedWindowStateFile(t, DesktopWindowState{Width: 1280, Height: 800, X: 40, Y: 50})
 	app, host := newRecordingHostApp(t)
 	host.screens = []nativeScreen{{Width: 1920, Height: 1080}}

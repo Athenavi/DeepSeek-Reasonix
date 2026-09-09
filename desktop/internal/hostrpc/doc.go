@@ -2,8 +2,8 @@
 // (docs/DESKTOP_HOST_PROTOCOL.md): one JSON-RPC 2.0 connection over the
 // service's stdio joining the Electron shell to the desktop App.
 //
-// Registry reflects over the exported methods of the bound App value exactly
-// as Wails did, rejects any signature the shell could not call, and invokes a
+// Registry reflects over the exported methods of the bound App value the way
+// the retired shell did, rejects any signature the shell could not call, and invokes a
 // method from JSON arguments. Contract freezes the accepted commands, the
 // event names and every DTO shape into canonical JSON whose SHA-256 digest
 // both sides compare during the hello handshake; WriteTypeScript renders the

@@ -33,8 +33,8 @@ import (
 
 // updater.go is the transport-free core of the desktop auto-updater: manifest
 // fetch, version comparison, signed download, and per-platform apply/relaunch. It
-// has no Wails dependency so the logic is unit-tested directly; updater_app.go is
-// the thin Wails binding that wires these into App methods and progress events.
+// has no shell dependency so the logic is unit-tested directly; updater_app.go is
+// the thin bridge binding that wires these into App methods and progress events.
 
 // Manifest endpoints — R2 CDN first (fast, especially in CN), then the crash
 // worker release gateway, then GitHub as the stable channel's last resort. The
@@ -196,7 +196,7 @@ type UpdateDownloadResult struct {
 	SHA256    string `json:"sha256"`
 }
 
-// updateProgress is the payload of the "updater:progress" Wails event emitted
+// updateProgress is the payload of the "updater:progress" bridge event emitted
 // throughout DownloadUpdate / InstallUpdate.
 type updateProgress struct {
 	RequestID string `json:"requestId"`

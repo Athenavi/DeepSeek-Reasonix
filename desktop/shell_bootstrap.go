@@ -5,16 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"reasonix/internal/installlayout"
 	"reasonix/internal/proc"
 )
 
-const (
-	shellServiceEnv = "REASONIX_DESKTOP_SERVICE"
-	shellModeEnv    = "REASONIX_DESKTOP_SHELL"
-)
+const shellServiceEnv = "REASONIX_DESKTOP_SERVICE"
 
 // exitIfShellBootstrapped hands a plain desktop launch to the Electron shell
 // installed beside this binary and exits; the shell restarts this binary as
@@ -26,8 +22,8 @@ func exitIfShellBootstrapped(args []string) {
 }
 
 // maybeBootstrapShell reports handled=false when the launch is already a
-// service or contract mode, REASONIX_DESKTOP_SHELL=wails keeps the in-process
-// shell, or no shell executable is installed beside this binary.
+// service or contract mode, or when no shell executable is installed beside
+// this binary.
 func maybeBootstrapShell(args []string) (handled bool, exitCode int) {
 	if hostRPCRequested(args) {
 		return false, 0
@@ -43,9 +39,6 @@ func maybeBootstrapShell(args []string) (handled bool, exitCode int) {
 }
 
 func bootstrapShell(exe, goos string, args, env []string) (handled bool, exitCode int) {
-	if strings.EqualFold(strings.TrimSpace(envValue(env, shellModeEnv)), "wails") {
-		return false, 0
-	}
 	shell, ok := shellExecutableBeside(exe, goos)
 	if !ok {
 		return false, 0
@@ -79,13 +72,4 @@ func shellExecutableBeside(exe, goos string) (string, bool) {
 		return "", false
 	}
 	return shell, true
-}
-
-func envValue(env []string, key string) string {
-	for _, entry := range env {
-		if k, v, ok := strings.Cut(entry, "="); ok && k == key {
-			return v
-		}
-	}
-	return ""
 }

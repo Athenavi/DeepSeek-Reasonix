@@ -18,14 +18,12 @@ const (
 type desktopShellPhase string
 
 const (
-	desktopShellStarting             desktopShellPhase = "starting"
-	desktopShellDOMReady             desktopShellPhase = "dom_ready"
-	desktopShellFrontendReady        desktopShellPhase = "frontend_ready"
-	desktopShellVisible              desktopShellPhase = "visible"
-	desktopShellBackgroundHidden     desktopShellPhase = "background_hidden"
-	desktopShellRendererRecovering   desktopShellPhase = "renderer_recovering"
-	desktopShellCompatibilityRestart desktopShellPhase = "compatibility_restart"
-	desktopShellFailed               desktopShellPhase = "failed"
+	desktopShellStarting         desktopShellPhase = "starting"
+	desktopShellDOMReady         desktopShellPhase = "dom_ready"
+	desktopShellFrontendReady    desktopShellPhase = "frontend_ready"
+	desktopShellVisible          desktopShellPhase = "visible"
+	desktopShellBackgroundHidden desktopShellPhase = "background_hidden"
+	desktopShellFailed           desktopShellPhase = "failed"
 )
 
 // desktopShellCoordinator is the single owner of main-window lifecycle state.
@@ -52,7 +50,7 @@ func newDesktopShellCoordinator(app *App) *desktopShellCoordinator {
 }
 
 func (c *desktopShellCoordinator) start(ctx context.Context) {
-	if c == nil || c.app == nil || c.app.remoteWindowTicket != "" {
+	if c == nil || c.app == nil {
 		return
 	}
 	c.mu.Lock()
@@ -93,7 +91,7 @@ func (c *desktopShellCoordinator) start(ctx context.Context) {
 		c.mu.Lock()
 		ready := c.frontendReady
 		if !ready {
-			c.phase = desktopShellRendererRecovering
+			c.phase = desktopShellFailed
 		}
 		c.mu.Unlock()
 		if !ready {
@@ -128,7 +126,7 @@ func (c *desktopShellCoordinator) markDOMReady() {
 	c.mu.Unlock()
 }
 
-// markFrontendHeartbeat separates the first React + Wails bridge frame from a
+// markFrontendHeartbeat separates the first React + host bridge frame from a
 // stable renderer. Health requires a later heartbeat at least two seconds
 // after the first, so one lucky bridge call cannot commit update/LKG state.
 func (c *desktopShellCoordinator) markFrontendHeartbeat(now time.Time) (first, healthy bool) {
@@ -158,15 +156,6 @@ func (c *desktopShellCoordinator) markFrontendHeartbeat(now time.Time) (first, h
 	}
 	c.mu.Unlock()
 	return first, healthy
-}
-
-func (c *desktopShellCoordinator) markCompatibilityRestart() {
-	if c == nil {
-		return
-	}
-	c.mu.Lock()
-	c.phase = desktopShellCompatibilityRestart
-	c.mu.Unlock()
 }
 
 func (c *desktopShellCoordinator) markFailed() {
@@ -236,9 +225,9 @@ const (
 	desktopPresentUnminimise
 )
 
-// desktopPresentPlanFor deliberately emits only gtk_window_present on Linux.
-// Wails maps WindowUnminimise to gtk_window_present; preceding it with
-// gtk_widget_show breaks maximised -> minimised restoration on GNOME (#7552).
+// desktopPresentPlanFor deliberately emits only the unminimise/present action
+// on Linux. Preceding it with a show breaks maximised -> minimised restoration
+// on GNOME (#7552); the shell's unminimise maps to gtk_window_present.
 func desktopPresentPlanFor(goos string, wasMaximised bool) []desktopPresentAction {
 	if goos == "linux" {
 		return []desktopPresentAction{desktopPresentUnminimise}
@@ -267,4 +256,31 @@ func applyDesktopPresentPlan(ctx context.Context, host nativeHost, actions []des
 			host.UnminimiseWindow(ctx)
 		}
 	}
+}
+
+// showMainWindowFrom presents the main window through the shell coordinator
+// (or the raw present plan when no coordinator is attached, e.g. tests).
+func (a *App) showMainWindowFrom(source string) {
+	if a.ctx == nil {
+		return
+	}
+	if a.desktopShell.coordinator != nil {
+		a.desktopShell.coordinator.Present(source)
+	} else {
+		applyDesktopPresentPlan(a.ctx, a.nativeHost(), desktopPresentPlanFor("", a.backgroundMaximised.Swap(false)))
+	}
+	a.kickDeferredRebuildRetry()
+}
+
+// handleDesktopFrontendTimeout fires when the frontend heartbeat never
+// arrived. The Electron shell reloads a crashed renderer itself; a page that
+// is alive but never responsive still deserves a presented window and a
+// diagnostics trail instead of a hidden process.
+func (a *App) handleDesktopFrontendTimeout(source string) {
+	if a == nil {
+		return
+	}
+	slog.Warn("desktop: frontend never became ready", "source", metricBucket(source))
+	a.recordDiagnosticMetric("desktop_frontend", "ready_timeout."+metricBucket(source))
+	a.showMainWindowFrom("frontend_ready_timeout")
 }

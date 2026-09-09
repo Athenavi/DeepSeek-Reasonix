@@ -134,8 +134,8 @@ func (a *App) projectTreeRuntimeSnapshot(revision uint64) ProjectTreeRuntimeSnap
 	return ProjectTreeRuntimeSnapshot{Revision: revision, Topics: topics}
 }
 
-func (a *App) attachExistingSessionRuntime(tab *WorkspaceTab, path string, wailsCtx context.Context) bool {
-	attached := a.attachExistingSessionRuntimeCore(tab, path, wailsCtx)
+func (a *App) attachExistingSessionRuntime(tab *WorkspaceTab, path string, appCtx context.Context) bool {
+	attached := a.attachExistingSessionRuntimeCore(tab, path, appCtx)
 	if attached {
 		a.emitProjectTreeRuntimeChangedWithLegacy()
 	}

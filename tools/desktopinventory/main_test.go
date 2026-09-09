@@ -18,7 +18,9 @@ func TestInventoryIsClassifiedAndCurrent(t *testing.T) {
 	}
 	counts := inv.counts()
 	for _, kind := range kindOrder {
-		if len(counts[kind]) == 0 {
+		// native-call and frontend-native tracked the retired shell's direct
+		// bridge calls; both are legitimately empty under the Electron host.
+		if len(counts[kind]) == 0 && kind != kindNativeCall && kind != kindFrontendNative {
 			t.Errorf("no %s entries discovered", kind)
 		}
 	}
@@ -41,7 +43,7 @@ func TestShellFileRules(t *testing.T) {
 	cases := map[string]class{
 		"webview2_recovery_windows.go": classDeleteShell,
 		"tray_loop_windows.go":         classMigrateHost,
-		"main.go":                      classMigrateHost,
+		"main.go":                      classKeepBusiness,
 		"sessions.go":                  "",
 	}
 	for name, want := range cases {

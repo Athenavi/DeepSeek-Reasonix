@@ -3,9 +3,8 @@ package main
 import "context"
 
 // nativeHost is the only route from business code to the shell toolkit. Each
-// method maps 1:1 onto a host/* call in docs/DESKTOP_HOST_PROTOCOL.md, so the
-// Wails adapter can be swapped for the Electron bridge without touching the
-// call sites.
+// method maps 1:1 onto a host/* call in docs/DESKTOP_HOST_PROTOCOL.md, served
+// by the Electron shell through rpcNativeHost; tests substitute fakes.
 type nativeHost interface {
 	ShowWindow(ctx context.Context)
 	ShowApplication(ctx context.Context)
@@ -29,7 +28,6 @@ type nativeHost interface {
 	OpenExternal(ctx context.Context, url string)
 	Quit(ctx context.Context)
 	OpenDevTools(ctx context.Context)
-	NavigateRemoteWindow(ctx context.Context, url string)
 }
 
 type nativeScreen struct {
@@ -76,24 +74,23 @@ type noopNativeHost struct{}
 
 var _ nativeHost = noopNativeHost{}
 
-func (noopNativeHost) ShowWindow(context.Context)                   {}
-func (noopNativeHost) ShowApplication(context.Context)              {}
-func (noopNativeHost) HideWindow(context.Context)                   {}
-func (noopNativeHost) HideApplication(context.Context)              {}
-func (noopNativeHost) MaximiseWindow(context.Context)               {}
-func (noopNativeHost) UnmaximiseWindow(context.Context)             {}
-func (noopNativeHost) MinimiseWindow(context.Context)               {}
-func (noopNativeHost) UnminimiseWindow(context.Context)             {}
-func (noopNativeHost) ToggleMaximiseWindow(context.Context)         {}
-func (noopNativeHost) CenterWindow(context.Context)                 {}
-func (noopNativeHost) WindowIsMaximised(context.Context) bool       { return false }
-func (noopNativeHost) WindowIsMinimised(context.Context) bool       { return false }
-func (noopNativeHost) SetWindowPosition(context.Context, int, int)  {}
-func (noopNativeHost) SetWindowTitle(context.Context, string)       {}
-func (noopNativeHost) OpenExternal(context.Context, string)         {}
-func (noopNativeHost) Quit(context.Context)                         {}
-func (noopNativeHost) OpenDevTools(context.Context)                 {}
-func (noopNativeHost) NavigateRemoteWindow(context.Context, string) {}
+func (noopNativeHost) ShowWindow(context.Context)                  {}
+func (noopNativeHost) ShowApplication(context.Context)             {}
+func (noopNativeHost) HideWindow(context.Context)                  {}
+func (noopNativeHost) HideApplication(context.Context)             {}
+func (noopNativeHost) MaximiseWindow(context.Context)              {}
+func (noopNativeHost) UnmaximiseWindow(context.Context)            {}
+func (noopNativeHost) MinimiseWindow(context.Context)              {}
+func (noopNativeHost) UnminimiseWindow(context.Context)            {}
+func (noopNativeHost) ToggleMaximiseWindow(context.Context)        {}
+func (noopNativeHost) CenterWindow(context.Context)                {}
+func (noopNativeHost) WindowIsMaximised(context.Context) bool      { return false }
+func (noopNativeHost) WindowIsMinimised(context.Context) bool      { return false }
+func (noopNativeHost) SetWindowPosition(context.Context, int, int) {}
+func (noopNativeHost) SetWindowTitle(context.Context, string)      {}
+func (noopNativeHost) OpenExternal(context.Context, string)        {}
+func (noopNativeHost) Quit(context.Context)                        {}
+func (noopNativeHost) OpenDevTools(context.Context)                {}
 
 func (noopNativeHost) Screens(context.Context) ([]nativeScreen, error) { return nil, nil }
 

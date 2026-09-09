@@ -16,9 +16,11 @@ import (
 
 const wailsRuntimeImport = "github.com/wailsapp/wails/v2/pkg/runtime"
 
-// shellFilePatterns name desktop Go files that exist only because of the Wails,
-// WebView2 or WebKitGTK shell. Their contents leave with the old shell unless
-// a rule below reassigns them to the Electron host.
+// shellFilePatterns name desktop Go files that existed only because of the
+// retired Wails, WebView2 or WebKitGTK shell. The delete-shell rules are gone
+// from the tree with the old shell; the migrate-host rules keep classifying the
+// survivors, and any reintroduced file matching a retired name is flagged
+// delete-shell again.
 var shellFilePatterns = map[string]struct {
 	class class
 	owner string
@@ -33,7 +35,7 @@ var shellFilePatterns = map[string]struct {
 	`^hang_watchdog.*\.go$`:              {classDeleteShell, "no native UI thread in the Go service"},
 	`^icon_repair_.*\.go$`:               {classDeleteShell, "icons are packaged by the Electron bundle"},
 	`^window_icon_.*\.go$`:               {classDeleteShell, "icons are packaged by the Electron bundle"},
-	`^main\.go$`:                         {classMigrateHost, "--host-rpc entry; Wails options retired"},
+	`^main\.go$`:                         {classKeepBusiness, "--host-rpc service entry + shell bootstrap"},
 	`^single_instance\.go$`:              {classMigrateHost, "Electron requestSingleInstanceLock keyed by canonical home"},
 	`^menu\.go$`:                         {classMigrateHost, "Electron application menu"},
 	`^tray.*\.go$`:                       {classMigrateHost, "Electron Tray through host/tray.*"},
