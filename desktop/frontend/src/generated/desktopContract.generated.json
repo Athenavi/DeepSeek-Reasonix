@@ -18156,6 +18156,13 @@
     "eventwire.ReadStatus": {
       "fields": [
         {
+          "name": "verdict",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
           "name": "readId",
           "type": {
             "kind": "string"
@@ -18649,6 +18656,13 @@
     },
     "eventwire.Tool": {
       "fields": [
+        {
+          "name": "diagnostic",
+          "optional": true,
+          "type": {
+            "kind": "any"
+          }
+        },
         {
           "name": "verifying",
           "optional": true,
@@ -22703,6 +22717,17 @@
             "elem": {
               "kind": "object",
               "ref": "provider.ReadPause"
+            },
+            "kind": "nullable"
+          }
+        },
+        {
+          "name": "readCompletion",
+          "optional": true,
+          "type": {
+            "elem": {
+              "kind": "object",
+              "ref": "provider.ReadCompletion"
             },
             "kind": "nullable"
           }
@@ -32873,6 +32898,63 @@
         }
       ]
     },
+    "provider.CompletedRead": {
+      "fields": [
+        {
+          "name": "read_id",
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "path",
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "snapshot",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "intent",
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "verdict",
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "covered",
+          "type": {
+            "elem": {
+              "elem": {
+                "kind": "integer"
+              },
+              "kind": "array"
+            },
+            "kind": "array"
+          }
+        },
+        {
+          "name": "source_end",
+          "optional": true,
+          "type": {
+            "elem": {
+              "kind": "integer"
+            },
+            "kind": "nullable"
+          }
+        }
+      ]
+    },
     "provider.DecisionReceipt": {
       "fields": [
         {
@@ -33068,6 +33150,13 @@
     "provider.PausedRead": {
       "fields": [
         {
+          "name": "snapshot",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
           "name": "readId",
           "type": {
             "kind": "string"
@@ -33130,8 +33219,42 @@
         }
       ]
     },
+    "provider.ReadCompletion": {
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "reads",
+          "type": {
+            "elem": {
+              "kind": "object",
+              "ref": "provider.CompletedRead"
+            },
+            "kind": "array"
+          }
+        },
+        {
+          "name": "omitted",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        }
+      ]
+    },
     "provider.ReadPause": {
       "fields": [
+        {
+          "name": "code",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
         {
           "name": "id",
           "type": {
