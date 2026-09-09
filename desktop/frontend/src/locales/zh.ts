@@ -2472,6 +2472,7 @@ export const zh: Record<DictKey, string> = {
   "settings.hardwareAcceleration": "硬件加速",
   "settings.hardwareAccelerationHint": "使用 GPU 加速界面和内置网页渲染。遇到白屏、闪烁或显示异常时，可尝试关闭。关闭后可能降低流畅度并增加 CPU 占用。",
   "settings.hardwareAccelerationRestart": "已保存，完全退出 Reasonix 并重新打开后生效。仅关闭窗口到后台不会生效。",
+  "settings.hardwareAccelerationRestartShort": "重启后生效",
   "settings.hardwareAccelerationOverride": "本次启动已通过启动配置禁用硬件加速。移除该配置并完全重启后，将恢复已保存的设置。",
   "settings.subagentReasoning": "子代理推理强度",
   "settings.connectionFollowSession": "随会话",

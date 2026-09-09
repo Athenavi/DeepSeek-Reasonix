@@ -15,7 +15,7 @@ import { catalogForPreset } from "../lib/providerCatalog";
 import { ProviderCatalogPicker, type CatalogChoice } from "./ProviderCatalogPicker";
 import { Eye, EyeOff, Files } from "lucide-react";
 import { lazy, memo, Suspense, startTransition, useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
-import { ArrowRight, Check, CheckCircle2, ChevronDown, ChevronUp, CircleDollarSign, Clipboard, ExternalLink, KeyRound, Languages, ListChecks, Loader2, Monitor, MoreHorizontal, PanelBottom, Play, Power, QrCode, RefreshCw, Send, ShieldCheck, SlidersHorizontal, Trash2, Volume2 } from "lucide-react";
+import { ArrowRight, Check, CheckCircle2, ChevronDown, ChevronUp, CircleDollarSign, Clipboard, ExternalLink, KeyRound, Languages, ListChecks, Loader2, Monitor, MoreHorizontal, PanelBottom, Play, Power, QrCode, RefreshCw, Send, SlidersHorizontal, Trash2, Volume2 } from "lucide-react";
 import { asArray } from "../lib/array";
 import { ShellInterpreterFields } from "./SettingsShellSupport";
 import { CHANNEL_ICONS } from "./channelIcons";
@@ -1645,7 +1645,6 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
   const t = useT();
   const closeBehavior = normalizeCloseBehavior(s.closeBehavior);
   const soundPanelId = useId();
-  const defaultToolApprovalMode = normalizeToolApprovalMode(s.defaultToolApprovalMode);
   const languagePref = normalizeLangPref(s.desktopLanguage);
   const desktopCurrency = normalizeDesktopCurrency(s.desktopCurrency);
   const desktopLayoutStyle = normalizeDesktopLayoutStyle(s.desktopLayoutStyle);
@@ -1742,11 +1741,10 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
       <SessionExperienceSettings snapshot={s} busy={busy} apply={apply} />
 
       <SettingsSection title={t("settings.general.sectionSystem")} description={t("settings.general.sectionSystemHint")}>
-      {graphics && <SettingsField label={t("settings.hardwareAcceleration")} hint={t("settings.hardwareAccelerationHint")} icon={<Monitor size={18} />}>
+      {graphics && <SettingsField label={<span className="settings-graphics-label"><span>{t("settings.hardwareAcceleration")}</span>{graphics.restartRequired && graphics.override === "none" && <span className="settings-graphics-status">{t("settings.hardwareAccelerationRestartShort")}</span>}</span>} hint={t("settings.hardwareAccelerationHint")} icon={<Monitor size={18} />}>
         <div className="settings-graphics-control">
           <ToggleSegment value={graphics.hardwareAcceleration} disabled={graphicsBusy || !graphics.writable || graphics.override !== "none"} onChange={updateGraphics} />
           {graphics.override !== "none" && <div className="settings-inline-hint">{t("settings.hardwareAccelerationOverride")}</div>}
-          {graphics.restartRequired && graphics.override === "none" && <div className="settings-inline-hint">{t("settings.hardwareAccelerationRestart")}</div>}
           {graphicsError && <div className="settings-inline-error" role="alert">{graphicsError}</div>}
         </div>
       </SettingsField>}
@@ -1760,20 +1758,6 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
               onClick={() => void apply(() => app.SetCloseBehavior(mode))}
             >
               {closeBehaviorLabel(mode, t)}
-            </button>
-          ))}
-        </SettingsOptions>
-      </SettingsField>
-      <SettingsField label={t("settings.defaultToolApprovalMode")} hint={t("settings.defaultToolApprovalModeHint")} icon={<ShieldCheck size={18} />}>
-        <SettingsOptions layout="field" className="set-seg">
-          {TOOL_APPROVAL_MODES.map((mode) => (
-            <button
-              key={mode}
-              className={`set-seg__btn${defaultToolApprovalMode === mode ? " set-seg__btn--on" : ""}`}
-              disabled={busy}
-              onClick={() => void apply(() => app.SetDefaultToolApprovalMode(mode))}
-            >
-              {t(`settings.defaultToolApprovalMode.${mode}`)}
             </button>
           ))}
         </SettingsOptions>

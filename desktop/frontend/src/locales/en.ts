@@ -2469,6 +2469,7 @@ export const en = {
   "settings.hardwareAcceleration": "Hardware acceleration",
   "settings.hardwareAccelerationHint": "Use the GPU for interface and embedded web rendering. Turn it off if you see a blank screen, flicker, or display errors. It may reduce smoothness and increase CPU use when disabled.",
   "settings.hardwareAccelerationRestart": "Saved. Fully quit and reopen Reasonix for this to take effect; hiding the window is not enough.",
+  "settings.hardwareAccelerationRestartShort": "Takes effect after restart",
   "settings.hardwareAccelerationOverride": "Hardware acceleration is disabled for this launch by startup configuration. Remove the override and fully restart to restore the saved setting.",
   "settings.subagentReasoning": "Subagent reasoning effort",
   "settings.connectionFollowSession": "Follow session",
