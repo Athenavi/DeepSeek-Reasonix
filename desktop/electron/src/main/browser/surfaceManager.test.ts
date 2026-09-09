@@ -126,9 +126,13 @@ test("a crashed website view reloads its last URL in human mode and emits crash"
   const events = viewOf(tab).fire();
   events.onNavigate("https://a.test/page", false);
   const epoch = tab.epoch;
+  const partition = tab.partition;
   events.onRenderProcessGone("crashed");
   assert.equal(tab.mode, "human");
   assert.equal(tab.epoch, epoch + 1);
+  // Promoted from prototypes/electron-browser: the reload keeps the persistent
+  // partition, so website logins survive a renderer crash.
+  assert.equal(tab.partition, partition, "recovery preserves the login partition");
   assert.deepEqual(crashes, ["crashed"]);
   assert.equal(viewOf(tab).page.calls.at(-1), "load:https://a.test/page");
   for (let i = 0; i < 5; i++) events.onRenderProcessGone("oom");

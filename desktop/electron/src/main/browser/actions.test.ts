@@ -86,6 +86,29 @@ test("a take-over that lands while the ref resolves cancels the act", async () =
   assert.equal(s.page.inputs.length, 0);
 });
 
+// Promoted from prototypes/electron-browser/scripts/verify-runtime.cjs: a
+// renderer crash between approval and dispatch must cancel the pending act —
+// the recovered page comes back in human mode and nothing is ever replayed.
+test("a renderer crash while the ref resolves cancels the act without dispatching", async () => {
+  const s = await setup();
+  s.answers.beforeResolve = () => s.view.fire().onRenderProcessGone("crashed");
+  await assert.rejects(s.actions.act(s.tab, s.request({}), s.verify), code(BROWSER_ERR_TAKEN_OVER));
+  assert.equal(s.page.inputs.length, 0, "no input reached the crashed page");
+  assert.equal(s.tab.mode, "human", "the recovered tab waits for a fresh grant");
+});
+
+// Promoted from the same prototype suite: input already dispatched when the
+// renderer dies is treated as applied (executed, no token rotation), so the
+// Go-side ledger can never settle it as not-executed and replay it.
+test("a renderer crash after dispatch completes the act without replay", async () => {
+  const s = await setup();
+  s.settled.push(() => s.view.fire().onRenderProcessGone("crashed"));
+  assert.deepEqual(await s.actions.act(s.tab, s.request({}), s.verify), { executed: true });
+  assert.equal(s.page.inputs.length, 3, "the click was physically dispatched before the crash");
+  assert.equal(s.tab.mode, "human");
+  assert.deepEqual(s.page.calls.at(-1), "load:https://a.test/", "the crashed view reloads its last URL");
+});
+
 test("click dispatches trusted mouse events at the zoomed centre and rotates the token", async () => {
   const s = await setup();
   s.page.zoom = 2;
