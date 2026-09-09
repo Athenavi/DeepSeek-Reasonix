@@ -5,6 +5,7 @@ import { shellActionFromURL, type ShellAction } from "./failurePage.js";
 import type { HelloWindow } from "./handshake.js";
 import { errorText, type Logger } from "./log.js";
 import { APP_ORIGIN } from "./protocol.js";
+import { AppZoomStore } from "./zoomStore.js";
 
 export const DEFAULT_GEOMETRY: HelloWindow = { width: 1280, height: 820, minWidth: 760, minHeight: 480, frameless: false, zoomFactor: 1 };
 
@@ -19,6 +20,7 @@ export interface MainWindowDeps {
   onCloseRequested(): Promise<boolean>;
   onCloseAllowed(): void;
   onShellAction(action: ShellAction): void;
+  zoomStore: AppZoomStore;
 }
 
 type Content = "none" | "app" | "failure";
@@ -70,7 +72,7 @@ export class MainWindow {
         contextIsolation: true,
         nodeIntegration: false,
         spellcheck: false,
-        zoomFactor: geometry.zoomFactor,
+        zoomFactor: this.deps.zoomStore.current.appZoomFactor,
       },
     });
     this.win = win;
@@ -107,6 +109,18 @@ export class MainWindow {
     win.on("closed", () => {
       this.win = null;
     });
+  }
+
+  async getAppZoom(): Promise<number> { return (await this.deps.zoomStore.load()).appZoomFactor; }
+  async setAppZoom(factor: number): Promise<number> {
+    const state = await this.deps.zoomStore.set(factor);
+    this.browserWindow?.webContents.setZoomFactor(state.appZoomFactor);
+    return state.appZoomFactor;
+  }
+  async resetAppZoom(): Promise<number> { return this.setAppZoom(1); }
+  async stepAppZoom(direction: 1 | -1): Promise<number> {
+    const current = await this.getAppZoom();
+    return this.setAppZoom(current + direction * 0.05);
   }
 
   async loadApp(): Promise<void> {

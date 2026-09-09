@@ -6,6 +6,9 @@ export interface MenuDeps {
   toggleDevTools(): void;
   showWindow(): void;
   quit(): void;
+  zoomIn(): void;
+  zoomOut(): void;
+  resetZoom(): void;
 }
 
 export function applicationMenuTemplate(deps: MenuDeps): MenuItemConstructorOptions[] {
@@ -22,6 +25,11 @@ export function applicationMenuTemplate(deps: MenuDeps): MenuItemConstructorOpti
       ],
     },
     { role: "editMenu" },
+    { label: "View", submenu: [
+      { label: "Zoom In", accelerator: "CmdOrCtrl+=", click: () => deps.zoomIn() },
+      { label: "Zoom Out", accelerator: "CmdOrCtrl+-", click: () => deps.zoomOut() },
+      { label: "Reset Zoom", accelerator: "CmdOrCtrl+0", click: () => deps.resetZoom() },
+    ] },
     { role: "windowMenu" },
   ];
 }

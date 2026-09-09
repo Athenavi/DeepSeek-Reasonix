@@ -78,7 +78,20 @@ export function installDesktopHostStub(commands: object, options: DesktopHostStu
         isMaximised: () => Promise.resolve(false),
         minimise: () => {},
         toggleMaximise: () => {},
-        close: () => {},
+      close: () => {},
+      // The Electron shell owns zoom natively; tests drive it through the
+      // same command table the bridge path uses, so tables without zoom
+      // commands keep the neutral default.
+      getAppZoom: async () => {
+        const fn = ref.current.GetDesktopZoomFactor as (() => Promise<number>) | undefined;
+        return typeof fn === "function" ? await fn() : 1;
+      },
+      setAppZoom: async (factor: number) => {
+        const fn = ref.current.SetDesktopZoomFactor as ((factor: number) => Promise<number>) | undefined;
+        if (typeof fn === "function") await fn(factor);
+        return factor;
+      },
+      resetAppZoom: async () => 1,
       },
       getPathForFile: options.getPathForFile ?? (() => ""),
       onServiceState: () => () => {},

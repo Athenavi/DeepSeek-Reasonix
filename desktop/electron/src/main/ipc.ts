@@ -24,6 +24,9 @@ export interface RendererWindowApi {
   bounds(): WindowBounds;
   setTheme(theme: WindowTheme): void;
   setBackgroundColour(r: number, g: number, b: number, a: number): void;
+  getAppZoom(): Promise<number>;
+  setAppZoom(factor: number): Promise<number>;
+  resetAppZoom(): Promise<number>;
 }
 
 // The user-driven browser panel: no grant is involved because the user is
@@ -126,6 +129,9 @@ export function registerRendererIpc(deps: RendererIpcDeps): void {
   handle(IPC.windowGetBounds, () => deps.window.bounds());
   handle(IPC.windowSetTheme, (theme) => deps.window.setTheme(theme === "light" || theme === "dark" ? theme : "system"));
   handle(IPC.windowSetBackground, (r, g, b, a) => deps.window.setBackgroundColour(finite(r), finite(g), finite(b), finite(a, 255)));
+  handle(IPC.appZoomGet, () => deps.window.getAppZoom());
+  handle(IPC.appZoomSet, (factor) => deps.window.setAppZoom(finite(factor, Number.NaN)));
+  handle(IPC.appZoomReset, () => deps.window.resetAppZoom());
 
   const browser = deps.browser;
   if (!browser) return;

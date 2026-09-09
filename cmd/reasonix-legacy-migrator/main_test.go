@@ -63,7 +63,7 @@ func TestMigrateFlatInstallToVersioned(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(root, "pending-update.json"), []byte(`{"pending":true}`), 0o644)
 	_ = os.WriteFile(filepath.Join(root, "startup-state.json"), []byte(`{}`), 0o644)
 
-	if err := migrate(root, "v1.20.0"); err != nil {
+	if err := migrateWithRelaunch(root, "v1.20.0", true); err != nil {
 		t.Fatal(err)
 	}
 	if !installlayout.HasCurrent(root) {
@@ -82,7 +82,7 @@ func TestMigrateFlatInstallToVersioned(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Second run is idempotent cleanup-only.
-	if err := migrate(root, "v1.20.0"); err != nil {
+	if err := migrateWithRelaunch(root, "v1.20.0", true); err != nil {
 		t.Fatalf("idempotent re-run: %v", err)
 	}
 	ptr2, err := installlayout.ReadCurrent(root)
@@ -93,7 +93,7 @@ func TestMigrateFlatInstallToVersioned(t *testing.T) {
 
 func TestMigrateRefusesWithoutFlatUnit(t *testing.T) {
 	root := t.TempDir()
-	if err := migrate(root, "v1.20.0"); err == nil {
+	if err := migrateWithRelaunch(root, "v1.20.0", true); err == nil {
 		t.Fatal("expected failure without flat desktop")
 	}
 }
@@ -110,7 +110,7 @@ func TestMigrateRefusesCorruptCurrentPointerWithoutOverwritingIt(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := migrate(root, "v1.20.0"); err == nil {
+	if err := migrateWithRelaunch(root, "v1.20.0", true); err == nil {
 		t.Fatal("corrupt current.json was treated as an absent pointer")
 	}
 	got, err := os.ReadFile(current)

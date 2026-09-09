@@ -245,11 +245,14 @@ export function SettingsPanel({
     setConversationWidth(applyConversationWidth(s.conversationWidth));
   }, [s?.conversationWidth, s?.desktopTheme, s?.desktopThemeStyle, s?.desktopTerminalTheme]);
   useEffect(() => {
-    if (desktopPlatform !== "windows") return;
+    const host = desktopHost();
+    if (host.kind === "none" && desktopPlatform !== "windows") return;
     let cancelled = false;
     void (async () => {
       try {
-        const persisted = await app.GetDesktopZoomFactor();
+        const persisted = host.kind === "electron"
+          ? await host.native.getAppZoom()
+          : await app.GetDesktopZoomFactor();
         if (cancelled || typeof persisted !== "number" || !Number.isFinite(persisted)) return;
         const snapped = snapZoom(persisted);
         saveRestartZoom(snapped);
@@ -367,7 +370,9 @@ export function SettingsPanel({
     setWarning(null);
     setZoomPct(zoomToPercent(snapped));
     try {
-      await app.SetDesktopZoomFactor(snapped);
+      const host = desktopHost();
+      if (host.kind === "electron") await host.native.setAppZoom(snapped);
+      else await app.SetDesktopZoomFactor(snapped);
       if (seq === zoomSaveSeq.current) saveRestartZoom(snapped);
     } catch (e) {
       if (seq !== zoomSaveSeq.current) return;
@@ -443,7 +448,7 @@ export function SettingsPanel({
                       terminalTheme={terminalTheme}
                       conversationWidth={conversationWidth}
                       textSize={textSize}
-                      showDisplayZoom={desktopPlatform === "windows"}
+                      showDisplayZoom={desktopHost().kind !== "none" || desktopPlatform === "windows"}
                       zoomPct={zoomPct}
                       fontFamily={fontFamily}
                       monoFontFamily={monoFontFamily}
