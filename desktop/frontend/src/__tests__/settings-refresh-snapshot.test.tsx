@@ -491,7 +491,10 @@ desktopStub.replaceCommands(({
   },
 }).main.App);
 
-localStorage.setItem("reasonix-zoom-restart", "1");
+// Seed the persisted restart value directly; the native binding is exercised
+// by the reset mutation below, while startup hydration is intentionally
+// deterministic in this bridge fixture.
+localStorage.setItem("reasonix-zoom-restart", "0.5");
 await act(async () => {
   zoomRoot.render(
     <LocaleProvider>
