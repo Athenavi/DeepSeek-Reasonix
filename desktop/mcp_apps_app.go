@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"reasonix/internal/control"
 	"reasonix/internal/plugin"
 )
@@ -157,7 +156,7 @@ func (a *App) MCPOpenAppLink(rawURL string) error {
 	if err != nil {
 		return err
 	}
-	runtime.BrowserOpenURL(a.ctx, u.String())
+	a.nativeHost().OpenExternal(a.ctx, u.String())
 	return nil
 }
 

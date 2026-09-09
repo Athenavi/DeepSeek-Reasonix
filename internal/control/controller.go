@@ -514,9 +514,6 @@ type Options struct {
 	ModelSettingsRevision       string
 	ModelSettingsSourceRevision string
 	ModelSettingsCurrent        func() (string, error)
-	// FrozenEffort is the configured adapter ID used to build this runtime.
-	// Nil permits legacy/custom controllers to fall back to host metadata.
-	FrozenEffort *string
 	// BeforeInboxDispatch lets the owner reserve runtime admission before a
 	// queued message becomes a new turn. The returned release runs after claim
 	// and synchronous turn admission, outside every controller lock.

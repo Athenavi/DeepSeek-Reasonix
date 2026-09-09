@@ -343,7 +343,7 @@ func (a *App) CloseMergedWorktreeTab(request CloseMergedWorktreeTabRequest) (Clo
 	a.markTabRemovedLocked(current)
 	delete(a.tabs, current.ID)
 	a.removeTabOrderLocked(current.ID)
-	_ = a.saveTabsLocked()
+	a.saveTabsLocked()
 	a.mu.Unlock()
 
 	if a.terminals != nil {

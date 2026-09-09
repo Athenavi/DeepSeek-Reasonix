@@ -28,6 +28,15 @@ func writeInstallerStaging(t *testing.T, root, label string, includeLauncher boo
 			t.Fatal(err)
 		}
 	}
+	for _, name := range installlayout.ShellRequiredNames(runtime.GOOS) {
+		p := filepath.Join(staging, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(label+"-"+name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if includeLauncher {
 		name := installlayout.LauncherBinaryName()
 		if err := os.WriteFile(filepath.Join(staging, name), []byte(label+"-"+name), 0o755); err != nil {
