@@ -13,6 +13,7 @@ import {
   type ServiceState,
   type WindowTheme,
 } from "../shared/ipc.js";
+import type { GraphicsSettingsState } from "../main/graphics.js";
 
 type Listener = (...args: unknown[]) => void;
 
@@ -203,6 +204,10 @@ contextBridge.exposeInMainWorld("reasonixDesktop", {
       getAppZoom: () => call(IPC.appZoomGet),
       setAppZoom: (factor: number) => call(IPC.appZoomSet, factor),
       resetAppZoom: () => call(IPC.appZoomReset),
+    },
+    graphics: {
+      get: () => call(IPC.graphicsGet) as Promise<GraphicsSettingsState>,
+      setHardwareAcceleration: (enabled: boolean) => call(IPC.graphicsSet, enabled) as Promise<GraphicsSettingsState>,
     },
     getPathForFile: (file: File) => webUtils.getPathForFile(file),
     onServiceState,

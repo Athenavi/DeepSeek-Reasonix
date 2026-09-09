@@ -93,6 +93,10 @@ export function installDesktopHostStub(commands: object, options: DesktopHostStu
       },
       resetAppZoom: async () => 1,
       },
+      graphics: {
+        get: () => Promise.resolve({ hardwareAcceleration: true, startupEnabled: true, override: "none" as const, restartRequired: false, writable: true, warning: null }),
+        setHardwareAcceleration: async (enabled: boolean) => ({ hardwareAcceleration: enabled, startupEnabled: true, override: "none" as const, restartRequired: enabled !== true, writable: true, warning: null }),
+      },
       getPathForFile: options.getPathForFile ?? (() => ""),
       onServiceState: () => () => {},
     },
