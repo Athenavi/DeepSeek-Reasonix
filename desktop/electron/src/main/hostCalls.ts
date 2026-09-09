@@ -74,6 +74,18 @@ export interface HostCallDeps {
 }
 
 const remoteInput = (params: Params) => ({ hostKey: str(params, "hostKey"), url: str(params, "url"), title: str(params, "title") });
+const EXTERNAL_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
+function externalURL(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("refusing to open an invalid external URL");
+  }
+  if (!EXTERNAL_PROTOCOLS.has(url.protocol)) throw new Error(`refusing to open external URL with protocol ${url.protocol}`);
+  return url.href;
+}
 
 export function buildHostCallTable(deps: HostCallDeps): HostCallTable {
   const done = (run: () => void): HostCall => (params) => {
@@ -110,7 +122,7 @@ export function buildHostCallTable(deps: HostCallDeps): HostCallTable {
     "host/dialog.saveFile": (params) => deps.dialogs.saveFile(params),
     "host/dialog.message": (params) => deps.dialogs.message(params),
     "host/shell.openExternal": async (params) => {
-      await deps.openExternal(str(params, "url"));
+      await deps.openExternal(externalURL(str(params, "url")));
       return {};
     },
     "host/app.quit": done(() => deps.lifecycle.approve()),

@@ -45,7 +45,7 @@ test("every documented host/* method is dispatched with parsed params", async ()
   assert.deepEqual(await dispatchHostCall(table, "host/shell.openExternal", { url: "https://e" }), {});
   assert.deepEqual(await dispatchHostCall(table, "host/app.quit", undefined), {});
   assert.deepEqual(calls, [
-    'show("tray")', "setPosition(10.4,0)", "tray(打开,退出,Reasonix)", "remoteOpen(h1)", 'relaunch(["--x"])', "open(https://e)", "approve()",
+    'show("tray")', "setPosition(10.4,0)", "tray(打开,退出,Reasonix)", "remoteOpen(h1)", 'relaunch(["--x"])', "open(https://e/)", "approve()",
   ]);
   for (const method of ["host/window.hide", "host/window.maximise", "host/window.center", "host/devtools.toggle", "host/tray.destroy", "host/app.hide"]) {
     assert.deepEqual(await dispatchHostCall(table, method, {}), {});
@@ -56,6 +56,16 @@ test("update relaunch preserves the stable launcher path", async () => {
   const { table, calls } = deps();
   await dispatchHostCall(table, "host/app.relaunch", { args: ["--after-update"], execPath: "/opt/reasonix/reasonix-launcher" });
   assert.deepEqual(calls, ['relaunch(["--after-update"],"/opt/reasonix/reasonix-launcher")']);
+});
+
+test("host external links reject non-user-facing protocols", async () => {
+  const { table, calls } = deps();
+  for (const url of ["file:///tmp/probe", "javascript:alert(1)", "data:text/plain,probe", "not a url"]) {
+    await assert.rejects(dispatchHostCall(table, "host/shell.openExternal", { url }), /refusing to open/);
+  }
+  assert.deepEqual(calls, []);
+  await dispatchHostCall(table, "host/shell.openExternal", { url: "mailto:test@example.com" });
+  assert.deepEqual(calls, ["open(mailto:test@example.com)"]);
 });
 
 test("browser host calls merge into the table when the surface is wired", async () => {
