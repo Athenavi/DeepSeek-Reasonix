@@ -1008,18 +1008,6 @@
       ]
     }
   },
-  "ClearGoal": {
-    "domain": "desktop/app.go",
-    "owner": "App.ClearGoal",
-    "sources": [
-      "desktop/app.go"
-    ],
-    "scope": {
-      "kind": "owner-state",
-      "resolver": "App.ClearGoal",
-      "inputs": []
-    }
-  },
   "ClearGoalForTab": {
     "domain": "desktop/app.go",
     "owner": "App.ClearGoalForTab",
@@ -1358,18 +1346,6 @@
       "inputs": [
         "tabID"
       ]
-    }
-  },
-  "ContextUsage": {
-    "domain": "desktop/app.go",
-    "owner": "App.ContextUsage",
-    "sources": [
-      "desktop/app.go"
-    ],
-    "scope": {
-      "kind": "owner-state",
-      "resolver": "App.ContextUsage",
-      "inputs": []
     }
   },
   "ContextUsageForTab": {
@@ -2986,21 +2962,6 @@
       ]
     }
   },
-  "ListTaskEvents": {
-    "domain": "desktop/app.go",
-    "owner": "App.ListTaskEvents",
-    "sources": [
-      "desktop/app.go"
-    ],
-    "scope": {
-      "kind": "owner-inputs",
-      "resolver": "App.ListTaskEvents",
-      "inputs": [
-        "taskID",
-        "afterSequence"
-      ]
-    }
-  },
   "ListTaskEventsForTab": {
     "domain": "desktop/app.go",
     "owner": "App.ListTaskEventsForTab",
@@ -3122,22 +3083,6 @@
       ]
     }
   },
-  "MCPAppCallTool": {
-    "domain": "desktop/mcp_apps_app.go",
-    "owner": "App.MCPAppCallTool",
-    "sources": [
-      "desktop/mcp_apps_app.go"
-    ],
-    "scope": {
-      "kind": "owner-inputs",
-      "resolver": "App.MCPAppCallTool",
-      "inputs": [
-        "instanceToken",
-        "toolName",
-        "args"
-      ]
-    }
-  },
   "MCPAppCallToolForTab": {
     "domain": "desktop/mcp_apps_app.go",
     "owner": "App.MCPAppCallToolForTab",
@@ -3196,20 +3141,6 @@
       "inputs": []
     }
   },
-  "MCPCloseAppInstance": {
-    "domain": "desktop/mcp_apps_app.go",
-    "owner": "App.MCPCloseAppInstance",
-    "sources": [
-      "desktop/mcp_apps_app.go"
-    ],
-    "scope": {
-      "kind": "owner-inputs",
-      "resolver": "App.MCPCloseAppInstance",
-      "inputs": [
-        "instanceToken"
-      ]
-    }
-  },
   "MCPCloseAppInstanceForTab": {
     "domain": "desktop/mcp_apps_app.go",
     "owner": "App.MCPCloseAppInstanceForTab",
@@ -3253,24 +3184,6 @@
       ]
     }
   },
-  "MCPOpenAppInstance": {
-    "domain": "desktop/mcp_apps_app.go",
-    "owner": "App.MCPOpenAppInstance",
-    "sources": [
-      "desktop/mcp_apps_app.go"
-    ],
-    "scope": {
-      "kind": "owner-inputs",
-      "resolver": "App.MCPOpenAppInstance",
-      "inputs": [
-        "server",
-        "tool",
-        "generation",
-        "callID",
-        "resourceURI"
-      ]
-    }
-  },
   "MCPOpenAppInstanceForTab": {
     "domain": "desktop/mcp_apps_app.go",
     "owner": "App.MCPOpenAppInstanceForTab",
@@ -3287,20 +3200,6 @@
         "generation",
         "callID",
         "resourceURI"
-      ]
-    }
-  },
-  "MCPOpenAppLink": {
-    "domain": "desktop/mcp_apps_app.go",
-    "owner": "App.MCPOpenAppLink",
-    "sources": [
-      "desktop/mcp_apps_app.go"
-    ],
-    "scope": {
-      "kind": "owner-inputs",
-      "resolver": "App.MCPOpenAppLink",
-      "inputs": [
-        "rawURL"
       ]
     }
   },
@@ -3708,20 +3607,6 @@
       ]
     }
   },
-  "OpenTaskSession": {
-    "domain": "desktop/app.go",
-    "owner": "App.OpenTaskSession",
-    "sources": [
-      "desktop/app.go"
-    ],
-    "scope": {
-      "kind": "owner-inputs",
-      "resolver": "App.OpenTaskSession",
-      "inputs": [
-        "taskID"
-      ]
-    }
-  },
   "OpenTaskSessionByKey": {
     "domain": "desktop/task_catalog.go",
     "owner": "App.OpenTaskSessionByKey",
@@ -3780,20 +3665,6 @@
       "inputs": []
     }
   },
-  "OpenWorkspaceInExternalOpener": {
-    "domain": "desktop/external_opener.go",
-    "owner": "App.OpenWorkspaceInExternalOpener",
-    "sources": [
-      "desktop/external_opener.go"
-    ],
-    "scope": {
-      "kind": "owner-inputs",
-      "resolver": "App.OpenWorkspaceInExternalOpener",
-      "inputs": [
-        "id"
-      ]
-    }
-  },
   "OpenWorkspaceInExternalOpenerForTab": {
     "domain": "desktop/external_opener.go",
     "owner": "App.OpenWorkspaceInExternalOpenerForTab",
@@ -3806,20 +3677,6 @@
       "inputs": [
         "tabID",
         "id"
-      ]
-    }
-  },
-  "OpenWorkspacePath": {
-    "domain": "desktop/app.go",
-    "owner": "App.OpenWorkspacePath",
-    "sources": [
-      "desktop/app.go"
-    ],
-    "scope": {
-      "kind": "owner-inputs",
-      "resolver": "App.OpenWorkspacePath",
-      "inputs": [
-        "rel"
       ]
     }
   },
@@ -4996,22 +4853,6 @@
       "inputs": []
     }
   },
-  "RequeueTask": {
-    "domain": "desktop/app.go",
-    "owner": "App.RequeueTask",
-    "sources": [
-      "desktop/app.go"
-    ],
-    "scope": {
-      "kind": "owner-inputs",
-      "resolver": "App.RequeueTask",
-      "inputs": [
-        "taskID",
-        "expectedVersion",
-        "idemKey"
-      ]
-    }
-  },
   "RequeueTaskByKey": {
     "domain": "desktop/task_catalog.go",
     "owner": "App.RequeueTaskByKey",
@@ -5510,20 +5351,6 @@
       ]
     }
   },
-  "RevealWorkspacePath": {
-    "domain": "desktop/app.go",
-    "owner": "App.RevealWorkspacePath",
-    "sources": [
-      "desktop/app.go"
-    ],
-    "scope": {
-      "kind": "owner-inputs",
-      "resolver": "App.RevealWorkspacePath",
-      "inputs": [
-        "rel"
-      ]
-    }
-  },
   "RevealWorkspacePathForTab": {
     "domain": "desktop/app.go",
     "owner": "App.RevealWorkspacePathForTab",
@@ -5597,20 +5424,6 @@
         "tabID",
         "checkpointID",
         "scope"
-      ]
-    }
-  },
-  "RunShell": {
-    "domain": "desktop/app.go",
-    "owner": "App.RunShell",
-    "sources": [
-      "desktop/app.go"
-    ],
-    "scope": {
-      "kind": "owner-inputs",
-      "resolver": "App.RunShell",
-      "inputs": [
-        "command"
       ]
     }
   },
@@ -6172,20 +5985,6 @@
     "scope": {
       "kind": "owner-inputs",
       "resolver": "App.SetCloseBehavior",
-      "inputs": [
-        "mode"
-      ]
-    }
-  },
-  "SetCollaborationMode": {
-    "domain": "desktop/app.go",
-    "owner": "App.SetCollaborationMode",
-    "sources": [
-      "desktop/app.go"
-    ],
-    "scope": {
-      "kind": "owner-inputs",
-      "resolver": "App.SetCollaborationMode",
       "inputs": [
         "mode"
       ]

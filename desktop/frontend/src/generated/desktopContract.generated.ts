@@ -3,7 +3,7 @@
 
 export const DESKTOP_PROTOCOL_VERSION = 1;
 
-export const DESKTOP_CONTRACT_DIGEST = "sha256:3953b6f826df64435dff252f1eae941630d218cd80bfde13153c86ccce83fcc2";
+export const DESKTOP_CONTRACT_DIGEST = "sha256:bc35be07dc5badc1623a556dd7aa38597e6a91dc87072b0a1dad7a91f4fea7f6";
 
 export const DESKTOP_COMMANDS = [
   "AIRenameSession",
@@ -75,7 +75,6 @@ export const DESKTOP_COMMANDS = [
   "CleanRecoveryLineage",
   "CleanRemoteLegacyWorkbenchData",
   "ClearBotSecret",
-  "ClearGoal",
   "ClearGoalForTab",
   "ClearMCPServerAuthentication",
   "ClearProviderKey",
@@ -100,7 +99,6 @@ export const DESKTOP_COMMANDS = [
   "ConnectKey",
   "ConnectRemoteHost",
   "ContextPanel",
-  "ContextUsage",
   "ContextUsageForTab",
   "CopyThemePack",
   "CreateBlankProject",
@@ -216,7 +214,6 @@ export const DESKTOP_COMMANDS = [
   "ListSessionsForTab",
   "ListTabs",
   "ListTaskEventPage",
-  "ListTaskEvents",
   "ListTaskEventsForTab",
   "ListTaskPage",
   "ListTasks",
@@ -226,18 +223,14 @@ export const DESKTOP_COMMANDS = [
   "ListTrashedSessions",
   "ListWorkspaces",
   "LookupInboxFollowupForTarget",
-  "MCPAppCallTool",
   "MCPAppCallToolForTab",
   "MCPAppResourceDigest",
   "MCPAppResourceDigestForTab",
   "MCPCapabilityMatrix",
-  "MCPCloseAppInstance",
   "MCPCloseAppInstanceForTab",
   "MCPMarketplace",
   "MCPMarketplaceResolve",
-  "MCPOpenAppInstance",
   "MCPOpenAppInstanceForTab",
-  "MCPOpenAppLink",
   "MCPOpenAppLinkForTab",
   "MCPServers",
   "Memory",
@@ -267,14 +260,11 @@ export const DESKTOP_COMMANDS = [
   "OpenProjectTab",
   "OpenRemoteProjectTab",
   "OpenRemoteWorkspace",
-  "OpenTaskSession",
   "OpenTaskSessionByKey",
   "OpenTaskSessionForTab",
   "OpenTopicSession",
   "OpenUserConfigPath",
-  "OpenWorkspaceInExternalOpener",
   "OpenWorkspaceInExternalOpenerForTab",
-  "OpenWorkspacePath",
   "OpenWorkspacePathForTab",
   "PauseGoalForTab",
   "PauseRemoteTabGoal",
@@ -359,7 +349,6 @@ export const DESKTOP_COMMANDS = [
   "ReplayRemoteTabPrompts",
   "ReportCrash",
   "ReportDesktopWebViewReady",
-  "RequeueTask",
   "RequeueTaskByKey",
   "RequeueTaskForTab",
   "ResetProviderPresetAccess",
@@ -393,13 +382,11 @@ export const DESKTOP_COMMANDS = [
   "RetrySessionRecovery",
   "RevealBackgroundRuntime",
   "RevealPath",
-  "RevealWorkspacePath",
   "RevealWorkspacePathForTab",
   "RevealWorkspaceWriterForTab",
   "Rewind",
   "RewindForTab",
   "RewindRemoteTab",
-  "RunShell",
   "RunShellForTab",
   "RuntimeDoctor",
   "SaveClipboardImage",
@@ -439,7 +426,6 @@ export const DESKTOP_COMMANDS = [
   "SetBotSettings",
   "SetBypass",
   "SetCloseBehavior",
-  "SetCollaborationMode",
   "SetCollaborationModeForTab",
   "SetCompactRatio",
   "SetComposerProfileForTab",
@@ -4243,7 +4229,6 @@ export interface GeneratedDesktopCommands {
   CleanRecoveryLineage(arg0: RecoveryCleanupRequest): Promise<RecoveryCleanupResult>;
   CleanRemoteLegacyWorkbenchData(arg0: string): Promise<void>;
   ClearBotSecret(arg0: string): Promise<void>;
-  ClearGoal(): Promise<void>;
   ClearGoalForTab(arg0: string): Promise<void>;
   ClearMCPServerAuthentication(arg0: string): Promise<void>;
   ClearProviderKey(arg0: string): Promise<void>;
@@ -4268,7 +4253,6 @@ export interface GeneratedDesktopCommands {
   ConnectKey(arg0: string): Promise<string>;
   ConnectRemoteHost(arg0: string): Promise<void>;
   ContextPanel(arg0: string): Promise<ContextPanelInfo>;
-  ContextUsage(): Promise<ContextInfo>;
   ContextUsageForTab(arg0: string): Promise<ContextInfo>;
   CopyThemePack(arg0: string, arg1: string, arg2: string): Promise<ThemePackView>;
   CreateBlankProject(arg0: string, arg1: string): Promise<string>;
@@ -4384,7 +4368,6 @@ export interface GeneratedDesktopCommands {
   ListSessionsForTab(arg0: string): Promise<SessionMeta[]>;
   ListTabs(): Promise<TabMeta[]>;
   ListTaskEventPage(arg0: TaskEventPageRequest): Promise<EventPage>;
-  ListTaskEvents(arg0: string, arg1: number): Promise<TaskEvent[]>;
   ListTaskEventsForTab(arg0: string, arg1: string, arg2: number): Promise<TaskEvent[]>;
   ListTaskPage(arg0: TaskPageRequest): Promise<TaskPage>;
   ListTasks(): Promise<TaskSnapshot[]>;
@@ -4394,18 +4377,14 @@ export interface GeneratedDesktopCommands {
   ListTrashedSessions(): Promise<SessionMeta[]>;
   ListWorkspaces(): Promise<WorkspaceMeta[]>;
   LookupInboxFollowupForTarget(arg0: InboxTargetView, arg1: string): Promise<InboxReceiptView>;
-  MCPAppCallTool(arg0: string, arg1: string, arg2: unknown): Promise<string>;
   MCPAppCallToolForTab(arg0: string, arg1: string, arg2: string, arg3: unknown): Promise<string>;
   MCPAppResourceDigest(arg0: string): Promise<string>;
   MCPAppResourceDigestForTab(arg0: string, arg1: string): Promise<string>;
   MCPCapabilityMatrix(): Promise<MCPCapabilityMatrixView>;
-  MCPCloseAppInstance(arg0: string): Promise<void>;
   MCPCloseAppInstanceForTab(arg0: string, arg1: string): Promise<void>;
   MCPMarketplace(arg0: string): Promise<MCPMarketplaceView>;
   MCPMarketplaceResolve(arg0: string): Promise<MCPMarketplaceEntryView>;
-  MCPOpenAppInstance(arg0: string, arg1: string, arg2: number, arg3: string, arg4: string): Promise<MCPAppInstanceView | null>;
   MCPOpenAppInstanceForTab(arg0: string, arg1: string, arg2: string, arg3: number, arg4: string, arg5: string): Promise<MCPAppInstanceView | null>;
-  MCPOpenAppLink(arg0: string): Promise<void>;
   MCPOpenAppLinkForTab(arg0: string, arg1: string, arg2: string): Promise<void>;
   MCPServers(): Promise<ServerView[]>;
   Memory(): Promise<MemoryView>;
@@ -4435,14 +4414,11 @@ export interface GeneratedDesktopCommands {
   OpenProjectTab(arg0: string, arg1: string): Promise<TabMeta>;
   OpenRemoteProjectTab(arg0: string, arg1: string, arg2: RemoteTabOpenOptions): Promise<TabMeta>;
   OpenRemoteWorkspace(arg0: string, arg1: string): Promise<void>;
-  OpenTaskSession(arg0: string): Promise<ControlResult>;
   OpenTaskSessionByKey(arg0: TaskOpenRequest): Promise<ControlResult>;
   OpenTaskSessionForTab(arg0: string, arg1: string): Promise<ControlResult>;
   OpenTopicSession(arg0: string, arg1: string, arg2: string, arg3: string): Promise<TabMeta>;
   OpenUserConfigPath(): Promise<void>;
-  OpenWorkspaceInExternalOpener(arg0: string): Promise<void>;
   OpenWorkspaceInExternalOpenerForTab(arg0: string, arg1: string): Promise<void>;
-  OpenWorkspacePath(arg0: string): Promise<void>;
   OpenWorkspacePathForTab(arg0: string, arg1: string): Promise<void>;
   PauseGoalForTab(arg0: string): Promise<boolean>;
   PauseRemoteTabGoal(arg0: string): Promise<void>;
@@ -4527,7 +4503,6 @@ export interface GeneratedDesktopCommands {
   ReplayRemoteTabPrompts(arg0: string): Promise<unknown>;
   ReportCrash(arg0: string, arg1: string): Promise<void>;
   ReportDesktopWebViewReady(): Promise<void>;
-  RequeueTask(arg0: string, arg1: number, arg2: string): Promise<ControlResult>;
   RequeueTaskByKey(arg0: TaskActionRequest): Promise<ControlResult>;
   RequeueTaskForTab(arg0: string, arg1: string, arg2: number, arg3: string): Promise<ControlResult>;
   ResetProviderPresetAccess(arg0: string): Promise<void>;
@@ -4561,13 +4536,11 @@ export interface GeneratedDesktopCommands {
   RetrySessionRecovery(arg0: RecoveryPreferenceRequest): Promise<void>;
   RevealBackgroundRuntime(arg0: string): Promise<TabMeta>;
   RevealPath(arg0: string): Promise<void>;
-  RevealWorkspacePath(arg0: string): Promise<void>;
   RevealWorkspacePathForTab(arg0: string, arg1: string): Promise<void>;
   RevealWorkspaceWriterForTab(arg0: string): Promise<TabMeta>;
   Rewind(arg0: number, arg1: string): Promise<void>;
   RewindForTab(arg0: string, arg1: number, arg2: string): Promise<void>;
   RewindRemoteTab(arg0: string, arg1: string, arg2: string): Promise<void>;
-  RunShell(arg0: string): Promise<void>;
   RunShellForTab(arg0: string, arg1: string): Promise<void>;
   RuntimeDoctor(): Promise<RuntimeDoctorReport>;
   SaveClipboardImage(): Promise<string>;
@@ -4607,7 +4580,6 @@ export interface GeneratedDesktopCommands {
   SetBotSettings(arg0: BotSettingsView): Promise<void>;
   SetBypass(arg0: boolean): Promise<void>;
   SetCloseBehavior(arg0: string): Promise<void>;
-  SetCollaborationMode(arg0: string): Promise<void>;
   SetCollaborationModeForTab(arg0: string, arg1: string): Promise<void>;
   SetCompactRatio(arg0: number): Promise<void>;
   SetComposerProfileForTab(arg0: string, arg1: string, arg2: string, arg3: string): Promise<string[]>;
