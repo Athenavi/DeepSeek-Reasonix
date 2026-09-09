@@ -1097,7 +1097,8 @@ func TestExtractLinuxReleaseUnitRejectsAmbiguousMembers(t *testing.T) {
 func TestApplyLinuxVersionedActivatesWithoutPersistingGuard(t *testing.T) {
 	root := robustTempDir(t)
 	source := robustTempDir(t)
-	for _, name := range []string{installlayout.DesktopBinaryName(), installlayout.CLIBinaryName()} {
+	// This fixture describes a Linux release even when the test host is Windows.
+	for _, name := range []string{"reasonix-desktop", "reasonix"} {
 		if err := os.WriteFile(filepath.Join(source, name), []byte("old-"+name), 0o700); err != nil {
 			t.Fatal(err)
 		}
@@ -1107,10 +1108,10 @@ func TestApplyLinuxVersionedActivatesWithoutPersistingGuard(t *testing.T) {
 		Version:     "v1.20.0",
 		RequestID:   "seed-linux",
 		Members: []installlayout.Member{
-			{Name: installlayout.DesktopBinaryName(), Path: filepath.Join(source, installlayout.DesktopBinaryName())},
-			{Name: installlayout.CLIBinaryName(), Path: filepath.Join(source, installlayout.CLIBinaryName())},
+			{Name: "reasonix-desktop", Path: filepath.Join(source, "reasonix-desktop")},
+			{Name: "reasonix", Path: filepath.Join(source, "reasonix")},
 		},
-		RequiredNames: []string{installlayout.DesktopBinaryName(), installlayout.CLIBinaryName()},
+		RequiredNames: []string{"reasonix-desktop", "reasonix"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -1127,10 +1128,7 @@ func TestApplyLinuxVersionedActivatesWithoutPersistingGuard(t *testing.T) {
 	if err != nil || ptr.ActiveVersion != "v1.20.1" {
 		t.Fatalf("pointer=%+v err=%v", ptr, err)
 	}
-	activeDesktop, err := installlayout.ActiveDesktopPath(root)
-	if err != nil {
-		t.Fatal(err)
-	}
+	activeDesktop := filepath.Join(root, filepath.FromSlash(ptr.ActiveDir), "reasonix-desktop")
 	data, err := os.ReadFile(activeDesktop)
 	if err != nil || string(data) != "new-reasonix-desktop" {
 		t.Fatalf("active desktop=%q err=%v", data, err)

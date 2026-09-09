@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -541,7 +542,9 @@ func TestSFTPFileRelayRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	// Windows exposes only the read-only bit through chmod; the Windows
+	// round-trip still checks native file access and both transfer directions.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Fatalf("relayed file mode = %v, want 0600", info.Mode().Perm())
 	}
 	// The reverse direction must download the remote bytes and enforce the
@@ -582,5 +585,42 @@ func TestRelayFileNameSanitizes(t *testing.T) {
 	}
 	if name == relayFileName("/tmp/x/evil.png") {
 		t.Fatal("relayFileName must be unique per call")
+	}
+}
+
+func TestBrowserRelayRemotePathContract(t *testing.T) {
+	for _, tc := range []struct {
+		name, home, agentPath, wirePath string
+	}{
+		{"posix", "/home/user", "/workspace/report.csv", "/workspace/report.csv"},
+		{"posix backslash filename", "/home/user", "/workspace/report\\name.csv", "/workspace/report\\name.csv"},
+		{"posix drive-like directory", "/home/user", "/C:/report.csv", "/C:/report.csv"},
+		{"windows native", "/C:/Users/user", `C:\work space\report.csv`, "/C:/work space/report.csv"},
+		{"windows other drive", "/C:/Users/user", `D:\work space\report.csv`, "/D:/work space/report.csv"},
+		{"windows forward slashes", "/C:/Users/user", "C:/work space/report.csv", "/C:/work space/report.csv"},
+		{"windows canonical", "/C:/Users/user", "/C:/work space/report.csv", "/C:/work space/report.csv"},
+		{"windows unprefixed server", "C:/Users/user", `D:\work space\report.csv`, "D:/work space/report.csv"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := relaySFTPPath(tc.agentPath, tc.home); got != tc.wirePath {
+				t.Fatalf("wire path = %q, want %q", got, tc.wirePath)
+			}
+			if got := relaySFTPPath(relayAgentPath(tc.wirePath, tc.home), tc.home); got != tc.wirePath {
+				t.Fatalf("Agent path round trip = %q, want %q", got, tc.wirePath)
+			}
+		})
+	}
+	for _, wire := range []string{"/C:/Users/user/capture.png", "D:/work/report.csv"} {
+		if got := relayAgentPath(wire, "/C:/Users/user"); !relayWindowsDrivePath(got) || strings.HasPrefix(got, "/") {
+			t.Fatalf("Windows Agent cannot consume %q", got)
+		}
+	}
+	if got := relayAgentPath("/C:/report.csv", "/home/user"); got != "/C:/report.csv" {
+		t.Fatalf("POSIX directory changed to a Windows drive: %q", got)
+	}
+	for _, relative := range []string{"C:report.csv", "report.csv", "../report.csv"} {
+		if relayWindowsDrivePath(relative) {
+			t.Fatalf("relative path accepted as absolute: %q", relative)
+		}
 	}
 }
