@@ -40,3 +40,35 @@ func TestBrowserUploadStagesOnlyOwnedFiles(t *testing.T) {
 		t.Fatalf("staged file did not retain approved bytes: %q %v", got, err)
 	}
 }
+
+func TestBrowserUploadPreservesSelectedFileName(t *testing.T) {
+	root, scratch := t.TempDir(), t.TempDir()
+	target := filepath.Join(root, "stored.csv")
+	if err := os.WriteFile(target, []byte("approved bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	selected := filepath.Join(root, "客户 report.csv")
+	if err := os.Symlink(target, selected); err != nil {
+		t.Fatal(err)
+	}
+	first, err := stageOwnedBrowserFile([]string{root}, scratch, selected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := stageOwnedBrowserFile([]string{root}, scratch, selected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second {
+		t.Fatal("separate uploads reused the same staging path")
+	}
+	for _, staged := range []string{first, second} {
+		if filepath.Base(staged) != filepath.Base(selected) {
+			t.Fatalf("selected filename changed: %s", staged)
+		}
+		got, err := os.ReadFile(staged)
+		if err != nil || string(got) != "approved bytes" {
+			t.Fatalf("staged file lost approved bytes: %q %v", got, err)
+		}
+	}
+}

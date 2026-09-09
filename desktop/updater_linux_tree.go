@@ -18,6 +18,11 @@ import (
 // extraction rejects aliases, links and duplicate paths before activation;
 // executable permissions survive, while setuid/setgid never enter a user tree.
 func stageLinuxShellRelease(archive []byte, staging string) ([]installlayout.Member, []string, error) {
+	root, err := os.OpenRoot(staging)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer root.Close()
 	gz, err := gzip.NewReader(bytes.NewReader(archive))
 	if err != nil {
 		return nil, nil, err
@@ -58,17 +63,20 @@ func stageLinuxShellRelease(archive []byte, staging string) ([]installlayout.Mem
 		if h.Typeflag != tar.TypeReg || h.Size < 0 || seen[name] {
 			return nil, nil, fmt.Errorf("invalid or duplicate release member %q", name)
 		}
-		expanded += h.Size
-		if expanded > 2<<30 || len(seen) >= 10000 {
+		if h.Size > (2<<30)-expanded || len(seen) >= 10000 {
 			return nil, nil, fmt.Errorf("release tree exceeds extraction limit")
 		}
+		expanded += h.Size
 		seen[name] = true
-		dst := filepath.Join(staging, filepath.FromSlash(name))
-		if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		// Resolve relative to the opened directory handle. Name validation
+		// enforces the release layout; Root also prevents an existing or
+		// concurrently replaced parent symlink from escaping staging.
+		dst := filepath.FromSlash(name)
+		if err := root.MkdirAll(filepath.Dir(dst), 0755); err != nil {
 			return nil, nil, err
 		}
 		mode := os.FileMode(h.Mode) & 0755
-		file, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+		file, err := root.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 		if err != nil {
 			return nil, nil, err
 		}

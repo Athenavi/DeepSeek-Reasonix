@@ -32,7 +32,7 @@ func main() {
 			w.WriteHeader(405)
 			return
 		}
-		http.SetCookie(w, &http.Cookie{Name: "fixture_session", Value: "synthetic", Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 86400})
+		http.SetCookie(w, &http.Cookie{Name: "fixture_session", Value: "synthetic", Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: 86400})
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		fmt.Fprint(w, `<script>opener.postMessage({type:'fixture-login'},location.origin);window.close()</script>`)
 	})

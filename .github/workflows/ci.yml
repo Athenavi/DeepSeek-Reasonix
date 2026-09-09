@@ -385,6 +385,7 @@ jobs:
         run: |
           pnpm --dir electron typecheck
           pnpm --dir electron test
+          node --test packaging/*.test.mjs
           pnpm --dir electron build
       - name: Test desktop frontend once per suite
         env:

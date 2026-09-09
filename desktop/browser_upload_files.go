@@ -48,6 +48,10 @@ func stageOwnedBrowserFile(roots []string, directory, file string) (string, erro
 	if !filepath.IsAbs(file) {
 		return "", fmt.Errorf("browser upload: file path must be absolute")
 	}
+	name := filepath.Base(file)
+	if !filepath.IsLocal(name) || name == "." || strings.ContainsAny(name, "/\\\x00") {
+		return "", fmt.Errorf("browser upload: file name must be a single local path component")
+	}
 	resolved, err := filepath.EvalSymlinks(file)
 	if err != nil {
 		return "", fmt.Errorf("browser upload: %w", err)
@@ -82,7 +86,12 @@ func stageOwnedBrowserFile(roots []string, directory, file string) (string, erro
 		if err != nil {
 			return "", err
 		}
-		out, err := os.OpenFile(filepath.Join(dir, filepath.Base(resolved)), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+		outputRoot, err := os.OpenRoot(dir)
+		if err != nil {
+			return "", err
+		}
+		defer outputRoot.Close()
+		out, err := outputRoot.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err != nil {
 			return "", err
 		}
@@ -92,10 +101,10 @@ func stageOwnedBrowserFile(roots []string, directory, file string) (string, erro
 			copyErr = errors.Join(copyErr, fmt.Errorf("file exceeds %d bytes", browserRelayMaxBytes))
 		}
 		if copyErr != nil || closeErr != nil {
-			_ = os.Remove(out.Name())
+			_ = outputRoot.Remove(name)
 			return "", fmt.Errorf("browser upload: staging failed: %w", errors.Join(copyErr, closeErr))
 		}
-		return out.Name(), nil
+		return filepath.Join(dir, name), nil
 	}
 	return "", fmt.Errorf("browser upload: file is outside this task's workspace and scratch directory")
 }

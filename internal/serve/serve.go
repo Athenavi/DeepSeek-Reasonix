@@ -1527,7 +1527,10 @@ func (s *Server) deleteSession(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "name required", http.StatusBadRequest)
 		return
 	}
-	if name == "." || name == ".." || strings.ContainsAny(name, `/\`) {
+	// Validate the untrusted name before constructing any transcript or sidecar
+	// path. IsLocal also rejects Windows drive-relative and reserved names;
+	// the separator check keeps this endpoint restricted to one basename.
+	if !filepath.IsLocal(name) || name == "." || strings.ContainsAny(name, `/\`) {
 		http.Error(w, "invalid session name", http.StatusBadRequest)
 		return
 	}

@@ -4,11 +4,38 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"math"
 	"os"
 	"path/filepath"
-	"reasonix/internal/installlayout"
+	"strings"
 	"testing"
+
+	"reasonix/internal/installlayout"
 )
+
+func TestLinuxShellRejectsExpandedSizeOverflow(t *testing.T) {
+	var archive bytes.Buffer
+	gz := gzip.NewWriter(&archive)
+	tw := tar.NewWriter(gz)
+	if err := tw.WriteHeader(&tar.Header{Name: "reasonix", Mode: 0755, Size: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write([]byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.WriteHeader(&tar.Header{Name: "app/large", Mode: 0644, Size: math.MaxInt64}); err != nil {
+		t.Fatal(err)
+	}
+	// The oversized member has no body: the limit must reject its header
+	// before attempting to copy, even when the summed sizes would overflow.
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := stageLinuxShellRelease(archive.Bytes(), t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "extraction limit") {
+		t.Fatalf("oversized header must fail before body copy, got %v", err)
+	}
+}
 
 func linuxShellArchive(t *testing.T, extra *tar.Header, omit string) []byte {
 	t.Helper()
@@ -90,6 +117,60 @@ func TestLinuxShellUpdateRejectsPartialOrUnsafeTreeWithoutMovingPointer(t *testi
 			ptr, err := installlayout.ReadCurrent(root)
 			if err != nil || ptr.ActiveVersion != "v1.39.0" {
 				t.Fatalf("changed old pointer: %+v %v", ptr, err)
+			}
+		})
+	}
+}
+
+func TestLinuxShellExtractionCannotFollowPreexistingLinksOutsideStaging(t *testing.T) {
+	for _, name := range []string{"app", "app/resources", "reasonix-desktop"} {
+		t.Run(name, func(t *testing.T) {
+			staging, outside := t.TempDir(), t.TempDir()
+			sentinel := filepath.Join(outside, "keep")
+			if err := os.WriteFile(sentinel, []byte("original"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			target := outside
+			if name == "reasonix-desktop" {
+				target = sentinel
+			}
+			link := filepath.Join(staging, filepath.FromSlash(name))
+			if err := os.MkdirAll(filepath.Dir(link), 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(target, link); err != nil {
+				t.Skipf("symlinks unavailable: %v", err)
+			}
+			if _, _, err := stageLinuxShellRelease(linuxShellArchive(t, nil, ""), staging); err == nil {
+				t.Fatal("extraction accepted a symlink outside staging")
+			}
+			entries, err := os.ReadDir(outside)
+			if err != nil || len(entries) != 1 || entries[0].Name() != "keep" {
+				t.Fatalf("extraction created files outside staging: %v %v", entries, err)
+			}
+			data, err := os.ReadFile(sentinel)
+			if err != nil || string(data) != "original" {
+				t.Fatalf("extraction changed outside file: %q %v", data, err)
+			}
+		})
+	}
+}
+
+func TestLinuxShellExtractionRejectsEscapingPathsWithoutOutsideWrites(t *testing.T) {
+	parent := t.TempDir()
+	outside := filepath.Join(parent, "outside")
+	for _, name := range []string{"../outside", "app/../../outside", outside, `app\..\..\outside`} {
+		t.Run(name, func(t *testing.T) {
+			staging, err := os.MkdirTemp(parent, "staging-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			archive := linuxShellArchive(t, &tar.Header{Name: name, Typeflag: tar.TypeReg}, "")
+			if _, _, err := stageLinuxShellRelease(archive, staging); err == nil {
+				t.Fatal("extraction accepted an escaping path")
+			}
+			if _, err := os.Stat(outside); !os.IsNotExist(err) {
+				t.Fatalf("extraction created an outside file: %v", err)
 			}
 		})
 	}
