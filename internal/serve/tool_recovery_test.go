@@ -35,7 +35,7 @@ func TestToolRecoveryHTTPRoutesAndFences(t *testing.T) {
 		t.Fatal(err)
 	}
 	response.Body.Close()
-	if response.StatusCode != 200 || got.Revision != v.Revision || got.Calls == nil {
+	if response.StatusCode != http.StatusOK || got.Revision != v.Revision || got.Calls == nil {
 		t.Fatalf("snapshot=%+v status=%d", got, response.StatusCode)
 	}
 	valid := control.ToolRecoveryRequest{SessionPath: v.SessionPath, RuntimeEpoch: v.RuntimeEpoch, Revision: v.Revision, Action: "unsupported"}

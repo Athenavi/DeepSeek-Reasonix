@@ -3,7 +3,7 @@
 
 export const DESKTOP_PROTOCOL_VERSION = 1;
 
-export const DESKTOP_CONTRACT_DIGEST = "sha256:eddb9a8b4d0e9e24a4cd40fef0fcdf76b986191e00d8b33683da5f9764ace432";
+export const DESKTOP_CONTRACT_DIGEST = "sha256:da756f0aad931a798a0e8ed7322e306fefa1e493afeb643742a2dd45ab96fe6b";
 
 export const DESKTOP_COMMANDS = [
   "AIRenameSession",
@@ -1180,6 +1180,7 @@ export interface Profile {
 }
 
 export interface ReadStatus {
+  verdict?: string;
   readId: string;
   generation?: number;
   seq?: number;
@@ -1272,6 +1273,7 @@ export interface StreamAttempt {
 
 export interface Tool {
   runState?: string;
+  diagnostic?: unknown;
   verifying?: boolean;
   id?: string;
   name: string;
@@ -2001,6 +2003,7 @@ export interface HistoryMessage {
   decisionReceipt?: provider_DecisionReceipt | null;
   readiness?: event_FinalReadiness | null;
   readPause?: ReadPause | null;
+  readCompletion?: ReadCompletion | null;
   protocolRecovery?: ProtocolRecoveryAction | null;
   diagnostic?: FailureDiagnostic | null;
   serverSearch?: ServerSearchCall[];
@@ -3924,6 +3927,16 @@ export interface ActionIdentity {
   resource_scope?: string;
 }
 
+export interface CompletedRead {
+  read_id: string;
+  path: string;
+  snapshot?: string;
+  intent: string;
+  verdict: string;
+  covered: number[][];
+  source_end?: number | null;
+}
+
 export interface provider_DecisionReceipt {
   id: string;
   kind: string;
@@ -3962,6 +3975,7 @@ export interface provider_MemoryCitation {
 }
 
 export interface PausedRead {
+  snapshot?: string;
   readId: string;
   path: string;
   intent?: string;
@@ -3974,7 +3988,14 @@ export interface ProtocolRecoveryAction {
   id: string;
 }
 
+export interface ReadCompletion {
+  id: string;
+  reads: CompletedRead[];
+  omitted?: number;
+}
+
 export interface ReadPause {
+  code?: string;
   id: string;
   reads: PausedRead[];
   omitted?: number;
