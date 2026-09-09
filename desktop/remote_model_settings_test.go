@@ -589,6 +589,42 @@ func TestAppendRemoteModelSettingsReportsLegacyTargetNotRequired(t *testing.T) {
 	}
 }
 
+// Fresh and restored tabs run generation 0 with an unrecorded verdict; they
+// must stay pending in the application status instead of claiming
+// not_required before any capability probe has run.
+func TestAppendRemoteModelSettingsFreshTabStaysPending(t *testing.T) {
+	isolateDesktopUserDirs(t)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer upstream.Close()
+	app := NewApp()
+	defer app.closeCredentialProxy()
+	view := ProviderView{Name: "legacy", Kind: "openai", BaseURL: upstream.URL, Models: []string{"m"}, NoProxy: true}
+	if _, err := app.SaveProviderWithKey(view, "legacy-key"); err != nil {
+		t.Fatal(err)
+	}
+	if err := editUserConfig(func(c *config.Config) error {
+		return c.UpsertRemoteHost(config.RemoteHostEntry{Name: "legacy-host", Host: "127.0.0.1", CredentialMode: "local-proxy"})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	tab := &remoteTab{
+		id: "fresh-tab", ref: RemoteTabRef{HostID: "legacy-host", Workspace: "ws"},
+		model: "legacy/m",
+	}
+	app.remoteTabs = map[string]*remoteTab{tab.id: tab}
+
+	result := emptyModelSettingsResult()
+	app.appendRemoteModelSettingsStatus(&result)
+	if len(result.Targets) != 1 || result.Targets[0].Application != "pending" {
+		t.Fatalf("fresh tab not reported as pending: %+v", result.Targets)
+	}
+	if result.Application != "pending" {
+		t.Fatalf("fresh tab did not keep the receipt pending: %q", result.Application)
+	}
+}
+
 // SubmitRemoteTab must only deliver an unrevisioned turn to the connection the
 // legacy admission was recorded for: a replaced generation re-admits against
 // the new target before the request leaves, and the Serve never receives the

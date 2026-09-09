@@ -370,7 +370,9 @@ func (a *App) ensureRemoteModelSettings(tabID string) (string, uint64, error) {
 		}
 		model, applied, generation, path := tab.model, tab.settings.revision, tab.gen, tab.routing.currentPath
 		valid := tab.settings.generation == generation && tab.settings.sessionPath == path
-		unsupported := tab.settings.unsupportedGen == generation
+		// Generation 0 is an unrecorded verdict, not a legacy one: fresh and
+		// restored tabs run generation 0 before their first attachment.
+		unsupported := tab.settings.unsupportedGen != 0 && tab.settings.unsupportedGen == generation
 		a.remoteTabMu.Unlock()
 		if unsupported {
 			return "", generation, nil
@@ -447,7 +449,9 @@ func (a *App) appendRemoteModelSettingsStatus(result *ModelSettingsResult) {
 			model = resolveNewSessionModel(cfg)
 		}
 		desired := cfg.ModelRuntimeFingerprint(model)
-		if tab.settings.unsupportedGen == tab.gen {
+		// Generation 0 is an unrecorded verdict: a not-yet-attached tab has not
+		// probed any Serve and must stay pending, not claim not_required.
+		if tab.settings.unsupportedGen != 0 && tab.settings.unsupportedGen == tab.gen {
 			// The Serve predates the protocol and never applies snapshots in
 			// this generation, so the target does not participate: report it as
 			// not required instead of a pending application that would keep the
