@@ -154,6 +154,7 @@ func ToWire(e event.Event) Event {
 	case event.ExtensionSurface, event.ExtensionStatus:
 		w.Extension = ToWireExtensionSurface(e.Extension)
 	case event.TurnDone:
+		w.Recovery = e.Recovery
 		w.Outcome = e.Outcome
 		w.ReadPause = e.ReadPause
 		w.CheckpointTurn = e.CheckpointTurn

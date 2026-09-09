@@ -10,14 +10,15 @@ import (
 type ToolRunState string
 
 const (
-	ToolRunPending    ToolRunState = "pending"
-	ToolRunStarted    ToolRunState = "started"
-	ToolRunRunning    ToolRunState = "running"
-	ToolRunCompleted  ToolRunState = "completed"
-	ToolRunFailed     ToolRunState = "failed"
-	ToolRunCancelled  ToolRunState = "cancelled"
-	ToolRunNotStarted ToolRunState = "not_started"
-	ToolRunUnknown    ToolRunState = "unknown"
+	ToolRunPending       ToolRunState = "pending"
+	ToolRunStarted       ToolRunState = "started"
+	ToolRunRunning       ToolRunState = "running"
+	ToolRunCompleted     ToolRunState = "completed"
+	ToolRunFailed        ToolRunState = "failed"
+	ToolRunCancelled     ToolRunState = "cancelled"
+	ToolRunNotStarted    ToolRunState = "not_started"
+	ToolRunUnknown       ToolRunState = "unknown"
+	ToolRunUserConfirmed ToolRunState = "user_confirmed"
 )
 
 // ActionIdentity is the stable local identity of one logical tool action.
@@ -34,20 +35,26 @@ type ActionIdentity struct {
 
 // ToolCallRecord is a durable, provider-excluded execution receipt.
 type ToolCallRecord struct {
-	Identity       ActionIdentity  `json:"identity"`
-	Arguments      json.RawMessage `json:"arguments,omitempty"`
-	State          ToolRunState    `json:"state"`
-	ReadOnly       bool            `json:"read_only"`
-	IdempotencyKey string          `json:"idempotency_key,omitempty"`
-	StartedAt      int64           `json:"started_at,omitempty"`
-	FinishedAt     int64           `json:"finished_at,omitempty"`
-	ResultDigest   string          `json:"result_digest,omitempty"`
-	EffectSummary  string          `json:"effect_summary,omitempty"`
+	Identity         ActionIdentity  `json:"identity"`
+	Arguments        json.RawMessage `json:"arguments,omitempty"`
+	State            ToolRunState    `json:"state"`
+	ReadOnly         bool            `json:"read_only"`
+	IdempotencyKey   string          `json:"idempotency_key,omitempty"`
+	StartedAt        int64           `json:"started_at,omitempty"`
+	FinishedAt       int64           `json:"finished_at,omitempty"`
+	ResultDigest     string          `json:"result_digest,omitempty"`
+	EffectSummary    string          `json:"effect_summary,omitempty"`
+	Resolution       string          `json:"resolution,omitempty"`
+	ResolvedAt       int64           `json:"resolved_at,omitempty"`
+	ResolutionSource string          `json:"resolution_source,omitempty"`
+	InspectionID     string          `json:"inspection_id,omitempty"`
+	InspectionState  string          `json:"inspection_state,omitempty"`
+	SupersededBy     string          `json:"superseded_by,omitempty"`
 }
 
 func ToolResultRunState(m Message) ToolRunState {
 	switch m.ToolRunState {
-	case ToolRunPending, ToolRunStarted, ToolRunRunning, ToolRunCompleted, ToolRunFailed, ToolRunCancelled, ToolRunNotStarted, ToolRunUnknown:
+	case ToolRunPending, ToolRunStarted, ToolRunRunning, ToolRunCompleted, ToolRunFailed, ToolRunCancelled, ToolRunNotStarted, ToolRunUnknown, ToolRunUserConfirmed:
 		return m.ToolRunState
 	case "":
 	default:
@@ -75,7 +82,11 @@ func RecordToolRecovery(r *InterruptedTurnRecovery, call InterruptedToolSummary,
 	switch state {
 	case ToolRunCompleted:
 		r.CompletedTools = append(r.CompletedTools, call)
-	case ToolRunNotStarted:
+	case ToolRunFailed:
+		r.FailedTools = append(r.FailedTools, call)
+	case ToolRunUserConfirmed:
+		r.UserConfirmedTools = append(r.UserConfirmedTools, call)
+	case ToolRunNotStarted, ToolRunCancelled, ToolRunPending:
 		r.NotStartedTools = append(r.NotStartedTools, call)
 		r.InterruptedTools = append(r.InterruptedTools, call.Name)
 	default:
@@ -97,6 +108,8 @@ type InterruptedTurnRecovery struct {
 	SatisfiedWrites         []InterruptedToolSummary `json:"satisfied_writes,omitempty"`
 	Pending                 bool                     `json:"pending,omitempty"`
 	CompletedTools          []InterruptedToolSummary `json:"completed_tools,omitempty"`
+	FailedTools             []InterruptedToolSummary `json:"failed_tools,omitempty"`
+	UserConfirmedTools      []InterruptedToolSummary `json:"user_confirmed_tools,omitempty"`
 	InterruptedTools        []string                 `json:"interrupted_tools,omitempty"`
 	NotStartedTools         []InterruptedToolSummary `json:"not_started_tools,omitempty"`
 	UnknownTools            []InterruptedToolSummary `json:"unknown_tools,omitempty"`

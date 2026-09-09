@@ -114,9 +114,6 @@ const (
 	ContextMaintenanceEvent
 	// WorkspaceChanged reports a debounced host-side workspace mutation.
 	WorkspaceChanged
-	// ToolStarted is the durable execution barrier immediately before a tool
-	// begins. It is distinct from ToolDispatch, which only records intent.
-	ToolStarted
 	// TurnPhase reports a host-side work phase for the active turn (working |
 	// checking | verifying | reviewing). Content-free; Text holds the phase.
 	TurnPhase
@@ -141,9 +138,8 @@ const (
 	SessionChanged
 	// ReadStatus upserts one logical read's delivery state instead of per page.
 	ReadStatus
-	// KindCount is a sentinel one past the last real Kind. New event kinds must
-	// be inserted above it so completeness tests cover them automatically.
-	KindCount
+	ToolStarted // Persisted after policy/validation and before execution.
+	KindCount // Follows all real event kinds.
 )
 
 // TurnPhaseName is the machine-readable phase on TurnPhase events.
@@ -224,6 +220,7 @@ type Profile struct {
 // Output/Err/Truncated are filled in. Args is the raw JSON arguments — a sink
 // compacts it for display.
 type Tool struct {
+	RunState provider.ToolRunState
 	// Verifying is emitted only once an authorized check actually enters execution.
 	Verifying bool
 	ID        string

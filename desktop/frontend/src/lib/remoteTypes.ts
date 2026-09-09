@@ -85,20 +85,6 @@ export interface RemoteTabSnapshot {
   pendingEvents?: unknown[];
 }
 
-export interface RemoteToolRecovery {
-  sessionId?: string;
-  turnId?: string;
-  attemptId?: string;
-  callId: string;
-  tool: string;
-  state: "pending" | "started" | "running" | "completed" | "failed" | "cancelled" | "unknown" | "user_confirmed" | "recovery_required";
-  readOnly: boolean;
-  resourceScope?: string;
-  argumentDigest?: string;
-  effectSummary?: string;
-  requiresUserDecision?: boolean;
-}
-
 export interface RemoteAskAnswer {
   QuestionID: string;
   Selected: string[];

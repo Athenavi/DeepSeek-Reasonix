@@ -51,7 +51,7 @@ export type EventKind =
   | "read_status"
   | "provider_unreachable";
 export type StreamAttemptAction = "begin" | "discard" | "commit";
-export type TurnStatus = "queued" | "in_progress" | "waiting_user" | "cancelling" | "completed" | "interrupted" | "failed" | "protocol_failed";
+export type TurnStatus = "queued" | "in_progress" | "waiting_user" | "cancelling" | "completed" | "interrupted" | "failed" | "protocol_failed" | "recovery_required";
 export interface TurnEventEnvelope {
   turnId: string;
   seq: number;

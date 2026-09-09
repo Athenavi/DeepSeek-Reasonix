@@ -1146,6 +1146,11 @@ func (c *Controller) finishGuardedTurn(err error, completion *guardedTurnComplet
 	}
 	done.Receipt = bindCompletionLogSources(done.Receipt, c.History())
 	done = c.applyTurnDoneProtocol(done, cancelRequested)
+	if pending := c.executor.PendingToolRecovery(); len(pending) > 0 {
+		done.Recovery = &event.RecoveryStatus{State: "recovery_required", Reason: "tool_effect_unconfirmed", RequiresUserDecision: true}
+	} else if c.executor.SilentToolRecovery() {
+		done.Recovery = &event.RecoveryStatus{State: "recovery_required", Reason: "silent_interruption"}
+	}
 	var readErr *agent.IncompleteReadError
 	if errors.As(err, &readErr) {
 		done.ReadPause = readErr.Pause
@@ -4056,6 +4061,7 @@ func (c *Controller) stripCancelledVisibleTurnMessagesAfterWithFallbackAt(idx in
 		localIndexes = append(localIndexes, len(next)-1)
 	}
 	next[localIndexes[len(localIndexes)-1]].InterruptedTurn = recovery
+	recovery.SilentInterruption = len(recovery.CompletedTools) == 0 && len(recovery.InterruptedTools) == 0 && !recovery.DroppedPartialText && !recovery.DroppedPartialReasoning
 	c.replaceSessionAfterCancel(next)
 }
 
