@@ -151,13 +151,16 @@ func (a *App) handleTabSessionTransition(tab *WorkspaceTab) func(control.Session
 		}
 		tab.SessionPath = canonicalTabSessionPath(info.TargetPath)
 		if a.tabs[tab.ID] == tab {
-			a.saveTabsLocked()
+			_ = a.saveTabsLocked()
 		}
 		a.mu.Unlock()
 		if oldLease != nil {
 			go oldLease.Release()
 		}
 		info.OnCommit(func() {
+			if info.OriginalPath != "" && sessionRuntimeKey(info.OriginalPath) != sessionRuntimeKey(info.TargetPath) {
+				a.discardPendingTabEffort(tab)
+			}
 			tab.setPinnedFiles(pinnedState.Files)
 			a.emitRuntimeEvent(tabMetaRefreshEventChannel, TabMetaRefreshEvent{TabID: tab.ID, Meta: a.MetaForTab(tab.ID)})
 		})

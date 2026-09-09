@@ -1779,6 +1779,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 	ctrlOpts := control.Options{
 		ModelSettingsRevision:          cfg.ModelRuntimeFingerprint(modelRef),
 		ModelSettingsCurrent:           runtimeModelSettingsReader(root, modelName, modelRef, opts.ModelSettings),
+		FrozenEffort:                   &entry.Effort,
 		FrozenImageInput:               &imageEnabled,
 		ImageCapabilityChanged:         runtimeImageCapabilityReader(root, modelName, imageSnapshot, opts.ModelSettings),
 		TaskBudget:                     taskBudgetFromConfig(cfg),

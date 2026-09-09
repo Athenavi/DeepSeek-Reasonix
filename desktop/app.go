@@ -817,7 +817,7 @@ func (a *App) restoreOrBuildTabs() {
 				a.activeTabID = ordered[0]
 			}
 		}
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 		a.mu.Unlock()
 		for _, tab := range toBuild {
 			a.startTabControllerBuild(tab)
@@ -1277,7 +1277,7 @@ func (a *App) submitInitialGoalToLocalTab(
 	tab.toolApprovalMode = toolApprovalMode
 	tab.goal = goal
 	tab.mode = tabModeFromAxes(false, toolApprovalMode == control.ToolApprovalYolo)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 
 	ctrl.SetPlanMode(false)
@@ -1608,7 +1608,7 @@ func (a *App) ensureTabControllerWorkspace(tab *WorkspaceTab) error {
 			tab.sink = &tabEventSink{tabID: tab.ID, app: a, ctx: a.ctx}
 		}
 		hostKey = takeTabSharedHostKey(tab)
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	if hostKey != "" {
@@ -1807,7 +1807,7 @@ func (a *App) SetModeForTab(tabID, mode string) []string {
 	drained = append(drained, applyTabToolApprovalModeToController(ctrl, approvalMode)...)
 	a.mu.Lock()
 	if a.tabs[tabIDForSave] == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	return drained
@@ -1917,7 +1917,7 @@ func (a *App) SetComposerProfileForTab(tabID, collaborationMode, toolApprovalMod
 
 	a.mu.Lock()
 	if a.tabs[tabIDForSave] == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	if drained == nil {
@@ -1961,7 +1961,7 @@ func (a *App) SetCollaborationModeForTab(tabID, mode string) {
 	}
 	a.mu.Lock()
 	if a.tabs[tabIDForSave] == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 }
@@ -2087,7 +2087,7 @@ func (a *App) assignFreshSessionTopic(tab *WorkspaceTab) {
 	tab.TopicTitle = defaultTopicTitle
 	tab.topicTitleSource = topicTitleSourceAuto
 	if current := a.tabs[tab.ID]; current == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	if strings.TrimSpace(scope) == "global" {
@@ -2118,7 +2118,7 @@ func (a *App) ensureTabTopicIndexedForUserTurn(tab *WorkspaceTab) {
 	tab.TopicTitle = defaultTopicTitle
 	tab.topicTitleSource = topicTitleSourceAuto
 	if current := a.tabs[tab.ID]; current == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	if strings.TrimSpace(scope) == "global" {
@@ -2274,7 +2274,7 @@ func (a *App) clearActiveSessionRuntime(tab *WorkspaceTab, oldCtrl control.Sessi
 	// was just destroyed, and finishing later would pass the generation
 	// check and overwrite this controller.
 	a.supersedeTabBuildLocked(tab)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 	// Same contract as ClearSession's non-running path: the replacement
 	// session starts with zero spend.
@@ -3087,7 +3087,7 @@ func (a *App) removeSessionRuntimeBindings(dir, sessionPath string) ([]removedSe
 	dir, entries, activeID, version := a.saveTabsCollectLocked()
 	a.mu.Unlock()
 
-	a.saveTabsWrite(dir, entries, activeID, version)
+	_ = a.saveTabsWrite(dir, entries, activeID, version)
 
 	return removed, fallback
 }
@@ -3348,7 +3348,7 @@ func (a *App) openTransientBlankRuntime(scope, workspaceRoot string) error {
 	a.tabs[tab.ID] = tab
 	a.tabOrder = append(a.tabOrder, tab.ID)
 	a.activeTabID = tab.ID
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 
 	a.startTabControllerBuild(tab)
@@ -3828,6 +3828,7 @@ func (a *App) rebindTabToLoadedSessionPath(tab *WorkspaceTab, sessionPath string
 
 		a.clearDeferredRebuildVersion(tab.ID, pendingSequence)
 		a.emitReady(a.ctx, tab.ID)
+		a.notifyEffortSelectionCleared(tab, source.pendingEffort != nil)
 
 		tab.turnStartMu.Unlock()
 		a.runtimeAdmissionMu.Unlock()
@@ -3933,6 +3934,7 @@ func (a *App) rebindTabToLoadedSessionPath(tab *WorkspaceTab, sessionPath string
 	tab.adoptSessionLease(targetLease)
 	targetLease = nil
 	tab.Ctrl = candidate.ctrl
+	tab.pendingEffort = nil
 	tab.sink = candidate.sink
 	tab.SessionPath = sessionPath
 	tab.model = candidate.model
@@ -3955,7 +3957,7 @@ func (a *App) rebindTabToLoadedSessionPath(tab *WorkspaceTab, sessionPath string
 		a.newSessionRuntimeLocked(tab, transition.targetKey)
 	}
 	newEpoch := a.advanceSessionRuntimeEpochLocked(tab)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	candidate.ctrl = nil
 	candidate.sink = nil
 	committed = true
@@ -3989,6 +3991,7 @@ func (a *App) rebindTabToLoadedSessionPath(tab *WorkspaceTab, sessionPath string
 	a.clearDeferredRebuildVersion(tab.ID, pendingSequence)
 	a.notifyTabRuntimeRebuiltAtEpoch(tab, newEpoch)
 	a.emitReady(a.ctx, tab.ID)
+	a.notifyEffortSelectionCleared(tab, source.pendingEffort != nil)
 	return nil
 }
 
@@ -4054,7 +4057,7 @@ func (a *App) reattachDetachedSessionRuntimeForRebind(
 
 	delete(a.detachedSessions, key)
 	applyRuntimeTab(tab, detached, sessionPath, a.ctx, a)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	attachedCtrl := tab.Ctrl
 	attachedSink := tab.sink
 	attachedEpoch := a.runtimeEpochForTabLocked(tab)
@@ -4955,7 +4958,7 @@ func (a *App) RemoveWorkspace(dir string) error {
 				a.activeTabID = ordered[0]
 			}
 		}
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 		a.mu.Unlock()
 
 		for _, tab := range closeTabs {
@@ -6758,7 +6761,7 @@ func (a *App) SetGoalForTab(tabID, goal string) error {
 	}
 	a.mu.Lock()
 	if a.tabs[tabIDForSave] == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	return nil
@@ -6803,7 +6806,7 @@ func (a *App) ResumeGoalForTab(tabID string) bool {
 	a.mu.Lock()
 	if a.tabs[tab.ID] == tab {
 		tab.goal = strings.TrimSpace(ctrl.Goal())
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	return true
@@ -6866,7 +6869,7 @@ func (a *App) SetToolApprovalModeForTab(tabID, mode string) []string {
 	drained := applyTabToolApprovalModeToController(ctrl, mode)
 	a.mu.Lock()
 	if a.tabs[tabIDForSave] == tab {
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 	}
 	a.mu.Unlock()
 	return drained
@@ -9242,6 +9245,8 @@ type EffortInfo struct {
 	Current   string                     `json:"current"`
 	Default   string                     `json:"default"`
 	Levels    []string                   `json:"levels"`
+	Pending   *string                    `json:"pending,omitempty"`
+	CanDefer  bool                       `json:"canDefer,omitempty"`
 }
 
 // Models flattens the configured providers into their (provider, model) pairs —
@@ -9752,12 +9757,14 @@ func (a *App) SetModelForTab(tabID, name string) (retErr error) {
 	tab.Ctrl = newCtrl
 	tab.model = name
 	tab.effort = cloneStringPtr(effortOverride)
+	clearedEffort := tab.pendingEffort != nil
+	tab.pendingEffort = nil
 	tab.Label = newCtrl.Label()
 	applyNormalizedRuntimeToTabLocked(tab, restoredRuntime)
 	// Supersede any in-flight startup build: it would otherwise finish later,
 	// overwrite this controller, and release/steal the tab's session lease.
 	a.supersedeTabBuildLocked(tab)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 	if oldCtrl != nil {
 		oldCtrl.Close()
@@ -9779,6 +9786,7 @@ func (a *App) SetModelForTab(tabID, name string) (retErr error) {
 	// A model switch changes the pricing context; discard the session-local
 	// automatic wallet hint and let the next balance response rebind it.
 	tab.clearRuntimeDisplayCurrency()
+	a.notifyEffortSelectionCleared(tab, clearedEffort)
 	a.notifyTabRuntimeRebuilt(tab)
 	timing.SwapAndPersist = time.Since(stageStarted)
 	return nil
@@ -9789,7 +9797,19 @@ func (a *App) Effort() EffortInfo {
 }
 
 func (a *App) EffortForTab(tabID string) EffortInfo {
-	entry, err := a.currentProviderEntryForTab(tabID)
+	tab := a.tabByID(tabID)
+	if tab != nil {
+		a.reconcileTabWithPinnedSessionMeta(tab)
+	}
+	a.mu.RLock()
+	snap := snapshotTabRuntimeLocked(tab)
+	var pending *string
+	if tab != nil && tab.pendingEffort != nil {
+		display := displayedEffort(tab.pendingEffort.value)
+		pending = &display
+	}
+	a.mu.RUnlock()
+	entry, err := providerEntryForTabSnapshot(snap)
 	if err != nil {
 		return EffortInfo{Current: "auto", Levels: []string{}}
 	}
@@ -9801,154 +9821,11 @@ func (a *App) EffortForTab(tabID string) EffortInfo {
 	if levels == nil {
 		levels = []string{}
 	}
-	return EffortInfo{Supported: true, Current: config.EffortDisplay(entry), Default: cap.Default, Levels: levels, Options: config.ReasoningCapabilityForEntry(entry).Options}
+	return EffortInfo{Supported: true, Current: config.EffortDisplay(entry), Default: cap.Default, Levels: levels, Options: config.ReasoningCapabilityForEntry(entry).Options, Pending: pending, CanDefer: tab != nil && !snap.readOnly}
 }
 
 func (a *App) SetEffort(level string) error {
 	return a.SetEffortForTab("", level)
-}
-
-func (a *App) SetEffortForTab(tabID, level string) error {
-	tab := a.tabByID(tabID)
-	if tab == nil {
-		if strings.TrimSpace(tabID) == "" {
-			entry, err := a.currentProviderEntryForTab("")
-			if err != nil {
-				return err
-			}
-			effort, err := config.NormalizeEffort(entry, level)
-			if err != nil {
-				return err
-			}
-			return a.applyProviderEffortConfig(entry, effort)
-		}
-		return fmt.Errorf("tab %q not found", tabID)
-	}
-	// Build+swap path; serialize with the other rebuild paths (see
-	// runtimeRebuildMu). The tab==nil branch above goes through
-	// applyProviderEffortConfig → rebuildSetting, which takes the lock itself.
-	pendingSequence := a.deferredRebuildSequence(tab.ID)
-	a.runtimeRebuildMu.Lock()
-	defer a.runtimeRebuildMu.Unlock()
-	tab.turnStartMu.Lock()
-	defer tab.turnStartMu.Unlock()
-	prevPath := a.reconciledSessionPathForTab(tab)
-	if prevPath == "" {
-		prevPath = a.currentSessionPathFor(tab)
-	}
-	// Recomputing prevPath after this attach would be a dead store: it is
-	// unconditionally derived again after ensureTabControllerWorkspace below.
-	if a.controllerForTab(tab) == nil && prevPath != "" {
-		a.attachExistingSessionRuntime(tab, prevPath, a.ctx)
-	}
-	if err := rebuildControllerActiveWorkErrorFor(a.controllerForTab(tab), "effort"); err != nil {
-		return err
-	}
-	if err := a.ensureTabControllerWorkspace(tab); err != nil {
-		return err
-	}
-	prevPath = a.reconciledSessionPathForTab(tab)
-	if prevPath == "" {
-		prevPath = a.currentSessionPathFor(tab)
-	}
-	if a.controllerForTab(tab) == nil && prevPath != "" && a.attachExistingSessionRuntime(tab, prevPath, a.ctx) {
-		prevPath = a.reconciledSessionPathForTab(tab)
-		if prevPath == "" {
-			prevPath = a.currentSessionPathFor(tab)
-		}
-		if err := rebuildControllerActiveWorkErrorFor(a.controllerForTab(tab), "effort"); err != nil {
-			return err
-		}
-	}
-	snap := a.tabRuntimeSnapshot(tab)
-	runtime := snap.normalizedRuntime()
-	entry, err := a.currentProviderEntryForTab(tabID)
-	if err != nil {
-		return err
-	}
-	modelRef := entry.Name + "/" + entry.Model
-	effort, err := config.NormalizeEffort(entry, level)
-	if err != nil {
-		return err
-	}
-	var carried []provider.Message
-	oldCtrl := a.controllerForTab(tab)
-	if oldCtrl != nil {
-		if prevPath == "" {
-			prevPath = oldCtrl.SessionPath()
-		}
-		if err := a.ensureTabSessionLeaseForRebuild(tab, prevPath, "effort"); err != nil {
-			return err
-		}
-		if err := a.snapshotTabForAction(tab, "changing effort"); err != nil {
-			return err
-		}
-		prevPath = sessionPathAfterSnapshot(oldCtrl, prevPath)
-		carried = oldCtrl.History()
-	}
-	sharedHost := a.lookupSharedHost(snap.sharedHostKey)
-	newCtrl, err := boot.Build(a.bootContext(), boot.Options{
-		Model:                    modelRef,
-		RequireKey:               false,
-		StatsSource:              "desktop",
-		TaskStore:                a.taskStore(),
-		OnConfigLoadWarnings:     a.configLoadWarningsHandler(),
-		Sink:                     snap.sink,
-		WorkspaceRoot:            snap.workspaceRoot,
-		SessionDir:               sessionDirForSnapshot(snap),
-		EffortOverride:           &effort,
-		SharedHost:               sharedHost,
-		MCPHostProfile:           plugin.HostProfileDesktopApps,
-		CleanupPendingReconciler: reconcileDesktopCleanupPending,
-		SubagentParentLive:       a.subagentParentProbeForBuild(tab),
-		SessionRecoveryMeta:      a.tabSessionRecoveryMeta(tab),
-		PinnedContextLoader:      pinnedContextLoader(snap.workspaceRoot),
-		OnSessionRecovered:       a.handleTabSessionRecovered(tab),
-		OnSessionTransition:      a.handleTabSessionTransition(tab),
-		BeforeInboxDispatch:      a.beforeInboxDispatch,
-		OnSessionTitleChanged:    a.onSessionTitleChanged,
-		// Keep the private temporary directory across effort switches (#7575).
-		SessionTemp: sessionTempFromController(oldCtrl),
-	})
-	if err != nil {
-		return err
-	}
-	a.bindControllerDisplayRecorder(newCtrl)
-	configureControllerRuntime(newCtrl, oldCtrl, runtime)
-	path := agent.ContinueSessionPath(prevPath, newCtrl.SessionDir(), newCtrl.Label())
-	if err := a.ensureTabSessionLeaseForRebuild(tab, path, "effort"); err != nil {
-		newCtrl.Close()
-		return err
-	}
-	restoredRuntime, err := resumeControllerRuntimeWithMessages(newCtrl, carried, path, runtime)
-	if err != nil {
-		newCtrl.Close()
-		return err
-	}
-	a.mu.Lock()
-	if err := a.authorizeTabReplacementLocked(tab, newCtrl, "switching effort", "effort-switch"); err != nil {
-		a.mu.Unlock()
-		newCtrl.Close()
-		tab.releaseSessionLease()
-		return err
-	}
-	tab.Ctrl = newCtrl
-	tab.model = modelRef
-	tab.effort = &effort
-	tab.Label = newCtrl.Label()
-	applyNormalizedRuntimeToTabLocked(tab, restoredRuntime)
-	clearTabStartupError(tab)
-	tab.Ready = true
-	a.supersedeTabBuildLocked(tab)
-	a.saveTabsLocked()
-	a.mu.Unlock()
-	if oldCtrl != nil {
-		oldCtrl.Close()
-	}
-	a.clearDeferredRebuildVersion(tab.ID, pendingSequence)
-	a.persistTabSessionPath(tab, path)
-	a.notifyTabRuntimeRebuilt(tab)
-	return nil
 }
 
 // SetAgentPresetDeprecatedNotice is returned by the deprecated execution-mode
@@ -9995,7 +9872,7 @@ func (a *App) persistTabTokenMode(tab *WorkspaceTab) {
 		return
 	}
 	a.mu.Lock()
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 	_ = a.saveTabSessionMetaForCurrentSession(tab)
 }
@@ -10541,20 +10418,19 @@ func (a *App) runEffortCommandForTab(tabID, input string) {
 }
 
 func (a *App) currentProviderEntryForTab(tabID string) (*config.ProviderEntry, error) {
-	if tab := a.tabByID(tabID); tab != nil {
+	return a.currentProviderEntryForRuntimeTab(a.tabByID(tabID))
+}
+
+func (a *App) currentProviderEntryForRuntimeTab(tab *WorkspaceTab) (*config.ProviderEntry, error) {
+	if tab != nil {
 		a.reconcileTabWithPinnedSessionMeta(tab)
 	}
-	a.mu.RLock()
-	ref := ""
-	workspaceRoot := ""
-	effortOverride := (*string)(nil)
-	if tab := a.tabByIDLocked(tabID); tab != nil {
-		ref = tab.model
-		workspaceRoot = tab.WorkspaceRoot
-		effortOverride = cloneStringPtr(tab.effort)
-	}
-	a.mu.RUnlock()
-	cfg, err := config.LoadForRoot(workspaceRoot)
+	return providerEntryForTabSnapshot(a.tabRuntimeSnapshot(tab))
+}
+
+func providerEntryForTabSnapshot(snap tabRuntimeSnapshot) (*config.ProviderEntry, error) {
+	ref := snap.model
+	cfg, err := config.LoadForRoot(snap.workspaceRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -10570,8 +10446,13 @@ func (a *App) currentProviderEntryForTab(tabID string) (*config.ProviderEntry, e
 	if !ok {
 		return nil, fmt.Errorf("unknown model %q", resolved)
 	}
-	if effortOverride != nil {
-		entry.Effort = *effortOverride
+	if snap.effort != nil {
+		entry.Effort = *snap.effort
+	}
+	if current, ok := snap.ctrl.(interface{ EffortSnapshot() (string, bool) }); ok {
+		if effort, available := current.EffortSnapshot(); available {
+			entry.Effort = effort
+		}
 	}
 	return entry, nil
 }

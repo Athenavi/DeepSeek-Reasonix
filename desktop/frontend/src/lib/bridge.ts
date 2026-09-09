@@ -1,4 +1,5 @@
 import { makeMockModelSettingsBindings, type ModelSettingsBindings } from "./modelSettingsBridge";
+import { MockEffortSelections } from "./mockEffortSelections";
 import { mockProviderTemplate, mockPreset, mockBundlePreset, mockKimiAPIModels, mockLongCatModels, mockTokenRhythmModels, mockTokenRhythmModelOverrides, mockMiMoV25Models, mockMiniMaxModels, mockGLMAPIModels, mockGLMCodingModels, mockGLMAnthropicModels, mockQwenAPIModels, mockQwenPlanModels, mockQwenPlanVisionModels, mockStepFunModels, mockOpenCodeGoModels, mockNovitaModels, mockGMIModels, mockVercelModels, mockOllamaCloudModels } from "./mockProviderTemplates";
 // Wails and the browser mock share this React-to-Go contract.
 // @ts-ignore generated locally; fresh checkouts use the disabled drift check below.
@@ -1455,7 +1456,7 @@ function makeMockApp(): AppBindings {
   const globalWorkspaceRoot = "~/Library/Application Support/reasonix/global-workspace";
   let cwd = freshMock ? globalWorkspaceRoot : "~/projects/joyquant-db"; // mutable so PickWorkspace is visible in dev
   let workspaces = freshMock ? [] : ["~/projects/joyquant-db", "~/projects/joyquant-sys", "~/projects/reasonix", "~/projects/blade"];
-  let mockEffort = "auto";
+  const mockEfforts = new MockEffortSelections();
   let mockDesktopZoomFactor = 1.0;
   let mockActiveThemeId = "";
   let mockBaseStyle = "graphite";
@@ -2286,6 +2287,7 @@ function makeMockApp(): AppBindings {
     mockTabs = mockTabs.map((tab) => (tab.id === tabId ? { ...tab, running } : tab));
   };
   const emitMockTurnStarted = (submissionId?: string) => {
+    mockEfforts.beginTurn(currentMockTurnTabId() ?? "");
     setMockTabRunning(currentMockTurnTabId(), true);
     emit({ kind: "turn_started", submissionId });
   };
@@ -2498,6 +2500,7 @@ function makeMockApp(): AppBindings {
     mockTabs = mockTabs.map((tab) => {
       const match = tabID ? tab.id === tabID : tab.active;
       if (!match) return tab;
+      mockEfforts.clearPending(tab.id);
       applied = true;
       return { ...tab, label };
     });
@@ -3284,9 +3287,9 @@ function makeMockApp(): AppBindings {
         async Compact() {},
         async CompactForTab() {},
         async NewSession() {},
-        async NewSessionForTab() {},
+        async NewSessionForTab(tabID) { mockEfforts.clearPending(tabID || currentMockTurnTabId() || ""); },
         async ClearSession() { return { sessionPath: "", sessionGeneration: 0 }; },
-        async ClearSessionForTab() { return { sessionPath: "", sessionGeneration: 0 }; },
+        async ClearSessionForTab(tabID) { mockEfforts.clearPending(tabID || currentMockTurnTabId() || ""); return { sessionPath: "", sessionGeneration: 0 }; },
     async Checkpoints() {
       return [
         { turn: 0, prompt: "你好呀", files: ["src/App.tsx"], fileCount: 1, turnFileCount: 1, time: Date.now() - 30_000, canCode: true, canConversation: true },
@@ -4326,16 +4329,18 @@ function makeMockApp(): AppBindings {
           setMockTabModel(tabID, name);
         },
         async Effort() {
-          return { supported: true, current: mockEffort, default: "high", levels: ["auto", "high", "max"] };
+          return this.EffortForTab(currentMockTurnTabId() ?? "");
         },
-        async EffortForTab() {
-          return this.Effort();
+        async EffortForTab(tabID) {
+          const effort = mockEfforts.get(tabID || currentMockTurnTabId() || "");
+          return { supported: true, ...effort, canDefer: true, default: "high", levels: ["auto", "high", "max"] };
         },
         async SetEffort(level: string) {
-          mockEffort = level || "auto";
+          await this.SetEffortForTab(currentMockTurnTabId() ?? "", level);
         },
-        async SetEffortForTab(_tabID, level) {
-          await this.SetEffort(level);
+        async SetEffortForTab(tabID, level) {
+          const id = tabID || currentMockTurnTabId() || "";
+          mockEfforts.select(id, level, mockTabs.find(tab => tab.id === id)?.running === true);
         },
         async ReloadRuntime(_tabID) {},
     async Memory() {

@@ -414,7 +414,7 @@ func (a *App) rebuildStartupTabLocked(tab *WorkspaceTab) error {
 	if tab.sink == nil {
 		tab.sink = &tabEventSink{tabID: tab.ID, app: a, ctx: a.ctx}
 	}
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 
 	a.buildTabControllerWithContext(tab, loadedTabSession{}, buildCtx, generation, cancel)

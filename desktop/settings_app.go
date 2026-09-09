@@ -1998,6 +1998,7 @@ func (a *App) rebuildSettingTurnLockedWithModel(setting string, tab *WorkspaceTa
 	}
 	tab.Ctrl = ctrl
 	tab.modelApplication.failure = nil
+	clearedEffort := clearPendingEffortForModelLocked(tab, model)
 	tab.model = model
 	tab.Label = ctrl.Label()
 	applyNormalizedRuntimeToTabLocked(tab, restoredRuntime)
@@ -2006,7 +2007,7 @@ func (a *App) rebuildSettingTurnLockedWithModel(setting string, tab *WorkspaceTa
 	// Supersede any in-flight startup build: it would otherwise finish later,
 	// pass its generation check, and overwrite the controller just installed.
 	a.supersedeTabBuildLocked(tab)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	a.mu.Unlock()
 	// True subgraph rebuilds reuse the same controller pointer — never Close it.
 	if oldCtrl != nil && oldCtrl != ctrl {
@@ -2014,6 +2015,7 @@ func (a *App) rebuildSettingTurnLockedWithModel(setting string, tab *WorkspaceTa
 	}
 	a.persistTabSessionPath(tab, path)
 	a.clearDeferredRebuildVersion(tab.ID, pendingSequence)
+	a.notifyEffortSelectionCleared(tab, clearedEffort)
 	a.notifyTabRuntimeRebuilt(tab)
 	a.emitReady(a.ctx)
 	return nil

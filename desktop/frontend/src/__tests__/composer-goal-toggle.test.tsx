@@ -2269,10 +2269,10 @@ console.log("\ncomposer goal toggle");
   eq(textarea.value, "existing text", "disabled command action does not insert / into existing text");
 
   await rerender({ running: true });
-  await waitFor("content menu closes when a run starts", () => !document.querySelector(".composer-content-menu"));
+  ok(Boolean(document.querySelector(".composer-content-menu")), "content menu remains available when a run starts");
+  await act(async () => { contentTrigger.click(); await flushTimers(); });
   await rerender({ running: false });
   ok(!document.querySelector(".composer-content-menu"), "content menu stays closed after the run ends");
-
   await replaceComposerDraft(rerender, 3004, "");
   await act(async () => {
     contentTrigger.click();
@@ -2286,9 +2286,9 @@ console.log("\ncomposer goal toggle");
   });
   await waitFor("recent-session picker before running", () => Boolean(document.querySelector(".slashmenu__search")));
   await rerender({ running: true });
-  await waitFor("recent-session picker closes when a run starts", () => !document.querySelector(".slashmenu__search"));
+  ok(Boolean(document.querySelector(".slashmenu__search")), "recent-session picker remains usable during a run");
   await rerender({ running: false });
-  ok(!document.querySelector(".slashmenu__search"), "recent-session picker stays closed after the run ends");
+  ok(Boolean(document.querySelector(".slashmenu__search")), "finishing a run does not discard the reference being prepared");
 
   await act(async () => {
     root.unmount();

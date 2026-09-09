@@ -561,6 +561,7 @@ export function Composer({
   imageInputEnabled = true,
   imageUnderstandingEnabled = false,
   attachmentInputEnabled = true,
+  remoteSession = false,
   tabId, turnId,
   effort,
   onSend,
@@ -646,6 +647,7 @@ export function Composer({
   imageUnderstandingEnabled?: boolean;
   /** False for remote sessions because local filesystem paths are not portable to Serve. */
   attachmentInputEnabled?: boolean;
+  remoteSession?: boolean;
   tabId?: string; turnId?: string;
   effort?: EffortInfo;
   onSend: (displayText: string, submitText?: string, tabId?: string, structured?: StructuredInvocationSubmit) => void | Promise<void>;
@@ -749,6 +751,7 @@ export function Composer({
   const finishing = runtimeState.finishing;
   if (runtimeState.known) running = runtimeState.running ?? running;
   if (runtimeState.unknown) disabled = true;
+  attachmentInputEnabled = attachmentInputEnabled && !disabled && !readOnly;
   const pendingKey = followupSessionKey(inboxSessionPath, inboxHostId, inboxWorkspace);
   const pendingKeyRef = useRef(pendingKey);
   pendingKeyRef.current = pendingKey;
@@ -1585,17 +1588,19 @@ export function Composer({
     if (menuMode && menuMode !== "pastChats") setContentMenuOpen(false);
   }, [menuMode]);
 
-  // A starting run closes the transient content surfaces. Without this the
-  // popover state survives the run (its open prop gates on !running) and the
-  // menu would pop back unprompted the moment the turn finishes.
+  // Content remains editable during a run; task-mode controls still close.
   useEffect(() => {
     if (!running) return;
-    setContentMenuOpen(false);
-    setDirectPastChats(false);
-    setShowPastChats(false);
-    setPastChatQuery("");
-    if (pastChatToken) setDismissed(true);
-  }, [pastChatToken, running]);
+    setIntentMenuOpen(false);
+    setIntentMenuClosing(false);
+    if (remoteSession) {
+      setContentMenuOpen(false);
+      setDirectPastChats(false);
+      setShowPastChats(false);
+      setPastChatQuery("");
+      if (pastChatToken) setDismissed(true);
+    }
+  }, [pastChatToken, remoteSession, running]);
 
   const resetPromptHistoryNavigation = () => {
     if (historyIndexRef.current === -1) return;
@@ -2412,6 +2417,7 @@ export function Composer({
   }, [attachmentInputEnabled]);
 
   const onPaste = (e: ClipboardEvent<HTMLTextAreaElement | HTMLDivElement>) => {
+    if (disabled || readOnly) return;
     clearNativeClipboardPasteTimer();
     const files = clipboardFiles(e.clipboardData);
     if (files.length > 0) {
@@ -3165,10 +3171,10 @@ export function Composer({
   }, []);
 
   useEffect(() => {
-    if (!pastChatToken || directPastChats || dismissed || running || disabled || readOnly) return;
+    if (!pastChatToken || directPastChats || dismissed || (running && remoteSession) || disabled || readOnly) return;
     setDirectPastChats(true);
     void openPastChats(pastChatToken.query);
-  }, [directPastChats, disabled, dismissed, openPastChats, pastChatToken, readOnly, running]);
+  }, [directPastChats, disabled, dismissed, openPastChats, pastChatToken, readOnly, remoteSession, running]);
 
   const clearDirectPastChatToken = () => {
     const current = textRef.current;
@@ -3728,9 +3734,12 @@ export function Composer({
   const effortLabel = (id: string) => id === "auto" ? t("common.auto") : effortOptions.find((option) => option.id === id)?.name || id;
   const effortLevels = effort?.options ? ["auto", ...effortOptions.map((option) => option.id)] : asArray(effort?.levels);
   const currentEffort = effort?.current || "auto";
+  const selectedEffort = effort?.pending ?? currentEffort;
+  const effortPendingHint = effort?.pending ? t("composer.effortNextTurnHint") : undefined;
+  const effortDeferredUnavailable = running && (remoteSession || effort?.canDefer !== true);
   const hasEffort = Boolean(effort?.supported && effortLevels.length > 0);
   const chooseEffortLevel = (level: string) => {
-    if (level !== currentEffort) onSetEffort(level);
+    if (!disabled && !readOnly && !effortDeferredUnavailable && level !== selectedEffort) onSetEffort(level);
   };
   // Run-strip state machine: retry > waiting-approval > waiting-ask > streaming.
   // Decision surfaces own the "waiting on user" UI; while suspendedByDecision
@@ -3941,7 +3950,7 @@ export function Composer({
         }}
       />
       {!heroMode && <AnchoredPopover
-        open={(contentMenuOpen || intentMenuOpen) && !disabled && !readOnly && !running}
+        open={((contentMenuOpen && !(running && remoteSession)) || (intentMenuOpen && !running)) && !disabled && !readOnly}
         anchorRef={contentMenuOpen ? contentMenuAnchorRef : intentMenuAnchorRef}
         onClose={() => { setContentMenuOpen(false); closeIntentMenu(); }}
         className="composer-access-menu composer-content-menu composer-intent-menu composer-menu-surface"
@@ -4548,7 +4557,7 @@ export function Composer({
                     type="button"
                     className={`composer-content-trigger${contentMenuOpen ? " composer-content-trigger--open" : ""}`}
                     onClick={() => (contentMenuOpen ? setContentMenuOpen(false) : openContentMenu())}
-                    disabled={disabled || readOnly || running}
+                    disabled={disabled || readOnly || (running && remoteSession)}
                     aria-haspopup="menu"
                     aria-expanded={contentMenuOpen}
                     aria-label={t("composer.contentMenuTitle")}
@@ -4622,10 +4631,10 @@ export function Composer({
                 useAppNavigationStore.getState().setSettingsTarget("models");
               }} /></Suspense>
               {hasEffort && !heroMode && <div className="composer-effort-control">
-                <ComposerChoice key={`effort-${tabId}`} label={effortLabel(currentEffort)}
-                  ariaLabel={`${t("status.effortTitle")}: ${effortLabel(currentEffort)}`}
-                  icon={<Brain size={16} />} showChevron
-                  value={currentEffort} disabled={disabled || readOnly || running}
+                <ComposerChoice key={`effort-${draftKey}`} label={effortLabel(selectedEffort)}
+                  ariaLabel={`${t("status.effortTitle")}: ${effortLabel(selectedEffort)}`}
+                  icon={<Brain size={16} />} showChevron title={effortPendingHint}
+                  value={selectedEffort} disabled={disabled || readOnly || effortDeferredUnavailable}
                   onPick={chooseEffortLevel}
                   options={effortLevels.map(level => ({ value: level, label: effortLabel(level) }))} />
               </div>}

@@ -60,7 +60,7 @@ func (a *App) markLocalTakeoverSpectator(tab *WorkspaceTab) {
 	if a.tabs[tab.ID] == tab && !tab.removed {
 		tab.ReadOnly = true
 		tab.Takeover.Spectator = true
-		a.saveTabsLocked()
+		_ = a.saveTabsLocked()
 		marked = true
 	}
 	a.mu.Unlock()
@@ -189,7 +189,7 @@ func (a *App) promoteLocalTakeoverSpectator(
 	}
 	a.supersedeTabBuildLocked(tab)
 	newEpoch := a.advanceSessionRuntimeEpochLocked(tab)
-	a.saveTabsLocked()
+	_ = a.saveTabsLocked()
 	candidate.ctrl = nil
 	candidate.sink = nil
 	committed = true
