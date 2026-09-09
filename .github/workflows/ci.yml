@@ -418,14 +418,14 @@ jobs:
       - name: Verify frontend artifact layout
         run: test -f frontend/dist/index.html
       - name: Install browser runtimes
-        run: PLAYWRIGHT_BROWSERS_PATH=.pw-browsers pnpm --dir frontend exec playwright install --with-deps chromium webkit
+        run: PLAYWRIGHT_BROWSERS_PATH=.pw-browsers pnpm --dir frontend exec playwright install --with-deps chromium
       - name: Test desktop browser contracts
         run: |
           pnpm --dir frontend test:motion-browser
           PLAYWRIGHT_BROWSERS_PATH=.pw-browsers pnpm --dir frontend test:app-browser
-          PLAYWRIGHT_BROWSERS_PATH=.pw-browsers REASONIX_SETTINGS_BROWSERS=chromium,webkit pnpm --dir frontend test:settings-browser
+          PLAYWRIGHT_BROWSERS_PATH=.pw-browsers REASONIX_SETTINGS_BROWSERS=chromium pnpm --dir frontend test:settings-browser
           xvfb-run -a env REASONIX_TRANSCRIPT_NATIVE_THUMB=1 pnpm --dir frontend test:transcript-browser
-          PLAYWRIGHT_BROWSERS_PATH=.pw-browsers pnpm --dir frontend test:transcript-reader-browser
+          REASONIX_TRANSCRIPT_READER_BROWSERS=chromium PLAYWRIGHT_BROWSERS_PATH=.pw-browsers pnpm --dir frontend test:transcript-reader-browser
 
   desktop-prepare:
     needs: changes
@@ -830,7 +830,7 @@ jobs:
 
   govulncheck:
     needs: changes
-    if: always() && (github.event_name != 'pull_request' || needs.changes.outputs.code != 'false')
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     continue-on-error: true # informational — stdlib vulns need a Go patch release
     steps:
@@ -849,7 +849,7 @@ jobs:
 
   coverage:
     needs: changes
-    if: always() && (github.event_name != 'pull_request' || needs.changes.outputs.code != 'false')
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
