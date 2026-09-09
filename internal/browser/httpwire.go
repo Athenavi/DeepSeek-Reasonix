@@ -2,6 +2,8 @@ package browser
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -70,11 +72,11 @@ type wireTab struct {
 }
 
 func toWireTab(t Tab) wireTab {
-	return wireTab{ID: t.ID, URL: t.URL, Title: t.Title, Loading: t.Loading, Temporary: t.Temporary}
+	return wireTab(t)
 }
 
 func (t wireTab) tab() Tab {
-	return Tab{ID: t.ID, URL: t.URL, Title: t.Title, Loading: t.Loading, Temporary: t.Temporary}
+	return Tab(t)
 }
 
 type wireTabs struct {
@@ -82,14 +84,16 @@ type wireTabs struct {
 }
 
 type wireOpenRequest struct {
-	URL       string `json:"url"`
-	Temporary bool   `json:"temporary,omitempty"`
+	OperationID string `json:"operationId"`
+	URL         string `json:"url"`
+	Temporary   bool   `json:"temporary,omitempty"`
 }
 
 type wireNavigateRequest struct {
-	TabID  string `json:"tabId"`
-	URL    string `json:"url,omitempty"`
-	Action string `json:"action"`
+	OperationID string `json:"operationId"`
+	TabID       string `json:"tabId"`
+	URL         string `json:"url,omitempty"`
+	Action      string `json:"action"`
 }
 
 type wireSnapshotRequest struct {
@@ -134,19 +138,11 @@ type wireActRequest struct {
 }
 
 func toWireAct(req ActRequest) wireActRequest {
-	return wireActRequest{
-		OperationID: req.OperationID, TabID: req.TabID, DocumentToken: req.DocumentToken,
-		Action: req.Action, Ref: req.Ref, Text: req.Text, Keys: req.Keys,
-		Options: req.Options, Files: req.Files, Submit: req.Submit, DeltaX: req.DeltaX, DeltaY: req.DeltaY,
-	}
+	return wireActRequest(req)
 }
 
 func (w wireActRequest) request() ActRequest {
-	return ActRequest{
-		OperationID: w.OperationID, TabID: w.TabID, DocumentToken: w.DocumentToken,
-		Action: w.Action, Ref: w.Ref, Text: w.Text, Keys: w.Keys,
-		Options: w.Options, Files: w.Files, Submit: w.Submit, DeltaX: w.DeltaX, DeltaY: w.DeltaY,
-	}
+	return ActRequest(w)
 }
 
 type wireActResult struct {
@@ -154,6 +150,24 @@ type wireActResult struct {
 	Reason        string `json:"reason,omitempty"`
 	DocumentToken string `json:"documentToken,omitempty"`
 	Outcome       string `json:"outcome,omitempty"`
+}
+
+func (w *wireActResult) UnmarshalJSON(data []byte) error {
+	type receipt wireActResult
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	var executed *bool
+	if err := json.Unmarshal(fields["executed"], &executed); err != nil || executed == nil {
+		return fmt.Errorf("browser receipt is missing a boolean executed field")
+	}
+	var decoded receipt
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*w = wireActResult(decoded)
+	return nil
 }
 
 type wireDownloadsRequest struct {
@@ -178,5 +192,6 @@ type wireDownloads struct {
 }
 
 type wireCloseRequest struct {
-	TabID string `json:"tabId"`
+	OperationID string `json:"operationId"`
+	TabID       string `json:"tabId"`
 }

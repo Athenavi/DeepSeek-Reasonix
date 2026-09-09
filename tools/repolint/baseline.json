@@ -93,7 +93,7 @@
       "file-size": 2643
     },
     "desktop/frontend/src/components/Composer.tsx": {
-      "file-size": 3797
+      "file-size": 4002
     },
     "desktop/frontend/src/components/ContextPanel.tsx": {
       "file-size": 36
@@ -114,7 +114,7 @@
       "file-size": 141
     },
     "desktop/frontend/src/components/SettingsPanel.tsx": {
-      "file-size": 6436
+      "file-size": 7284
     },
     "desktop/frontend/src/components/StatusBar.tsx": {
       "file-size": 25
@@ -129,13 +129,13 @@
       "file-size": 277
     },
     "desktop/frontend/src/components/WorkspacePanel.tsx": {
-      "file-size": 1346
+      "file-size": 1353
     },
     "desktop/frontend/src/custom/features/heartbeat/HeartbeatPanel.tsx": {
       "file-size": 177
     },
     "desktop/frontend/src/lib/bridge.ts": {
-      "file-size": 4821
+      "file-size": 4999
     },
     "desktop/frontend/src/lib/crash.ts": {
       "file-size": 212
@@ -144,10 +144,10 @@
       "file-size": 264
     },
     "desktop/frontend/src/lib/types.ts": {
-      "file-size": 1613
+      "file-size": 1634
     },
     "desktop/frontend/src/lib/useController.ts": {
-      "file-size": 4252
+      "file-size": 4267
     },
     "desktop/heartbeat.go": {
       "essay": 7
@@ -199,7 +199,7 @@
     },
     "desktop/remote_tab.go": {
       "essay": 8,
-      "file-size": 92
+      "file-size": 182
     },
     "desktop/remote_tab_commands.go": {
       "essay": 1
@@ -371,8 +371,8 @@
     "internal/agent/agent.go": {
       "complexity": 27,
       "essay": 25,
-      "file-size": 2030,
-      "function-size": 88,
+      "file-size": 2040,
+      "function-size": 104,
       "struct-state": 2
     },
     "internal/agent/cache_shape_test.go": {
@@ -409,8 +409,8 @@
       "test-file-size": 487
     },
     "internal/agent/execute_batch.go": {
-      "complexity": 22,
-      "function-size": 138
+      "complexity": 27,
+      "function-size": 167
     },
     "internal/agent/execute_one.go": {
       "complexity": 1,
@@ -471,7 +471,7 @@
     },
     "internal/agent/run_loop.go": {
       "essay": 10,
-      "function-size": 1
+      "function-size": 2
     },
     "internal/agent/run_usage.go": {
       "complexity": 1
@@ -527,7 +527,7 @@
     "internal/agent/task.go": {
       "complexity": 3,
       "essay": 12,
-      "file-size": 1171,
+      "file-size": 1207,
       "function-size": 18
     },
     "internal/agent/task_test.go": {
@@ -546,10 +546,10 @@
       "test-file-size": 946
     },
     "internal/boot/boot.go": {
-      "complexity": 260,
+      "complexity": 264,
       "essay": 77,
       "file-size": 2072,
-      "function-size": 1713,
+      "function-size": 1726,
       "narrative": 3
     },
     "internal/boot/boot_test.go": {
@@ -805,7 +805,7 @@
     },
     "internal/config/config.go": {
       "essay": 22,
-      "file-size": 1494,
+      "file-size": 1552,
       "narrative": 2
     },
     "internal/config/credentials.go": {
@@ -826,7 +826,7 @@
     },
     "internal/config/load.go": {
       "essay": 3,
-      "file-size": 1740,
+      "file-size": 1759,
       "function-size": 45
     },
     "internal/config/main_test.go": {
@@ -866,7 +866,7 @@
     "internal/control/controller.go": {
       "complexity": 12,
       "essay": 87,
-      "file-size": 5031,
+      "file-size": 5565,
       "function-size": 83,
       "narrative": 4,
       "struct-state": 17
@@ -1206,7 +1206,7 @@
     "internal/provider/openai/openai.go": {
       "complexity": 53,
       "essay": 25,
-      "file-size": 477,
+      "file-size": 543,
       "function-size": 180,
       "struct-state": 9
     },
@@ -1218,12 +1218,12 @@
     },
     "internal/provider/provider.go": {
       "essay": 7,
-      "file-size": 307
+      "file-size": 314
     },
     "internal/provider/responses/responses.go": {
       "complexity": 49,
       "essay": 2,
-      "file-size": 1,
+      "file-size": 99,
       "function-size": 161,
       "struct-state": 5
     },
@@ -1349,7 +1349,7 @@
     },
     "internal/serve/serve.go": {
       "essay": 22,
-      "file-size": 877
+      "file-size": 899
     },
     "internal/serve/serve_test.go": {
       "test-file-size": 422

@@ -50,6 +50,7 @@ const browser: DesktopBrowserHost = {
   setZoom: async (id, factor) => { calls.push(`zoom ${id} ${factor}`); },
   toggleDevTools: async (id) => { calls.push(`devtools ${id}`); },
   resume: async (id) => { calls.push(`resume ${id}`); },
+  takeover: async (id) => { calls.push(`takeover ${id}`); },
   setLayout: (rect) => { layouts.push(rect); },
   setOverlay: (active) => { overlays.push(active); },
   onTabs: (cb) => { tabsCb = cb; return () => { tabsCb = null; }; },
@@ -123,13 +124,21 @@ try {
   await act(async () => [...document.querySelectorAll("button")].find((el) => el.textContent === "Retry")!.click());
   assert.equal(calls.at(-1), "navigate t1 reload", "Retry reloads the tab");
 
-  await emitTabs([tab({ id: "t1", mode: "human", temporary: true, zoom: 1.25 })]);
+  const takeOver = [...document.querySelectorAll("button")].find((el) => el.textContent === "Take over");
+  assert.ok(takeOver, "agent mode exposes an explicit takeover button");
+  await act(async () => takeOver.click());
+  assert.equal(calls.at(-1), "takeover t1", "Take over uses the application host operation");
+  await emitTabs([tab({ id: "t1", mode: "human", temporary: true, zoom: 1.25, epoch: 1 })]);
+  assert.equal([...document.querySelectorAll("button")].some((el) => el.textContent === "Take over"), false);
   const banner = document.querySelector(".browser-panel__takeover");
   assert.ok(banner?.textContent?.includes("You are controlling this page; the agent is paused"), "human mode shows the take-over banner");
   assert.ok(document.querySelector(".browser-tab__badge")?.textContent === "Temporary", "temporary tabs carry a badge");
   assert.equal(byLabel("Reset zoom (125%)")?.textContent, "125%");
   await act(async () => [...banner!.querySelectorAll("button")].find((el) => el.textContent === "Resume")!.click());
   assert.equal(calls.at(-1), "resume t1", "Resume hands the page back to the agent");
+  await emitTabs([tab({ id: "t1", mode: "agent", temporary: true, zoom: 1.25, epoch: 2 })]);
+  assert.equal(document.querySelector(".browser-panel__takeover"), null, "authoritative Resume clears the takeover banner");
+  assert.ok([...document.querySelectorAll("button")].find((el) => el.textContent === "Take over"), "Resume restores the manual takeover entry");
   await act(async () => byLabel("Zoom in")!.click());
   assert.equal(calls.at(-1), "zoom t1 1.5");
   await act(async () => byLabel("Toggle DevTools")!.click());

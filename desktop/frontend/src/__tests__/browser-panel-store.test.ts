@@ -17,7 +17,7 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function fakeHost(initial: BrowserTabView[] = []) {
   const calls: string[] = [];
-  const fail: Partial<Record<"open" | "close" | "navigate", Error>> = {};
+  const fail: Partial<Record<"open" | "close" | "navigate" | "takeover", Error>> = {};
   let tabsCb: ((tabs: BrowserTabView[]) => void) | null = null;
   let downloadCb: ((entry: BrowserDownloadView) => void) | null = null;
   const host: DesktopBrowserHost = {
@@ -33,6 +33,7 @@ function fakeHost(initial: BrowserTabView[] = []) {
     setZoom: async (id, factor) => { calls.push(`zoom ${id} ${factor}`); },
     toggleDevTools: async (id) => { calls.push(`devtools ${id}`); },
     resume: async (id) => { calls.push(`resume ${id}`); },
+    takeover: async (id) => { calls.push(`takeover ${id}`); if (fail.takeover) throw fail.takeover; },
     setLayout: () => {},
     setOverlay: () => {},
     onTabs: (cb) => { tabsCb = cb; return () => { tabsCb = null; }; },
@@ -97,6 +98,15 @@ console.log("\nbrowser panel store");
   await tick();
   assert.deepEqual(store().shown.map((entry) => entry.id), ["seed"], "attach lists existing tabs");
   assert.equal(selectAddress(store()), "https://example.com/", "address falls back to the active tab url");
+  await store().takeover("seed");
+  assert.equal(fake.calls.at(-1), "takeover seed", "explicit takeover reaches the host for the selected tab");
+  assert.equal(selectActiveTab(store())?.mode, "agent", "ownership waits for the authoritative host update");
+  fake.emitTabs([tab({ id: "seed", mode: "human", epoch: 1 })]);
+  assert.equal(selectActiveTab(store())?.mode, "human");
+  await store().resume("seed");
+  assert.equal(fake.calls.at(-1), "resume seed");
+  fake.emitTabs([tab({ id: "seed", mode: "agent", epoch: 2 })]);
+  assert.equal(selectActiveTab(store())?.mode, "agent");
   store().setDraft("seed", "localhost:3000/app");
   assert.equal(selectAddress(store()), "localhost:3000/app");
   await store().submitAddress();
@@ -134,7 +144,9 @@ console.log("\nbrowser panel store");
   await store().close("a1");
   fake.fail.open = new Error("open refused");
   await store().open("https://example.net");
-  assert.deepEqual(notices, ["navigation refused", "close refused", "open refused"], "host failures reach the notifier");
+  fake.fail.takeover = new Error("takeover refused");
+  await store().takeover("a1");
+  assert.deepEqual(notices, ["navigation refused", "close refused", "open refused", "takeover refused"], "host failures reach the notifier");
   assert.equal(store().shown.length, 1, "a failed close keeps the tab");
   console.log("  PASS  host errors are surfaced through the bound notifier");
 }

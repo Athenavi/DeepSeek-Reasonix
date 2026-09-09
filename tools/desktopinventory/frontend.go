@@ -98,7 +98,7 @@ func scanFrontend(root string, inv *inventory) error {
 	}
 	for name, loc := range native {
 		owner := "desktopHost() adapter (AppBindings proxy over desktop/invoke)"
-		if method := strings.TrimPrefix(name, "window.runtime."); method != name {
+		if method, ok := strings.CutPrefix(name, "window.runtime."); ok {
 			owner = frontendNativeOwner[method]
 			if owner == "" {
 				owner = "desktopHost().native (unmapped)"

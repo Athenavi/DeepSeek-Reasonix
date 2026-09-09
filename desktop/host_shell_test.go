@@ -43,7 +43,7 @@ func newHostShellBridgeForTest(t *testing.T, replies map[string]any) (*App, *hos
 	t.Helper()
 	isolateDesktopUserDirs(t)
 	a := NewApp()
-	registry, err := hostrpc.NewRegistry(a, nil)
+	registry, err := newDesktopRegistry(a)
 	if err != nil {
 		t.Fatal(err)
 	}

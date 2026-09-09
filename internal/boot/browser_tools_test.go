@@ -36,7 +36,9 @@ func (bootBrowserExecutor) Act(context.Context, browser.ActRequest) (browser.Act
 func (bootBrowserExecutor) Downloads(context.Context, browser.DownloadsRequest) ([]browser.Download, error) {
 	return nil, browser.ErrNoGrant
 }
-func (bootBrowserExecutor) Close(context.Context, string) error { return browser.ErrNoGrant }
+func (bootBrowserExecutor) Close(context.Context, browser.CloseRequest) error {
+	return browser.ErrNoGrant
+}
 
 const browserBootConfig = `
 default_model = "test-model"

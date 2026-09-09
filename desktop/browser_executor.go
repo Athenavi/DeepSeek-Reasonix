@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -74,9 +75,31 @@ func (a *App) browserExecutorForTab(tab *WorkspaceTab) browser.Executor {
 	if exec, ok := a.browserExecutors[tab.ID]; ok {
 		return exec
 	}
-	exec := &hostBrowserExecutor{app: a, host: a.hostShell.server, tabID: tab.ID, grantID: "grant-" + tab.ID}
+	exec := &hostBrowserExecutor{app: a, host: a.hostShell.server, tabID: tab.ID, grantID: newBrowserGrantID()}
 	a.browserExecutors[tab.ID] = exec
 	return exec
+}
+
+func newBrowserGrantID() string {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		panic(err)
+	}
+	return "grant-" + hex.EncodeToString(buf)
+}
+
+func (a *App) revokeRemoteBrowserHost(hostID string) {
+	a.remoteTabMu.Lock()
+	var ids []string
+	for _, tab := range a.remoteTabs {
+		if tab != nil && tab.ref.HostID == hostID {
+			ids = append(ids, tab.id)
+		}
+	}
+	a.remoteTabMu.Unlock()
+	for _, id := range ids {
+		a.forgetRemoteBrowserExecutor(id)
+	}
 }
 
 // forgetBrowserExecutorLocked drops the tab's executor and revokes its grant
@@ -89,8 +112,14 @@ func (a *App) forgetBrowserExecutorLocked(tabID string) {
 	if !ok {
 		return
 	}
+	a.revokeBrowserExecutor(exec)
+}
+
+func (a *App) revokeBrowserExecutor(exec *hostBrowserExecutor) {
 	exec.revoked.Store(true)
 	a.goSafe("revokeBrowserGrant", func() {
+		exec.grantMu.Lock()
+		defer exec.grantMu.Unlock()
 		ctx, cancel := context.WithTimeout(context.Background(), rpcHostWindowTimeout)
 		defer cancel()
 		_ = exec.host.Request(ctx, "host/browser.revoke", map[string]string{"grantId": exec.grantID}, nil)
@@ -131,6 +160,9 @@ func (e *hostBrowserExecutor) browserSessionKey() string {
 }
 
 func (e *hostBrowserExecutor) ensureGrant(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if e.revoked.Load() {
 		return browser.ErrNoGrant
 	}
@@ -139,12 +171,18 @@ func (e *hostBrowserExecutor) ensureGrant(ctx context.Context) error {
 	}
 	e.grantMu.Lock()
 	defer e.grantMu.Unlock()
+	if e.revoked.Load() {
+		return browser.ErrNoGrant
+	}
 	if e.granted.Load() {
 		return nil
 	}
 	params := map[string]string{"grantId": e.grantID, "tabId": e.tabID, "sessionId": e.browserSessionKey()}
 	if err := e.host.Request(ctx, "host/browser.grant", params, nil); err != nil {
 		return mapHostBrowserError(err)
+	}
+	if e.revoked.Load() {
+		return browser.ErrNoGrant
 	}
 	e.granted.Store(true)
 	return nil
@@ -161,6 +199,9 @@ func (a *App) tabSessionKeyForBrowser(tabID string) string {
 
 func (e *hostBrowserExecutor) call(ctx context.Context, method string, params map[string]any, result any) error {
 	if err := e.ensureGrant(ctx); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if params == nil {
@@ -207,18 +248,51 @@ func (e *hostBrowserExecutor) Tabs(ctx context.Context) ([]browser.Tab, error) {
 
 func (e *hostBrowserExecutor) Open(ctx context.Context, req browser.OpenRequest) (browser.Tab, error) {
 	var out hostBrowserTab
-	err := e.call(ctx, "host/browser.tabs.open", map[string]any{"url": req.URL, "temporary": req.Temporary}, &out)
+	err := e.write(ctx, req.OperationID, "open", "", req, "host/browser.tabs.open", map[string]any{"url": req.URL, "temporary": req.Temporary}, &out)
 	return out.tab(), err
 }
 
 func (e *hostBrowserExecutor) Navigate(ctx context.Context, req browser.NavigateRequest) (browser.Tab, error) {
 	var out hostBrowserTab
-	err := e.call(ctx, "host/browser.tabs.navigate", map[string]any{"tabId": req.TabID, "url": req.URL, "action": req.Action}, &out)
+	err := e.write(ctx, req.OperationID, "navigate", req.TabID, req, "host/browser.tabs.navigate", map[string]any{"tabId": req.TabID, "url": req.URL, "action": req.Action}, &out)
 	return out.tab(), err
 }
 
-func (e *hostBrowserExecutor) Close(ctx context.Context, tabID string) error {
-	return e.call(ctx, "host/browser.tabs.close", map[string]any{"tabId": tabID}, nil)
+func (e *hostBrowserExecutor) Close(ctx context.Context, req browser.CloseRequest) error {
+	return e.write(ctx, req.OperationID, "close", req.TabID, req, "host/browser.tabs.close", map[string]any{"tabId": req.TabID}, nil)
+}
+
+// Every browser write uses the same durable reservation, including history
+// operations whose reply may disappear after the browser already navigated.
+func (e *hostBrowserExecutor) write(ctx context.Context, id, action, tabID string, request any, method string, params map[string]any, out any) error {
+	if err := e.ensureGrant(ctx); err != nil {
+		return err
+	}
+	ledger, err := e.app.browserLedger()
+	if err != nil {
+		return err
+	}
+	digest, err := actDigest(request)
+	if err != nil {
+		return err
+	}
+	if err := ledger.Reserve(browserops.Operation{ID: id, SessionID: e.browserSessionKey(), Generation: e.grantID, TabID: tabID, Action: action, Digest: digest}); err != nil {
+		if errors.Is(err, browserops.ErrDuplicateOperation) {
+			return fmt.Errorf("%w: operationId already recorded", browser.ErrUnknownOutcome)
+		}
+		return err
+	}
+	err = e.call(ctx, method, params, out)
+	if err == nil {
+		e.settle(ledger, id, browserops.StateExecuted, "")
+		return nil
+	}
+	if errors.Is(err, browser.ErrNoGrant) || errors.Is(err, browser.ErrTakenOver) || errors.Is(err, browser.ErrStaleReference) {
+		e.settle(ledger, id, browserops.StateNotExecuted, err.Error())
+		return err
+	}
+	e.settle(ledger, id, browserops.StateUnknown, err.Error())
+	return fmt.Errorf("%w: %s", browser.ErrUnknownOutcome, err.Error())
 }
 
 func (e *hostBrowserExecutor) Snapshot(ctx context.Context, req browser.SnapshotRequest) (browser.Snapshot, error) {
@@ -305,12 +379,22 @@ func (e *hostBrowserExecutor) Act(ctx context.Context, req browser.ActRequest) (
 	}
 	if err := ledger.Reserve(op); err != nil {
 		if errors.Is(err, browserops.ErrDuplicateOperation) {
-			return browser.ActResult{Executed: false, Outcome: browser.OutcomeNotExecuted, Reason: "operationId already used; mint a new one after a fresh snapshot"}, nil
+			return browser.ActResult{Outcome: browser.OutcomeUnknown}, fmt.Errorf("%w: operationId already recorded", browser.ErrUnknownOutcome)
 		}
 		return browser.ActResult{}, err
 	}
+	if req.Action == browser.ActionUpload {
+		files, cleanup, err := e.prepareUploadFiles(req.Files)
+		if err != nil {
+			e.settle(ledger, req.OperationID, browserops.StateNotExecuted, err.Error())
+			return browser.ActResult{}, err
+		}
+		defer cleanup()
+		req.Files = files
+	}
 	var out struct {
-		Executed      bool   `json:"executed"`
+		Executed      *bool  `json:"executed"`
+		Outcome       string `json:"outcome"`
 		Reason        string `json:"reason"`
 		DocumentToken string `json:"documentToken"`
 	}
@@ -322,7 +406,13 @@ func (e *hostBrowserExecutor) Act(ctx context.Context, req browser.ActRequest) (
 	}
 	callErr := e.call(ctx, "host/browser.act", params, &out)
 	switch {
-	case callErr == nil && out.Executed:
+	case callErr == nil && out.Executed == nil:
+		e.settle(ledger, req.OperationID, browserops.StateUnknown, "host returned no execution receipt")
+		return browser.ActResult{Outcome: browser.OutcomeUnknown}, browser.ErrUnknownOutcome
+	case callErr == nil && out.Outcome == browser.OutcomeUnknown:
+		e.settle(ledger, req.OperationID, browserops.StateUnknown, out.Reason)
+		return browser.ActResult{Outcome: browser.OutcomeUnknown}, fmt.Errorf("%w: %s", browser.ErrUnknownOutcome, out.Reason)
+	case callErr == nil && *out.Executed:
 		e.settle(ledger, req.OperationID, browserops.StateExecuted, "")
 		return browser.ActResult{Executed: true, Outcome: browser.OutcomeExecuted, DocumentToken: out.DocumentToken}, nil
 	case callErr == nil:
@@ -333,7 +423,7 @@ func (e *hostBrowserExecutor) Act(ctx context.Context, req browser.ActRequest) (
 		return browser.ActResult{}, callErr
 	default:
 		e.settle(ledger, req.OperationID, browserops.StateUnknown, callErr.Error())
-		return browser.ActResult{Outcome: browser.OutcomeUnknown}, fmt.Errorf("%w: %v", browser.ErrUnknownOutcome, callErr)
+		return browser.ActResult{Outcome: browser.OutcomeUnknown}, fmt.Errorf("%w: %s", browser.ErrUnknownOutcome, callErr.Error())
 	}
 }
 
@@ -343,7 +433,7 @@ func (e *hostBrowserExecutor) settle(ledger *browserops.Ledger, id string, state
 	}
 }
 
-func actDigest(req browser.ActRequest) (string, error) {
+func actDigest(req any) (string, error) {
 	raw, err := json.Marshal(req)
 	if err != nil {
 		return "", err

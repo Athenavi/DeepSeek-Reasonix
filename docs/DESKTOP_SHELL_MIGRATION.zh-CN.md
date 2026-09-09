@@ -181,6 +181,23 @@ configuration 指纹已变化），以及 Windows/Linux runner 验证。
 在 shell 下，macOS 交接子进程等待的是 Electron 进程（服务的父进程，
 通过 `-owner-pid` 传入），替换后用 `open -n` 重新打开 bundle，shell 本身只退出。
 
+#### 首次从 Wails 升级
+
+从 v1.38.x 首次升级 Electron 时，需要**手动安装完整安装包**。
+已发布的客户端会复制并执行旧安装中的更新助手，无法携带新的 `app/` 目录。
+因此发布资产标记 `install_layout: "electron-v1"`：v1.38.x 现有的清单校验会在
+下载和替换任何文件前拒绝未知布局，保留可用的旧安装；更新错误界面仍提供官方下载页
+入口。退出旧应用后，通过该页面安装完整 Windows 安装器、macOS 应用或 Linux 包。
+便携版应完整解压到新目录，不能只替换 Go 可执行文件。配置、会话及数据目录名称与
+格式保持不变。由于旧客户端校验整个跨平台清单，macOS 首次迁移也采用手动安装。
+
+完成首次迁移后，Electron 客户端接受 `electron-v1`，先发布同一版本的 Go 服务、
+CLI 与完整壳资源，再移动 `current.json`。Linux 原生包继续由包管理器管理。
+Windows 更新先等待 Electron 所属进程退出，再通过按数据目录命名的管道验证新
+Go 服务；管道服务端 PID 由 Windows 内核提供，旧 Wails 端点检测仍保留。
+所有镜像和发布清单必须保留此边界；改回 `versioned-v1` 会重新启用不安全的旧版
+自动更新路径。
+
 ### F. 全矩阵验收并删除旧实现
 
 CI 切换到新构建、契约生成和原生测试入口；删除 Wails 入口、依赖、生成绑定、WebView2

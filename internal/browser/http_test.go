@@ -53,18 +53,18 @@ func TestHTTPRoundTripEveryMethod(t *testing.T) {
 	if !reflect.DeepEqual(rec.sessions, []string{"/sessions/one.jsonl"}) {
 		t.Fatalf("handler saw sessions %q, want the client's session", rec.sessions)
 	}
-	tab, err := client.Open(ctx, OpenRequest{URL: "https://c.test", Temporary: true})
+	tab, err := client.Open(ctx, OpenRequest{OperationID: "open-1", URL: "https://c.test", Temporary: true})
 	if err != nil || tab != (Tab{ID: "t-new", URL: "https://c.test", Temporary: true}) {
 		t.Fatalf("open = %+v, %v", tab, err)
 	}
-	if !reflect.DeepEqual(fake.opens, []OpenRequest{{URL: "https://c.test", Temporary: true}}) {
+	if !reflect.DeepEqual(fake.opens, []OpenRequest{{OperationID: "open-1", URL: "https://c.test", Temporary: true}}) {
 		t.Fatalf("open request = %+v", fake.opens)
 	}
-	tab, err = client.Navigate(ctx, NavigateRequest{TabID: "t1", URL: "https://d.test", Action: NavigateURL})
+	tab, err = client.Navigate(ctx, NavigateRequest{OperationID: "nav-1", TabID: "t1", URL: "https://d.test", Action: NavigateURL})
 	if err != nil || tab != (Tab{ID: "t1", URL: "https://d.test"}) {
 		t.Fatalf("navigate = %+v, %v", tab, err)
 	}
-	if !reflect.DeepEqual(fake.navs, []NavigateRequest{{TabID: "t1", URL: "https://d.test", Action: NavigateURL}}) {
+	if !reflect.DeepEqual(fake.navs, []NavigateRequest{{OperationID: "nav-1", TabID: "t1", URL: "https://d.test", Action: NavigateURL}}) {
 		t.Fatalf("navigate request = %+v", fake.navs)
 	}
 	snap, err := client.Snapshot(ctx, SnapshotRequest{TabID: "t1", Selector: "main"})
@@ -99,8 +99,42 @@ func TestHTTPRoundTripEveryMethod(t *testing.T) {
 	if !reflect.DeepEqual(fake.dls, []DownloadsRequest{{TabID: "t1", WaitFor: 1500 * time.Millisecond}}) {
 		t.Fatalf("downloads request = %+v", fake.dls)
 	}
-	if err := client.Close(ctx, "t2"); err != nil || !reflect.DeepEqual(fake.closed, []string{"t2"}) {
+	if err := client.Close(ctx, CloseRequest{OperationID: "close-1", TabID: "t2"}); err != nil || !reflect.DeepEqual(fake.closed, []string{"t2"}) {
 		t.Fatalf("close: err=%v closed=%v", err, fake.closed)
+	}
+	if len(fake.closes) != 1 || fake.closes[0].OperationID != "close-1" {
+		t.Fatalf("close operationId lost: %+v", fake.closes)
+	}
+}
+
+func TestHTTPEveryWriteTreatsMalformedReceiptAsUnknown(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("{broken")) }))
+	defer server.Close()
+	exec := NewHTTPExecutor(server.URL, "token", server.Client())
+	ctx := context.Background()
+	checks := []error{}
+	_, err := exec.Open(ctx, OpenRequest{OperationID: "open", URL: "https://example.test"})
+	checks = append(checks, err)
+	_, err = exec.Navigate(ctx, NavigateRequest{OperationID: "nav", TabID: "t", Action: NavigateBack})
+	checks = append(checks, err)
+	_, err = exec.Act(ctx, ActRequest{OperationID: "act", TabID: "t", Action: ActionClick})
+	checks = append(checks, err)
+	for _, err := range checks {
+		if !errors.Is(err, ErrUnknownOutcome) {
+			t.Fatalf("malformed write receipt: %v", err)
+		}
+	}
+}
+
+func TestHTTPActRequiresAnExplicitExecutionReceipt(t *testing.T) {
+	for _, payload := range []string{`{}`, `{"executed":null}`, `{"executed":"false"}`} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(payload)) }))
+		exec := NewHTTPExecutor(server.URL, "token", server.Client())
+		_, err := exec.Act(context.Background(), ActRequest{OperationID: "act", Action: ActionClick})
+		server.Close()
+		if !errors.Is(err, ErrUnknownOutcome) {
+			t.Fatalf("payload %s became a known receipt: %v", payload, err)
+		}
 	}
 }
 
@@ -126,7 +160,7 @@ func TestHTTPRoundTripMapsEverySentinel(t *testing.T) {
 				return err
 			}()},
 			{"downloads", func() error { _, err := client.Downloads(ctx, DownloadsRequest{TabID: "t1"}); return err }()},
-			{"close", client.Close(ctx, "t1")},
+			{"close", client.Close(ctx, CloseRequest{OperationID: "close-1", TabID: "t1"})},
 		}
 		for _, c := range checks {
 			if !errors.Is(c.err, sentinel) {

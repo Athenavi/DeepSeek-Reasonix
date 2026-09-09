@@ -8,6 +8,7 @@ import { DownloadTracker } from "./browser/downloads.js";
 import { ElectronGuestViewFactory } from "./browser/electronGuestViews.js";
 import { GrantRegistry } from "./browser/grants.js";
 import { buildBrowserHostCalls } from "./browser/hostCalls.js";
+import { browserLayoutInDIP } from "./browser/layout.js";
 import { BrowserSurfaceManager } from "./browser/surfaceManager.js";
 import { emptyContract, loadContract, type LoadedContract } from "./contract.js";
 import { DialogHost } from "./dialogs.js";
@@ -24,6 +25,7 @@ import { record } from "./params.js";
 import { APP_INDEX_URL, APP_SCHEME, registerAppProtocol, resolveDistRoot } from "./protocol.js";
 import { RemoteWindowHost } from "./remoteWindows.js";
 import { ServiceSupervisor } from "./service.js";
+import { claimShellInstance } from "./singleInstance.js";
 import { TrayHost } from "./tray.js";
 import { DEFAULT_GEOMETRY, MainWindow } from "./window.js";
 
@@ -41,14 +43,13 @@ const home = reasonixHome({ env: process.env, platform: process.platform, homedi
 if (home === "") {
   console.error("reasonix-desktop-shell: cannot resolve the Reasonix data home (set REASONIX_HOME)");
   app.exit(1);
-} else if (!dev && !app.requestSingleInstanceLock()) {
+} else if (!claimShellInstance(app, home, dev)) {
   app.quit();
 } else {
   bootstrap(home);
 }
 
 function bootstrap(dataHome: string): void {
-  app.setPath("userData", join(dataHome, "desktop-shell"));
   const logsDir = join(app.getPath("userData"), "logs");
   const log = createLogger(new RotatingFile(join(logsDir, "shell.log")), !app.isPackaged);
   const serviceLog = new RotatingFile(join(logsDir, "service.log"));
@@ -83,6 +84,10 @@ function bootstrap(dataHome: string): void {
     platform: process.platform,
     icon: windowIcon,
     log,
+    onRendererLost: (reason) => {
+      browser.pauseForRendererLoss(reason);
+      for (const tab of browser.all()) documents.invalidateTab(tab.id);
+    },
     onAppDomReady: (rendererGeneration) => {
       const generation = service.generation;
       if (generation === "") return;
@@ -159,7 +164,13 @@ function bootstrap(dataHome: string): void {
       beforeClose: async (reason) => record(await service.request("desktop/beforeClose", { reason })).prevent === true,
       shutdown: () => service.shutdown(),
     },
-    app: { quit: () => app.quit(), relaunch: (args) => app.relaunch({ args }) },
+    app: {
+      quit: () => app.quit(),
+      relaunch: (args: string[], execPath?: string) => {
+        if (execPath) delete process.env.REASONIX_DESKTOP_SERVICE;
+        app.relaunch({ args, ...(execPath ? { execPath } : {}) });
+      },
+    },
     // Website views go first: a WebContents closing after its window is
     // gone is the ordering that left orphaned renderers in the prototype.
     onCloseAllowed: () => {
@@ -228,11 +239,17 @@ function bootstrap(dataHome: string): void {
       onState: (state) => {
         mainWindow.send(IPC.serviceState, state);
         grants.observeGeneration(state.generation);
+        if (state.phase !== "ready") {
+          browser.pauseForRendererLoss(`service ${state.phase}`);
+          documents.clear();
+        }
       },
       onReady: (hello: HelloResult) => {
         log.info(`desktop service ready: generation ${hello.runtimeGeneration}, pid ${hello.service.pid}`);
         if (!mainWindow.browserWindow) mainWindow.create(hello.window);
-        void mainWindow.loadApp();
+        // Reattach the surviving renderer after a service restart. Reloading
+        // would destroy unsent composer drafts; desktop:resync repairs reads.
+        if (!mainWindow.reattachApp()) void mainWindow.loadApp();
       },
       onFailed: (error) => {
         const failure = describeHandshakeFailure(error);
@@ -288,7 +305,8 @@ function bootstrap(dataHome: string): void {
         setZoom: (tabId, factor) => browser.setZoom(tabId, factor),
         toggleDevTools: (tabId) => browser.toggleDevTools(tabId),
         resume: (tabId) => browser.resume(tabId),
-        setLayout: (rect) => browser.setLayout(rect),
+        takeover: (tabId) => browser.takeover(tabId, "user takeover"),
+        setLayout: (rect) => browser.setLayout(browserLayoutInDIP(rect, mainWindow.browserWindow?.webContents.getZoomFactor() ?? 1)),
         setOverlay: (active) => browser.setOverlay(active),
       },
       log,

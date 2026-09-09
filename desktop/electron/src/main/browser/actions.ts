@@ -29,6 +29,7 @@ export interface ActRequest {
 
 export interface ActResult {
   executed: boolean;
+  outcome?: "unknown";
   reason?: string;
   documentToken?: string;
 }
@@ -73,27 +74,36 @@ export class ActionExecutor {
     this.checkpoint(tab, binding, verify);
     const page = tab.view.page;
     let outcome: ActResult;
-    switch (request.action) {
-      case "click":
-        outcome = await this.click(tab, binding, request, verify);
-        break;
-      case "type":
-        outcome = await this.type(tab, binding, request, verify);
-        break;
-      case "press":
-        outcome = await this.press(tab, binding, request, verify);
-        break;
-      case "scroll":
-        outcome = await this.scroll(tab, binding, request, verify);
-        break;
-      case "select":
-        outcome = await this.select(tab, binding, request, verify);
-        break;
-      case "upload":
-        outcome = await this.upload(tab, binding, request, verify);
-        break;
-      default:
-        return { executed: false, reason: `unsupported action ${JSON.stringify(request.action)}`, documentToken: request.documentToken };
+    let dispatched = false;
+    const dispatch = () => { dispatched = true; };
+    try {
+      switch (request.action) {
+        case "click":
+          outcome = await this.click(tab, binding, request, verify, dispatch);
+          break;
+        case "type":
+          outcome = await this.type(tab, binding, request, verify, dispatch);
+          break;
+        case "press":
+          outcome = await this.press(tab, binding, request, verify, dispatch);
+          break;
+        case "scroll":
+          outcome = await this.scroll(tab, binding, request, verify, dispatch);
+          break;
+        case "select":
+          outcome = await this.select(tab, binding, request, verify, dispatch, () => { dispatched = false; });
+          break;
+        case "upload":
+          outcome = await this.upload(tab, binding, request, verify, dispatch);
+          break;
+        default:
+          return { executed: false, reason: `unsupported action ${JSON.stringify(request.action)}`, documentToken: request.documentToken };
+      }
+    } catch (error) {
+      // A checkpoint failure after any dispatch cannot prove zero effects.
+      // Preserve uncertainty so the durable ledger never permits a replay.
+      if (dispatched) return { executed: false, outcome: "unknown", reason: String(error) };
+      throw error;
     }
     if (!outcome.executed) return { ...outcome, documentToken: request.documentToken };
     await this.sleep(this.deps.settleMs ?? ACT_SETTLE_MS);
@@ -151,43 +161,50 @@ export class ActionExecutor {
     return null;
   }
 
-  private async click(tab: BrowserTab, binding: DocumentBinding, request: ActRequest, verify: () => void): Promise<ActResult> {
+  private async click(tab: BrowserTab, binding: DocumentBinding, request: ActRequest, verify: () => void, dispatch: () => void): Promise<ActResult> {
     const target = await this.target(tab, binding, request.ref, verify);
     if (!target.ok) return { executed: false, reason: target.reason };
     if (target.element.disabled) return { executed: false, reason: "element is disabled" };
     if (target.element.tag === "option") return { executed: false, reason: "use the select action for <option> elements" };
+    dispatch();
     this.mouseClick(tab, target.centre);
     return { executed: true };
   }
 
-  private async type(tab: BrowserTab, binding: DocumentBinding, request: ActRequest, verify: () => void): Promise<ActResult> {
+  private async type(tab: BrowserTab, binding: DocumentBinding, request: ActRequest, verify: () => void, dispatch: () => void): Promise<ActResult> {
     const target = await this.target(tab, binding, request.ref, verify);
     if (!target.ok) return { executed: false, reason: target.reason };
     if (target.element.disabled) return { executed: false, reason: "element is disabled" };
     if (!target.element.editable) return { executed: false, reason: "element is not editable" };
+    dispatch();
     this.mouseClick(tab, target.centre);
     await this.sleep(30);
     this.checkpoint(tab, binding, verify);
     this.deps.surfaces.markAgentInput(tab);
     if (request.text !== "") await tab.view.page.insertText(request.text);
     if (request.submit) {
+      this.checkpoint(tab, binding, verify);
       const failure = this.sendKeys(tab, "Enter");
       if (failure) return { executed: false, reason: failure };
     }
     return { executed: true };
   }
 
-  private async press(tab: BrowserTab, binding: DocumentBinding, request: ActRequest, verify: () => void): Promise<ActResult> {
+  private async press(tab: BrowserTab, binding: DocumentBinding, request: ActRequest, verify: () => void, dispatch: () => void): Promise<ActResult> {
     if (request.keys.trim() === "") return { executed: false, reason: "press needs keys" };
+    // Validate before focusing: focusing itself dispatches a physical click.
+    try { parseKeySequence(request.keys); } catch (error) { return { executed: false, reason: String(error) }; }
     if (request.ref !== "") {
       const target = await this.target(tab, binding, request.ref, verify);
       if (!target.ok) return { executed: false, reason: target.reason };
       if (target.element.editable) {
+        dispatch();
         this.mouseClick(tab, target.centre);
         await this.sleep(30);
         this.checkpoint(tab, binding, verify);
       }
     }
+    dispatch();
     const failure = this.sendKeys(tab, request.keys);
     return failure ? { executed: false, reason: failure } : { executed: true };
   }
@@ -195,7 +212,7 @@ export class ActionExecutor {
   // Blink negates WebMouseWheelEvent deltas when it builds the DOM WheelEvent,
   // so the request keeps DOM semantics (positive deltaY scrolls down) and the
   // sign flips here.
-  private async scroll(tab: BrowserTab, binding: DocumentBinding, request: ActRequest, verify: () => void): Promise<ActResult> {
+  private async scroll(tab: BrowserTab, binding: DocumentBinding, request: ActRequest, verify: () => void, dispatch: () => void): Promise<ActResult> {
     let at: Point;
     if (request.ref !== "") {
       const target = await this.target(tab, binding, request.ref, verify);
@@ -209,6 +226,7 @@ export class ActionExecutor {
     if (!Number.isFinite(request.deltaX) || !Number.isFinite(request.deltaY)) return { executed: false, reason: "scroll deltas must be numbers" };
     if (request.deltaX === 0 && request.deltaY === 0) return { executed: false, reason: "scroll deltas are both zero" };
     this.deps.surfaces.markAgentInput(tab);
+    dispatch();
     tab.view.page.sendInputEvent({ type: "mouseWheel", x: at.x, y: at.y, deltaX: -request.deltaX, deltaY: -request.deltaY, canScroll: true });
     return { executed: true };
   }
@@ -220,12 +238,14 @@ export class ActionExecutor {
     return { width: (typeof size.width === "number" ? size.width : 0) * zoom, height: (typeof size.height === "number" ? size.height : 0) * zoom };
   }
 
-  private async select(tab: BrowserTab, binding: DocumentBinding, request: ActRequest, verify: () => void): Promise<ActResult> {
+  private async select(tab: BrowserTab, binding: DocumentBinding, request: ActRequest, verify: () => void, dispatch: () => void, noEffects: () => void): Promise<ActResult> {
     if (request.ref === "") return { executed: false, reason: "select needs a ref" };
     const page: GuestPage = tab.view.page;
     const target = frameForRef(page, binding, request.ref);
     const code = scriptCall(SELECT_SCRIPT_SOURCE, { key: REGISTRY_KEY, snapshotId: binding.snapshotId, docId: target.binding.docId, ref: request.ref, options: request.options });
     let raw: unknown;
+    this.checkpoint(tab, binding, verify);
+    dispatch();
     try {
       raw = await runInFrame(page, target.frame, code);
     } catch (error) {
@@ -234,14 +254,14 @@ export class ActionExecutor {
     const out = raw as SelectOutput | null;
     if (!out || typeof out.ok !== "boolean") throw staleReference("select script returned nothing");
     if (!out.ok) {
+      noEffects();
       if (out.reason === "stale") throw staleReference(`${request.ref} predates the current document`);
       return { executed: false, reason: out.reason };
     }
-    this.checkpoint(tab, binding, verify);
     return { executed: true };
   }
 
-  private async upload(tab: BrowserTab, binding: DocumentBinding, request: ActRequest, verify: () => void): Promise<ActResult> {
+  private async upload(tab: BrowserTab, binding: DocumentBinding, request: ActRequest, verify: () => void, dispatch: () => void): Promise<ActResult> {
     if (request.files.length === 0) return { executed: false, reason: "upload needs files" };
     for (const file of request.files) {
       if (!isAbsolute(file)) return { executed: false, reason: `file path must be absolute: ${file}` };
@@ -251,6 +271,6 @@ export class ActionExecutor {
     const located = await locateRef(tab.view.page, binding, request.ref);
     if (!located.ok) return { executed: false, reason: located.reason };
     this.checkpoint(tab, binding, verify);
-    return uploadFiles(tab.view.page, located.value, request.files);
+    return uploadFiles(tab.view.page, located.value, request.files, () => this.checkpoint(tab, binding, verify), dispatch);
   }
 }

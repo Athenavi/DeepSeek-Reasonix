@@ -13,7 +13,7 @@ function fakeApp(sequencer: () => QuitSequencer) {
       calls.push("quit");
       if (sequencer().onBeforeQuit()) calls.push("exit");
     },
-    relaunch: (args: string[]) => calls.push(`relaunch:${args.join(",")}`),
+    relaunch: (args: string[], execPath?: string) => calls.push(`relaunch:${args.join(",")}${execPath ? `@${execPath}` : ""}`),
   };
   return { app, calls };
 }
@@ -91,4 +91,13 @@ test("relaunch runs the shutdown and re-spawns with the requested args", async (
   await tick();
   assert.deepEqual(log, ["shutdown", "closeAllowed"]);
   assert.deepEqual(calls, ["quit", "relaunch:--after-update", "quit", "exit"]);
+});
+
+test("relaunch waits for shutdown then starts the committed stable launcher", async () => {
+  const { sequencer, calls, log } = build();
+  sequencer.relaunch(["--after-update"], "/opt/reasonix/reasonix-launcher");
+  assert.deepEqual(calls, ["quit"]);
+  await tick();
+  assert.deepEqual(log, ["shutdown", "closeAllowed"]);
+  assert.deepEqual(calls, ["quit", "relaunch:--after-update@/opt/reasonix/reasonix-launcher", "quit", "exit"]);
 });

@@ -158,15 +158,6 @@ func (c *desktopShellCoordinator) markFrontendHeartbeat(now time.Time) (first, h
 	return first, healthy
 }
 
-func (c *desktopShellCoordinator) markFailed() {
-	if c == nil {
-		return
-	}
-	c.mu.Lock()
-	c.phase = desktopShellFailed
-	c.mu.Unlock()
-}
-
 func (c *desktopShellCoordinator) Present(source string) {
 	if c == nil || c.app == nil || c.app.ctx == nil {
 		return

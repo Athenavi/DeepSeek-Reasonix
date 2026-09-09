@@ -46,7 +46,7 @@ export interface RemoteWindowHostApi {
 
 export interface LifecycleHostApi {
   approve(): void;
-  relaunch(args: string[]): void;
+  relaunch(args: string[], execPath?: string): void;
 }
 
 export interface ScreenInfo {
@@ -115,7 +115,9 @@ export function buildHostCallTable(deps: HostCallDeps): HostCallTable {
     },
     "host/app.quit": done(() => deps.lifecycle.approve()),
     "host/app.relaunch": (params) => {
-      deps.lifecycle.relaunch(strList(params, "args"));
+      const execPath = str(params, "execPath");
+      if (execPath) deps.lifecycle.relaunch(strList(params, "args"), execPath);
+      else deps.lifecycle.relaunch(strList(params, "args"));
       return {};
     },
     "host/devtools.toggle": done(() => deps.window.toggleDevTools()),

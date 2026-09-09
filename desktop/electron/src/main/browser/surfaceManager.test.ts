@@ -44,7 +44,8 @@ test("open, activate, layout and overlay drive visibility of exactly one view", 
   assert.equal(first.partition, "persist:browser");
   assert.equal(second.partition, `temp:${second.id}`);
   assert.equal(viewOf(first).page.calls[0], "load:https://example.com/");
-  assert.equal(manager.activeTabId, second.id);
+  assert.equal(manager.activeTabId, null, "opens do not select a native view without the application renderer");
+  manager.activate(second.id);
   assert.equal(viewOf(second).visible, false, "no layout yet: nothing is visible");
 
   manager.setLayout({ x: 300, y: 100, width: 600, height: 500 });
@@ -72,6 +73,7 @@ test("open, activate, layout and overlay drive visibility of exactly one view", 
 test("navigation bumps the epoch, records the URL and clears load errors", async () => {
   const { manager, viewOf, broadcasts } = setup();
   const tab = await manager.open("https://a.test", { taskId: "t", temporary: false });
+  manager.activate(tab.id);
   const events = viewOf(tab).fire();
   const before = broadcasts.length;
   events.onStartLoading();
@@ -139,9 +141,10 @@ test("a crashed website view reloads its last URL in human mode and emits crash"
   assert.equal(viewOf(tab).page.calls.filter((call) => call === "load:https://a.test/page").length, 3, "reloads are capped");
 });
 
-test("popups become tabs of the same task and partition and are activated", async () => {
+test("popups retain task and partition without stealing the application selection", async () => {
   const { manager, viewOf, factory } = setup();
   const tab = await manager.open("https://a.test", { taskId: "t", temporary: true });
+  manager.activate(tab.id);
   const adopt = viewOf(tab).fire().onPopup("https://login.test/oauth", "new-window");
   assert.ok(adopt);
   const child = factory.create(tab.partition) as FakeGuestView;
@@ -151,20 +154,23 @@ test("popups become tabs of the same task and partition and are activated", asyn
   assert.equal(tabs[1].taskId, "t");
   assert.equal(tabs[1].partition, tab.partition);
   assert.equal(tabs[1].temporary, true);
-  assert.equal(manager.activeTabId, tabs[1].id);
+  assert.equal(manager.activeTabId, tab.id);
   assert.ok(child.events, "the popup view is bound to its own tab record");
   manager.close(tab.id);
   assert.equal(viewOf(tab).fire().onPopup("https://x", "new-window"), null, "a closed tab cannot spawn popups");
 });
 
-test("close and destroyAll tear views down and pick a remaining active tab", async () => {
+test("close and destroyAll tear views down and leave replacement selection to the renderer", async () => {
   const { manager, viewOf } = setup();
   const a = await manager.open("https://a.test", { taskId: "t", temporary: false });
   const b = await manager.open("https://b.test", { taskId: "t", temporary: false });
+  manager.activate(b.id);
   manager.setLayout({ x: 0, y: 0, width: 10, height: 10 });
   manager.close(b.id);
   assert.equal(viewOf(b).destroyed, true);
-  assert.equal(manager.activeTabId, a.id);
+  assert.equal(manager.activeTabId, null);
+  assert.equal(viewOf(a).visible, false);
+  manager.activate(a.id);
   assert.equal(viewOf(a).visible, true);
   assert.equal(b.mode, "human", "a closed tab fails every pending act as taken over");
   viewOf(a).fire().onDestroyed();
@@ -174,6 +180,29 @@ test("close and destroyAll tear views down and pick a remaining active tab", asy
   assert.equal(viewOf(c).destroyed, true);
   assert.equal(manager.all().length, 0);
   assert.equal(c.mode, "human");
+});
+
+test("background opens never replace the current task's page or revive a detached renderer", async () => {
+  const { manager, viewOf, takeovers } = setup();
+  const a = await manager.open("https://a.test", { taskId: "A", temporary: false });
+  manager.activate(a.id);
+  manager.setLayout({ x: 400, y: 100, width: 500, height: 500 });
+  const b = await manager.open("https://b.test", { taskId: "B", temporary: false });
+  assert.equal(manager.activeTabId, a.id);
+  assert.equal(viewOf(a).visible, true);
+  assert.equal(viewOf(b).visible, false);
+  const epoch = a.epoch;
+  manager.pauseForRendererLoss("app renderer crashed");
+  assert.equal(manager.activeTabId, null);
+  assert.equal(viewOf(a).visible, false);
+  assert.equal(a.mode, "human");
+  assert.ok(a.epoch > epoch, "pending acts lose their document epoch");
+  assert.equal(takeovers.length, 2);
+  manager.activate(a.id);
+  assert.equal(viewOf(a).visible, false, "selection cannot restore the lost layout");
+  manager.setLayout({ x: 400, y: 100, width: 500, height: 500 });
+  assert.equal(viewOf(a).visible, true);
+  assert.equal(a.mode, "human", "remount never resumes actions automatically");
 });
 
 test("navigate, zoom and devtools act on the page", async () => {

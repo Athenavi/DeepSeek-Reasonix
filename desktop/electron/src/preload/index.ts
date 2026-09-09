@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import { DesktopEventStream, MissedEventSubscriptions } from "../shared/eventStream.js";
 import {
   hostOS,
   IPC,
@@ -8,7 +9,6 @@ import {
   type BrowserOpenOptions,
   type BrowserTabView,
   type ContractInfo,
-  type EventFrame,
   type IpcResult,
   type ServiceState,
   type WindowTheme,
@@ -47,35 +47,42 @@ function readContract(): ContractInfo {
 }
 
 const listeners = new Map<string, Set<Listener>>();
-let eventsBound = false;
+const missedSubscriptions = new MissedEventSubscriptions();
 
-function bindEvents(): void {
-  if (eventsBound) return;
-  eventsBound = true;
-  ipcRenderer.on(IPC.event, (_event, frame: unknown) => {
-    const { name, args } = (frame ?? {}) as Partial<EventFrame>;
-    if (typeof name !== "string") return;
-    const set = listeners.get(name);
-    if (!set) return;
-    const payload = Array.isArray(args) ? args : [];
-    for (const listener of [...set]) {
-      try {
-        listener(...payload);
-      } catch (error) {
-        console.error(`[reasonixDesktop] listener for ${name} failed`, error);
-      }
+function emit(name: string, args: unknown[]): void {
+  const set = listeners.get(name);
+  if (!set) { if (name !== "desktop:resync") missedSubscriptions.add(name); return; }
+  for (const listener of [...set]) {
+    try {
+      listener(...args);
+    } catch (error) {
+      console.error(`[reasonixDesktop] listener for ${name} failed`, error);
     }
-  });
+  }
 }
 
+const eventStream = new DesktopEventStream((frame) => emit(frame.name, frame.args), (recovery) => {
+  if (recovery.reason === "generation") missedSubscriptions.clear();
+  emit("desktop:resync", [recovery]);
+});
+// Bind before React mounts, so unsubscribed event names still advance the
+// transport cursor and cannot hide missing frames from later subscribers.
+ipcRenderer.on(IPC.event, (_event, frame: unknown) => eventStream.accept(frame));
+
 function on(name: string, listener: Listener): () => void {
-  bindEvents();
   let set = listeners.get(name);
   if (!set) {
     set = new Set();
     listeners.set(name, set);
   }
   set.add(listener);
+  if (name === "desktop:resync" && eventStream.recovery) {
+    queueMicrotask(() => {
+      if (set.has(listener) && eventStream.recovery) listener(eventStream.recovery);
+    });
+  } else if (missedSubscriptions.consume(name)) {
+    eventStream.requestRecovery("subscription");
+  }
   return () => {
     set.delete(listener);
     if (set.size === 0) listeners.delete(name);
@@ -86,8 +93,18 @@ let lastServiceState: ServiceState | null = null;
 const serviceStateListeners = new Set<(state: ServiceState) => void>();
 ipcRenderer.on(IPC.serviceState, (_event, state: ServiceState) => {
   lastServiceState = state;
+  eventStream.observeState(state);
   for (const listener of [...serviceStateListeners]) listener(state);
 });
+
+// The stream must know its generation even when the app has no service-state
+// subscriber. A newer push wins over this initial asynchronous snapshot.
+void call(IPC.serviceStateGet).then((state) => {
+  if (lastServiceState) return;
+  lastServiceState = state as ServiceState;
+  eventStream.observeState(lastServiceState);
+  for (const listener of [...serviceStateListeners]) listener(lastServiceState);
+}).catch(() => undefined);
 
 // A renderer that mounts after the service became ready never saw the push;
 // the first subscriber pulls the current state so nobody waits on a past event.
@@ -98,6 +115,7 @@ function onServiceState(listener: (state: ServiceState) => void): () => void {
     void call(IPC.serviceStateGet).then((state) => {
       if (lastServiceState || !serviceStateListeners.has(listener)) return;
       lastServiceState = state as ServiceState;
+      eventStream.observeState(lastServiceState);
       listener(lastServiceState);
     }).catch(() => undefined);
   }
@@ -151,6 +169,7 @@ const browser = {
   setZoom: (tabId: string, factor: number) => call(IPC.browserSetZoom, tabId, factor).then(() => undefined),
   toggleDevTools: (tabId: string) => call(IPC.browserToggleDevTools, tabId).then(() => undefined),
   resume: (tabId: string) => call(IPC.browserResume, tabId).then(() => undefined),
+  takeover: (tabId: string) => call(IPC.browserUserTakeover, tabId).then(() => undefined),
   setLayout: (rect: BrowserLayoutRect | null) => fire(IPC.browserSetLayout, rect),
   setOverlay: (active: boolean) => fire(IPC.browserSetOverlay, active),
   onTabs,

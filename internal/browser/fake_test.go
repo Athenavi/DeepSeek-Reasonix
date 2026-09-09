@@ -26,6 +26,7 @@ type fakeExecutor struct {
 	acts   []ActRequest
 	dls    []DownloadsRequest
 	closed []string
+	closes []CloseRequest
 }
 
 func (f *fakeExecutor) Tabs(context.Context) ([]Tab, error) {
@@ -75,9 +76,10 @@ func (f *fakeExecutor) Downloads(_ context.Context, req DownloadsRequest) ([]Dow
 	return f.downloads, f.err
 }
 
-func (f *fakeExecutor) Close(_ context.Context, tabID string) error {
+func (f *fakeExecutor) Close(_ context.Context, req CloseRequest) error {
 	f.calls = append(f.calls, "close")
-	f.closed = append(f.closed, tabID)
+	f.closed = append(f.closed, req.TabID)
+	f.closes = append(f.closes, req)
 	return f.err
 }
 

@@ -51,6 +51,7 @@ export interface DesktopBrowserHost {
   setZoom(tabId: string, factor: number): Promise<void>;
   toggleDevTools(tabId: string): Promise<void>;
   resume(tabId: string): Promise<void>;
+  takeover(tabId: string): Promise<void>;
   setLayout(rect: BrowserLayoutRect | null): void;
   setOverlay(active: boolean): void;
   onTabs(cb: (tabs: BrowserTabView[]) => void): () => void;

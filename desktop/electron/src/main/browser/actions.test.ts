@@ -180,12 +180,64 @@ test("upload validates files and sets them through the DevTools protocol", async
   assert.equal((await s.actions.act(s.tab, s.request({ action: "upload" }), s.verify)).reason, "upload needs files");
   assert.match((await s.actions.act(s.tab, s.request({ action: "upload", files: ["relative.txt"] }), s.verify)).reason ?? "", /absolute/);
   assert.match((await s.actions.act(s.tab, s.request({ action: "upload", files: ["/tmp/missing.bin"] }), s.verify)).reason ?? "", /not found/);
-  s.page.debugger.respond = (method) => (method === "Runtime.evaluate" ? { result: { objectId: "obj-9" } } : {});
+  s.page.debugger.respond = (method) => {
+    if (method === "Runtime.enable") s.page.debugger.emit("Runtime.executionContextCreated", { context: { id: 9, auxData: { isDefault: false } } });
+    return method === "Runtime.evaluate" ? { result: { objectId: "obj-9" } } : {};
+  };
   const result = await s.actions.act(s.tab, s.request({ action: "upload", files: ["/tmp/a.txt"] }), s.verify);
   assert.deepEqual(result, { executed: true, documentToken: "tok-2" });
-  assert.deepEqual(s.page.debugger.commands.map((command) => command.method), ["Runtime.evaluate", "DOM.setFileInputFiles", "Runtime.releaseObjectGroup"]);
-  assert.deepEqual(s.page.debugger.commands[1].params, { objectId: "obj-9", files: ["/tmp/a.txt"] });
+  assert.deepEqual(s.page.debugger.commands.map((command) => command.method), ["Runtime.enable", "Runtime.evaluate", "Runtime.disable", "DOM.setFileInputFiles", "Runtime.releaseObjectGroup"]);
+  assert.deepEqual(s.page.debugger.commands[3].params, { objectId: "obj-9", files: ["/tmp/a.txt"] });
   assert.equal(s.page.debugger.attached, false, "the debugger is detached afterwards");
   s.answers.locate = { ok: true, tag: "input", type: "text", path: "html" };
   assert.equal((await s.actions.act(s.tab, s.request({ action: "upload", files: ["/tmp/a.txt"], documentToken: "tok-2" }), s.verify)).reason, "element is not a file input");
+});
+
+test("takeover after a focus click preserves an unknown receipt and stops typing", async () => {
+  for (const action of ["type", "press"]) {
+    const s = await setup();
+    s.answers.resolve = { ok: true, x: 0, y: 0, width: 10, height: 10, tag: "input", type: "text", disabled: false, editable: true, frameOffsetKnown: true };
+    s.settled.push(() => s.manager.takeover(s.tab.id, "user"));
+    const result = await s.actions.act(s.tab, s.request({ action, text: "hello", keys: "Enter" }), s.verify);
+    assert.equal(result.outcome, "unknown");
+    assert.equal(result.executed, false);
+    assert.equal(s.page.inputs.length, 3);
+    assert.deepEqual(s.page.inserted, []);
+  }
+});
+
+test("takeover during insertText cancels the pending submit without a false no-effect receipt", async () => {
+  const s = await setup();
+  s.answers.resolve = { ok: true, x: 0, y: 0, width: 10, height: 10, tag: "input", type: "text", disabled: false, editable: true, frameOffsetKnown: true };
+  s.page.insertText = async () => { s.manager.takeover(s.tab.id, "user"); };
+  const result = await s.actions.act(s.tab, s.request({ action: "type", text: "hello", submit: true }), s.verify);
+  assert.equal(result.outcome, "unknown");
+  assert.equal(s.page.inputs.filter((event) => event.type === "keyDown").length, 0);
+});
+
+test("upload verifies takeover and grant after CDP lookup, before attaching files", async () => {
+  for (const invalidate of ["takeover", "revoke", "navigation"]) {
+    const s = await setup();
+    s.page.debugger.respond = (method) => {
+      if (method === "Runtime.enable") s.page.debugger.emit("Runtime.executionContextCreated", { context: { id: 9, auxData: { isDefault: false } } });
+      if (method === "Runtime.evaluate") {
+        if (invalidate === "takeover") s.manager.takeover(s.tab.id, "user");
+        if (invalidate === "revoke") s.revoke();
+        if (invalidate === "navigation") s.view.fire().onNavigate("https://other.test", false);
+        return { result: { objectId: "original-input" } };
+      }
+      return {};
+    };
+    await assert.rejects(s.actions.act(s.tab, s.request({ action: "upload", files: ["/tmp/a.txt"] }), s.verify));
+    assert.equal(s.page.debugger.commands.some((command) => command.method === "DOM.setFileInputFiles"), false);
+  }
+});
+
+test("select receipt survives a takeover after its DOM mutation, and lost script replies stay unknown", async () => {
+  const s = await setup();
+  s.page.run = () => { s.manager.takeover(s.tab.id, "user"); return { ok: true, selected: ["x"] }; };
+  assert.deepEqual(await s.actions.act(s.tab, s.request({ action: "select", options: ["x"] }), s.verify), { executed: true });
+  const other = await setup();
+  other.page.run = () => { throw new Error("renderer gone after change"); };
+  assert.equal((await other.actions.act(other.tab, other.request({ action: "select", options: ["x"] }), other.verify)).outcome, "unknown");
 });

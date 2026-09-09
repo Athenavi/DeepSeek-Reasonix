@@ -111,6 +111,25 @@ is the single source of truth: it emits the JSON contract, its digest, the
 TypeScript command table and the DTO type declarations consumed by the
 renderer. A desktop Go test fails when the checked-in output drifts.
 
+Each command also records its source-module `domain`, exact `owner` (for
+example `App.OpenProjectTab`), repository-relative `sources`, `scope` and
+`cancellation`; these fields are included in the digest. The generator scans
+all platform declarations and writes `desktop/host_command_owners.generated.json`,
+which the host embeds and validates against every reflected command. Scope
+records the owner's named wire `inputs` (`argN` for unnamed legacy parameters)
+and `resolver`; zero-input commands use `owner-state`, others `owner-inputs`.
+These are provenance and dispatch boundaries. Input validation, tab/session
+selection and access checks remain in the existing App method.
+
+Current App commands declare `before-dispatch`: the host checks cancellation
+before decoding and immediately before dispatch, then preserves the method's
+result even if cancellation arrives during a synchronous write. They do not
+promise interruption after dispatch. A host method may opt into
+`cooperative-context` with a leading Go `context.Context`; the host injects
+the request context and excludes it from JSON arguments and generated DTOs.
+The method must cooperate with cancellation. Business Stop/Cancel commands
+continue to use their existing owners and semantics.
+
 ## Events (service → shell → renderer)
 
 ```jsonc
@@ -123,6 +142,25 @@ events carry one element. The shell forwards the frame to the renderer on the
 calls `cb(...args)`. Sequence numbers are strictly increasing per generation
 so a renderer that re-attaches can detect a gap and re-snapshot instead of
 trusting stale state.
+
+Both the service supervisor and preload reject duplicate or out-of-order
+frames; the preload also rejects old generations using the current service
+state. It binds the transport before React subscribes. A generation change,
+sequence gap or missed subscription raises the shell-local `desktop:resync`
+event (`generation`, `reason`, `expectedSeq`, `actualSeq`), which is not a Go
+business event. Runtime state is re-read through `SyncRuntimeState`; mounted
+controllers re-read `ListTabs` and use the existing `TurnEventsForTab` ledger
+and pending-prompt presentation to repair their projection. Reads are fenced
+against newer recovery requests and session/navigation changes. No business
+mutation is replayed, and a surviving application renderer is reattached
+after a service restart without reloading its unsent drafts.
+
+This recovery currently covers core runtime state, session metadata, durable
+turn events and pending prompts. Terminal output has a bounded snapshot but
+no atomic output cursor, so an affected terminal is visibly marked incomplete
+instead of merging an ambiguous snapshot into live output. Extension output,
+file-watch and other independent event streams still need capability-specific
+resnapshot contracts; they are not covered by this core recovery guarantee.
 
 ## Native host calls (service → shell)
 
@@ -146,7 +184,7 @@ phase.
 | `host/dialog.message` | `{"type":"info"\|"warning"\|"error"\|"question","title","message","buttons":[],"defaultButton","cancelButton"}` | `{"button":string}` |
 | `host/shell.openExternal` | `{"url":string}` | `{}` |
 | `host/app.quit` | `{}` | `{}` |
-| `host/app.relaunch` | `{"args":[]}` | `{}` |
+| `host/app.relaunch` | `{"args":[],"execPath"?:string}` | `{}` |
 | `host/devtools.toggle` | `{}` | `{}` |
 | `host/remoteWindow.open` | `{"hostKey","url","title"}` | `{"windowId":string}` |
 | `host/remoteWindow.navigate` | `{"hostKey","url","title"}` | `{}` |

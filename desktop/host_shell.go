@@ -169,7 +169,14 @@ func (a *App) startNativeShellSupport() {
 func (b *hostShellBridge) relaunch() error {
 	ctx, cancel := context.WithTimeout(context.Background(), rpcHostWindowTimeout)
 	defer cancel()
-	return b.server.Request(ctx, "host/app.relaunch", map[string][]string{"args": {}}, nil)
+	execPath := ""
+	if runtime.GOOS != "darwin" {
+		execPath = currentLauncherPath()
+	}
+	return b.server.Request(ctx, "host/app.relaunch", struct {
+		Args     []string `json:"args"`
+		ExecPath string   `json:"execPath,omitempty"`
+	}{Args: []string{}, ExecPath: execPath}, nil)
 }
 
 // quit asks the shell to shut the application down without restarting it.
@@ -184,7 +191,13 @@ func (b *hostShellBridge) quit() error {
 // off to the thin launcher.
 func (a *App) relaunchDesktop(relaunchBinary bool) {
 	if a.hostMode() {
-		if err := a.hostShell.relaunch(); err != nil {
+		var err error
+		if relaunchBinary {
+			err = a.hostShell.relaunch()
+		} else {
+			err = a.hostShell.quit()
+		}
+		if err != nil {
 			slog.Warn("desktop host: relaunch request failed", "err", err)
 		}
 		return

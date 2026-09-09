@@ -20,6 +20,7 @@ var hostEventNames = []string{
 	"remote:forwards",
 	"remote:server",
 	"remote:status",
+	"runtime-state:changed",
 	"runtime:rebuilt",
 	"session:active-version-changed",
 	"session:recovered",

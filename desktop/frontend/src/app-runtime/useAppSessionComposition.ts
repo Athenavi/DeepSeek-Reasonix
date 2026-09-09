@@ -599,6 +599,7 @@ export function useAppSessionComposition(input: AppSessionCompositionInput) {
     activeTabId,
     turnStartAt: state.turnStartAt,
     completionSummary: state.completionSummary,
+    sessionPath: state.meta?.sessionPath,
     openChangedDock: () => openRightDockMode("changed"),
   });
 

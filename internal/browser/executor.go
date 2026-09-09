@@ -17,7 +17,7 @@ type Executor interface {
 	Screenshot(ctx context.Context, req ScreenshotRequest) (Screenshot, error)
 	Act(ctx context.Context, req ActRequest) (ActResult, error)
 	Downloads(ctx context.Context, req DownloadsRequest) ([]Download, error)
-	Close(ctx context.Context, tabID string) error
+	Close(ctx context.Context, req CloseRequest) error
 }
 
 // Availability is an optional Executor capability: a host whose grant can
@@ -76,15 +76,22 @@ type Tab struct {
 }
 
 type OpenRequest struct {
-	URL       string
-	Temporary bool
+	OperationID string
+	URL         string
+	Temporary   bool
 }
 
 // NavigateRequest moves a bound tab; URL is consulted only for NavigateURL.
 type NavigateRequest struct {
-	TabID  string
-	URL    string
-	Action string
+	OperationID string
+	TabID       string
+	URL         string
+	Action      string
+}
+
+type CloseRequest struct {
+	OperationID string
+	TabID       string
 }
 
 type SnapshotRequest struct {

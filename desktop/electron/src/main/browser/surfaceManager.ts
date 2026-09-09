@@ -146,7 +146,9 @@ export class BrowserSurfaceManager {
     const partition = options.temporary ? `temp:${id}` : SHARED_PARTITION;
     const view = this.deps.views.create(partition);
     const tab = this.register(id, view, options.taskId, partition, options.temporary);
-    this.activate(tab.id);
+    // The application renderer owns selection. Agent opens must not replace
+    // another task's visible page while its address bar still names that task.
+    this.broadcast();
     const load = view.page.loadURL(href).catch((error: unknown) => {
       this.deps.log.warn(`browser tab ${tab.id} load failed: ${String(error)}`);
     });
@@ -250,6 +252,13 @@ export class BrowserSurfaceManager {
     tab.agentInputUntil = this.now() + AGENT_INPUT_GRACE_MS;
   }
 
+  pauseForRendererLoss(reason: string): void {
+    this.layout = null;
+    this.activeId = null;
+    this.applyVisibility();
+    for (const tab of this.all()) this.takeover(tab.id, reason);
+  }
+
   destroyAll(): void {
     const tabs = this.all();
     this.tabs.clear();
@@ -319,8 +328,8 @@ export class BrowserSurfaceManager {
       onPopup: () => {
         if (!this.tabs.has(tab.id)) return null;
         return (view) => {
-          const child = this.register(this.nextId(), view, tab.taskId, tab.partition, tab.temporary);
-          this.activate(child.id);
+          this.register(this.nextId(), view, tab.taskId, tab.partition, tab.temporary);
+          this.broadcast();
         };
       },
     };
@@ -347,8 +356,7 @@ export class BrowserSurfaceManager {
     tab.mode = "human";
     tab.epoch += 1;
     if (this.activeId === tab.id) {
-      const rest = this.all();
-      this.activeId = rest.length ? rest[rest.length - 1].id : null;
+      this.activeId = null;
       this.applyVisibility();
     }
   }

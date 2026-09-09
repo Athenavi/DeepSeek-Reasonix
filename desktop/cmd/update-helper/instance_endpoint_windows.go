@@ -8,6 +8,7 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+	"reasonix/desktop/internal/instanceidentity"
 )
 
 var errEndpointStarting = errors.New("instance mutex exists without an identifiable endpoint")
@@ -20,6 +21,13 @@ var instanceWindowPID = handoffUser32.NewProc("GetWindowThreadProcessId")
 // update helper can still find a running pre-Electron app. HWND_MESSAGE
 // is required: ordinary top-level window enumeration does not include them.
 func desktopEndpointImage(id string) (string, error) {
+	image, err := instanceidentity.EndpointImage(id)
+	if errors.Is(err, windows.ERROR_PIPE_BUSY) {
+		return "", errEndpointStarting
+	}
+	if err != nil || image != "" {
+		return image, err
+	}
 	name := "wails-app-" + id
 	class, err := windows.UTF16PtrFromString(name + "-sic")
 	if err != nil {

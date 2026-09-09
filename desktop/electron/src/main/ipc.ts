@@ -37,6 +37,7 @@ export interface BrowserRendererApi {
   setZoom(tabId: string, factor: number): void;
   toggleDevTools(tabId: string): void;
   resume(tabId: string): void;
+  takeover(tabId: string): void;
   setLayout(rect: BrowserLayoutRect | null): void;
   setOverlay(active: boolean): void;
 }
@@ -144,6 +145,7 @@ export function registerRendererIpc(deps: RendererIpcDeps): void {
   handle(IPC.browserSetZoom, (id, factor) => browser.setZoom(tabId(id), finite(factor, Number.NaN)));
   handle(IPC.browserToggleDevTools, (id) => browser.toggleDevTools(tabId(id)));
   handle(IPC.browserResume, (id) => browser.resume(tabId(id)));
+  handle(IPC.browserUserTakeover, (id) => browser.takeover(tabId(id)));
   handle(IPC.browserSetLayout, (rect) => browser.setLayout(parseLayout(rect)));
   handle(IPC.browserSetOverlay, (active) => browser.setOverlay(active === true));
 }

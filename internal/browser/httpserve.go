@@ -114,7 +114,7 @@ func (h *httpHandler) open(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &in) {
 		return
 	}
-	tab, err := h.exec.Open(sessionContext(r), OpenRequest{URL: in.URL, Temporary: in.Temporary})
+	tab, err := h.exec.Open(sessionContext(r), OpenRequest(in))
 	writeResult(w, toWireTab(tab), err)
 }
 
@@ -123,7 +123,7 @@ func (h *httpHandler) navigate(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &in) {
 		return
 	}
-	tab, err := h.exec.Navigate(sessionContext(r), NavigateRequest{TabID: in.TabID, URL: in.URL, Action: in.Action})
+	tab, err := h.exec.Navigate(sessionContext(r), NavigateRequest(in))
 	writeResult(w, toWireTab(tab), err)
 }
 
@@ -132,8 +132,8 @@ func (h *httpHandler) snapshot(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &in) {
 		return
 	}
-	snap, err := h.exec.Snapshot(sessionContext(r), SnapshotRequest{TabID: in.TabID, Selector: in.Selector})
-	writeResult(w, wireSnapshot{DocumentToken: snap.DocumentToken, URL: snap.URL, Title: snap.Title, Tree: snap.Tree, Refs: snap.Refs}, err)
+	snap, err := h.exec.Snapshot(sessionContext(r), SnapshotRequest(in))
+	writeResult(w, wireSnapshot(snap), err)
 }
 
 func (h *httpHandler) screenshot(w http.ResponseWriter, r *http.Request) {
@@ -141,8 +141,8 @@ func (h *httpHandler) screenshot(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &in) {
 		return
 	}
-	shot, err := h.exec.Screenshot(sessionContext(r), ScreenshotRequest{TabID: in.TabID, Ref: in.Ref, FullPage: in.FullPage})
-	writeResult(w, wireScreenshot{Path: shot.Path, MIME: shot.MIME, Width: shot.Width, Height: shot.Height}, err)
+	shot, err := h.exec.Screenshot(sessionContext(r), ScreenshotRequest(in))
+	writeResult(w, wireScreenshot(shot), err)
 }
 
 func (h *httpHandler) act(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +151,7 @@ func (h *httpHandler) act(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res, err := h.exec.Act(sessionContext(r), in.request())
-	writeResult(w, wireActResult{Executed: res.Executed, Reason: res.Reason, DocumentToken: res.DocumentToken, Outcome: res.Outcome}, err)
+	writeResult(w, wireActResult(res), err)
 }
 
 func (h *httpHandler) downloads(w http.ResponseWriter, r *http.Request) {
@@ -162,7 +162,7 @@ func (h *httpHandler) downloads(w http.ResponseWriter, r *http.Request) {
 	downloads, err := h.exec.Downloads(sessionContext(r), in.request())
 	out := wireDownloads{Downloads: make([]wireDownload, 0, len(downloads))}
 	for _, d := range downloads {
-		out.Downloads = append(out.Downloads, wireDownload{ID: d.ID, URL: d.URL, Path: d.Path, State: d.State, Bytes: d.Bytes})
+		out.Downloads = append(out.Downloads, wireDownload(d))
 	}
 	writeResult(w, out, err)
 }
@@ -172,5 +172,5 @@ func (h *httpHandler) close(w http.ResponseWriter, r *http.Request) {
 	if !decodeBody(w, r, &in) {
 		return
 	}
-	writeResult(w, struct{}{}, h.exec.Close(sessionContext(r), in.TabID))
+	writeResult(w, struct{}{}, h.exec.Close(sessionContext(r), CloseRequest(in)))
 }

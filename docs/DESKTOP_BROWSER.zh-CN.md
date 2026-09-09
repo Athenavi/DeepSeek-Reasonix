@@ -72,8 +72,10 @@ Go 通过现有通道把文件转成图像或文件结果。上传只读取任�
 - 授权 `{sessionID, taskID, runtimeGeneration, tabIDs, expiresAt}` 在任务开始使用浏览器
   时由 Go 签发，并在服务重启、会话变化、连接世代变化或任务结束时撤销。壳拒绝授权
   不是当前的 `host/browser.*` 调用。
-- 用户在页面上的键盘、鼠标或触控输入立即在壳中递增该标签的 epoch。旧 epoch 的待执行
-  与排队动作被取消，Go 收到 `browser:takeover`，Agent 的下一次调用必须重新读取页面。
+- 浏览器工具栏的“接管”按钮通过可信应用 IPC 立即将标签切为 `human` 模式并递增 epoch。
+  即使处于抑制 Agent 输入回声的 750 毫秒窗口内，显式接管仍立即生效；页面键盘、鼠标或
+  触控输入的自动检测在该窗口内仅尽力而为。旧 epoch 的待执行与排队动作被取消，Go 收到
+  `browser:takeover`。“恢复”将控制权交回 Agent 并再次递增 epoch，要求重新读取页面。
   登录页、验证码与 passkey 始终交由用户：标签处于 `human` 模式时 Agent 不能读取或操作它。
 - 每个写操作在壳执行前先在账本中预留 `{operationID, sessionID, generation, tabID, epoch,
   documentToken, action, digest}`。壳报告 `executed` 或带原因的 `not_executed`；回复丢失、

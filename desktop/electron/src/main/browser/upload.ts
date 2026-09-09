@@ -17,7 +17,7 @@ function objectIdOf(result: unknown): string | null {
 
 // Runtime.enable replays executionContextCreated for every live context
 // before its own reply, so a listener registered around it sees them all.
-async function defaultContexts(dbg: GuestDebugger): Promise<ExecutionContext[]> {
+async function executionContexts(dbg: GuestDebugger): Promise<ExecutionContext[]> {
   const contexts: ExecutionContext[] = [];
   const listener = (_event: unknown, method: string, params: unknown) => {
     if (method !== "Runtime.executionContextCreated") return;
@@ -30,20 +30,17 @@ async function defaultContexts(dbg: GuestDebugger): Promise<ExecutionContext[]> 
   } finally {
     dbg.removeListener("message", listener);
   }
-  return contexts.filter((context) => context.auxData?.isDefault === true);
+  return contexts;
 }
 
-// The main frame's registry lives in the isolated world, so its element is
-// re-found by CSS path in the page world; a child frame's registry already
-// lives in that frame's main world and is read directly.
+// Find the original registry node in its execution context, including the
+// main frame's isolated world. A CSS path would silently select a replacement
+// input after a rerender or a navigation.
 async function findObjectId(dbg: GuestDebugger, located: LocatedRef): Promise<string | null> {
-  if (located.isMainFrame) {
-    const result = await dbg.sendCommand("Runtime.evaluate", { expression: `document.querySelector(${JSON.stringify(located.path)})`, objectGroup: OBJECT_GROUP });
-    return objectIdOf(result);
-  }
-  const lookup = `(() => { const r = window[${JSON.stringify(REGISTRY_KEY)}]; return r && r.docId === ${JSON.stringify(located.binding.docId)} && r.snapshotId === ${JSON.stringify(located.snapshotId)} ? (r.refs.get(${JSON.stringify(located.ref)}) || null) : null; })()`;
+  const lookup = `(() => { const r = window[${JSON.stringify(REGISTRY_KEY)}]; if (!r || r.docId !== ${JSON.stringify(located.binding.docId)} || r.snapshotId !== ${JSON.stringify(located.snapshotId)}) return null; const e = r.refs.get(${JSON.stringify(located.ref)}); return e && e.isConnected && e.tagName === 'INPUT' && e.type === 'file' ? e : null; })()`;
   try {
-    for (const context of await defaultContexts(dbg)) {
+    for (const context of await executionContexts(dbg)) {
+      if (located.isMainFrame && context.auxData?.isDefault) continue;
       try {
         const objectId = objectIdOf(await dbg.sendCommand("Runtime.evaluate", { expression: lookup, contextId: context.id, objectGroup: OBJECT_GROUP }));
         if (objectId) return objectId;
@@ -57,7 +54,7 @@ async function findObjectId(dbg: GuestDebugger, located: LocatedRef): Promise<st
   return null;
 }
 
-export async function uploadFiles(page: GuestPage, located: LocatedRef, files: string[]): Promise<ActResult> {
+export async function uploadFiles(page: GuestPage, located: LocatedRef, files: string[], verify: () => void, dispatch: () => void): Promise<ActResult> {
   if (located.tag !== "input" || located.type !== "file") return { executed: false, reason: "element is not a file input" };
   const dbg = page.debugger;
   const attached = dbg.isAttached();
@@ -65,6 +62,8 @@ export async function uploadFiles(page: GuestPage, located: LocatedRef, files: s
   try {
     const objectId = await findObjectId(dbg, located);
     if (!objectId) return { executed: false, reason: "file input could not be located in the page" };
+    verify();
+    dispatch();
     await dbg.sendCommand("DOM.setFileInputFiles", { objectId, files });
     await dbg.sendCommand("Runtime.releaseObjectGroup", { objectGroup: OBJECT_GROUP }).catch(() => undefined);
     return { executed: true };

@@ -89,6 +89,9 @@ export function BrowserPanel({ taskId }: { taskId: string | undefined }) {
             : <button type="button" className="browser-panel__icon-btn" aria-label={copy.reload} disabled={!activeTab}
               onClick={() => activeTab && void store().navigate(activeTab.id, { action: "reload" })}><RotateCw size={14} /></button>}
           {addressBar}
+          {activeTab?.mode === "agent" && (
+            <button type="button" className="btn btn--small" onClick={() => void store().takeover(activeTab.id)}>{copy.takeControl}</button>
+          )}
           <button type="button" className="browser-panel__icon-btn" aria-label={copy.zoomOut} disabled={!activeTab}
             onClick={() => activeTab && void store().zoom(activeTab.id, -1)}><ZoomOut size={14} /></button>
           <button type="button" className="browser-panel__zoom" aria-label={copy.zoomReset(zoomPercent(activeTab?.zoom ?? 1))} disabled={!activeTab}

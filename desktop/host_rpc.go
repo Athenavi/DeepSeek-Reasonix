@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -67,7 +68,15 @@ func emitContractDir(args []string) (string, bool) {
 // emitContract writes the TypeScript and JSON contract files into dir from
 // the App type alone; no App instance or runtime is constructed.
 func emitContract(dir string) error {
-	registry, err := hostrpc.NewRegistry((*App)(nil), nil)
+	return emitHostContract(dir, dir)
+}
+
+func emitHostContract(dir, ownersDir string) error {
+	owners, err := hostrpc.SourceOwnership(".", "App")
+	if err != nil {
+		return err
+	}
+	registry, err := hostrpc.NewRegistryWithOwners((*App)(nil), nil, owners)
 	if err != nil {
 		return err
 	}
@@ -82,6 +91,13 @@ func emitContract(dir string) error {
 	if err := hostrpc.WriteJSON(&js, contract); err != nil {
 		return err
 	}
+	ownerJSON, err := json.MarshalIndent(owners, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(ownersDir, hostCommandOwnersFile), append(ownerJSON, '\n'), 0o644); err != nil {
+		return err
+	}
 	if err := os.WriteFile(filepath.Join(dir, contractTSFile), ts.Bytes(), 0o644); err != nil {
 		return err
 	}
@@ -89,7 +105,7 @@ func emitContract(dir string) error {
 }
 
 func runEmitContract(dir string) int {
-	if err := emitContract(dir); err != nil {
+	if err := emitHostContract(dir, "."); err != nil {
 		fmt.Fprintln(os.Stderr, "emit-contract:", err)
 		return 1
 	}
@@ -100,7 +116,13 @@ func runEmitContract(dir string) int {
 // shell closes stdin or acknowledges desktop/shutdown. It returns the
 // process exit code.
 func runHostRPC(app *App, stdin io.Reader, stdout io.Writer) int {
-	registry, err := hostrpc.NewRegistry(app, nil)
+	stopEndpoint, err := startUpdateEndpoint()
+	if err != nil {
+		slog.Error("desktop host: update endpoint", "err", err)
+		return 2
+	}
+	defer stopEndpoint()
+	registry, err := newDesktopRegistry(app)
 	if err != nil {
 		slog.Error("desktop host: contract registry", "err", err)
 		return 2

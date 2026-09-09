@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,8 @@ const browserBrokerForwardName = "browser-broker:"
 type browserBrokerRoute struct {
 	hostID string
 	gen    *managedHost
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // browserSessionResolution is what the broker resolves one request's session
@@ -43,13 +46,14 @@ type browserSessionResolution struct {
 type browserSessionResolver func(hostID, sessionPath string) (browserSessionResolution, error)
 
 type browserBroker struct {
-	mu      sync.Mutex
-	ln      net.Listener
-	server  *http.Server
-	port    int
-	routes  map[string]*browserBrokerRoute
-	byHost  map[string]string
-	resolve browserSessionResolver
+	lifecycleMu sync.Mutex
+	mu          sync.Mutex
+	ln          net.Listener
+	server      *http.Server
+	port        int
+	routes      map[string]*browserBrokerRoute
+	byHost      map[string]string
+	resolve     browserSessionResolver
 	// current reports whether gen is still the live connection for hostID;
 	// a replaced generation's token stops authenticating immediately.
 	current func(hostID string, gen *managedHost) bool
@@ -58,6 +62,7 @@ type browserBroker struct {
 	// newRelay builds the capture relay for a connection; nil uses the SFTP
 	// relay. Tests substitute a fake.
 	newRelay func(conn sftpConn) FileRelay
+	onRevoke func(hostID string)
 }
 
 func newBrowserBroker(resolve browserSessionResolver, current func(string, *managedHost) bool, connFor func(string, *managedHost) sftpConn) *browserBroker {
@@ -73,41 +78,76 @@ func newBrowserBroker(resolve browserSessionResolver, current func(string, *mana
 // register mints a fresh token for (hostID, gen), replacing the host's
 // previous token. Returns the token and the broker's loopback port.
 func (b *browserBroker) register(hostID string, gen *managedHost) (string, int, error) {
+	b.lifecycleMu.Lock()
+	defer b.lifecycleMu.Unlock()
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
 		return "", 0, fmt.Errorf("browser broker: mint token: %w", err)
 	}
 	token := hex.EncodeToString(buf)
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	if b.ln == nil {
+		b.mu.Unlock()
 		return "", 0, fmt.Errorf("browser broker: not running")
 	}
+	replaced := false
 	if old := b.byHost[hostID]; old != "" {
+		if route := b.routes[old]; route != nil && route.cancel != nil {
+			route.cancel()
+		}
 		delete(b.routes, old)
+		replaced = true
 	}
-	b.routes[token] = &browserBrokerRoute{hostID: hostID, gen: gen}
+	ctx, cancel := context.WithCancel(context.Background())
+	b.routes[token] = &browserBrokerRoute{hostID: hostID, gen: gen, ctx: ctx, cancel: cancel}
 	b.byHost[hostID] = token
-	return token, b.port, nil
+	port := b.port
+	b.mu.Unlock()
+	if replaced && b.onRevoke != nil {
+		b.onRevoke(hostID)
+	}
+	return token, port, nil
 }
 
 // revokeHost drops every token minted for hostID (serve stop, disconnect).
 func (b *browserBroker) revokeHost(hostID string) {
+	b.lifecycleMu.Lock()
+	defer b.lifecycleMu.Unlock()
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	if token := b.byHost[hostID]; token != "" {
+		if route := b.routes[token]; route != nil && route.cancel != nil {
+			route.cancel()
+		}
 		delete(b.routes, token)
 		delete(b.byHost, hostID)
+	}
+	b.mu.Unlock()
+	if b.onRevoke != nil {
+		b.onRevoke(hostID)
 	}
 }
 
 func (b *browserBroker) close() {
+	b.lifecycleMu.Lock()
+	defer b.lifecycleMu.Unlock()
 	b.mu.Lock()
 	server, listener := b.server, b.ln
+	hosts := make([]string, 0, len(b.byHost))
+	for _, route := range b.routes {
+		if route.cancel != nil {
+			route.cancel()
+		}
+		hosts = append(hosts, route.hostID)
+	}
 	b.server, b.ln = nil, nil
 	b.routes = map[string]*browserBrokerRoute{}
 	b.byHost = map[string]string{}
 	b.mu.Unlock()
+	if b.onRevoke != nil {
+		for _, hostID := range hosts {
+			b.onRevoke(hostID)
+		}
+	}
 	if server != nil {
 		_ = server.Close()
 	}
@@ -133,6 +173,14 @@ func (b *browserBroker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	exec := &brokerSessionExecutor{broker: b, route: route}
+	if route.ctx != nil {
+		ctx, cancel := context.WithCancel(r.Context())
+		body := r.Body
+		stop := context.AfterFunc(route.ctx, func() { cancel(); _ = body.Close() })
+		defer stop()
+		defer cancel()
+		r = r.WithContext(ctx)
+	}
 	browser.NewHTTPHandler(exec, token).ServeHTTP(w, r)
 }
 
@@ -145,14 +193,21 @@ type brokerSessionExecutor struct {
 }
 
 func (s *brokerSessionExecutor) resolve(ctx context.Context) (browserSessionResolution, error) {
+	if !s.current(ctx) {
+		return browserSessionResolution{}, browser.ErrNoGrant
+	}
 	res, err := s.broker.resolve(s.route.hostID, browser.SessionFromContext(ctx))
 	if err != nil {
 		return browserSessionResolution{}, err
 	}
-	if res.exec == nil {
+	if res.exec == nil || !s.current(ctx) {
 		return browserSessionResolution{}, browser.ErrNoGrant
 	}
 	return res, nil
+}
+
+func (s *brokerSessionExecutor) current(ctx context.Context) bool {
+	return ctx.Err() == nil && (s.route.ctx == nil || s.route.ctx.Err() == nil) && (s.broker.current == nil || s.broker.current(s.route.hostID, s.route.gen))
 }
 
 func (s *brokerSessionExecutor) Available(ctx context.Context) bool {
@@ -243,15 +298,54 @@ func (s *brokerSessionExecutor) Act(ctx context.Context, req browser.ActRequest)
 	if err != nil {
 		return browser.ActResult{}, err
 	}
+	if req.Action == browser.ActionUpload {
+		owner, ok := res.exec.(interface{ captureDir() (string, error) })
+		if !ok || s.broker.connFor == nil {
+			return browser.ActResult{}, fmt.Errorf("browser upload: no staging owner")
+		}
+		conn := s.broker.connFor(s.route.hostID, s.route.gen)
+		if conn == nil {
+			return browser.ActResult{}, browser.ErrNoGrant
+		}
+		newRelay := s.broker.newRelay
+		if newRelay == nil {
+			newRelay = func(c sftpConn) FileRelay { return sftpFileRelay{conn: c} }
+		}
+		relay, ok := newRelay(conn).(browserUploadRelay)
+		if !ok {
+			return browser.ActResult{}, fmt.Errorf("browser upload: relay cannot receive remote files")
+		}
+		scratch, err := owner.captureDir()
+		if err != nil {
+			return browser.ActResult{}, err
+		}
+		dir, err := os.MkdirTemp(scratch, "remote-upload-")
+		if err != nil {
+			return browser.ActResult{}, err
+		}
+		defer os.RemoveAll(dir)
+		files := make([]string, 0, len(req.Files))
+		for _, remote := range req.Files {
+			local, err := relay.Fetch(ctx, res.workspace, remote, dir)
+			if err != nil {
+				return browser.ActResult{}, err
+			}
+			files = append(files, local)
+		}
+		req.Files = files
+	}
+	if !s.current(ctx) {
+		return browser.ActResult{}, browser.ErrNoGrant
+	}
 	return res.exec.Act(ctx, req)
 }
 
-func (s *brokerSessionExecutor) Close(ctx context.Context, tabID string) error {
+func (s *brokerSessionExecutor) Close(ctx context.Context, req browser.CloseRequest) error {
 	res, err := s.resolve(ctx)
 	if err != nil {
 		return err
 	}
-	return res.exec.Close(ctx, tabID)
+	return res.exec.Close(ctx, req)
 }
 
 // relay stages one desktop capture file onto the remote host through the
@@ -291,6 +385,7 @@ func (a *App) browserBrokerPort() (int, error) {
 		return 0, fmt.Errorf("browser broker: listen: %w", err)
 	}
 	b := newBrowserBroker(a.resolveRemoteBrowserSession, a.remoteHostGenerationCurrent, a.remoteHostGenerationClient)
+	b.onRevoke = a.revokeRemoteBrowserHost
 	b.ln = ln
 	b.port = ln.Addr().(*net.TCPAddr).Port
 	b.server = &http.Server{
@@ -419,17 +514,16 @@ func (a *App) browserExecutorForRemoteTab(tab *remoteTab, sessionPath string) br
 		a.browserExecutors = map[string]*hostBrowserExecutor{}
 	}
 	if exec, ok := a.browserExecutors[key]; ok {
-		if exec.sessionKey != sessionPath {
-			exec.grantMu.Lock()
-			exec.sessionKey = sessionPath
-			exec.granted.Store(false)
-			exec.grantMu.Unlock()
+		if exec.sessionKey == sessionPath {
+			return exec
 		}
-		return exec
+		// A session rotation creates a new immutable owner; mutating the old
+		// executor races in-flight calls and lets them inherit the new grant.
+		a.revokeBrowserExecutor(exec)
 	}
 	exec := &hostBrowserExecutor{
 		app: a, host: a.hostShell.server, tabID: tab.id,
-		grantID: "grant-remote-" + tab.id, sessionKey: sessionPath,
+		grantID: newBrowserGrantID(), sessionKey: sessionPath,
 	}
 	a.browserExecutors[key] = exec
 	return exec

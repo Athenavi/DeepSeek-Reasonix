@@ -97,8 +97,7 @@ try {
   const state = await page.evaluate(() => new Promise((resolveState) => {
     const off = window.reasonixDesktop.native.onServiceState((s) => {
       if (s.phase === "ready" || s.phase === "failed" || s.phase === "exited") {
-        off();
-        resolveState(s);
+        queueMicrotask(() => { off(); resolveState(s); });
       }
     });
     setTimeout(() => resolveState({ phase: "timeout" }), 10_000);

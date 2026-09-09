@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,11 +24,13 @@ import (
 // brokerFakeExecutor answers from fixed fields and records the session each
 // call arrived with (the HTTP handler restores it into the context).
 type brokerFakeExecutor struct {
-	mu         sync.Mutex
-	tabs       []browser.Tab
-	screenshot browser.Screenshot
-	downloads  []browser.Download
-	sessions   []string
+	mu              sync.Mutex
+	tabs            []browser.Tab
+	screenshot      browser.Screenshot
+	downloads       []browser.Download
+	sessions        []string
+	uploadDirectory string
+	onAct           func(browser.ActRequest)
 }
 
 func (e *brokerFakeExecutor) note(ctx context.Context) {
@@ -64,15 +68,25 @@ func (e *brokerFakeExecutor) Screenshot(ctx context.Context, _ browser.Screensho
 	e.note(ctx)
 	return e.screenshot, nil
 }
-func (e *brokerFakeExecutor) Act(ctx context.Context, _ browser.ActRequest) (browser.ActResult, error) {
+func (e *brokerFakeExecutor) Act(ctx context.Context, req browser.ActRequest) (browser.ActResult, error) {
 	e.note(ctx)
+	if e.onAct != nil {
+		e.onAct(req)
+	}
 	return browser.ActResult{Executed: true, Outcome: browser.OutcomeExecuted}, nil
+}
+
+func (e *brokerFakeExecutor) captureDir() (string, error) {
+	if e.uploadDirectory == "" {
+		return "", errors.New("no upload directory")
+	}
+	return e.uploadDirectory, nil
 }
 func (e *brokerFakeExecutor) Downloads(ctx context.Context, _ browser.DownloadsRequest) ([]browser.Download, error) {
 	e.note(ctx)
 	return e.downloads, nil
 }
-func (e *brokerFakeExecutor) Close(ctx context.Context, _ string) error {
+func (e *brokerFakeExecutor) Close(ctx context.Context, _ browser.CloseRequest) error {
 	e.note(ctx)
 	return nil
 }
@@ -127,6 +141,112 @@ func (r *brokerTestRig) Stage(_ context.Context, workspace, localPath string) (s
 		return "", fmt.Errorf("relay unavailable")
 	}
 	return r.relayTo + filepath.Base(localPath), nil
+}
+
+func (r *brokerTestRig) Fetch(_ context.Context, workspace, remotePath, localDirectory string) (string, error) {
+	if workspace != "/ws" {
+		return "", fmt.Errorf("wrong workspace %s", workspace)
+	}
+	destination := filepath.Join(localDirectory, filepath.Base(remotePath))
+	return destination, os.WriteFile(destination, []byte("remote bytes: "+remotePath), 0o600)
+}
+
+func TestBrowserBrokerUploadStagesRemoteBytesAndCleansUp(t *testing.T) {
+	stagedPaths := make(chan string, 1)
+	exec := &brokerFakeExecutor{uploadDirectory: t.TempDir(), onAct: func(req browser.ActRequest) {
+		if len(req.Files) != 1 || req.Files[0] == "/ws/report.csv" {
+			t.Errorf("remote path reached local executor: %v", req.Files)
+			return
+		}
+		staged := req.Files[0]
+		data, err := os.ReadFile(staged)
+		if err != nil || string(data) != "remote bytes: /ws/report.csv" {
+			t.Errorf("staged upload: %q %v", data, err)
+		}
+		stagedPaths <- staged
+	}}
+	rig := newBrokerTestRig(t, sessionResolver(exec, "/ws", map[string]bool{"/s": true}))
+	rig.conn = fakeSFTPConn{}
+	token, _, err := rig.broker.register("host-1", rig.gen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := browser.NewHTTPExecutor(rig.baseURL, token, nil)
+	res, err := client.Act(browser.WithSession(context.Background(), "/s"), browser.ActRequest{OperationID: "upload", Action: browser.ActionUpload, Files: []string{"/ws/report.csv"}})
+	if err != nil || !res.Executed {
+		t.Fatalf("upload: %+v %v", res, err)
+	}
+	var staged string
+	select {
+	case staged = <-stagedPaths:
+	default:
+		t.Fatal("no upload dispatched")
+	}
+	if _, err := os.Stat(staged); !os.IsNotExist(err) {
+		t.Fatalf("staging remained after request: %v", err)
+	}
+}
+
+type browserGatedBody struct {
+	entered chan struct{}
+	closed  chan struct{}
+	once    sync.Once
+}
+
+func (b *browserGatedBody) Read([]byte) (int, error) {
+	close(b.entered)
+	<-b.closed
+	return 0, io.ErrClosedPipe
+}
+func (b *browserGatedBody) Close() error { b.once.Do(func() { close(b.closed) }); return nil }
+
+func TestBrowserBrokerRevokesRequestWhileBodyIsPending(t *testing.T) {
+	exec := &brokerFakeExecutor{}
+	rig := newBrokerTestRig(t, sessionResolver(exec, "/ws", map[string]bool{"/s": true}))
+	token, _, err := rig.broker.register("host-1", rig.gen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := &browserGatedBody{entered: make(chan struct{}), closed: make(chan struct{})}
+	req := httptest.NewRequest(http.MethodPost, "/v1/browser/act", body)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set(browser.SessionHeader, "/s")
+	done := make(chan struct{})
+	go func() { defer close(done); rig.broker.ServeHTTP(httptest.NewRecorder(), req) }()
+	<-body.entered
+	rig.broker.revokeHost("host-1")
+	<-done
+	if exec.lastSession() != "" {
+		t.Fatal("revoked request dispatched")
+	}
+}
+
+func TestBrowserBrokerRechecksGenerationAfterSessionResolution(t *testing.T) {
+	exec := &brokerFakeExecutor{}
+	entered, release := make(chan struct{}), make(chan struct{})
+	rig := newBrokerTestRig(t, func(string, string) (browserSessionResolution, error) {
+		close(entered)
+		<-release
+		return browserSessionResolution{exec: exec, workspace: "/ws"}, nil
+	})
+	token, _, err := rig.broker.register("host-1", rig.gen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := browser.NewHTTPExecutor(rig.baseURL, token, nil).Act(browser.WithSession(context.Background(), "/s"), browser.ActRequest{OperationID: "act", Action: browser.ActionClick})
+		done <- err
+	}()
+	<-entered
+	rig.setLive(false)
+	close(release)
+	if err := <-done; !errors.Is(err, browser.ErrNoGrant) {
+		t.Fatalf("superseded request: %v", err)
+	}
+	if exec.lastSession() != "" {
+		t.Fatal("superseded request reached executor")
+	}
 }
 
 func (r *brokerTestRig) setLive(live bool) {
@@ -363,22 +483,18 @@ func TestBrowserBrokerConcurrentRotation(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	for range 8 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range 20 {
 				_, _, _ = rig.broker.register("host-1", &managedHost{})
 			}
-		}()
+		})
 	}
 	for range 8 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range 20 {
 				_, _ = brokerTabsCall(t, rig.baseURL, token, "/s")
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	// After the dust settles only the last minted token authenticates.
@@ -428,6 +544,20 @@ func TestSFTPFileRelayRoundTrip(t *testing.T) {
 	if info.Mode().Perm() != 0o600 {
 		t.Fatalf("relayed file mode = %v, want 0600", info.Mode().Perm())
 	}
+	// The reverse direction must download the remote bytes and enforce the
+	// remote workspace boundary before handing a desktop path to Chromium.
+	relay := sftpFileRelay{conn: sftpFSConn{fs: fs}}
+	staged, err := relay.Fetch(context.Background(), filepath.Dir(remotePath), remotePath, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err = os.ReadFile(staged)
+	if err != nil || string(data) != "png-bytes" {
+		t.Fatalf("remote upload content = %q %v", data, err)
+	}
+	if _, err := relay.Fetch(context.Background(), filepath.Join(root, "unowned"), local, t.TempDir()); err == nil {
+		t.Fatal("foreign remote file was staged")
+	}
 }
 
 type sftpFSConn struct{ fs *sftpfs.FS }
@@ -450,7 +580,7 @@ func TestRelayFileNameSanitizes(t *testing.T) {
 	if strings.Contains(name, "/") || !strings.HasSuffix(name, "-evil.png") {
 		t.Fatalf("relayFileName = %q", name)
 	}
-	if relayFileName("/tmp/x/evil.png") == relayFileName("/tmp/x/evil.png") {
+	if name == relayFileName("/tmp/x/evil.png") {
 		t.Fatal("relayFileName must be unique per call")
 	}
 }

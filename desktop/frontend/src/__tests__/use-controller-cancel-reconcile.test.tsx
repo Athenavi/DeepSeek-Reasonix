@@ -373,6 +373,26 @@ eq(cancelCalls, cancelCallsBefore + 1, "idle stop does not retry through CancelT
 eq(controller?.state.items.filter((item) => item.kind === "notice").length, noticesBefore, "idle stop does not surface a Cancel failed notice");
 await waitFor("idle stop reconciliation", () => controller?.state.running === false);
 
+// A transport gap can hide the final event entirely: the resnapshot must
+// settle core state while retaining the mounted transcript and never cancel.
+backendRunning = true;
+await act(async () => {
+  desktopStub.emit("agent:event", { kind: "turn_started", tabId: "tab-a", turnId: "turn-gap-final" });
+  await flushPromises();
+});
+const gapCancelCalls = cancelCalls;
+const projectedUsers = controller?.state.items.filter(item => item.kind === "user") ?? [];
+const gapHistoryLoads = historyLoads;
+backendRunning = false;
+await act(async () => {
+  desktopStub.emit("desktop:resync", { generation: "g-current", reason: "gap", expectedSeq: 2, actualSeq: 4 });
+  await flushPromises();
+});
+await waitFor("event gap runtime snapshot", () => controller?.state.running === false);
+eq(cancelCalls, gapCancelCalls, "event gap recovery never replays a state-changing command");
+ok(projectedUsers.every(item => controller?.state.items.includes(item)), "event gap recovery retains projected user item identities");
+eq(historyLoads, gapHistoryLoads, "same-session event repair does not reload mounted history");
+
 await act(async () => {
   root.unmount();
 });

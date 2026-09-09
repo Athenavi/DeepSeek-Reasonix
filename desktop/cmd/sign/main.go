@@ -297,6 +297,7 @@ func genManifest(dir, version, tag string, notesVersions ...string) error {
 		}
 		url := fmt.Sprintf("https://github.com/%s/releases/download/%s/%s", repo, tag, name)
 		asset := update.Asset{URL: url, Sig: url + ".minisig", Size: size, SHA256: sum}
+		asset.InstallLayout = update.ElectronInstallLayout
 		if websiteDownload {
 			m.Downloads[name] = asset
 			fmt.Printf("manifest download: %s (%d bytes)\n", name, size)

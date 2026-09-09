@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -131,16 +132,7 @@ func TestEnsureServeLaunchesWithoutBrowserWhenBrokerFails(t *testing.T) {
 	if strings.Contains(*launch, "REASONIX_BROWSER") {
 		t.Fatalf("failed broker leaked environment:\n%s", *launch)
 	}
-	if !contains(steps, "browser_broker:unavailable: reverse tunnel refused") {
+	if !slices.Contains(steps, "browser_broker:unavailable: reverse tunnel refused") {
 		t.Fatalf("progress did not report the degraded launch: %v", steps)
 	}
-}
-
-func contains(list []string, want string) bool {
-	for _, s := range list {
-		if s == want {
-			return true
-		}
-	}
-	return false
 }

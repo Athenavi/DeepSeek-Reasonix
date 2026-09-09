@@ -3,7 +3,7 @@
 
 export const DESKTOP_PROTOCOL_VERSION = 1;
 
-export const DESKTOP_CONTRACT_DIGEST = "sha256:18361fc2ba4cd76cba5fffdb3f8798eb5429dd7c66edd33c78f2c1bf3f3129aa";
+export const DESKTOP_CONTRACT_DIGEST = "sha256:3953b6f826df64435dff252f1eae941630d218cd80bfde13153c86ccce83fcc2";
 
 export const DESKTOP_COMMANDS = [
   "AIRenameSession",
@@ -35,6 +35,7 @@ export const DESKTOP_COMMANDS = [
   "AnswerQuestion",
   "AnswerQuestionForTab",
   "AnswerRemoteTab",
+  "ApplyModelSettings",
   "ApplyUpdateRequest",
   "Approve",
   "ApproveRemoteTab",
@@ -65,6 +66,7 @@ export const DESKTOP_COMMANDS = [
   "CancelTrySubagentProfile",
   "Capabilities",
   "CapabilityDiagnostics",
+  "CaptureInboxTarget",
   "CheckRemotePlatform",
   "CheckUpdate",
   "Checkpoints",
@@ -126,6 +128,7 @@ export const DESKTOP_COMMANDS = [
   "Effort",
   "EffortForTab",
   "EnqueueInboxFollowup",
+  "EnqueueInboxFollowupForTarget",
   "EnqueueInboxFollowupWithInvocations",
   "EnqueueInboxSteer",
   "EnqueueInboxSteerForTurn",
@@ -155,11 +158,14 @@ export const DESKTOP_COMMANDS = [
   "GetDesktopZoomFactor",
   "GetHistoryIndexStatus",
   "GetHistorySearchContext",
+  "GetModelSettingsApplication",
+  "GetModelSettingsRequest",
   "GetPinnedFilesForTab",
   "GetProjectGroups",
   "GetProjectTreeRuntimeSnapshot",
   "GetProjectTreeSnapshot",
   "GetRecoveryLineage",
+  "GetRuntimeStateSnapshot",
   "GetSessionCatalogStatus",
   "GetSessionVersionState",
   "GetTask",
@@ -219,6 +225,7 @@ export const DESKTOP_COMMANDS = [
   "ListThemePacks",
   "ListTrashedSessions",
   "ListWorkspaces",
+  "LookupInboxFollowupForTarget",
   "MCPAppCallTool",
   "MCPAppCallToolForTab",
   "MCPAppResourceDigest",
@@ -382,6 +389,7 @@ export const DESKTOP_COMMANDS = [
   "ResumeSessionPage",
   "ResumeSessionPageForTab",
   "RetryInboxItem",
+  "RetryModelSettingsApplication",
   "RetrySessionRecovery",
   "RevealBackgroundRuntime",
   "RevealPath",
@@ -550,6 +558,7 @@ export const DESKTOP_COMMANDS = [
   "SummarizeUpTo",
   "SummarizeUpToForTab",
   "SwitchWorkspace",
+  "SyncRuntimeState",
   "TakeoverSession",
   "TerminalOutputForTab",
   "TerminalWorkspaceForTab",
@@ -562,6 +571,7 @@ export const DESKTOP_COMMANDS = [
   "TrustProjectHooks",
   "TrustProjectHooksForRoot",
   "TrySubagentProfile",
+  "TurnCheckLog",
   "TurnEventsForTab",
   "UndoRewindForTab",
   "UnpinFileForTab",
@@ -579,6 +589,8 @@ export const DESKTOP_COMMANDS = [
   "WorkspaceGitCommitDetail",
   "WorkspaceGitHistory",
   "WorkspaceRevisionForTab",
+  "WorkspaceTurnChangeDetail",
+  "WorkspaceTurnChanges",
   "WriteRemoteFile",
   "WriteTerminalForTab",
 ] as const;
@@ -598,6 +610,7 @@ export const DESKTOP_EVENTS = [
   "remote:forwards",
   "remote:server",
   "remote:status",
+  "runtime-state:changed",
   "runtime:rebuilt",
   "session:active-version-changed",
   "session:recovered",
@@ -814,6 +827,28 @@ export interface Summary {
   mcp_servers: number;
 }
 
+export interface TurnChanges {
+  id?: string;
+  turn: number;
+  coverage: string;
+  files: TurnFile[];
+  added: number;
+  removed: number;
+  reasons: string[];
+}
+
+export interface TurnFile {
+  path: string;
+  kind: string;
+  added: number;
+  removed: number;
+  binary?: boolean;
+  modeOnly?: boolean;
+  uncounted?: boolean;
+  unavailable?: string;
+  patch?: string;
+}
+
 export interface ProviderCatalog {
   brandId: string;
   brandLabel: string;
@@ -851,6 +886,22 @@ export interface RecoveryStatus {
   waited_ms?: number;
   wait_budget_ms?: number;
   waiting?: boolean;
+}
+
+export interface RuntimeStateSnapshot {
+  schemaVersion: number;
+  runtimeEpoch: string;
+  revision: number;
+  phase: string;
+  running: boolean;
+  turnId: string;
+  turnStatus: string;
+  turnEventSeq: number;
+  pendingPrompt: boolean;
+  cancelRequested: boolean;
+  cancellable: boolean;
+  backgroundJobs: number;
+  activity: string;
 }
 
 export interface event_WorkspaceRevision {
@@ -913,6 +964,8 @@ export interface Compaction {
 }
 
 export interface CompletionReceipt {
+  diff?: TurnChanges | null;
+  interrupted?: boolean;
   verdict: string;
   changes?: ReceiptChange[];
   verifications?: ReceiptVerification[];
@@ -924,6 +977,7 @@ export interface CompletionSummary {
   preset: string;
   verdict: string;
   mutations: number;
+  changed_files?: number;
   checks_passed: number;
   checks_failed: number;
   checks_suppressed: number;
@@ -957,6 +1011,7 @@ export interface eventwire_DecisionReceipt {
 }
 
 export interface Event {
+  runtimeState?: RuntimeStateSnapshot | null;
   kind: string;
   promptId?: string;
   promptKind?: string;
@@ -971,6 +1026,8 @@ export interface Event {
   memoryCitations?: eventwire_MemoryCitation[];
   level?: string;
   tool?: Tool | null;
+  readStatus?: ReadStatus | null;
+  readPause?: ReadPause | null;
   usage?: Usage | null;
   approval?: Approval | null;
   ask?: Ask | null;
@@ -1102,6 +1159,22 @@ export interface Profile {
   effort?: string;
 }
 
+export interface ReadStatus {
+  readId: string;
+  generation?: number;
+  seq?: number;
+  path: string;
+  intent?: string;
+  state: string;
+  covered?: number[][];
+  missing?: number[][];
+  sourceEnd?: number | null;
+  hasMore?: boolean;
+  reason?: string;
+  recovery?: string;
+  active?: boolean;
+}
+
 export interface ReceiptChange {
   path: string;
   reviewed: boolean;
@@ -1116,6 +1189,10 @@ export interface ReceiptVerification {
   command: string;
   passed: boolean;
   stale?: boolean;
+  toolCallId?: string;
+  toolResultId?: string;
+  interrupted?: boolean;
+  exitCode?: number | null;
 }
 
 export interface RecoveryApproval {
@@ -1174,6 +1251,7 @@ export interface StreamAttempt {
 }
 
 export interface Tool {
+  verifying?: boolean;
   id?: string;
   name: string;
   args?: string;
@@ -1874,6 +1952,9 @@ export interface HistoryEntry {
 }
 
 export interface HistoryMessage {
+  completionReceipt?: CompletionReceipt | null;
+  completionSummary?: CompletionSummary | null;
+  turnId?: string;
   role: string;
   content: string;
   detail?: string;
@@ -1898,6 +1979,7 @@ export interface HistoryMessage {
   archive?: string;
   decisionReceipt?: provider_DecisionReceipt | null;
   readiness?: event_FinalReadiness | null;
+  readPause?: ReadPause | null;
   protocolRecovery?: ProtocolRecoveryAction | null;
   diagnostic?: FailureDiagnostic | null;
   serverSearch?: ServerSearchCall[];
@@ -2083,6 +2165,16 @@ export interface InboxSnapshotView {
   bytes: number;
   maxItems: number;
   maxBytes: number;
+}
+
+export interface InboxTargetView {
+  tabId: string;
+  sessionPath: string;
+  generation: number;
+  selection: number;
+  remote: boolean;
+  hostId?: string;
+  workspace?: string;
 }
 
 export interface InstructionDiagnostic {
@@ -2359,6 +2451,47 @@ export interface ModelInfo {
   contextWindow?: number;
   vision?: boolean;
   displayName?: string;
+}
+
+export interface ModelSettingsChange {
+  kind: string;
+  requestId: string;
+  expectedFingerprint: string;
+  field?: string;
+  ref?: string;
+  name?: string;
+  presetId?: string;
+  baseURL?: string;
+  protocol?: string;
+  names?: string[];
+  provider?: ProviderView | null;
+  key?: string | null;
+  enabled?: boolean | null;
+  number?: number;
+  catalogs?: ProviderModelCatalogUpdate[];
+}
+
+export interface ModelSettingsIssue {
+  code: string;
+  message: string;
+}
+
+export interface ModelSettingsResult {
+  requestId: string;
+  persisted: boolean;
+  revision: string;
+  application: string;
+  targets: ModelSettingsTarget[];
+  issues: ModelSettingsIssue[];
+  appliedCatalogs: string[];
+}
+
+export interface ModelSettingsTarget {
+  tabId: string;
+  title?: string;
+  application: string;
+  appliedRevision: string;
+  desiredRevision: string;
 }
 
 export interface NativeConfirmRequest {
@@ -3004,6 +3137,27 @@ export interface RuntimeDoctorReport {
   runtimeOwnerFallbacks: number;
 }
 
+export interface RuntimeSessionState {
+  tabId: string;
+  scope: string;
+  workspaceRoot: string;
+  topicId: string;
+  sessionPath: string;
+  sessionGeneration: number;
+  open: boolean;
+  remote: boolean;
+  hostId?: string;
+  freshness: string;
+  state: RuntimeStateSnapshot;
+}
+
+export interface RuntimeStateProjection {
+  epoch: string;
+  revision: number;
+  sessions: RuntimeSessionState[];
+  topics: ProjectRuntimeTopic[];
+}
+
 export interface SandboxView {
   bash: string;
   network: boolean;
@@ -3158,6 +3312,7 @@ export interface SessionVersionStateView {
 }
 
 export interface SettingsView {
+  modelSettingsFingerprint: string;
   defaultModel: string;
   plannerModel: string;
   visionModel: string;
@@ -3569,6 +3724,11 @@ export interface TopicMeta {
   createdAt: number;
 }
 
+export interface TurnCheckLogView {
+  output: string;
+  truncated: boolean;
+}
+
 export interface TurnEventReplayView {
   events: Envelope[];
   floorSeq: number;
@@ -3770,8 +3930,23 @@ export interface provider_MemoryCitation {
   kind?: string;
 }
 
+export interface PausedRead {
+  readId: string;
+  path: string;
+  intent?: string;
+  covered?: number[][];
+  missing?: number[][];
+  reason: string;
+}
+
 export interface ProtocolRecoveryAction {
   id: string;
+}
+
+export interface ReadPause {
+  id: string;
+  reads: PausedRead[];
+  omitted?: number;
 }
 
 export interface ReasoningOption {
@@ -4028,6 +4203,7 @@ export interface GeneratedDesktopCommands {
   AnswerQuestion(arg0: string, arg1: QuestionAnswer[]): Promise<void>;
   AnswerQuestionForTab(arg0: string, arg1: string, arg2: QuestionAnswer[]): Promise<void>;
   AnswerRemoteTab(arg0: string, arg1: string, arg2: RemoteAskAnswer[]): Promise<void>;
+  ApplyModelSettings(arg0: ModelSettingsChange): Promise<ModelSettingsResult>;
   ApplyUpdateRequest(arg0: string, arg1: string, arg2: string): Promise<void>;
   Approve(arg0: string, arg1: boolean, arg2: boolean, arg3: boolean): Promise<void>;
   ApproveRemoteTab(arg0: string, arg1: string, arg2: string): Promise<void>;
@@ -4058,6 +4234,7 @@ export interface GeneratedDesktopCommands {
   CancelTrySubagentProfile(): Promise<void>;
   Capabilities(): Promise<CapabilitiesView>;
   CapabilityDiagnostics(arg0: boolean): Promise<Report>;
+  CaptureInboxTarget(arg0: string, arg1: string): Promise<InboxTargetView>;
   CheckRemotePlatform(arg0: string): Promise<void>;
   CheckUpdate(arg0: string): Promise<UpdateInfo | null>;
   Checkpoints(): Promise<CheckpointMeta[]>;
@@ -4119,6 +4296,7 @@ export interface GeneratedDesktopCommands {
   Effort(): Promise<EffortInfo>;
   EffortForTab(arg0: string): Promise<EffortInfo>;
   EnqueueInboxFollowup(arg0: string, arg1: string, arg2: string, arg3: string): Promise<InboxReceiptView>;
+  EnqueueInboxFollowupForTarget(arg0: InboxTargetView, arg1: string, arg2: string, arg3: InvocationRequest[], arg4: string): Promise<InboxReceiptView>;
   EnqueueInboxFollowupWithInvocations(arg0: string, arg1: string, arg2: string, arg3: InvocationRequest[], arg4: string): Promise<InboxReceiptView>;
   EnqueueInboxSteer(arg0: string, arg1: string, arg2: string, arg3: string): Promise<InboxReceiptView>;
   EnqueueInboxSteerForTurn(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string): Promise<InboxReceiptView>;
@@ -4148,11 +4326,14 @@ export interface GeneratedDesktopCommands {
   GetDesktopZoomFactor(): Promise<number>;
   GetHistoryIndexStatus(): Promise<historycatalog_Status>;
   GetHistorySearchContext(arg0: HistorySearchContextRequest): Promise<HistorySearchContextLine[]>;
+  GetModelSettingsApplication(): Promise<ModelSettingsResult>;
+  GetModelSettingsRequest(arg0: string): Promise<ModelSettingsResult>;
   GetPinnedFilesForTab(arg0: string): Promise<PinnedFileInfo[]>;
   GetProjectGroups(arg0: string, arg1: string): Promise<ProjectGroupsSnapshot>;
   GetProjectTreeRuntimeSnapshot(): Promise<ProjectTreeRuntimeSnapshot>;
   GetProjectTreeSnapshot(): Promise<ProjectTreeSnapshot>;
   GetRecoveryLineage(arg0: ProjectTopicKey): Promise<RecoveryLineageView>;
+  GetRuntimeStateSnapshot(): Promise<RuntimeStateProjection>;
   GetSessionCatalogStatus(): Promise<SessionCatalogStatus>;
   GetSessionVersionState(arg0: ProjectTopicKey): Promise<SessionVersionStateView>;
   GetTask(arg0: string): Promise<TaskSnapshot | null>;
@@ -4212,6 +4393,7 @@ export interface GeneratedDesktopCommands {
   ListThemePacks(): Promise<ThemePackView[]>;
   ListTrashedSessions(): Promise<SessionMeta[]>;
   ListWorkspaces(): Promise<WorkspaceMeta[]>;
+  LookupInboxFollowupForTarget(arg0: InboxTargetView, arg1: string): Promise<InboxReceiptView>;
   MCPAppCallTool(arg0: string, arg1: string, arg2: unknown): Promise<string>;
   MCPAppCallToolForTab(arg0: string, arg1: string, arg2: string, arg3: unknown): Promise<string>;
   MCPAppResourceDigest(arg0: string): Promise<string>;
@@ -4375,6 +4557,7 @@ export interface GeneratedDesktopCommands {
   ResumeSessionPage(arg0: string, arg1: number): Promise<HistoryPage>;
   ResumeSessionPageForTab(arg0: string, arg1: string, arg2: number): Promise<HistoryPage>;
   RetryInboxItem(arg0: string, arg1: string): Promise<void>;
+  RetryModelSettingsApplication(arg0: string): Promise<ModelSettingsResult>;
   RetrySessionRecovery(arg0: RecoveryPreferenceRequest): Promise<void>;
   RevealBackgroundRuntime(arg0: string): Promise<TabMeta>;
   RevealPath(arg0: string): Promise<void>;
@@ -4543,6 +4726,7 @@ export interface GeneratedDesktopCommands {
   SummarizeUpTo(arg0: number): Promise<void>;
   SummarizeUpToForTab(arg0: string, arg1: number): Promise<void>;
   SwitchWorkspace(arg0: string): Promise<string>;
+  SyncRuntimeState(): Promise<RuntimeStateProjection>;
   TakeoverSession(arg0: string, arg1: string): Promise<void>;
   TerminalOutputForTab(arg0: string, arg1: string): Promise<string>;
   TerminalWorkspaceForTab(arg0: string): Promise<TerminalWorkspaceView>;
@@ -4555,6 +4739,7 @@ export interface GeneratedDesktopCommands {
   TrustProjectHooks(): Promise<void>;
   TrustProjectHooksForRoot(arg0: string): Promise<void>;
   TrySubagentProfile(arg0: SubagentProfileInput, arg1: string): Promise<string>;
+  TurnCheckLog(arg0: string, arg1: string, arg2: string, arg3: string): Promise<TurnCheckLogView | null>;
   TurnEventsForTab(arg0: string, arg1: number): Promise<TurnEventReplayView>;
   UndoRewindForTab(arg0: string, arg1: string): Promise<RewindResultView>;
   UnpinFileForTab(arg0: string, arg1: string): Promise<void>;
@@ -4572,6 +4757,8 @@ export interface GeneratedDesktopCommands {
   WorkspaceGitCommitDetail(arg0: string, arg1: string, arg2: string): Promise<GitCommitDetailView>;
   WorkspaceGitHistory(arg0: string, arg1: string): Promise<GitCommitView[]>;
   WorkspaceRevisionForTab(arg0: string): Promise<WorkspaceRevisionView>;
+  WorkspaceTurnChangeDetail(arg0: string, arg1: string, arg2: number, arg3: string, arg4: string): Promise<TurnFile | null>;
+  WorkspaceTurnChanges(arg0: string, arg1: string, arg2: number, arg3: string): Promise<TurnChanges | null>;
   WriteRemoteFile(arg0: string, arg1: string, arg2: string, arg3: number): Promise<RemoteWriteResult>;
   WriteTerminalForTab(arg0: string, arg1: string, arg2: string): Promise<void>;
 }

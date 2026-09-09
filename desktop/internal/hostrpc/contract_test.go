@@ -51,7 +51,7 @@ func TestContractCanonicalJSONHasSortedKeysAndNoWhitespace(t *testing.T) {
 	if !json.Valid(canonical) {
 		t.Fatal("canonical JSON is invalid")
 	}
-	if !bytes.HasPrefix(canonical, []byte(`{"commands":[{"name":"Explode","params":[]}`)) {
+	if !bytes.HasPrefix(canonical, []byte(`{"commands":[{"cancellation":"before-dispatch","name":"Explode","params":[]`)) {
 		t.Fatalf("keys not sorted: %.80s", canonical)
 	}
 	var buf bytes.Buffer

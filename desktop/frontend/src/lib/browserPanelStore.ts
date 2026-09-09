@@ -31,6 +31,7 @@ export type BrowserPanelState = Projection & {
   zoom(tabId: string, direction: -1 | 0 | 1): Promise<void>;
   toggleDevTools(tabId: string): Promise<void>;
   resume(tabId: string): Promise<void>;
+  takeover(tabId: string): Promise<void>;
 };
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -152,6 +153,10 @@ export const useBrowserPanelStore = create<BrowserPanelState>((set, get) => {
     async resume(tabId) {
       const { host } = get();
       if (host) await call(host.resume(tabId));
+    },
+    async takeover(tabId) {
+      const { host } = get();
+      if (host) await call(host.takeover(tabId));
     },
   };
 });

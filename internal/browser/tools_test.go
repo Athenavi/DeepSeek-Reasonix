@@ -269,17 +269,20 @@ func TestTabWrites(t *testing.T) {
 	if err != nil || !strings.Contains(out, "opened tab t-new: https://c.example [temporary]") || !strings.Contains(out, "browser_snapshot") {
 		t.Fatalf("open out = %q, err = %v", out, err)
 	}
-	if !reflect.DeepEqual(fake.opens, []OpenRequest{{URL: "https://c.example", Temporary: true}}) {
+	if !reflect.DeepEqual(fake.opens, []OpenRequest{{OperationID: "op-1", URL: "https://c.example", Temporary: true}}) {
 		t.Fatalf("open requests = %+v", fake.opens)
 	}
 	out, err = run(t, fake, "browser_navigate", `{"operationId":"op-2","tabId":"t1","action":"reload"}`)
 	if err != nil || !strings.Contains(out, "navigated (reload)") || !strings.Contains(out, "now invalid") {
 		t.Fatalf("navigate out = %q, err = %v", out, err)
 	}
-	if !reflect.DeepEqual(fake.navs, []NavigateRequest{{TabID: "t1", Action: NavigateReload}}) {
+	if !reflect.DeepEqual(fake.navs, []NavigateRequest{{OperationID: "op-2", TabID: "t1", Action: NavigateReload}}) {
 		t.Fatalf("navigate requests = %+v", fake.navs)
 	}
 	out, err = run(t, fake, "browser_close", `{"operationId":"op-3","tabId":"t2"}`)
+	if len(fake.closes) != 1 || fake.closes[0].OperationID != "op-3" {
+		t.Fatalf("close operationId lost: %+v", fake.closes)
+	}
 	if err != nil || out != "closed tab t2" || !reflect.DeepEqual(fake.closed, []string{"t2"}) {
 		t.Fatalf("close out = %q, err = %v, closed = %v", out, err, fake.closed)
 	}

@@ -51,7 +51,7 @@ func (badOrder) Pair() (int, string) { return 0, "" }
 
 type badParam struct{}
 
-func (badParam) Ctx(context.Context) {}
+func (badParam) Ctx(string, context.Context) {}
 
 type badVariadic struct{}
 
@@ -118,7 +118,7 @@ func TestRegistryRejectsUnsupportedSignatures(t *testing.T) {
 	}{
 		{&badResults{}, "badResults.Three: 3 results"},
 		{&badOrder{}, "badOrder.Pair: results must be (T, error), got (int, string)"},
-		{&badParam{}, "badParam.Ctx: parameter 0: context.Context cannot be decoded"},
+		{&badParam{}, "badParam.Ctx: parameter 1: context.Context cannot be decoded"},
 		{&badVariadic{}, "badVariadic.Many: variadic"},
 		{&badFunc{}, "badFunc.Callback: parameter 0: func() is not JSON-serialisable"},
 		{new(notStruct), "must be a pointer to a struct"},

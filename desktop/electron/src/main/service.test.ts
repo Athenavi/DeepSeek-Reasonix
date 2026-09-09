@@ -139,8 +139,11 @@ test("events from the live generation are forwarded and stale ones dropped", asy
   await h.supervisor.start();
   h.spawned[0]?.event("agent:event");
   h.spawned[0]?.event("agent:event", "g-old");
+  h.spawned[0]?.event("duplicate");
+  h.spawned[0]?.send({ method: "desktop/event", params: { seq: 3, generation: "g-1", name: "after-gap", args: [] } });
+  h.spawned[0]?.send({ method: "desktop/event", params: { seq: 2, generation: "g-1", name: "late", args: [] } });
   await tick();
-  assert.deepEqual(h.events, ["g-1:agent:event"]);
+  assert.deepEqual(h.events, ["g-1:agent:event", "g-1:after-gap"]);
 });
 
 test("a handshake error fails the service without a restart and terminates the process", async () => {

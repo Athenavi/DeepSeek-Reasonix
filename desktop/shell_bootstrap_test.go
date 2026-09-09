@@ -112,3 +112,15 @@ func TestBootstrapShellIgnoresHostLaunchModes(t *testing.T) {
 		}
 	}
 }
+
+func TestLinuxBootstrapMatchesPackagedLayouts(t *testing.T) {
+	for exe, want := range map[string]string{
+		"/opt/reasonix/reasonix-desktop":                  "/opt/reasonix/app/Reasonix",
+		"/opt/reasonix/versions/v1.39.0/reasonix-desktop": "/opt/reasonix/versions/v1.39.0/app/Reasonix",
+		"/usr/bin/reasonix-desktop":                       "/usr/lib/reasonix/app/Reasonix",
+	} {
+		if got := shellPathForExecutable(exe, "linux"); got != want {
+			t.Errorf("%s: got %s want %s", exe, got, want)
+		}
+	}
+}

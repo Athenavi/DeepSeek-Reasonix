@@ -70,7 +70,7 @@ func hostDialogParamsFrom(opts nativeDialogOptions) hostDialogParams {
 		Filters:          []hostFileFilter{},
 	}
 	for _, f := range opts.Filters {
-		p.Filters = append(p.Filters, hostFileFilter{DisplayName: f.DisplayName, Pattern: f.Pattern})
+		p.Filters = append(p.Filters, hostFileFilter(f))
 	}
 	return p
 }

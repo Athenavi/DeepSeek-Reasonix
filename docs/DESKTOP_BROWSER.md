@@ -91,10 +91,13 @@ directory, so a remote path is never treated as a local one.
   service restarts, the session changes, the connection generation changes or
   the task ends. The shell rejects `host/browser.*` calls whose grant is not
   current.
-- User keyboard, mouse or touch input on a page increments that tab's epoch
-  immediately in the shell. Pending and queued actions for the old epoch are
-  cancelled, Go receives `browser:takeover`, the agent's next call must read
-  the page again. Login pages, captchas and passkeys are always a user
+- The browser toolbar's **Take over** button immediately switches the tab to
+  `human` mode and increments its epoch through trusted application IPC.
+  It works even during the 750 ms window that suppresses echoed agent input;
+  automatic keyboard, mouse and touch detection is best effort during that
+  window. Pending and queued actions for the old epoch are cancelled and Go
+  receives `browser:takeover`. **Resume** hands control back to the agent with
+  another epoch change, requiring a fresh page read. Login pages, captchas and passkeys are always a user
   hand-over: while the tab is in `human` mode the agent cannot read or act on
   it.
 - Every write reserves an operation `{operationID, sessionID, generation,

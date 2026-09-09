@@ -68,7 +68,7 @@ func main() {
 				}
 			}
 			body, _ := json.Marshal(map[string]any{"method": req.Params.Name, "args": req.Params.Arguments})
-			r, err := http.NewRequestWithContext(ctx, "POST", endpoint.String(), bytes.NewReader(body))
+			r, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(body))
 			if err != nil {
 				return nil, err
 			}

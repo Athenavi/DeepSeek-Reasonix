@@ -9,7 +9,7 @@ export interface LifecycleService {
 
 export interface LifecycleApp {
   quit(): void;
-  relaunch(args: string[]): void;
+  relaunch(args: string[], execPath?: string): void;
 }
 
 export interface QuitSequencerDeps {
@@ -25,6 +25,7 @@ export class QuitSequencer {
   private phase: QuitPhase = "idle";
   private approved = false;
   private relaunchArgs: string[] | null = null;
+  private relaunchExecPath: string | undefined;
 
   constructor(private readonly deps: QuitSequencerDeps) {}
 
@@ -54,8 +55,9 @@ export class QuitSequencer {
     this.deps.app.quit();
   }
 
-  relaunch(args: string[]): void {
+  relaunch(args: string[], execPath?: string): void {
     this.relaunchArgs = args;
+    this.relaunchExecPath = execPath;
     this.approve();
   }
 
@@ -80,7 +82,7 @@ export class QuitSequencer {
     }
     this.phase = "done";
     this.deps.onCloseAllowed();
-    if (this.relaunchArgs) this.deps.app.relaunch(this.relaunchArgs);
+    if (this.relaunchArgs) this.deps.app.relaunch(this.relaunchArgs, this.relaunchExecPath);
     this.deps.app.quit();
   }
 }

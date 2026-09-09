@@ -244,6 +244,30 @@ macOS hand-off waits for the Electron process (the service's parent, passed
 as `-owner-pid`) and reopens the swapped bundle with `open -n` while the shell
 only quits.
 
+#### First upgrade from Wails
+
+The first Electron release requires a **manual full-package installation**
+when upgrading from v1.38.x. Published clients copy and execute
+their existing update helper, which cannot transfer the new `app/` tree.
+Release assets therefore carry `install_layout: "electron-v1"`: existing
+v1.38.x manifest validation rejects that unknown layout before downloading or
+replacing files. The old installation remains usable; its update error view
+retains the official download-page link. Quit the old app and install the
+complete Windows installer, macOS app, or Linux package from that page.
+For a portable archive, extract the complete archive into a new directory;
+do not replace only the Go executable. Configuration, sessions and the data
+home retain their existing names and formats. macOS also uses this one-time
+manual transition because old clients validate the whole platform manifest.
+
+After that transition, Electron clients accept `electron-v1` and publish the
+Go service, CLI and complete shell resources as one version before moving
+`current.json`. Linux native packages remain owned by the package manager.
+Windows update completion waits for the Electron owner to exit and verifies
+the new Go service through a data-home-specific named pipe whose server PID
+is provided by Windows; Wails endpoint lookup remains for old running apps.
+This boundary must be retained on all mirrors and release manifests; changing
+the field back to `versioned-v1` would re-enable unsafe legacy automatic updates.
+
 ### F. Full-matrix acceptance and removal of the old shell
 
 CI on the new build, contract generation and native test entry points; Wails

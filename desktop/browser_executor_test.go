@@ -89,7 +89,7 @@ func TestBrowserExecutorActSettlesFromReceipt(t *testing.T) {
 	}
 
 	res, err = exec.Act(context.Background(), req)
-	if err != nil || res.Executed || res.Outcome != browser.OutcomeNotExecuted || res.Reason == "" {
+	if !errors.Is(err, browser.ErrUnknownOutcome) || res.Executed || res.Outcome != browser.OutcomeUnknown {
 		t.Fatalf("duplicate operation must not reach the shell: %+v err=%v", res, err)
 	}
 	if calls := host.methods(); len(calls) != 2 {
@@ -129,11 +129,70 @@ func TestBrowserExecutorLostReceiptIsUnknown(t *testing.T) {
 	if len(unknown) != 1 || unknown[0].ID != "op-x" {
 		t.Fatalf("unsettled: %+v", unknown)
 	}
-	if _, err := exec.Act(context.Background(), browser.ActRequest{OperationID: "op-x", TabID: "b1", DocumentToken: "d", Action: browser.ActionType, Ref: "e1", Text: "hi"}); err != nil {
-		t.Fatalf("a repeated unknown id must be refused without an error: %v", err)
+	if _, err := exec.Act(context.Background(), browser.ActRequest{OperationID: "op-x", TabID: "b1", DocumentToken: "d", Action: browser.ActionType, Ref: "e1", Text: "hi"}); !errors.Is(err, browser.ErrUnknownOutcome) {
+		t.Fatalf("a repeated unknown id must preserve the no-retry outcome: %v", err)
 	}
 	if calls := host.methods(); len(calls) != 2 {
 		t.Fatalf("an unknown operation must never be replayed: %v", calls)
+	}
+}
+
+func TestBrowserExecutorPartialReceiptPersistsUnknown(t *testing.T) {
+	host := &fakeBrowserHost{replies: map[string]any{"host/browser.act": map[string]any{"executed": false, "outcome": "unknown", "reason": "takeover after focus click"}}}
+	a, exec := newBrowserExecutorForTest(t, host)
+	res, err := exec.Act(context.Background(), browser.ActRequest{OperationID: "partial", TabID: "b1", DocumentToken: "d", Action: browser.ActionType})
+	if !errors.Is(err, browser.ErrUnknownOutcome) || res.Outcome != browser.OutcomeUnknown {
+		t.Fatalf("partial receipt: %+v %v", res, err)
+	}
+	ledger, _ := a.browserLedger()
+	if op, _ := ledger.Lookup("partial"); op.State != browserops.StateUnknown {
+		t.Fatalf("partial action settled as %s", op.State)
+	}
+}
+
+func TestBrowserExecutorMissingReceiptCannotMeanNotExecuted(t *testing.T) {
+	host := &fakeBrowserHost{replies: map[string]any{"host/browser.act": map[string]any{}}}
+	a, exec := newBrowserExecutorForTest(t, host)
+	_, err := exec.Act(context.Background(), browser.ActRequest{OperationID: "missing", TabID: "b1", Action: browser.ActionClick})
+	if !errors.Is(err, browser.ErrUnknownOutcome) {
+		t.Fatalf("missing receipt: %v", err)
+	}
+	ledger, _ := a.browserLedger()
+	if op, _ := ledger.Lookup("missing"); op.State != browserops.StateUnknown {
+		t.Fatalf("missing receipt settled as %s", op.State)
+	}
+}
+
+func TestBrowserExecutorEveryTabWriteReservesBeforeDispatch(t *testing.T) {
+	for _, action := range []string{"open", "navigate", "close"} {
+		t.Run(action, func(t *testing.T) {
+			host := &fakeBrowserHost{errs: map[string]error{"host/browser.tabs." + action: errors.New("receipt lost")}}
+			a, exec := newBrowserExecutorForTest(t, host)
+			call := func() error {
+				switch action {
+				case "open":
+					_, err := exec.Open(context.Background(), browser.OpenRequest{OperationID: "op", URL: "https://example.test"})
+					return err
+				case "navigate":
+					_, err := exec.Navigate(context.Background(), browser.NavigateRequest{OperationID: "op", TabID: "b1", Action: browser.NavigateBack})
+					return err
+				default:
+					return exec.Close(context.Background(), browser.CloseRequest{OperationID: "op", TabID: "b1"})
+				}
+			}
+			for range 2 {
+				if err := call(); !errors.Is(err, browser.ErrUnknownOutcome) {
+					t.Fatalf("lost/duplicate receipt: %v", err)
+				}
+			}
+			if len(host.methods()) != 2 {
+				t.Fatalf("write replayed: %v", host.methods())
+			}
+			ledger, _ := a.browserLedger()
+			if op, _ := ledger.Lookup("op"); op.State != browserops.StateUnknown || op.Action != action {
+				t.Fatalf("ledger: %+v", op)
+			}
+		})
 	}
 }
 

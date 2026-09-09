@@ -15,6 +15,7 @@ export interface MainWindowDeps {
   icon?: string;
   log: Logger;
   onAppDomReady(rendererGeneration: number): void;
+  onRendererLost?(reason: string): void;
   onCloseRequested(): Promise<boolean>;
   onCloseAllowed(): void;
   onShellAction(action: ShellAction): void;
@@ -95,6 +96,7 @@ export class MainWindow {
     });
     win.webContents.on("render-process-gone", (_event, details) => {
       deps.log.error(`renderer process gone: ${details.reason} (exit code ${details.exitCode})`);
+      deps.onRendererLost?.(`app renderer ${details.reason}`);
       if (this.content === "app" && this.browserWindow) win.webContents.reload();
     });
     win.on("close", (event) => {
@@ -118,9 +120,17 @@ export class MainWindow {
     }
   }
 
+  reattachApp(): boolean {
+    if (!this.browserWindow || this.content !== "app") return false;
+    this.rendererGeneration += 1;
+    this.deps.onAppDomReady(this.rendererGeneration);
+    return true;
+  }
+
   async showFailure(html: string): Promise<void> {
     const win = this.browserWindow;
     if (!win) return;
+    this.deps.onRendererLost?.("app failure page");
     this.content = "failure";
     try {
       await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);

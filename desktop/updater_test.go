@@ -87,6 +87,9 @@ func TestValidateAssetInstallLayout(t *testing.T) {
 	if err := validateAssetInstallLayout("versioned-v1"); err != nil {
 		t.Fatalf("versioned-v1 must be accepted: %v", err)
 	}
+	if err := validateAssetInstallLayout(update.ElectronInstallLayout); err != nil {
+		t.Fatal(err)
+	}
 	if err := validateAssetInstallLayout("unknown-layout"); err == nil {
 		t.Fatal("unknown install_layout must be rejected")
 	}
@@ -1116,28 +1119,10 @@ func TestApplyLinuxVersionedActivatesWithoutPersistingGuard(t *testing.T) {
 	currentInstallDirForLinuxUpdate = func() string { return root }
 	t.Cleanup(func() { currentInstallDirForLinuxUpdate = originalRoot })
 
-	var archive bytes.Buffer
-	gz := gzip.NewWriter(&archive)
-	tw := tar.NewWriter(gz)
-	for _, name := range []string{"reasonix-desktop", "reasonix-guard", "reasonix"} {
-		body := []byte("new-" + name)
-		if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0o755, Size: int64(len(body)), Typeflag: tar.TypeReg}); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := tw.Write(body); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := tw.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := gz.Close(); err != nil {
+	if err := applyLinuxVersioned(linuxShellArchive(t, nil, ""), "1.20.1"); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := applyLinuxVersioned(archive.Bytes(), "1.20.1"); err != nil {
-		t.Fatal(err)
-	}
 	ptr, err := installlayout.ReadCurrent(root)
 	if err != nil || ptr.ActiveVersion != "v1.20.1" {
 		t.Fatalf("pointer=%+v err=%v", ptr, err)

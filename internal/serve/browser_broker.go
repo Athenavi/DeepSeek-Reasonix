@@ -112,8 +112,8 @@ func (b *BrowserBroker) Downloads(ctx context.Context, req browser.DownloadsRequ
 	return b.current().Downloads(ctx, req)
 }
 
-func (b *BrowserBroker) Close(ctx context.Context, tabID string) error {
-	return b.current().Close(ctx, tabID)
+func (b *BrowserBroker) Close(ctx context.Context, req browser.CloseRequest) error {
+	return b.current().Close(ctx, req)
 }
 
 func validateBrokerEndpoint(endpoint string) error {
@@ -197,9 +197,9 @@ func (s sessionBrowserExecutor) Downloads(ctx context.Context, req browser.Downl
 	return exec.Downloads(ctx, req)
 }
 
-func (s sessionBrowserExecutor) Close(ctx context.Context, tabID string) error {
+func (s sessionBrowserExecutor) Close(ctx context.Context, req browser.CloseRequest) error {
 	ctx, exec := s.scope(ctx)
-	return exec.Close(ctx, tabID)
+	return exec.Close(ctx, req)
 }
 
 // sessionBrowserExecutor binds the configured executor to one controller's

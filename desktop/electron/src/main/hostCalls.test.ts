@@ -52,6 +52,12 @@ test("every documented host/* method is dispatched with parsed params", async ()
   }
 });
 
+test("update relaunch preserves the stable launcher path", async () => {
+  const { table, calls } = deps();
+  await dispatchHostCall(table, "host/app.relaunch", { args: ["--after-update"], execPath: "/opt/reasonix/reasonix-launcher" });
+  assert.deepEqual(calls, ['relaunch(["--after-update"],"/opt/reasonix/reasonix-launcher")']);
+});
+
 test("browser host calls merge into the table when the surface is wired", async () => {
   const { table, calls } = deps();
   await assert.rejects(dispatchHostCall(table, "host/browser.tabs.list", {}), (error: unknown) => error instanceof RpcError && error.code === -32601);

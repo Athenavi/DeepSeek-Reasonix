@@ -2,12 +2,16 @@
 // per-tab output, tool state, and approvals while the user switches tabs; components
 // render the active tab's state.
 import { runtimeStatusSnapshotIsStale } from "./runtimeStatusFreshness";
+import { useRuntimeSession } from "./useRuntimeState";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { asArray } from "./array";
 import { createControllerModelCommands } from "./controllerModelCommands";
 import { compactArchivedToolItems } from "./archivedToolItems";
 import { addBreadcrumb } from "./breadcrumbs";
 import { app, onEvent, onReady, onRuntimeRebuilt, onTabMeta, onTopicActivation } from "./bridge";
+import { startControllerEventRecovery } from "./controllerEventRecovery";
+import { metaFromTab } from "./controllerTabMeta";
+export { metaFromTab } from "./controllerTabMeta";
 import { invalidateCache } from "./composerHistory";
 import { formatInboxCancelError } from "./inboxError";
 import { settleForkConversationForTab } from "./forkWorktree";
@@ -18,7 +22,9 @@ import { answerPromptForActiveTurn, normalizeTurnSubmit, resolveActiveTurnId, re
 import { findTabAfterSubmitFailure, reduceManagementConfirmation, reduceSubmitFailure } from "./turnSubmissionFailure";
 import { formatContextMaintenanceNotice, isNewMaintenanceOperation, rememberMaintenanceOperation } from "./contextMaintenanceTypes";
 import { formatGuardianAssessmentNotice } from "./guardianEvents";
-import { completionSummaryPresentation, normalizeCompletionSummary, sessionQualityFloor } from "./completionSummary";
+import { normalizeCompletionSummary } from "./completionSummary";
+import { historicalResultNotice, withRunningChecks, withTurnResult } from "./completionResultState";
+import { mergeTurnResult } from "./turnResult";
 import { invalidateSharedQuery } from "./queryCoalesce";
 import { replayPendingPromptsForActiveTab } from "./promptReplay";
 import { createRafBatch } from "./rafBatch";
@@ -31,12 +37,13 @@ import { recordFrontendDiagnostic } from "./frontendDiagnosticBridge";
 import { uiPerfTracker } from "./uiPerf";
 import { getLocale, t } from "./i18n";
 import {
+  appendNoticeItem,
   deliveryReadinessDetail,
   errorMessage,
-  localizedNoticeText,
-  quietTranscriptNoticeKey,
   readinessMissingIds,
 } from "./controllerNotices";
+import { applyReadStatusEvent, type ReadStatusHost } from "./readStatus";
+import { upsertReadPause } from "./readPause";
 import { applyHydrateErrorState, hydratePlaceholderItems as resolveHydratePlaceholders } from "./hydrateErrorState";
 import { isHostRecoveryGuidance } from "./hostRecoverySteer";
 import { activeTabHydrationPlan, canAdoptUnboundLiveSurface, duplicateLiveItemIds, hasCachedLiveTurn, hasReusableCachedTranscript, hydratedHistoryApplyMode, sameSessionHydrateIdentity, sameSessionPlaceholderItems, shouldPreferResidentHistory, type HydrateSurfacePolicy } from "./hydrateHistoryApply";
@@ -54,7 +61,7 @@ import { useNavigationIntentFence } from "./useNavigationIntentFence";
 import type { SearchSource } from "./searchSources";
 import { attachWebSearchOutput, historySearchAndAnswer } from "./searchTranscript";
 import { fileDiffFromWire, parseTodos, summarize, summarizeFileDiff, type ToolFileDiff } from "./tools";
-import { modeHasAutoApproveTools, normalizeMode, normalizeToolApprovalMode, type QualityFloor } from "./types";
+import type { QualityFloor } from "./types";
 import type {
   BalanceInfo,
   CheckpointMeta,
@@ -301,6 +308,7 @@ export type Item =
       profile?: { model?: string; effort?: string }; // subagent model/effort from tool event
       argChars?: number; // args still streaming from the model: cumulative chars received
       subagentProgress?: SubagentProgress; // in-memory-only preview, never hydrated from history
+      verifying?: boolean; // Host-confirmed check execution; never inferred from prose.
     }
   | {
       kind: "extension";
@@ -374,7 +382,7 @@ function handlePromptFailure(dispatchTo: (tabId: string, action: Action) => void
 export function isSteerNoticeText(text: string): boolean {
   return text.startsWith(STEER_NOTICE_PREFIX);
 }
-export interface State {
+export interface State extends ReadStatusHost {
   items: Item[];
   /** Exact backend-owned turn targeted by Stop/Ask. */
   activeTurnId?: string;
@@ -630,45 +638,6 @@ function updatesContextGauge(usage?: WireUsage): boolean {
   const source = usage?.source?.trim();
   return !source || source === "executor";
 }
-export function metaFromTab(tab: TabMeta, existing?: Meta): Meta {
-  const cwd = tab.cwd || tab.workspaceRoot || existing?.cwd || "";
-  const toolApprovalMode = normalizeToolApprovalMode(
-    tab.toolApprovalMode,
-    normalizeMode(tab.mode),
-    modeHasAutoApproveTools(tab.mode),
-    (tab.toolApprovalMode ?? "").trim() === "" ? existing?.toolApprovalMode : undefined,
-  );
-  const autoApproveTools = toolApprovalMode === "yolo";
-  return {
-    label: tab.label || existing?.label || "",
-    ready: tab.ready,
-    runtime: tab.runtime,
-    startupErr: tab.startupErr,
-    eventChannel: existing?.eventChannel ?? "agent:event",
-    cwd,
-    workspaceRoot: tab.workspaceRoot || existing?.workspaceRoot || cwd,
-    workspaceName: tab.workspaceName || existing?.workspaceName,
-    workspacePath: tab.workspacePath || tab.workspaceRoot || existing?.workspacePath,
-    sessionPath: tab.sessionPath !== undefined ? tab.sessionPath : existing?.sessionPath,
-    sessionRevision: tab.sessionRevision !== undefined ? tab.sessionRevision : existing?.sessionRevision,
-    sessionDigest: tab.sessionDigest !== undefined ? tab.sessionDigest : existing?.sessionDigest,
-    sessionGeneration: tab.sessionGeneration !== undefined ? tab.sessionGeneration : existing?.sessionGeneration,
-    gitBranch: tab.gitBranch || existing?.gitBranch,
-    imageInputEnabled: existing?.imageInputEnabled,
-    visionFallbackEnabled: existing?.visionFallbackEnabled,
-    autoApproveTools,
-    bypass: autoApproveTools,
-    collaborationMode: tab.collaborationMode ?? existing?.collaborationMode ?? "normal",
-    toolApprovalMode,
-    tokenMode: tab.tokenMode ?? existing?.tokenMode ?? "full",
-    agentPreset: tab.agentPreset ?? existing?.agentPreset,
-    qualityFloor: tab.qualityFloor ?? existing?.qualityFloor,
-    floorInferred: tab.floorInferred ?? existing?.floorInferred,
-    goal: tab.goal ?? existing?.goal,
-    goalStatus: tab.goalStatus ?? existing?.goalStatus,
-    canonicalTodos: existing?.canonicalTodos, dismissedTodoBatches: (tab.sessionPath !== undefined ? tab.sessionPath : existing?.sessionPath) === existing?.sessionPath ? existing?.dismissedTodoBatches : undefined,
-  };
-}
 function countsTowardCurrentTurn(state: State): boolean {
   return state.turnActive || state.running;
 }
@@ -884,6 +853,15 @@ export function historyMessagesToItems(messages: HistoryMessage[], idPrefix: str
       continue;
     }
     if (m.role === "notice") {
+      if (m.code === "incomplete_read") {
+        items = upsertReadPause(items, m.readPause, `${idPrefix}${seq++}`);
+        continue;
+      }
+      if (m.completionReceipt || m.completionSummary) {
+        const result = historicalResultNotice(m, `${idPrefix}${seq}`);
+        if (result) { items.push(result); seq++; }
+        continue;
+      }
       if (m.code === "protocol_recovery" && m.pending && m.protocolRecovery?.id) {
         items.push({kind:"notice",id:`${idPrefix}${seq++}`,level:"info",code:m.code,text:t("notice.protocolRecoveryBody"),action:"recover_context",recoveryId:m.protocolRecovery.id});
         continue;
@@ -1508,6 +1486,10 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
         || (Boolean(e.turnId) && e.turnId !== s.activeTurnId);
       const fresh = {
         ...s,
+        // A new turn starts from no live read status: the previous turn's
+        // progress is history, not this turn's state.
+        readStatuses: undefined,
+        readStatusClosed: false,
         activeTurnId: e.turnId ?? s.activeTurnId,
         assistantSegmentOrdinal: startsNewTurn ? 0 : s.assistantSegmentOrdinal,
         pendingSearchSources: undefined,
@@ -1532,9 +1514,12 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       };
     }
     case "turn_phase": {
+      if (e.turnId && s.activeTurnId && e.turnId !== s.activeTurnId) return s;
       const phase = (e.phase ?? e.text ?? "").trim();
       if (!phase) return s;
-      return { ...s, turnPhase: phase, running: true, turnActive: true, cancellable: true };
+      const next = { ...s, turnPhase: phase, running: true, turnActive: true, cancellable: true };
+      if (phase === "verifying" || phase === "checking") return withTurnResult(next, { ...mergeTurnResult(s.completionSummary, undefined, e.turnId), checking: true });
+      return withRunningChecks(next);
     }
     case "turn_status": {
       if (e.turnId && s.activeTurnId && e.turnId !== s.activeTurnId) return s;
@@ -1576,16 +1561,8 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
     }
     case "completion_summary": {
       if (!e.completion) return s;
-      const completionSummary = normalizeCompletionSummary(e.completion);
-      const presentation = completionSummaryPresentation(completionSummary, sessionQualityFloor(s.meta), t);
-      if (!presentation) return { ...s, completionSummary };
-      return {
-        ...s, completionSummary, seq: s.seq + 1,
-        items: [...s.items, {
-          kind: "notice", id: `q${s.seq}`, level: presentation.level, variant: "completion",
-          title: presentation.title, text: presentation.body, action: "open_changes", completionSummary,
-        }],
-      };
+      if (e.turnId && s.activeTurnId && e.turnId !== s.activeTurnId) return s;
+      return withTurnResult(s, normalizeCompletionSummary({ ...s.completionSummary, ...e.completion, turnId: e.turnId ?? s.activeTurnId }));
     }
     case "text":
     case "reasoning": {
@@ -1762,7 +1739,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       // A nested result refreshes its sub-agent parent's recent activity.
       if (t.parentId) touchSubagentParent(next, t.parentId);
       const items = preserveToolPayloads ? next : compactArchivedToolItems(next);
-      return attachWebSearchOutput({ ...s, items }, t.name, t.output, t.err, idx >= 0 && next[idx]?.kind === "tool" ? next[idx].id : t.id);
+      return withRunningChecks(attachWebSearchOutput({ ...s, items }, t.name, t.output, t.err, idx >= 0 && next[idx]?.kind === "tool" ? next[idx].id : t.id));
     }
     case "tool_progress": {
       const t = e.tool;
@@ -1776,10 +1753,10 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       if (idx < 0) return s;
       const next = [...s.items];
       const it = next[idx];
-      if (it.kind === "tool") next[idx] = { ...it, output: (it.output ?? "") + (t.output ?? "") };
+      if (it.kind === "tool") next[idx] = { ...it, output: (it.output ?? "") + (t.output ?? ""), verifying: it.verifying || (t.verifying && it.status === "running") };
       // Streaming output of a sub-agent's real tool refreshes its card.
       if (t.parentId) touchSubagentParent(next, t.parentId);
-      return { ...s, items: next };
+      return withRunningChecks({ ...s, items: next });
     }
     case "usage": {
       if (!countsTowardCurrentTurn(s)) return s;
@@ -1820,6 +1797,8 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       // arguments, so drop the live estimate rather than double-count it.
       return { ...settled, usage, context: { ...settled.context, used, sessionTokens }, turnTokens, turnOutputTokens, turnOutputCharsAtUsage, turnOutputEstimated, turnTotalTokens, turnCost, turnRateBand, turnArgChars: updateContextGauge ? 0 : settled.turnArgChars, sessionTokens, sessionCost, sessionCurrency, usageSeq: settled.usageSeq + 1, lastRequestTps, pendingRequestModelMs: updateContextGauge ? undefined : settled.pendingRequestModelMs };
     }
+    case "read_status":
+      return applyReadStatusEvent(s, e);
     case "notice": {
       const next = appendNoticeToState(s, e.level ?? "info", e.text ?? "", e.detail, e.code, e.decisionReceipt);
       return e.code?.startsWith("stream_interrupted_") ? { ...next, streamInterruptNoticeShown: true } : next;
@@ -1908,6 +1887,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
     }
     case "turn_done": {
       if (e.turnId && s.activeTurnId && e.turnId !== s.activeTurnId) return s;
+      s = { ...s, readStatuses: undefined, readStatusClosed: true };
       const now = Date.now();
       s = snapshotCompletedTurnTelemetry(s, now);
       const workDurationMs = s.turnDoneAt ? Math.max(1, s.turnDoneAt - s.turnStartAt - (s.lastTurnWaitAccumMs ?? 0)) : undefined;
@@ -1945,7 +1925,9 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       } else if (todoGapResolved) {
         items = finalized.filter((item) => item.kind !== "notice" || item.variant !== "delivery" || !todoOnlyMissing(item.missing));
       }
-      if (e.outcome === "final_readiness") {
+      if (e.outcome === "incomplete_read") {
+        items = upsertReadPause(items, e.readPause, `read-pause-${e.turnId ?? s.seq}`);
+      } else if (e.outcome === "final_readiness") {
         const previous = items.map((item) => item.kind === "notice" && item.variant === "delivery"
           ? { ...item, action: undefined }
           : item);
@@ -2024,6 +2006,10 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
       };
       // Close user-wait unless the plan approval gate remains open.
       next = keepPlanApproval ? beginPromptWait(next, now) : endPromptWait(next, now);
+      if (e.receipt || s.completionSummary) {
+        const summary = mergeTurnResult(s.completionSummary, e.receipt, e.turnId, e.checkpointTurn);
+        return withTurnResult(next, { ...summary, checking: false });
+      }
       return next;
     }
     default: return s;
@@ -2037,6 +2023,7 @@ export function reducer(s: State, a: Action): State {
       const userItemId = `u${seq}`;
       return {
         ...s,
+        completionSummary: undefined,
         seq: seq + 1,
         items: [...s.items.map(item => item.kind==="notice" && item.action==="recover_context" ? {...item,action:undefined} : item), { kind: "user", id: userItemId, submissionId: a.submissionId, text: a.text, submitText: a.submitText, createdAt: Date.now() }],
         running: true,
@@ -2084,6 +2071,8 @@ export function reducer(s: State, a: Action): State {
     case "cancel_requested": {
       return endPromptWait({
         ...s,
+        readStatuses: undefined,
+        readStatusClosed: true,
         pendingPrompt: false,
         cancelRequested: true,
         approval: undefined,
@@ -2468,18 +2457,6 @@ function latestTodosAllComplete(items: Item[]): boolean {
   return false;
 }
 
-function appendNoticeItem(items: Item[], seq: number, id: string, level: "info" | "warn", rawText: string, detail?: string, code?: string, decisionReceipt?: WireDecisionReceipt): { items: Item[]; seq: number } {
-  if (quietTranscriptNoticeKey(rawText, code)) {
-    return { items, seq };
-  }
-  const text = localizedNoticeText(rawText, code);
-  if (quietTranscriptNoticeKey(text, code)) {
-    return { items, seq };
-  }
-  const trimmedDetail = detail?.trim();
-  return { items: [...items, { kind: "notice", id, level, text, ...(trimmedDetail ? { detail: trimmedDetail } : {}), ...(code ? { code } : {}), ...(decisionReceipt ? { decisionReceipt } : {}) }], seq: seq + 1 };
-}
-
 function appendNoticeToState(s: State, level: "info" | "warn", text: string, detail?: string, code?: string, decisionReceipt?: WireDecisionReceipt): State {
   const next = appendNoticeItem(s.items, s.seq, `n${s.seq}`, level, text, detail, code, decisionReceipt);
   return { ...s, running: s.turnActive ? s.running : false, seq: next.seq, items: next.items };
@@ -2507,6 +2484,7 @@ export function useController() {
   // can schedule an authoritative refetch after it rejects a stale snapshot.
   const scheduleStalePromptReconcileRef = useRef<(tabId: string) => void>(() => {});
   const [activeTabId, setActiveTabId] = useState<string | undefined>();
+  const runtimeState = useRuntimeSession(activeTabId);
   const activeTabIdRef = useRef<string | undefined>(undefined);
   // Invalidates async navigation completions even for ABA switches where the
   // visible tab ID eventually returns to the original value.
@@ -2833,6 +2811,7 @@ export function useController() {
       sessionGeneration?: number;
       cancelHydrateGeneration?: number;
       deferResetUntilHistory?: boolean; surfacePolicy?: HydrateSurfacePolicy;
+      recoveryCurrent?: () => boolean;
     } = {},
   ) => {
     const surfacePolicy = options.surfacePolicy ?? "preserve-current"; const resetSurface = reset || surfacePolicy === "replace-surface";
@@ -2841,7 +2820,7 @@ export function useController() {
     const sessionRevision = "sessionRevision" in options ? options.sessionRevision : stateMeta?.sessionRevision;
     const sessionDigest = "sessionDigest" in options ? options.sessionDigest : stateMeta?.sessionDigest;
     const sessionGeneration = "sessionGeneration" in options ? options.sessionGeneration : stateMeta?.sessionGeneration;
-    const canJoinInFlight = !resetSurface && !options.skipHistory;
+    const canJoinInFlight = !resetSurface && !options.skipHistory && !options.recoveryCurrent;
     const shouldTrackInFlight = !options.skipHistory;
     if (canJoinInFlight) {
       const existing = sessionLoadInFlight.current.get(tabId);
@@ -2863,6 +2842,7 @@ export function useController() {
       // Request seq alone cannot stop clear→mode-switch races: a load started
       // after clear with stale meta.sessionPath must also be rejected.
       const stillCurrent = () => {
+        if (options.recoveryCurrent && !options.recoveryCurrent()) return false;
         if (!sessionLoadCurrent(tabId, seq)) return false;
         if (cancelHydrateGeneration !== undefined && !cancelHydrateCurrent(tabId, cancelHydrateGeneration)) return false;
         const meta = statesRef.current.get(tabId)?.meta;
@@ -3619,6 +3599,25 @@ export function useController() {
       dispatchTo(tabId, { type: "meta", meta });
     });
 
+    const offRecovery = startControllerEventRecovery({
+      navigation: () => activeNavigationSeqRef.current,
+      bindings: () => new Map(Array.from(statesRef.current, ([id, state]) => [id, JSON.stringify([state.meta?.sessionPath, state.meta?.sessionGeneration, sessionLoadSeq.current.get(id)])])),
+      meta: id => statesRef.current.get(id)?.meta,
+      now: promptEventClock,
+      flush: () => textBatch.drain(),
+      prepare: tab => {
+        if (tab.runtime?.epoch) runtimeEpochByTabRef.current.set(tab.id, tab.runtime.epoch);
+        invalidateSharedQuery("MetaForTab", [tab.id]);
+        dispatchTo(tab.id, { type: "optimistic_meta", meta: metaFromTab(tab, statesRef.current.get(tab.id)?.meta) });
+      },
+      runtime: (tab, snapshotAt) => { dispatchRuntimeStatusForTab(tab.id, tab, snapshotAt); },
+      reset: id => turnEventProjector.release(id),
+      hydrate: (tab, recoveryCurrent) => loadSessionDataForTab(tab.id, true, "startup", {
+        sessionPath: tab.sessionPath, sessionRevision: tab.sessionRevision,
+        sessionDigest: tab.sessionDigest, sessionGeneration: tab.sessionGeneration, recoveryCurrent,
+      }),
+    });
+
     void syncActiveTabFromBackend(false, true);
     // The event subscription is live now, so ask the backend to re-emit any
     // approval/ask prompt that was already blocking a tab before this load —
@@ -3641,8 +3640,9 @@ export function useController() {
       offRebuilt();
       offTopicActivation();
       offTabMeta();
+      offRecovery();
     };
-  }, [dispatchTo, handleTopicActivationEvent, loadSessionDataForTab, refreshBalanceForTab, refreshCheckpoints, refreshMetaForTab, syncActiveTabFromBackend, turnEventProjector]);
+  }, [dispatchRuntimeStatusForTab, dispatchTo, handleTopicActivationEvent, loadSessionDataForTab, refreshBalanceForTab, refreshCheckpoints, refreshMetaForTab, syncActiveTabFromBackend, turnEventProjector]);
 
   // Track the visible tab in the transcript store: the active tab is pinned
   // out of LRU eviction. (In-flight loads of background tabs still complete
@@ -3736,7 +3736,7 @@ export function useController() {
     await reconcileTabRuntime(tabId, { refreshAncillary: false });
   }, [reconcileTabRuntime]);
   useStaleTurnWatchdog({
-    tabId: activeTabId, visibleState: activeState, activeTabIdRef, statesRef,
+    tabId: runtimeState.known ? undefined : activeTabId, visibleState: activeState, activeTabIdRef, statesRef,
     lastTurnActivityAtByTab, reconcile: reconcileStaleTurn,
   });
 
@@ -5021,8 +5021,9 @@ export function useController() {
     } catch { /* ignore */ }
   }, []);
 
+  const projectedState = useMemo(() => runtimeState.known ? { ...activeState, running: runtimeState.running ?? activeState.running } : activeState, [activeState, runtimeState.known, runtimeState.running]);
   return {
-    state: activeState,
+    state: projectedState,
     liveStore,
     activeTabId,
     send, sendToTab, recoverDeliveryToTab, runShell, runShellForTab, steer, steerForTab, notice,

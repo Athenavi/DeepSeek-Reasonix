@@ -374,7 +374,7 @@ func (a *App) installPortableUpdate(requestID string, meta *cachedUpdate, data [
 	a.emitProgress(requestID, meta.Channel, meta.Version, "installing", meta.Size, meta.Size, "")
 	var preparedUpdate *repair.UpdateTransaction
 	versionedPortable := (runtime.GOOS == "windows" || runtime.GOOS == "linux") && installlayout.HasCurrent(currentInstallDir())
-	if (runtime.GOOS == "windows" || runtime.GOOS == "linux") && !versionedPortable {
+	if runtime.GOOS == "windows" && !versionedPortable {
 		// Back up the complete legacy release unit (main binary plus launcher
 		// and migration siblings) so rollback never leaves a mixed-version
 		// install. Deb installs deliberately skip this because package-manager
@@ -392,11 +392,7 @@ func (a *App) installPortableUpdate(requestID string, meta *cachedUpdate, data [
 	case "darwin":
 		err = applyMac(meta.Path, meta.Version, a.updateHandoffOwnerPID())
 	case "linux":
-		if versionedPortable {
-			err = applyLinuxVersioned(data, meta.Version)
-		} else {
-			err = applyLinux(data, preparedUpdate)
-		}
+		err = applyLinuxVersioned(data, meta.Version)
 	default:
 		err = fmt.Errorf("self-update unsupported on %s", runtime.GOOS)
 	}

@@ -95,6 +95,20 @@ JSON 序列化的参数，结果为 `()`、`(T)`、`(error)` 或 `(T, error)`。
 事实来源：它输出 JSON 契约、摘要、TypeScript 命令表和渲染进程使用的 DTO 类型声明。
 检入的输出漂移时桌面 Go 测试失败。
 
+每个命令还记录源码模块 `domain`、准确的 `owner`（例如 `App.OpenProjectTab`）、
+仓库相对路径 `sources`、`scope` 和 `cancellation`，这些字段共同参与摘要。
+生成器扫描所有平台声明并输出 `desktop/host_command_owners.generated.json`；宿主内嵌
+该文件，要求每个反射命令都有匹配元数据。Scope 记录原方法的命名 wire `inputs`
+（遗留无名参数使用 `argN`）和 `resolver`；无参数命令使用 `owner-state`，其余使用
+`owner-inputs`。这些字段描述来源和分派边界；输入校验、标签/会话选择及权限检查仍由
+原有 App 方法负责。
+
+当前 App 命令声明 `before-dispatch`：宿主在解码前及真正分派前检查取消；同步写入
+开始后，即使收到取消也保留原方法的结果，不承诺中断已分派的方法。宿主方法可通过
+首个 Go 参数 `context.Context` 声明 `cooperative-context`；宿主注入请求 context，
+它不属于 JSON 参数或生成的 DTO。方法自身必须配合取消。业务 Stop/Cancel 命令继续
+沿用已有 owner 和语义。
+
 ## 事件（服务 → 壳 → 渲染进程）
 
 ```jsonc
@@ -105,6 +119,18 @@ JSON 序列化的参数，结果为 `()`、`(T)`、`(error)` 或 `(T, error)`。
 `reasonix:event` 通道转给渲染进程；preload 的 `on(name, cb)` 按 `name` 过滤并调用
 `cb(...args)`。序号在同一世代内严格递增，重新挂载的渲染进程可据此发现缺口并重新
 快照，而不是信任陈旧状态。
+
+服务监督器和 preload 都拒绝重复、倒序帧；preload 还根据当前服务状态拒绝旧世代帧，
+并在 React 订阅前接入传输。世代变化、序号缺口或订阅期间遗漏会触发壳内事件
+`desktop:resync`（`generation`、`reason`、`expectedSeq`、`actualSeq`），它不属于 Go
+业务事件。运行状态通过 `SyncRuntimeState` 重读；已挂载控制器重读 `ListTabs`，复用
+现有 `TurnEventsForTab` 日志与待审批提示恢复投影。异步读取受后续恢复请求、会话身份
+和导航变更约束，不重放业务调用。服务重启后复用仍存活的应用渲染进程，保留未发送草稿。
+
+当前保证范围是核心运行状态、会话元数据、持久化轮次事件和待审批提示。终端虽有有界
+输出快照，但没有原子输出游标，因此缺口后的终端会明确标记输出可能不完整，不将无法
+确定边界的快照合并进实时输出。扩展输出、文件监听等独立事件流仍需各自的重新快照契约，
+不在上述核心恢复保证范围内。
 
 ## 原生宿主调用（服务 → 壳）
 
@@ -127,7 +153,7 @@ Wails 实现在最后阶段删除。
 | `host/dialog.message` | `{"type":"info"\|"warning"\|"error"\|"question","title","message","buttons":[],"defaultButton","cancelButton"}` | `{"button":string}` |
 | `host/shell.openExternal` | `{"url":string}` | `{}` |
 | `host/app.quit` | `{}` | `{}` |
-| `host/app.relaunch` | `{"args":[]}` | `{}` |
+| `host/app.relaunch` | `{"args":[],"execPath"?:string}` | `{}` |
 | `host/devtools.toggle` | `{}` | `{}` |
 | `host/remoteWindow.open` | `{"hostKey","url","title"}` | `{"windowId":string}` |
 | `host/remoteWindow.navigate` | `{"hostKey","url","title"}` | `{}` |

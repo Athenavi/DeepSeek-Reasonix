@@ -34,7 +34,7 @@ func runOpen(ctx context.Context, exec Executor, args json.RawMessage) (string, 
 	if strings.TrimSpace(p.URL) == "" {
 		return "", fmt.Errorf("url is required")
 	}
-	tab, err := exec.Open(ctx, OpenRequest{URL: p.URL, Temporary: p.Temporary})
+	tab, err := exec.Open(ctx, OpenRequest{OperationID: p.OperationID, URL: p.URL, Temporary: p.Temporary})
 	if err != nil {
 		return "", translate(err, "browser_open "+p.URL)
 	}
@@ -79,7 +79,7 @@ func runNavigate(ctx context.Context, exec Executor, args json.RawMessage) (stri
 	default:
 		return "", fmt.Errorf("action must be one of url, back, forward, reload")
 	}
-	tab, err := exec.Navigate(ctx, NavigateRequest{TabID: p.TabID, URL: p.URL, Action: p.Action})
+	tab, err := exec.Navigate(ctx, NavigateRequest{OperationID: p.OperationID, TabID: p.TabID, URL: p.URL, Action: p.Action})
 	if err != nil {
 		return "", translate(err, "browser_navigate "+p.Action+" on tab "+p.TabID)
 	}
@@ -108,7 +108,7 @@ func runClose(ctx context.Context, exec Executor, args json.RawMessage) (string,
 	if err := requireTab(p.TabID); err != nil {
 		return "", err
 	}
-	if err := exec.Close(ctx, p.TabID); err != nil {
+	if err := exec.Close(ctx, CloseRequest{OperationID: p.OperationID, TabID: p.TabID}); err != nil {
 		return "", translate(err, "browser_close tab "+p.TabID)
 	}
 	return "closed tab " + p.TabID, nil

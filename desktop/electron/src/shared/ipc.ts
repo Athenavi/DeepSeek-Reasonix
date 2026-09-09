@@ -22,6 +22,7 @@ export const IPC = {
   browserSetZoom: "reasonix:browser:set-zoom",
   browserToggleDevTools: "reasonix:browser:toggle-devtools",
   browserResume: "reasonix:browser:resume",
+  browserUserTakeover: "reasonix:browser:user-takeover",
   browserSetLayout: "reasonix:browser:set-layout",
   browserSetOverlay: "reasonix:browser:set-overlay",
   browserTabs: "reasonix:browser:tabs",

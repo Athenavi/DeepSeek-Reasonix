@@ -172,7 +172,7 @@ func (e *httpExecutor) Tabs(ctx context.Context) ([]Tab, error) {
 
 func (e *httpExecutor) Open(ctx context.Context, req OpenRequest) (Tab, error) {
 	var out wireTab
-	if err := e.call(ctx, "open", wireOpenRequest{URL: req.URL, Temporary: req.Temporary}, &out); err != nil {
+	if err := e.write(ctx, "open", wireOpenRequest(req), &out); err != nil {
 		return Tab{}, err
 	}
 	return out.tab(), nil
@@ -180,7 +180,7 @@ func (e *httpExecutor) Open(ctx context.Context, req OpenRequest) (Tab, error) {
 
 func (e *httpExecutor) Navigate(ctx context.Context, req NavigateRequest) (Tab, error) {
 	var out wireTab
-	if err := e.call(ctx, "navigate", wireNavigateRequest{TabID: req.TabID, URL: req.URL, Action: req.Action}, &out); err != nil {
+	if err := e.write(ctx, "navigate", wireNavigateRequest(req), &out); err != nil {
 		return Tab{}, err
 	}
 	return out.tab(), nil
@@ -188,35 +188,31 @@ func (e *httpExecutor) Navigate(ctx context.Context, req NavigateRequest) (Tab, 
 
 func (e *httpExecutor) Snapshot(ctx context.Context, req SnapshotRequest) (Snapshot, error) {
 	var out wireSnapshot
-	if err := e.call(ctx, "snapshot", wireSnapshotRequest{TabID: req.TabID, Selector: req.Selector}, &out); err != nil {
+	if err := e.call(ctx, "snapshot", wireSnapshotRequest(req), &out); err != nil {
 		return Snapshot{}, err
 	}
-	return Snapshot{DocumentToken: out.DocumentToken, URL: out.URL, Title: out.Title, Tree: out.Tree, Refs: out.Refs}, nil
+	return Snapshot(out), nil
 }
 
 func (e *httpExecutor) Screenshot(ctx context.Context, req ScreenshotRequest) (Screenshot, error) {
 	var out wireScreenshot
-	if err := e.call(ctx, "screenshot", wireScreenshotRequest{TabID: req.TabID, Ref: req.Ref, FullPage: req.FullPage}, &out); err != nil {
+	if err := e.call(ctx, "screenshot", wireScreenshotRequest(req), &out); err != nil {
 		return Screenshot{}, err
 	}
-	return Screenshot{Path: out.Path, MIME: out.MIME, Width: out.Width, Height: out.Height}, nil
+	return Screenshot(out), nil
 }
 
 // Act sends one reserved write. A reply that never arrived leaves the
 // action's fate unknown, which is exactly ErrUnknownOutcome.
 func (e *httpExecutor) Act(ctx context.Context, req ActRequest) (ActResult, error) {
 	var out wireActResult
-	if err := e.call(ctx, "act", toWireAct(req), &out); err != nil {
-		var te *transportError
-		if errors.As(err, &te) {
-			return ActResult{Outcome: OutcomeUnknown}, fmt.Errorf("%w: %v", ErrUnknownOutcome, te.err)
-		}
+	if err := e.write(ctx, "act", toWireAct(req), &out); err != nil {
 		if errors.Is(err, ErrUnknownOutcome) {
 			return ActResult{Outcome: OutcomeUnknown}, err
 		}
 		return ActResult{}, err
 	}
-	res := ActResult{Executed: out.Executed, Reason: out.Reason, DocumentToken: out.DocumentToken, Outcome: out.Outcome}
+	res := ActResult(out)
 	if res.Outcome == "" {
 		res.Outcome = OutcomeNotExecuted
 		if res.Executed {
@@ -234,11 +230,21 @@ func (e *httpExecutor) Downloads(ctx context.Context, req DownloadsRequest) ([]D
 	}
 	downloads := make([]Download, 0, len(out.Downloads))
 	for _, d := range out.Downloads {
-		downloads = append(downloads, Download{ID: d.ID, URL: d.URL, Path: d.Path, State: d.State, Bytes: d.Bytes})
+		downloads = append(downloads, Download(d))
 	}
 	return downloads, nil
 }
 
-func (e *httpExecutor) Close(ctx context.Context, tabID string) error {
-	return e.call(ctx, "close", wireCloseRequest{TabID: tabID}, nil)
+func (e *httpExecutor) Close(ctx context.Context, req CloseRequest) error {
+	return e.write(ctx, "close", wireCloseRequest(req), nil)
+}
+
+// Once a write is handed to HTTP, only explicit refusal codes prove it did
+// not run. Truncated/invalid replies and HTTP failures also leave it unknown.
+func (e *httpExecutor) write(ctx context.Context, method string, in, out any) error {
+	err := e.call(ctx, method, in, out)
+	if err == nil || errors.Is(err, ErrStaleReference) || errors.Is(err, ErrTakenOver) || errors.Is(err, ErrNoGrant) || errors.Is(err, ErrUnknownOutcome) {
+		return err
+	}
+	return fmt.Errorf("%w: %s", ErrUnknownOutcome, err.Error())
 }

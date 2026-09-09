@@ -53,7 +53,7 @@ func (e *brokerTestExecutor) Downloads(ctx context.Context, _ browser.DownloadsR
 	e.session(ctx)
 	return nil, nil
 }
-func (e *brokerTestExecutor) Close(ctx context.Context, _ string) error {
+func (e *brokerTestExecutor) Close(ctx context.Context, _ browser.CloseRequest) error {
 	e.session(ctx)
 	return nil
 }

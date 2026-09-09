@@ -53,7 +53,7 @@ func hostRPCShell(t *testing.T) (*rpcwire.Conn, *io.PipeWriter, func() (int, boo
 
 func hostRPCHello(t *testing.T) hostrpc.HelloParams {
 	t.Helper()
-	registry, err := hostrpc.NewRegistry((*App)(nil), nil)
+	registry, err := newDesktopRegistry((*App)(nil))
 	if err != nil {
 		t.Fatal(err)
 	}

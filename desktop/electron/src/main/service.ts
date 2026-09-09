@@ -1,5 +1,6 @@
 import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from "node:child_process";
 import type { EventFrame, ServiceState } from "../shared/ipc.js";
+import { eventFrame } from "../shared/eventStream.js";
 import type { HelloResult } from "./handshake.js";
 import { errorText, type Logger } from "./log.js";
 import { RestartBudget } from "./restartBudget.js";
@@ -37,6 +38,7 @@ interface Session {
   generation: string;
   alive: boolean;
   ready: boolean;
+  eventSeq: number;
   expectExit: boolean;
   exited: Promise<void>;
 }
@@ -47,13 +49,6 @@ function describeExit(code: number | null, signal: NodeJS.Signals | null): strin
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function parseEventFrame(params: unknown): EventFrame | null {
-  if (typeof params !== "object" || params === null) return null;
-  const frame = params as Record<string, unknown>;
-  if (typeof frame.seq !== "number" || typeof frame.generation !== "string" || typeof frame.name !== "string") return null;
-  return { seq: frame.seq, generation: frame.generation, name: frame.name, args: Array.isArray(frame.args) ? frame.args : [] };
 }
 
 export class ServiceSupervisor {
@@ -180,6 +175,7 @@ export class ServiceSupervisor {
       generation: "",
       alive: true,
       ready: false,
+      eventSeq: 0,
       expectExit: false,
       exited: Promise.resolve(),
     };
@@ -226,7 +222,7 @@ export class ServiceSupervisor {
       this.options.log.warn(`unknown service notification ${method}`);
       return;
     }
-    const frame = parseEventFrame(params);
+    const frame = eventFrame(params);
     if (!frame) {
       this.options.log.warn("malformed desktop/event frame dropped");
       return;
@@ -235,6 +231,9 @@ export class ServiceSupervisor {
       this.options.log.warn(`event ${frame.name} from dead generation ${frame.generation} dropped`);
       return;
     }
+    if (frame.seq <= session.eventSeq) return;
+    if (frame.seq > session.eventSeq + 1) this.options.log.warn(`desktop event gap: ${session.eventSeq} -> ${frame.seq}`);
+    session.eventSeq = frame.seq;
     this.handlers.onEvent(frame);
   }
 

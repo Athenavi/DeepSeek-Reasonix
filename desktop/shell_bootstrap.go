@@ -58,12 +58,7 @@ func bootstrapShell(exe, goos string, args, env []string) (handled bool, exitCod
 // Reasonix beside the service inside a macOS bundle, and never exe itself.
 func shellExecutableBeside(exe, goos string) (string, bool) {
 	exe = filepath.Clean(exe)
-	dir := filepath.Dir(exe)
-	name := installlayout.ShellExecutableNameFor(goos)
-	shell := filepath.Join(dir, installlayout.AppShellDirName, name)
-	if goos == "darwin" {
-		shell = filepath.Join(filepath.Dir(dir), "MacOS", name)
-	}
+	shell := shellPathForExecutable(exe, goos)
 	info, err := os.Lstat(shell)
 	if err != nil || !info.Mode().IsRegular() {
 		return "", false
@@ -72,4 +67,17 @@ func shellExecutableBeside(exe, goos string) (string, bool) {
 		return "", false
 	}
 	return shell, true
+}
+
+func shellPathForExecutable(exe, goos string) string {
+	dir := filepath.Dir(exe)
+	name := installlayout.ShellExecutableNameFor(goos)
+	shell := filepath.Join(dir, installlayout.AppShellDirName, name)
+	if goos == "darwin" {
+		shell = filepath.Join(filepath.Dir(dir), "MacOS", name)
+	} else if goos == "linux" && dir == "/usr/bin" {
+		// The native package keeps executables in /usr/bin and Chromium in /usr/lib.
+		shell = filepath.Join("/usr/lib/reasonix", installlayout.AppShellDirName, name)
+	}
+	return shell
 }

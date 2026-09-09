@@ -19,7 +19,7 @@ class TestResizeObserver { observe() {} unobserve() {} disconnect() {} }
 const noop = () => {};
 const browser: DesktopBrowserHost = {
   list: async () => [], open: async () => { throw new Error("unused"); }, close: async () => {}, activate: async () => {},
-  navigate: async () => {}, setZoom: async () => {}, toggleDevTools: async () => {}, resume: async () => {},
+  navigate: async () => {}, setZoom: async () => {}, toggleDevTools: async () => {}, resume: async () => {}, takeover: async () => {},
   setLayout: noop, setOverlay: noop, onTabs: () => noop, onDownload: () => noop,
 };
 const electron: ReasonixDesktopHost = {
