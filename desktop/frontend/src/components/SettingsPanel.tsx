@@ -1741,11 +1741,9 @@ function GeneralSection({ s, busy, apply, agentRunning }: SectionProps & { agent
       <SessionExperienceSettings snapshot={s} busy={busy} apply={apply} />
 
       <SettingsSection title={t("settings.general.sectionSystem")} description={t("settings.general.sectionSystemHint")}>
-      {graphics && <SettingsField label={<span className="settings-graphics-label"><span>{t("settings.hardwareAcceleration")}</span>{graphics.restartRequired && graphics.override === "none" && <span className="settings-graphics-status">{t("settings.hardwareAccelerationRestartShort")}</span>}</span>} hint={t("settings.hardwareAccelerationHint")} icon={<Monitor size={18} />}>
+      {graphics && <SettingsField label={<span className="settings-graphics-label"><span>{t("settings.hardwareAcceleration")}</span>{graphics.restartRequired && graphics.override === "none" && <span className="settings-graphics-status">{t("settings.hardwareAccelerationRestartShort")}</span>}{graphics.override !== "none" && <span className="settings-graphics-status settings-graphics-status--warning">{t("settings.hardwareAccelerationOverride")}</span>}{graphicsError && <span className="settings-graphics-status settings-graphics-status--error" role="alert">{graphicsError}</span>}</span>} hint={t("settings.hardwareAccelerationHint")} icon={<Monitor size={18} />}>
         <div className="settings-graphics-control">
           <ToggleSegment value={graphics.hardwareAcceleration} disabled={graphicsBusy || !graphics.writable || graphics.override !== "none"} onChange={updateGraphics} />
-          {graphics.override !== "none" && <div className="settings-inline-hint">{t("settings.hardwareAccelerationOverride")}</div>}
-          {graphicsError && <div className="settings-inline-error" role="alert">{graphicsError}</div>}
         </div>
       </SettingsField>}
       <SettingsField label={t("settings.closeBehavior")} hint={<DesktopCloseBehaviorHint backgroundSelected={closeBehavior === "background"} hint={t("settings.closeBehaviorHint")} unavailableHint={t("settings.closeBehaviorUnavailable")} />} icon={<Power size={18} />}>
