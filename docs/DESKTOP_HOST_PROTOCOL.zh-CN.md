@@ -159,6 +159,10 @@ Wails 实现在最后阶段删除。
 | `host/remoteWindow.navigate` | `{"hostKey","url","title"}` | `{}` |
 | `host/remoteWindow.focus` `close` | `{"hostKey"}` | `{}` |
 | `host/tray.ensure` | `{"openTitle","openTooltip","quitTitle","quitTooltip","tooltip"}` | `{"ready":bool,"reason":string}` |
+
+`host/shell.openExternal` 只接受 `http:`、`https:` 和 `mailto:` URL。
+包括 `file:`、`javascript:`、`data:` 在内的其他协议会在 Electron 宿主边界
+被拒绝，不会交给系统打开器执行。
 | `host/tray.destroy` | `{}` | `{}` |
 | `host/browser.grant` `revoke` | `{"grantId","tabId","sessionId"}` / `{"grantId"}` | `{}` |
 | `host/browser.tabs.list` | `{"grantId"}` | `{"tabs":[{"id","url","title","loading","temporary"}]}` |
