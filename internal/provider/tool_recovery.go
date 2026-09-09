@@ -1,16 +1,49 @@
 package provider
 
-import "strings"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // ToolRunState is local execution evidence; it is never sent as a wire field.
 // Unknown legacy results are classified conservatively when interrupted.
 type ToolRunState string
 
 const (
+	ToolRunPending    ToolRunState = "pending"
+	ToolRunStarted    ToolRunState = "started"
+	ToolRunRunning    ToolRunState = "running"
 	ToolRunCompleted  ToolRunState = "completed"
+	ToolRunFailed     ToolRunState = "failed"
+	ToolRunCancelled  ToolRunState = "cancelled"
 	ToolRunNotStarted ToolRunState = "not_started"
 	ToolRunUnknown    ToolRunState = "unknown"
 )
+
+// ActionIdentity is the stable local identity of one logical tool action.
+// It is provider-excluded and must not be inferred from an attempt alone.
+type ActionIdentity struct {
+	SessionID      string `json:"session_id,omitempty"`
+	TurnID         string `json:"turn_id,omitempty"`
+	AttemptID      string `json:"attempt_id,omitempty"`
+	CallID         string `json:"call_id,omitempty"`
+	CanonicalTool  string `json:"canonical_tool,omitempty"`
+	ArgumentDigest string `json:"argument_digest,omitempty"`
+	ResourceScope  string `json:"resource_scope,omitempty"`
+}
+
+// ToolCallRecord is a durable, provider-excluded execution receipt.
+type ToolCallRecord struct {
+	Identity       ActionIdentity  `json:"identity"`
+	Arguments      json.RawMessage `json:"arguments,omitempty"`
+	State          ToolRunState    `json:"state"`
+	ReadOnly       bool            `json:"read_only"`
+	IdempotencyKey string          `json:"idempotency_key,omitempty"`
+	StartedAt      int64           `json:"started_at,omitempty"`
+	FinishedAt     int64           `json:"finished_at,omitempty"`
+	ResultDigest   string          `json:"result_digest,omitempty"`
+	EffectSummary  string          `json:"effect_summary,omitempty"`
+}
 
 func ToolResultRunState(m Message) ToolRunState {
 	switch m.ToolRunState {
@@ -55,6 +88,9 @@ func RecordToolRecovery(r *InterruptedTurnRecovery, call InterruptedToolSummary,
 // provider-excluded handoff for an unfinished turn. It contains bounded facts;
 // raw partial reasoning remains local for display.
 type InterruptedTurnRecovery struct {
+	TurnID                  string                   `json:"turn_id,omitempty"`
+	AttemptID               string                   `json:"attempt_id,omitempty"`
+	Cause                   string                   `json:"cause,omitempty"`
 	TerminalStatus          string                   `json:"terminalStatus,omitempty"` // failed | interrupted; absent preserves legacy display
 	FailureDiagnostic       *FailureDiagnostic       `json:"failureDiagnostic,omitempty"`
 	WriteChecks             []WriteRecoveryCheck     `json:"write_checks,omitempty"`
@@ -64,6 +100,9 @@ type InterruptedTurnRecovery struct {
 	InterruptedTools        []string                 `json:"interrupted_tools,omitempty"`
 	NotStartedTools         []InterruptedToolSummary `json:"not_started_tools,omitempty"`
 	UnknownTools            []InterruptedToolSummary `json:"unknown_tools,omitempty"`
+	ToolCalls               []ToolCallRecord         `json:"tool_calls,omitempty"`
+	RequiresUserDecision    bool                     `json:"requires_user_decision,omitempty"`
+	SilentInterruption      bool                     `json:"silent_interruption,omitempty"`
 	DroppedPartialText      bool                     `json:"dropped_partial_text,omitempty"`
 	DroppedPartialReasoning bool                     `json:"dropped_partial_reasoning,omitempty"`
 }
