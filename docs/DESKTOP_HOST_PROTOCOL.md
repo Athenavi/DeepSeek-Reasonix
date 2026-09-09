@@ -165,8 +165,8 @@ resnapshot contracts; they are not covered by this core recovery guarantee.
 ## Native host calls (service → shell)
 
 These replace direct shell-toolkit calls in Go. Each maps to one method of the
-Go `nativeHost` interface; the Wails implementation is retired in the final
-phase.
+Go `nativeHost` interface; the Wails implementation was retired when the Electron shell
+landed.
 
 | Method | Params | Result |
 | --- | --- | --- |
