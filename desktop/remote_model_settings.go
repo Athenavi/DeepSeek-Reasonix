@@ -351,34 +351,36 @@ func remoteModelSettingsRequest(ctx context.Context, client *http.Client, base, 
 
 // ensureRemoteModelSettings is the Desktop remote run-admission boundary.
 // Approval/ask/steer replies bypass it because they belong to the accepted run.
-func (a *App) ensureRemoteModelSettings(tabID string) (string, error) {
+// The returned generation scopes the admission (revision or legacy skip) to one
+// tab generation; callers must re-admit before a target that no longer runs it.
+func (a *App) ensureRemoteModelSettings(tabID string) (string, uint64, error) {
 	if !a.remoteTabLocalProxy(tabID) {
-		return "", nil
+		return "", 0, nil
 	}
 	for {
 		cfg, err := config.LoadModelRuntimeSnapshot(".")
 		if err != nil {
-			return "", err
+			return "", 0, err
 		}
 		a.remoteTabMu.Lock()
 		tab := a.remoteTabs[tabID]
 		if tab == nil {
 			a.remoteTabMu.Unlock()
-			return "", fmt.Errorf("remote session is no longer available")
+			return "", 0, fmt.Errorf("remote session is no longer available")
 		}
 		model, applied, generation, path := tab.model, tab.settings.revision, tab.gen, tab.routing.currentPath
 		valid := tab.settings.generation == generation && tab.settings.sessionPath == path
 		unsupported := tab.settings.unsupportedGen == generation
 		a.remoteTabMu.Unlock()
 		if unsupported {
-			return "", nil
+			return "", generation, nil
 		}
 		if model == "" {
 			model = resolveNewSessionModel(cfg)
 		}
 		desired := cfg.ModelRuntimeFingerprint(model)
 		if valid && applied == desired {
-			return applied, nil
+			return applied, generation, nil
 		}
 		next, err := resolveModelSettingsRuntime(cfg, model)
 		if err == nil {
@@ -404,7 +406,7 @@ func (a *App) ensureRemoteModelSettings(tabID string) (string, error) {
 					// instead of admitting against the retired fence.
 					continue
 				}
-				return "", nil
+				return "", generation, nil
 			}
 			a.remoteTabMu.Lock()
 			if current := a.remoteTabs[tabID]; current == tab && current.gen == generation && current.routing.currentPath == path {
@@ -412,13 +414,13 @@ func (a *App) ensureRemoteModelSettings(tabID string) (string, error) {
 				current.settings.failureRevision = desired
 			}
 			a.remoteTabMu.Unlock()
-			return "", fmt.Errorf("model settings were saved but the remote session could not apply them: %w", err)
+			return "", 0, fmt.Errorf("model settings were saved but the remote session could not apply them: %w", err)
 		}
 		a.remoteTabMu.Lock()
 		acknowledged := tab.settings.revision != "" && tab.settings.generation == tab.gen && tab.settings.sessionPath == tab.routing.currentPath
 		a.remoteTabMu.Unlock()
 		if !acknowledged {
-			return "", fmt.Errorf("remote session did not acknowledge the saved model settings")
+			return "", 0, fmt.Errorf("remote session did not acknowledge the saved model settings")
 		}
 		// Read the current file again: another save may have won during the
 		// remote build. Never admit a new request with that stale completion.

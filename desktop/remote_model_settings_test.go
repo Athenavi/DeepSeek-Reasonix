@@ -457,9 +457,9 @@ func TestEnsureRemoteModelSettingsAdmitsLegacyServeTurns(t *testing.T) {
 	app.remoteRuntime = kernel
 	app.remoteMu.Unlock()
 
-	revision, err := app.ensureRemoteModelSettings(tab.id)
-	if err != nil || revision != "" {
-		t.Fatalf("legacy Serve turn admission failed: revision=%q err=%v", revision, err)
+	revision, admittedGen, err := app.ensureRemoteModelSettings(tab.id)
+	if err != nil || revision != "" || admittedGen != 1 {
+		t.Fatalf("legacy Serve turn admission failed: revision=%q gen=%d err=%v", revision, admittedGen, err)
 	}
 	if kernel.switches != 1 {
 		t.Fatalf("expected one protocol probe, got %d", kernel.switches)
@@ -472,16 +472,16 @@ func TestEnsureRemoteModelSettingsAdmitsLegacyServeTurns(t *testing.T) {
 	}
 
 	// The remembered verdict admits later turns without re-probing the Serve.
-	if revision, err = app.ensureRemoteModelSettings(tab.id); err != nil || revision != "" || kernel.switches != 1 {
-		t.Fatalf("repeat admission re-probed legacy Serve: revision=%q err=%v switches=%d", revision, err, kernel.switches)
+	if revision, admittedGen, err = app.ensureRemoteModelSettings(tab.id); err != nil || revision != "" || admittedGen != 1 || kernel.switches != 1 {
+		t.Fatalf("repeat admission re-probed legacy Serve: revision=%q gen=%d err=%v switches=%d", revision, admittedGen, err, kernel.switches)
 	}
 
 	// A new tab generation (reconnect or replaced Serve) probes once more.
 	app.remoteTabMu.Lock()
 	tab.gen = 2
 	app.remoteTabMu.Unlock()
-	if revision, err = app.ensureRemoteModelSettings(tab.id); err != nil || revision != "" || kernel.switches != 2 {
-		t.Fatalf("new generation did not re-probe the protocol: revision=%q err=%v switches=%d", revision, err, kernel.switches)
+	if revision, admittedGen, err = app.ensureRemoteModelSettings(tab.id); err != nil || revision != "" || admittedGen != 2 || kernel.switches != 2 {
+		t.Fatalf("new generation did not re-probe the protocol: revision=%q gen=%d err=%v switches=%d", revision, admittedGen, err, kernel.switches)
 	}
 }
 
@@ -537,9 +537,9 @@ func TestEnsureRemoteModelSettingsReprobesReplacedConnection(t *testing.T) {
 	app.remoteRuntime = kernel
 	app.remoteMu.Unlock()
 
-	revision, err := app.ensureRemoteModelSettings(tab.id)
-	if err != nil || revision != "" {
-		t.Fatalf("replaced connection admission failed: revision=%q err=%v", revision, err)
+	revision, admittedGen, err := app.ensureRemoteModelSettings(tab.id)
+	if err != nil || revision != "" || admittedGen != 2 {
+		t.Fatalf("replaced connection admission failed: revision=%q gen=%d err=%v", revision, admittedGen, err)
 	}
 	if kernel.switches != 2 {
 		t.Fatalf("expected the replacement generation to be re-probed, switches=%d", kernel.switches)
@@ -586,5 +586,70 @@ func TestAppendRemoteModelSettingsReportsLegacyTargetNotRequired(t *testing.T) {
 	}
 	if result.Application == "pending" {
 		t.Fatal("legacy target drove the receipt into a pending application")
+	}
+}
+
+// SubmitRemoteTab must only deliver an unrevisioned turn to the connection the
+// legacy admission was recorded for: a replaced generation re-admits against
+// the new target before the request leaves, and the Serve never receives the
+// optional expected-model-settings header on this path.
+func TestSubmitRemoteTabFencesLegacyAdmissionToItsTarget(t *testing.T) {
+	isolateDesktopUserDirs(t)
+	submits := make(chan string, 4)
+	serve := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/submit" {
+			submits <- r.Header.Get(expectedModelSettingsHeader)
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		http.Error(w, "unexpected path", http.StatusNotFound)
+	}))
+	defer serve.Close()
+	app := NewApp()
+	defer app.closeCredentialProxy()
+	view := ProviderView{Name: "legacy", Kind: "openai", BaseURL: serve.URL, Models: []string{"m"}, NoProxy: true}
+	if _, err := app.SaveProviderWithKey(view, "legacy-key"); err != nil {
+		t.Fatal(err)
+	}
+	if err := editUserConfig(func(c *config.Config) error {
+		return c.UpsertRemoteHost(config.RemoteHostEntry{Name: "legacy-host", Host: "127.0.0.1", CredentialMode: "local-proxy"})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	tab := &remoteTab{
+		id: "legacy-tab", ref: RemoteTabRef{HostID: "legacy-host", Workspace: "ws"},
+		state: "ready", client: serve.Client(), base: serve.URL, model: "legacy/m", gen: 1,
+		routing: remoteTabSessionRouting{currentPath: "/proj/session"},
+	}
+	app.remoteTabs = map[string]*remoteTab{tab.id: tab}
+	kernel := &unsupportedModelSettingsKernel{}
+	app.remoteMu.Lock()
+	app.remoteRuntime = kernel
+	app.remoteMu.Unlock()
+
+	if err := app.SubmitRemoteTab(tab.id, "first turn"); err != nil {
+		t.Fatalf("legacy submit failed: %v", err)
+	}
+	// A reconnect replaced the target generation; the next submit re-admits
+	// against it before delivering the turn.
+	app.remoteTabMu.Lock()
+	tab.gen = 2
+	app.remoteTabMu.Unlock()
+	if err := app.SubmitRemoteTab(tab.id, "second turn"); err != nil {
+		t.Fatalf("submit after reconnect failed: %v", err)
+	}
+	if kernel.switches != 2 {
+		t.Fatalf("replaced generation was not re-admitted, switches=%d", kernel.switches)
+	}
+	close(submits)
+	seen := 0
+	for header := range submits {
+		seen++
+		if header != "" {
+			t.Fatalf("legacy submit carried a model-settings revision header: %q", header)
+		}
+	}
+	if seen != 2 {
+		t.Fatalf("expected both turns delivered, got %d", seen)
 	}
 }
