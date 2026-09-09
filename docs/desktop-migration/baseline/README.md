@@ -47,3 +47,8 @@ loads the UI from `frontend/dist` through the `reasonix://app` handler, the
 same path the packaged build uses. Idle growth between 2 s and 30 s is the
 same order for both shells and is re-measured over an hour in the phase F
 acceptance run.
+
+The phase F acceptance run on the packaged macOS artifact (startup/idle,
+1/5 browser tabs, 35-cycle tab/session leak loops, one-hour sustained use,
+interaction p95 evidence and gaps) is recorded in `PHASE_F_ACCEPTANCE.md`
+beside this file.
