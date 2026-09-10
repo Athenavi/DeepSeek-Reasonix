@@ -41,9 +41,9 @@ const ports: Parameters<typeof useDesktopNavigation>[0]["ports"] = {
   listSessions: async () => { calls.push("history-refresh"); return []; },
   topicAccepted: seq => { acceptedTopics.push(seq); },
 };
-function Probe({ visible = "A", single = true }: { visible?: string; single?: boolean }) {
+function Probe({ visible = "A" }: { visible?: string }) {
   useRemoteTabOpened(meta => { calls.push(`resource:${meta.id}`); }, () => {});
-  api = useDesktopNavigation({ visible: { tabId: visible, sessionKey: visible }, singleSurface: single, ports,
+  api = useDesktopNavigation({ visible: { tabId: visible, sessionKey: visible }, ports,
     setTabRevealSignal: () => { calls.push("reveal-tab"); }, setTranscriptRevealSignal: () => { calls.push("reveal-transcript"); },
     setProjectRevision: () => { calls.push("project"); }, setHistory: () => { calls.push("history-close"); },
     t: ((key: string) => key) as Translator, showToast: message => { calls.push(`notice:${message}`); },
@@ -52,7 +52,7 @@ function Probe({ visible = "A", single = true }: { visible?: string; single?: bo
   });
   return null;
 }
-const paint = (visible = "A", single = true) => act(async () => root.render(<Probe visible={visible} single={single} />));
+const paint = (visible = "A") => act(async () => root.render(<Probe visible={visible} />));
 const topic = (id: string) => api.enqueueNavigation({ kind: "topic", scope: "project", workspaceRoot: "fixture", topicId: id });
 async function finish(id: string, task: Promise<void>) { pending.get(id)!.resolve(tab(id)); await task; }
 try {
@@ -93,10 +93,10 @@ try {
   assert.ok(calls.includes("project"));
 
   calls.length = 0;
-  await paint("A", false);
   const history = api.enqueueNavigation({ kind: "resume-session", session: { scope: "global", topicId: "history", path: "history.jsonl" } as SessionMeta });
   await finish("history", history);
-  assert.ok(calls.includes("tab-session"));
+  assert.ok(calls.includes("open:history"), "resuming a session activates its topic surface");
+  assert.ok(!calls.includes("tab-session"), "every layout style takes the surface path, never a legacy tab");
   assert.ok(calls.includes("history-close"));
 
   calls.length = 0;

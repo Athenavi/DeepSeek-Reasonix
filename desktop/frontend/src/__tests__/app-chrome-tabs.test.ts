@@ -19,6 +19,7 @@ const desktopNavigationSource = readFileSync(resolve(testDir, "../app-runtime/us
 const dockToggleSource = readFileSync(resolve(testDir, "../app-shell/DockToggleButton.tsx"), "utf8");
 const chatPaneSource = readFileSync(resolve(testDir, "../app-shell/ChatPaneRegion.tsx"), "utf8");
 const transcriptSurfaceSource = readFileSync(resolve(testDir, "../app-runtime/useTranscriptSurfaceProjection.ts"), "utf8");
+const desktopNavigationOwnerSource = readFileSync(resolve(testDir, "../app-runtime/desktopNavigationOwner.ts"), "utf8");
 const appViewSource = readFileSync(resolve(testDir, "../app-shell/AppRuntimeView.tsx"), "utf8");
 const transcriptSource = readFileSync(resolve(testDir, "../components/Transcript.tsx"), "utf8");
 const composerSource = readFileSync(resolve(testDir, "../components/Composer.tsx"), "utf8");
@@ -354,21 +355,22 @@ ok(
 
 
 
-const navigationBlock = appSource.match(/const runNavigationRequest = useCallback\([\s\S]*?\n  \}, \[[^\]]*singleSurfaceLayout[^\]]*\]\);/)?.[0] ?? "";
-
 ok(
   /return navigation\.enqueueNavigation\(\{ kind: "topic", scope, workspaceRoot, topicId, sessionPath \}\);/.test(sessionNavigationSource) &&
     /const targetRoot = scope === "project" \? workspaceRoot : ""/.test(sessionNavigationSource) &&
     /enqueueNavigation\(\{ kind: "blank", scope, workspaceRoot: targetRoot \}\)/.test(sessionNavigationSource) &&
     /return navigation\.enqueueNavigation\(\{ kind: "sidebar-im", connection \}\);/.test(sessionNavigationSource) &&
-    /return navigation\.enqueueNavigation\(\{ kind: "resume-session", session \}\);/.test(sessionNavigationSource),
+    /navigation\.enqueueNavigation\(\{ kind: "resume-session", session \}\)/.test(sessionNavigationSource),
   "topic, blank, IM, and history navigation all use the shared coalescing path",
 );
 
 
+// The owner resumes history through topic activation alone; a second
+// resumeSession call would re-pin a session the activation already pinned.
+const historyResumeBlock = desktopNavigationOwnerSource.match(/const \{ session \} = request;[\s\S]*?ports\.closeHistory\(\);/)?.[0] ?? "";
 ok(
-  !/await resumeSession\(session\.path, targetTab\.id\);/.test(navigationBlock),
-  "history navigation does not re-resume a session that OpenTopicSession already pinned",
+  historyResumeBlock.includes("ports.closeHistory()") && !historyResumeBlock.includes("resumeSession"),
+  "history navigation does not re-resume a session that topic activation already pinned",
 );
 
 

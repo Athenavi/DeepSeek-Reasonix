@@ -174,7 +174,7 @@ export function useAppSessionComposition(input: AppSessionCompositionInput) {
   } = runtime.navigation;
   const {
     setTransientOverlayDismissSignal, managementActive, desktopLayoutStyle,
-    singleSurfaceLayout, windowsFramelessChrome, rightDockMode,
+    windowsFramelessChrome, rightDockMode,
     workspacePanelOpen, workspacePanelMaximized, liveTerminalHeight, setLiveWorkspacePanelRenderWidth,
     setRightDockTreeWidth, terminalPanelOpen, setSettingsTarget, enterConversation,
   } = shell;
@@ -645,9 +645,7 @@ export function useAppSessionComposition(input: AppSessionCompositionInput) {
     transitioning: runtimeTransitioning,
     navigationDataReady: navigationTargetDataReady,
     preserved: preservedTranscriptSurface,
-    singleSurface: singleSurfaceLayout,
     controllerReady,
-    heroLayout: desktopLayoutStyle === "creation" || desktopLayoutStyle === "workbench",
     availability,
     sessionActivity: Boolean(conversationView.runtime.running || conversationView.runtime.pendingPrompt
       || conversationView.runtime.approval || conversationView.runtime.ask || conversationView.runtime.extensionForm
@@ -676,7 +674,7 @@ export function useAppSessionComposition(input: AppSessionCompositionInput) {
 
   const { openAutomationTopic, topicAccepted } = useAutomationNavigation({ noteIntent: noteNavigationIntent,
     enqueue: useCommittedCommand((intent, seq) => enqueueNavigationWithIntent(intent, seq)) });  const { enqueueNavigation, enqueueNavigationWithIntent, openRemoteProject } = useDesktopNavigation({
-    visible: { tabId: activeTabId ?? "", sessionKey: activeSessionIdentity }, singleSurface: singleSurfaceLayout,
+    visible: { tabId: activeTabId ?? "", sessionKey: activeSessionIdentity },
     ports: { isNavigationIntentCurrent, activateTopic, openTopicSession, openGlobalTab, openProjectTab,
       ensureBlankSurface, ensureBlankTab, createIsolatedWorktree, openChannelSession, resumeSession,
       registeredNavigationIntent, switchRemoteTab, openRemoteProject: desktopBridge.openRemoteProjectTab,
