@@ -78,6 +78,23 @@
             "desktop"
           ],
           "title": {
+            "en": "Electron desktop shell",
+            "zh": "Electron 桌面壳"
+          },
+          "body": {
+            "en": "The desktop app now runs on an Electron shell in place of the retired Wails host. Existing settings migrate once on first launch, and window zoom and hardware acceleration are owned by the shell.",
+            "zh": "桌面应用改用 Electron 壳，替换已退役的 Wails 宿主。旧版设置会在首次启动时一次性迁移，窗口缩放与硬件加速由壳层接管。"
+          },
+          "refs": [
+            9988
+          ]
+        },
+        {
+          "kind": "new",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
             "en": "Durable tool recovery",
             "zh": "持久工具恢复"
           },
@@ -240,6 +257,39 @@
             },
             "refs": [
               10040
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Electron desktop shell",
+              "zh": "Electron 桌面壳"
+            },
+            "body": {
+              "en": "The desktop app runs on an Electron shell in place of the retired Wails host, migrating legacy settings once on first launch.",
+              "zh": "桌面应用改用 Electron 壳，替换已退役的 Wails 宿主，并在首次启动时一次性迁移旧版设置。"
+            },
+            "refs": [
+              9988
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "OpenCode Go provider preset",
+              "zh": "OpenCode Go 提供商预设"
+            },
+            "body": {
+              "en": "The OpenCode Go curated provider preset is available, with its routing, reasoning, and search contracts carried onto the current kernel.",
+              "zh": "新增 OpenCode Go curated 提供商预设，其路由、推理与搜索契约已迁移到当前内核。"
+            },
+            "refs": [
+              10015
             ]
           }
         ],
