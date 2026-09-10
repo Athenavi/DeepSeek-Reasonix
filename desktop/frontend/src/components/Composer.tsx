@@ -9,6 +9,7 @@ import { asArray } from "../lib/array";
 import { filterAtMatches } from "../lib/atMatches";
 import { DedupIndex, sha256 } from "../lib/attachDedup";
 import { app, onFilesDropped } from "../lib/bridge";
+import { desktopHost } from "../lib/desktopHost";
 import { steerInboxItemForActiveTurn } from "../lib/inboxSubmit";
 import { formatInboxError, isInboxItemMissing } from "../lib/inboxError";
 import { inboxScopeKey } from "../lib/composerInboxQueue";
@@ -107,9 +108,7 @@ export interface WorkspaceReference {
 const LONG_PASTE_MIN_CHARS = 2000;
 const LONG_PASTE_MIN_LINES = 20;
 const COMPOSER_MIN_HEIGHT = 104;
-// Fresh installs open at the compact baseline; a manual resize still persists
-// and takes precedence over this default.
-const COMPOSER_DEFAULT_HEIGHT = 104;
+const COMPOSER_DEFAULT_HEIGHT = 140;
 const COMPOSER_MAX_HEIGHT = 360;
 // Height reserved for the in-card run strip while a turn runs; applied via a
 // CSS calc so --composer-height always stays in "logical height" space.
@@ -2642,9 +2641,9 @@ export function Composer({
     try {
       await navigator.clipboard.writeText(selection.selected);
     } catch {
-      // Fall back to Wails desktop runtime, then execCommand
+      // Fall back to the desktop host clipboard, then execCommand
       try {
-        if (typeof window !== "undefined" && (await window.runtime?.ClipboardSetText?.(selection.selected))) {
+        if (await desktopHost().native.clipboardWriteText(selection.selected)) {
           /* ok */
         } else if (!fallbackCopyText(selection.selected)) {
           // Every clipboard path failed. Cutting now would delete text that
@@ -2756,15 +2755,10 @@ export function Composer({
     return items.some((item) => getWebkitFileEntry(item) === null);
   };
 
-  const clearWailsDropTarget = () => {
-    document.querySelectorAll(".wails-drop-target-active").forEach((el) => el.classList.remove("wails-drop-target-active"));
-  };
-
   const stopNativeFileDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     e.nativeEvent.stopImmediatePropagation();
-    clearWailsDropTarget();
   };
 
   const onFileDropCapture = (e: DragEvent<HTMLDivElement>) => {
@@ -3922,7 +3916,7 @@ export function Composer({
         decisionPending ? "composer-wrap--decision-pending" : "",
         heroMode ? "composer-wrap--hero" : "",
       ].filter(Boolean).join(" ")}
-      style={attachmentInputEnabled ? { "--wails-drop-target": "drop" } as CSSProperties : undefined}
+      data-native-drop-target={attachmentInputEnabled ? "" : undefined}
       onDropCapture={onFileDropCapture}
     >
       <input
