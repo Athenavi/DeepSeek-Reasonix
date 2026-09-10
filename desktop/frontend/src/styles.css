@@ -24079,7 +24079,11 @@ body > .mermaid-diagram--fullscreen {
   gap: 8px;
   padding: 7px 10px 3px;
   border-bottom: 1px solid transparent;
-  --reasonix-draggable: drag;
+  /* This row is a control strip under the shell bar, which owns the window's
+     drag region now. Leaving it draggable swallowed clicks on any control that
+     did not opt out individually — the tab strip and add button declared
+     no-drag, the leading overview chevron did not, so it never responded. */
+  --reasonix-draggable: no-drag;
 }
 
 @container (max-width: 520px) {
@@ -37491,6 +37495,18 @@ html[data-dock-launcher="full"] .app:not(.app--creation) .layout:not(.layout--wo
   animation: spin 0.8s linear infinite;
 }
 
+
+/* The dock wraps TabContainer in this unstyleable-looking div. Without a rule
+   it stays a content-sized block, so .tab-container's `flex: 1 1 auto` never
+   applied and the container collapsed to its content — a short view left the
+   dock mostly empty, and the container's own `overflow: hidden` then clipped
+   the tab-overview popover, which is positioned inside it. */
+.workbench-dock__panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 
 .tab-container {
   flex: 1 1 auto;

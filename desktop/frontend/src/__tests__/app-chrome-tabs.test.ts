@@ -412,11 +412,26 @@ ok(
   "macOS leaves safe space for inset window controls on the shell bar, not the sidebar",
 );
 
+// The shell bar owns the window's drag region now. While the dock's control
+// strip was also draggable, any control that did not opt out individually —
+// the leading overview chevron did not — never received a click.
 ok(
-  finalDeclaration(".workbench-dock__tools", "--reasonix-draggable") === "drag" &&
+  finalDeclaration(".workbench-dock__tools", "--reasonix-draggable") === "no-drag" &&
     finalDeclaration(".workbench-dock__tabs", "--reasonix-draggable") === "no-drag" &&
-    finalDeclaration(".workbench-dock__tab", "--reasonix-draggable") === "no-drag",
-  "maximized workbench dock keeps a draggable title region while tabs remain clickable",
+    finalDeclaration(".workbench-dock__tab", "--reasonix-draggable") === "no-drag" &&
+    finalDeclaration(".workbench-dock__tab-overview", "--reasonix-draggable") !== "drag",
+  "the dock's control strip is not a window drag region, so every control stays clickable",
+);
+
+// The dock wraps TabContainer in .workbench-dock__panel. It must stretch that
+// container: unstyled, the wrapper is a content-sized block, so the container
+// collapses to its content and its own overflow clip then cuts off the tab
+// overview popover, which is positioned inside it.
+ok(
+  finalDeclaration(".workbench-dock__panel", "flex") === "1 1 auto" &&
+    finalDeclaration(".workbench-dock__panel", "display") === "flex" &&
+    finalDeclaration(".tab-container", "overflow") === "hidden",
+  "the dock panel stretches its tab container so in-dock popovers are not clipped",
 );
 
 ok(
