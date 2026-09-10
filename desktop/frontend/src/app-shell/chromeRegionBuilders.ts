@@ -156,8 +156,6 @@ export function buildAppShellClassNames(input: {
     layout: [
       "layout",
       input.workbench ? "layout--workbench" : "",
-      input.workbench ? "layout--workbench-chrome-hidden" : "",
-      input.creation ? "layout--creation-chrome-hidden" : "",
       input.imDetailActive ? "layout--statusbar-hidden" : "",
       input.sidebarCollapsed ? "layout--sidebar-collapsed" : "",
       input.sidebarResizing ? "layout--resizing layout--sidebar-resizing" : "",

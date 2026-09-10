@@ -393,34 +393,21 @@ ok(
   "Windows Creation stays 40px while macOS and Linux keep the shared Creation geometry",
 );
 
-for (const selector of [
-  ".layout--workbench-chrome-hidden",
-  ":root[data-theme-style] .layout--workbench-chrome-hidden",
-]) {
-  ok(
-    finalDeclaration(selector, "--app-chrome-height") === "0px" &&
-      finalDeclaration(selector, "grid-template-rows") === "minmax(0, 1fr) var(--statusbar-height)" &&
-      finalDeclaration(selector, "background") === "var(--bg)",
-    `${selector} removes the workbench chrome row`,
-  );
-}
-
+// Every style now renders the bar as the layout's own first row, so there is no
+// chrome row left to remove and no layout class describing its absence.
 ok(
-  finalDeclaration(":root[data-theme-style] .app--darwin .layout--workbench-chrome-hidden", "--app-chrome-height") === "0px" &&
-    finalDeclaration(".app--darwin .layout--workbench-chrome-hidden .sidebar--workbench", "padding-top") === "46px" &&
-    finalDeclaration(".app--darwin .layout--workbench-chrome-hidden.layout--sidebar-collapsed .topicbar", "padding-left") === "96px",
-  "macOS workbench leaves safe space for inset window controls",
+  /\.topicbar \{\s*position: relative;\s*z-index: var\(--z-inline-sticky\);\s*grid-row: 1;\s*grid-column: 1 \/ -1;/.test(stylesSource) &&
+    /grid-template-rows: auto minmax\(0, 1fr\) var\(--statusbar-height\)/.test(stylesSource),
+  "the shell bar spans every column as the layout's first row",
 );
 
+// The bar covers the sidebar's column too, so the macOS inset moves from a
+// sidebar-collapsed special case onto the bar itself. The sidebar is the row
+// below the bar now, so the traffic lights can no longer reach it.
 ok(
-  finalDeclaration(".app--darwin .layout--workbench-chrome-hidden.layout--workspace-maximized .workbench-dock__tools", "padding-left") === "96px",
-  "macOS maximized workbench dock leaves safe space for inset window controls",
-);
-
-ok(
-  /@media \(max-width: 820px\) \{[\s\S]*\.app--darwin \.layout--workbench-chrome-hidden \.topicbar\s*\{[\s\S]*padding-left:\s*96px;/.test(stylesSource) &&
-    /@media \(max-width: 820px\) \{[\s\S]*\.app--darwin \.layout--workbench-chrome-hidden\.layout--workspace-maximized \.workbench-dock__tools\s*\{[\s\S]*padding-left:\s*96px;/.test(stylesSource),
-  "macOS workbench keeps safe space when responsive CSS hides the sidebar",
+  finalDeclaration(".app--darwin .topicbar", "padding-left") === "var(--chrome-left-safe-offset)" &&
+    finalDeclaration(".app--darwin .sidebar--workbench", "padding") === "14px 12px 10px",
+  "macOS leaves safe space for inset window controls on the shell bar, not the sidebar",
 );
 
 ok(
@@ -447,29 +434,14 @@ ok(
   "Creation right-dock tabs keep their equal-column treatment without dividers",
 );
 
-for (const selector of [
-  ".app--windows-frameless.app--workbench .workbench-dock__tools",
-  ":root[data-theme-style] .app--windows-frameless.app--workbench .workbench-dock__tools",
-]) {
-  const padding = finalDeclaration(selector, "padding") ?? "";
-  ok(
-    finalDeclaration(selector, "height") === "calc(40px + var(--windows-window-controls-height))" &&
-      padding === "var(--windows-window-controls-height) 12px 0" &&
-      !padding.includes("--windows-window-controls-safe"),
-    `${selector} keeps dock tabs on a full-width row below Windows controls`,
-  );
-}
-
-for (const selector of [
-  ".app--windows-frameless.app--workbench .workbench-dock__tools::before",
-  ":root[data-theme-style] .app--windows-frameless.app--workbench .workbench-dock__tools::before",
-]) {
-  ok(
-    finalDeclaration(selector, "top") === "calc(var(--windows-window-controls-height) - 1px)" &&
-      finalDeclaration(selector, "height") === "1px",
-    `${selector} separates the Windows title row from the dock tabs`,
-  );
-}
+// The bar, not the dock's tools row, is the window's native title surface now:
+// it carries the caption inset at every dock state, and the tools row is a plain
+// tab strip that reserves nothing for the window controls.
+ok(
+  finalDeclaration(".app--windows-frameless .topicbar", "padding-right") === "var(--windows-window-controls-safe)" &&
+    finalDeclaration(".app--windows-frameless.app--workbench .workbench-dock__tools", "height") === undefined,
+  "the Windows caption inset sits on the shell bar, not on the dock's tools row",
+);
 
 ok(
   /@container \(max-width: 420px\) \{[\s\S]*?\.app--workbench \.workbench-dock__tab,[\s\S]*?:root\[data-theme-style\] \.app--workbench \.workbench-dock__tab \{[\s\S]*?padding-left:\s*10px;[\s\S]*?padding-right:\s*10px;[\s\S]*?gap:\s*4px;/.test(stylesSource),
@@ -477,10 +449,10 @@ ok(
 );
 
 for (const selector of [
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar",
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__chrome-btn",
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__icon-btn",
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__action-btn",
+  ":root[data-theme-style] .app--workbench .topicbar",
+  ":root[data-theme-style] .app--workbench .topicbar__chrome-btn",
+  ":root[data-theme-style] .app--workbench .topicbar__icon-btn",
+  ":root[data-theme-style] .app--workbench .topicbar__action-btn",
 ]) {
   ok(
     finalDeclaration(selector, "box-shadow") === "none",
@@ -489,15 +461,15 @@ for (const selector of [
 }
 
 ok(
-  finalDeclaration(":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar", "background") === "var(--bg-elev)",
+  finalDeclaration(":root[data-theme-style] .app--workbench .topicbar", "background") === "var(--bg-elev)",
   "workbench topic bar uses elevated background for light-mode white",
 );
 
 for (const selector of [
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__identity",
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__title-row",
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__title-row h1",
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .tooltip-trigger:has(.topicbar__icon-btn)",
+  ":root[data-theme-style] .app--workbench .topicbar__identity",
+  ":root[data-theme-style] .app--workbench .topicbar__title-row",
+  ":root[data-theme-style] .app--workbench .topicbar__title-row h1",
+  ":root[data-theme-style] .app--workbench .tooltip-trigger:has(.topicbar__icon-btn)",
 ]) {
   ok(
     finalDeclaration(selector, "background") === "transparent" &&
@@ -508,12 +480,12 @@ for (const selector of [
 }
 
 for (const selector of [
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__icon-btn",
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__chrome-btn",
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__icon-btn:hover",
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__icon-btn:focus-visible",
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__chrome-btn:hover:not(.topicbar__chrome-btn--blocked)",
-  ":root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__chrome-btn:focus-visible:not(.topicbar__chrome-btn--blocked)",
+  ":root[data-theme-style] .app--workbench .topicbar__icon-btn",
+  ":root[data-theme-style] .app--workbench .topicbar__chrome-btn",
+  ":root[data-theme-style] .app--workbench .topicbar__icon-btn:hover",
+  ":root[data-theme-style] .app--workbench .topicbar__icon-btn:focus-visible",
+  ":root[data-theme-style] .app--workbench .topicbar__chrome-btn:hover:not(.topicbar__chrome-btn--blocked)",
+  ":root[data-theme-style] .app--workbench .topicbar__chrome-btn:focus-visible:not(.topicbar__chrome-btn--blocked)",
 ]) {
   ok(
     finalDeclaration(selector, "background") === "transparent",

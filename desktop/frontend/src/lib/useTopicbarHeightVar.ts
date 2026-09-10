@@ -1,10 +1,11 @@
-// Publishes the topic bar's measured height as --topicbar-live-height on the
-// document root. The dock column aligns its own top edge with the bar, and the
-// bar's height is not a constant: it differs per layout style (classic /
-// workbench / creation), per theme skin and per platform caption strip.
+// Publishes the shell bar's measured height as --app-bar-height on the document
+// root. The bar is the layout's first grid row and sizes to its own content, so
+// the two consumers that position themselves against its bottom edge — the
+// sidebar resizer and the overlay dock — cannot read the height from CSS. It is
+// not a constant: it differs per layout style, theme skin and platform caption.
 import { useEffect } from "react";
 
-const VAR = "--topicbar-live-height";
+const VAR = "--app-bar-height";
 
 export function useTopicbarHeightVar(): void {
   useEffect(() => {

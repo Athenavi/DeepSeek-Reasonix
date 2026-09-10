@@ -2083,14 +2083,16 @@ a[href] {
   --workspace-width: 420px;
   --workspace-resizer-width: 8px;
   --terminal-height: 280px;
-  --app-chrome-height: 38px;
+  /* The bar sizes to its own content, so this is only the fallback for the two
+     absolutely-positioned consumers below until useTopicbarHeightVar publishes
+     the measured value as --app-bar-height. */
   --topicbar-height: 56px;
   --statusbar-height: var(--statusbar-dock-height);
   --chrome-left-safe-offset: 0px;
   position: relative;
   display: grid;
   justify-content: start;
-  grid-template-rows: var(--app-chrome-height) minmax(0, 1fr) var(--statusbar-height);
+  grid-template-rows: auto minmax(0, 1fr) var(--statusbar-height);
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
@@ -2108,7 +2110,6 @@ a[href] {
    rows; workspace and terminal preferences remain in their stores. */
 
 .app--darwin .layout {
-  --app-chrome-height: 44px;
   --chrome-left-safe-offset: 112px;
   transition:
     grid-template-columns 0.28s cubic-bezier(0.2, 0.72, 0.2, 1),
@@ -2160,7 +2161,7 @@ a[href] {
    Sidebar and workspace panel stay full-height in columns 1 and 3;
    the terminal occupies column 2 row 3, statusbar at row 4. */
 .layout--terminal-drawer-open {
-  grid-template-rows: var(--app-chrome-height) minmax(0, 1fr) var(--terminal-height, 280px) var(--statusbar-height);
+  grid-template-rows: auto minmax(0, 1fr) var(--terminal-height, 280px) var(--statusbar-height);
   transition:
     grid-template-columns 0.16s ease,
     min-width 0.16s ease,
@@ -2233,45 +2234,9 @@ a[href] {
 .layout--terminal-drawer-open .workspace-panel-resizer {
   grid-row: 2 / 4;
 }
-/* Chrome-hidden variants: rows shift up by one (3 rows total: content, terminal, statusbar). */
-.layout.layout--workbench-chrome-hidden.layout--terminal-drawer-open .sidebar {
-  grid-row: 1 / 3 !important;
-}
-.layout.layout--workbench-chrome-hidden.layout--terminal-drawer-open .workspace-panel-resizer {
-  grid-row: 1 / 3 !important;
-}
-.layout.layout--workbench-chrome-hidden.layout--terminal-drawer-open .workbench-dock {
-  grid-row: 1 / 3 !important;
-}
-.app--creation .layout.layout--creation-chrome-hidden.layout--terminal-drawer-open .sidebar {
-  grid-row: 1 / 3 !important;
-}
-.app--creation .layout.layout--creation-chrome-hidden.layout--terminal-drawer-open .workspace-panel-resizer {
-  grid-row: 1 / 3 !important;
-}
-.app--creation .layout.layout--creation-chrome-hidden.layout--terminal-drawer-open .workbench-dock {
-  grid-row: 1 / 3 !important;
-}
-.layout.layout--workbench-chrome-hidden.layout--terminal-drawer-open {
-  grid-template-rows: minmax(0, 1fr) var(--terminal-height, 280px) var(--statusbar-height) !important;
-  transition:
-    grid-template-columns 0.16s ease,
-    min-width 0.16s ease,
-    grid-template-rows 0.22s cubic-bezier(0.2, 0.72, 0.2, 1) !important;
-}
-.app--creation .layout.layout--creation-chrome-hidden.layout--terminal-drawer-open {
-  grid-template-rows: minmax(0, 1fr) var(--terminal-height, 280px) !important;
-  transition:
-    grid-template-columns 0.16s ease,
-    min-width 0.16s ease,
-    grid-template-rows 0.22s cubic-bezier(0.2, 0.72, 0.2, 1) !important;
-}
 /* StatusBar shifts to row 4 when the terminal drawer adds an extra row. */
 .layout--terminal-drawer-open .statusbar {
   grid-row: 4;
-}
-.layout--workbench-chrome-hidden.layout--terminal-drawer-open .statusbar {
-  grid-row: 3;
 }
 
 /* Keep the old layout--terminal-open rules for backward compat — they are
@@ -2279,7 +2244,7 @@ a[href] {
    no longer added by App.tsx but may remain in cached localStorage styles. */
 .layout--terminal-open {
   grid-template-columns: var(--sidebar-expanded-width) minmax(0, 1fr);
-  grid-template-rows: var(--app-chrome-height) minmax(0, 1fr) minmax(220px, min(42vh, 440px)) var(--statusbar-height);
+  grid-template-rows: auto minmax(0, 1fr) minmax(220px, min(42vh, 440px)) var(--statusbar-height);
 }
 .layout--terminal-open.layout--sidebar-collapsed {
   grid-template-columns: 0px minmax(0, 1fr);
@@ -2302,65 +2267,11 @@ a[href] {
 .layout--terminal-open .statusbar {
   grid-row: 4;
 }
-.layout--workbench-chrome-hidden.layout--terminal-open {
-  grid-template-rows: minmax(0, 1fr) minmax(220px, min(42vh, 440px)) var(--statusbar-height);
-}
-.layout--workbench-chrome-hidden.layout--terminal-open .workbench-dock {
-  grid-row: 2;
-}
-
-.layout--workbench-chrome-hidden.layout--terminal-open .statusbar {
-  grid-row: 3;
-}
-.app--creation .layout--creation-chrome-hidden.layout--terminal-open {
-  grid-template-rows: minmax(0, 1fr) minmax(220px, min(42vh, 440px));
-}
-.app--creation .layout--creation-chrome-hidden.layout--terminal-open .workbench-dock {
-  grid-row: 2;
-}
 .layout--workspace-maximized .chat-pane {
   display: none;
 }
 .layout--workspace-maximized .workspace-panel-resizer {
   display: none;
-}
-
-.layout--workbench-chrome-hidden {
-  --app-chrome-height: 0px;
-  grid-template-rows: minmax(0, 1fr) var(--statusbar-height);
-  background: var(--bg);
-}
-
-.layout--workbench-chrome-hidden .sidebar,
-.layout--workbench-chrome-hidden .chat-pane,
-.layout--workbench-chrome-hidden .workspace-panel-resizer,
-.layout--workbench-chrome-hidden .context-inspector,
-.layout--workbench-chrome-hidden .workbench-dock {
-  grid-row: 1;
-}
-.layout--workbench-chrome-hidden .terminal-drawer-resizer {
-  grid-row: 1;
-}
-.layout--workbench-chrome-hidden .terminal-drawer {
-  grid-row: 2;
-}
-.app--creation .layout--creation-chrome-hidden .terminal-drawer-resizer {
-  grid-row: 1;
-}
-.app--creation .layout--creation-chrome-hidden .terminal-drawer {
-  grid-row: 2;
-}
-
-.layout--workbench-chrome-hidden .statusbar {
-  grid-row: 2;
-}
-
-.app--darwin .layout--workbench-chrome-hidden.layout--sidebar-collapsed .topicbar {
-  padding-left: 96px;
-}
-
-.app--darwin .layout--workbench-chrome-hidden.layout--workspace-maximized .workbench-dock__tools {
-  padding-left: 96px;
 }
 
 .sidebar {
@@ -2787,7 +2698,7 @@ a[href] {
 .sidebar-resizer {
   --reasonix-draggable: no-drag;
   position: absolute;
-  top: var(--app-chrome-height);
+  top: var(--app-bar-height, var(--topicbar-height));
   bottom: var(--statusbar-height);
   /* The sidebar is position:static, so anchor via left from the layout
      container. 1px width means the hairline sits exactly on the sidebar's
@@ -6718,7 +6629,9 @@ body > .mermaid-diagram--fullscreen {
    containing block .composer-wrap lives inside the footer. The composer is
    hidden while a decision owns the footer, so the two states never overlap. */
 .footer--decision {
-  max-height: calc(100% - var(--topicbar-height));
+  /* 100% is .chat-pane, which no longer contains the shell bar, so it is
+     already the space left for the footer. */
+  max-height: 100%;
   overflow-y: auto;
 }
 
@@ -21937,12 +21850,6 @@ body > .mermaid-diagram--fullscreen {
   .chat-pane {
     grid-column: 1;
   }
-  .app--darwin .layout--workbench-chrome-hidden .topicbar {
-    padding-left: 96px;
-  }
-  .app--darwin .layout--workbench-chrome-hidden.layout--workspace-maximized .workbench-dock__tools {
-    padding-left: 96px;
-  }
   .topbar {
     padding: 0 12px 0 82px; /* clear macOS inset traffic lights when the sidebar is hidden */
   }
@@ -22328,10 +22235,14 @@ body > .mermaid-diagram--fullscreen {
   }
 }
 
+/* The bar is the layout's first row and spans every column, so the dock's tabs
+   start directly beneath it instead of under an imitated strip. */
 .topicbar {
   position: relative;
   z-index: var(--z-inline-sticky);
-  flex: 0 0 auto;
+  grid-row: 1;
+  grid-column: 1 / -1;
+  min-width: 0;
   container-type: inline-size;
   display: flex;
   align-items: center;
@@ -22346,6 +22257,15 @@ body > .mermaid-diagram--fullscreen {
 
 .topicbar button {
   --reasonix-draggable: no-drag;
+}
+
+/* The bar covers the sidebar's column too, so the macOS traffic lights always
+   overlap its left end rather than only doing so when the sidebar is hidden.
+   The themed pair is required: :root[data-theme-style] .topicbar resets the
+   padding shorthand at a higher specificity than the bare scope. */
+.app--darwin .topicbar,
+:root[data-theme-style] .app--darwin .topicbar {
+  padding-left: var(--chrome-left-safe-offset);
 }
 
 .topicbar__chrome-btn {
@@ -22458,11 +22378,10 @@ body > .mermaid-diagram--fullscreen {
 }
 /* When the dock is closed in workbench mode, the fixed top-right dock-toggle
 /* When the dock is closed in workbench mode, the fixed top-right dock-toggle
-   overlaps the topic bar's right edge; leave room so the actions don't
-   collide with it. When the dock is open it occupies the right column, so no
-   extra margin is needed. Classic/creation keep the toggle inside the actions
-   row, so the extra margin does not apply there. */
-.layout--workbench:not(.layout--workspace-open) .topicbar__actions {
+   overlaps the bar's right edge whether or not the dock is open — the bar spans
+   the whole window either way — so workbench always leaves room for it.
+   Creation keeps its toggle inside the actions row, so it needs no margin. */
+.app--workbench .topicbar__actions {
   margin-right: 36px;
 }
 
@@ -26088,23 +26007,8 @@ body > .mermaid-diagram--fullscreen {
 }
 
 :root[data-theme-style] .layout {
-  --app-chrome-height: 46px;
   --topicbar-height: 58px;
   background: var(--bg);
-}
-
-:root[data-theme-style] .layout--workbench-chrome-hidden {
-  --app-chrome-height: 0px;
-  grid-template-rows: minmax(0, 1fr) var(--statusbar-height);
-  background: var(--bg);
-}
-
-:root[data-theme-style] .app--darwin .layout {
-  --app-chrome-height: 46px;
-}
-
-:root[data-theme-style] .app--darwin .layout--workbench-chrome-hidden {
-  --app-chrome-height: 0px;
 }
 
 :root[data-theme-style] .sidebar {
@@ -26582,36 +26486,36 @@ body > .mermaid-diagram--fullscreen {
   background: var(--bg-elev-2);
 }
 
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar,
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__chrome-btn,
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__icon-btn,
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__action-btn {
+:root[data-theme-style] .app--workbench .topicbar,
+:root[data-theme-style] .app--workbench .topicbar__chrome-btn,
+:root[data-theme-style] .app--workbench .topicbar__icon-btn,
+:root[data-theme-style] .app--workbench .topicbar__action-btn {
   box-shadow: none;
 }
 
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar {
+:root[data-theme-style] .app--workbench .topicbar {
   background: var(--bg-elev);
 }
 
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__identity,
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__title-row,
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__title-row h1,
-:root[data-theme-style] .layout--workbench-chrome-hidden .tooltip-trigger:has(.topicbar__icon-btn) {
+:root[data-theme-style] .app--workbench .topicbar__identity,
+:root[data-theme-style] .app--workbench .topicbar__title-row,
+:root[data-theme-style] .app--workbench .topicbar__title-row h1,
+:root[data-theme-style] .app--workbench .tooltip-trigger:has(.topicbar__icon-btn) {
   background: transparent;
   box-shadow: none;
   filter: none;
 }
 
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__icon-btn,
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__chrome-btn {
+:root[data-theme-style] .app--workbench .topicbar__icon-btn,
+:root[data-theme-style] .app--workbench .topicbar__chrome-btn {
   background: transparent;
   filter: none;
 }
 
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__icon-btn:hover,
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__icon-btn:focus-visible,
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__chrome-btn:hover:not(.topicbar__chrome-btn--blocked),
-:root[data-theme-style] .layout--workbench-chrome-hidden .topicbar__chrome-btn:focus-visible:not(.topicbar__chrome-btn--blocked) {
+:root[data-theme-style] .app--workbench .topicbar__icon-btn:hover,
+:root[data-theme-style] .app--workbench .topicbar__icon-btn:focus-visible,
+:root[data-theme-style] .app--workbench .topicbar__chrome-btn:hover:not(.topicbar__chrome-btn--blocked),
+:root[data-theme-style] .app--workbench .topicbar__chrome-btn:focus-visible:not(.topicbar__chrome-btn--blocked) {
   border-color: transparent;
   background: transparent;
 }
@@ -27985,9 +27889,6 @@ body > .mermaid-diagram--fullscreen {
   padding: 14px 12px 10px;
 }
 
-.app--darwin .layout--workbench-chrome-hidden .sidebar--workbench {
-  padding-top: 46px;
-}
 
 .sidebar--workbench .sidebar__head {
   flex: 0 0 auto;
@@ -28986,10 +28887,10 @@ body > .mermaid-diagram--fullscreen {
    - Do NOT touch global base tokens (--bg / --border / --text-base /
      --scrollbar-size) — override them scoped to .app--creation if needed.
    ========================================================================== */
-.app--creation .layout--creation-chrome-hidden {
-  --app-chrome-height: 0px;
+/* Creation hides the status bar outright (see .app--creation .statusbar), so
+   its grid row collapses to zero as well. */
+.app--creation .layout {
   --statusbar-height: 0px;
-  grid-template-rows: minmax(0, 1fr);
 }
 
 .app--creation .statusbar {
@@ -29493,20 +29394,6 @@ body > .mermaid-diagram--fullscreen {
   :root[data-theme-style]:not([data-theme]) .app--creation .footer {
     background: transparent;
   }
-}
-
-.app--creation .layout--creation-chrome-hidden .sidebar,
-.app--creation .layout--creation-chrome-hidden .chat-pane,
-.app--creation .layout--creation-chrome-hidden .sidebar-resizer,
-.app--creation .layout--creation-chrome-hidden .workspace-panel-resizer,
-.app--creation .layout--creation-chrome-hidden .context-inspector,
-.app--creation .layout--creation-chrome-hidden .workbench-dock {
-  grid-row: 1;
-}
-
-.app--creation .layout--creation-chrome-hidden .sidebar-resizer,
-:root[data-theme-style] .app--creation .layout--creation-chrome-hidden .sidebar-resizer {
-  top: 0;
 }
 
 .app--creation .topicbar,
@@ -33198,49 +33085,9 @@ body > .mermaid-diagram--fullscreen {
   padding-right: var(--windows-window-controls-safe);
 }
 
-/* When workspace panel is open the workbench-dock covers the right edge, so the
-/* When workspace panel is open the workbench-dock covers the right edge, so the
-   topicbar no longer needs the window-controls safe space — use the normal 18px
-   padding instead to prevent buttons from being pushed off-screen or overlapping
-   the dock. */
-.app--windows-frameless .layout--workspace-open .topicbar,
-.app--windows-frameless .layout--workspace-maximized .topicbar,
-:root[data-theme-style] .app--windows-frameless .layout--workspace-open .topicbar,
-:root[data-theme-style] .app--windows-frameless .layout--workspace-maximized .topicbar {
-  padding-right: 18px;
-}
-
-/* Workbench hides AppChrome, so its dock is also the native title surface.
-/* Workbench hides AppChrome, so its dock is also the native title surface.
-   Keep the Windows caption buttons on a dedicated first row and render the
-   complete dock tab strip below it, matching Classic's separated chrome. */
-.app--windows-frameless.app--workbench .workbench-dock__tools,
-:root[data-theme-style] .app--windows-frameless.app--workbench .workbench-dock__tools {
-  position: relative;
-  height: calc(40px + var(--windows-window-controls-height));
-  padding: var(--windows-window-controls-height) 12px 0;
-}
-
-.app--windows-frameless.app--workbench .workbench-dock__tools::before,
-:root[data-theme-style] .app--windows-frameless.app--workbench .workbench-dock__tools::before {
-  content: "";
-  position: absolute;
-  top: calc(var(--windows-window-controls-height) - 1px);
-  right: 0;
-  left: 0;
-  height: 1px;
-  background: var(--border-soft);
-  pointer-events: none;
-}
-
-/* macOS keeps dock tabs and the fixed workspace toggle in one title row. The
-   toggle stays anchored to the window edge while this row reserves its hit
-   area; the four tabs share the remaining width instead of sliding under it. */
-.app--darwin.app--workbench .workbench-dock__tools,
-:root[data-theme-style] .app--darwin.app--workbench .workbench-dock__tools {
-  padding-right: 48px;
-}
-
+/* The shell bar spans the whole window, so it — not the dock's tools row —
+   carries the window-controls inset on Windows and hosts the fixed workspace
+   toggle on macOS. Neither platform reserves space inside the tools row now. */
 .app--darwin.app--workbench .workbench-dock__tabs,
 :root[data-theme-style] .app--darwin.app--workbench .workbench-dock__tabs {
   flex: 1 1 auto;
@@ -33328,23 +33175,17 @@ body > .mermaid-diagram--fullscreen {
     grid-column: 1 !important;
   }
 
-  .app .layout--workbench-chrome-hidden.layout--terminal-drawer-open .terminal-drawer,
-  :root[data-theme-style] .app .layout--workbench-chrome-hidden.layout--terminal-drawer-open .terminal-drawer,
-  .app--creation .layout--creation-chrome-hidden.layout--terminal-drawer-open .terminal-drawer,
-  :root[data-theme-style] .app--creation .layout--creation-chrome-hidden.layout--terminal-drawer-open .terminal-drawer {
-    grid-row: 2;
-  }
-
-  .app .layout--workbench-chrome-hidden.layout--terminal-drawer-open,
-  :root[data-theme-style] .app .layout--workbench-chrome-hidden.layout--terminal-drawer-open {
-    grid-template-rows: minmax(0, 1fr) var(--terminal-height, 280px) var(--statusbar-height);
-  }
-
   .app .chat-pane,
-  :root[data-theme-style] .app .chat-pane,
+  :root[data-theme-style] .app .chat-pane {
+    grid-column: 1 !important;
+    min-width: 0;
+  }
+
+  /* The bar keeps the whole row even when everything else collapses into the
+     single narrow-viewport column. */
   .app .topicbar,
   :root[data-theme-style] .app .topicbar {
-    grid-column: 1 !important;
+    grid-column: 1 / -1 !important;
     min-width: 0;
   }
 
@@ -36838,7 +36679,7 @@ body > .mermaid-diagram--fullscreen {
    topic bar defaults to --bg-elev; in light themes that reads as a hard
    white band, so use #F5F6F9 to blend it into the chat area. Dark themes
    keep the themed elevation so the header never turns light-on-dark.
-   !important beats the theme-style / chrome-hidden topicbar rules. */
+   !important beats the theme-style topicbar rules. */
 .topicbar,
 :root[data-theme="dark"] .topicbar,
 :root[data-theme-style] .topicbar {
@@ -38224,19 +38065,6 @@ html[data-dock-launcher="full"] .app:not(.app--creation) .layout:not(.layout--wo
   .tab-picker__list { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); }
   .tab-picker__item { flex-direction: column; justify-content: center; gap: 6px; height: 5.5rem; }
   .tab-picker__label { flex: 0 0 auto; text-align: center; }
-}
-
-/* The dock column starts below the topic bar so the panel reads as its own
-   surface (the bar spans the content area above it). The bar's height varies
-   by layout style, theme skin and platform caption strip, so the spacer reads
-   the measured value published by useTopicbarHeightVar. */
-.layout--workspace-open .workbench-dock:not(.workbench-dock--overlay)::before {
-  content: "";
-  display: block;
-  flex: 0 0 auto;
-  height: var(--topicbar-live-height, var(--topicbar-height));
-  background: var(--bg-elev);
-  border-bottom: 1px solid var(--border-soft);
 }
 
 /* Tab overview: the dock strip's leading dropdown (open tabs, recently closed
