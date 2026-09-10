@@ -3,7 +3,7 @@
 
 export const DESKTOP_PROTOCOL_VERSION = 1;
 
-export const DESKTOP_CONTRACT_DIGEST = "sha256:da756f0aad931a798a0e8ed7322e306fefa1e493afeb643742a2dd45ab96fe6b";
+export const DESKTOP_CONTRACT_DIGEST = "sha256:7b9f66d0fe65b706ad0e4fff9c4abd53f48802ed54dc38da1c4b9da2b2a7d9a7";
 
 export const DESKTOP_COMMANDS = [
   "AIRenameSession",
@@ -173,7 +173,11 @@ export const DESKTOP_COMMANDS = [
   "GetTopicSummary",
   "GetWorktreeStatus",
   "GitBranches",
+  "GitBranchesForTab",
   "GitCheckout",
+  "GitCheckoutForTab",
+  "GitCreateBranch",
+  "GitCreateBranchForTab",
   "HeartbeatGenerateID",
   "HeartbeatListTasks",
   "HeartbeatReloadConfig",
@@ -576,6 +580,7 @@ export const DESKTOP_COMMANDS = [
   "WorkspaceConflictForTab",
   "WorkspaceGitCommitDetail",
   "WorkspaceGitHistory",
+  "WorkspaceGitStatsForTab",
   "WorkspaceRevisionForTab",
   "WorkspaceTurnChangeDetail",
   "WorkspaceTurnChanges",
@@ -3848,6 +3853,9 @@ export interface WorkspaceChangesView {
   gitAvailable: boolean;
   gitErr?: string;
   gitBranch?: string;
+  added?: number;
+  removed?: number;
+  incomplete?: boolean;
 }
 
 export interface WorkspaceConflictView {
@@ -4411,7 +4419,11 @@ export interface GeneratedDesktopCommands {
   GetTopicSummary(arg0: ProjectTopicKey): Promise<ProjectNode>;
   GetWorktreeStatus(arg0: string): Promise<MergeInspection>;
   GitBranches(): Promise<string[]>;
+  GitBranchesForTab(arg0: string, arg1: string): Promise<string[]>;
   GitCheckout(arg0: string): Promise<void>;
+  GitCheckoutForTab(arg0: string, arg1: string, arg2: string): Promise<void>;
+  GitCreateBranch(arg0: string): Promise<void>;
+  GitCreateBranchForTab(arg0: string, arg1: string, arg2: string): Promise<void>;
   HeartbeatGenerateID(): Promise<string>;
   HeartbeatListTasks(): Promise<HeartbeatTask[]>;
   HeartbeatReloadConfig(): Promise<HeartbeatConfigView>;
@@ -4814,6 +4826,7 @@ export interface GeneratedDesktopCommands {
   WorkspaceConflictForTab(arg0: string): Promise<WorkspaceConflictView>;
   WorkspaceGitCommitDetail(arg0: string, arg1: string, arg2: string): Promise<GitCommitDetailView>;
   WorkspaceGitHistory(arg0: string, arg1: string): Promise<GitCommitView[]>;
+  WorkspaceGitStatsForTab(arg0: string, arg1: string): Promise<WorkspaceChangesView>;
   WorkspaceRevisionForTab(arg0: string): Promise<WorkspaceRevisionView>;
   WorkspaceTurnChangeDetail(arg0: string, arg1: string, arg2: number, arg3: string, arg4: string): Promise<TurnFile | null>;
   WorkspaceTurnChanges(arg0: string, arg1: string, arg2: number, arg3: string): Promise<TurnChanges | null>;

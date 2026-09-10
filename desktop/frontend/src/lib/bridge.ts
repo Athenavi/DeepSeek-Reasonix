@@ -493,6 +493,11 @@ export interface AppBindings extends ToolRecoveryBindings, ModelSettingsBindings
   TurnCheckLog(tabID: string, sessionPath: string, toolID: string, resultID: string): Promise<{ output: string; truncated: boolean } | null>;
   GitBranches(): Promise<string[]>;
   GitCheckout(branch: string): Promise<void>;
+  GitCreateBranch(name: string): Promise<void>;
+  GitBranchesForTab(tabID: string, workspaceRoot: string): Promise<string[]>;
+  GitCheckoutForTab(tabID: string, workspaceRoot: string, branch: string): Promise<void>;
+  GitCreateBranchForTab(tabID: string, workspaceRoot: string, name: string): Promise<void>;
+  WorkspaceGitStatsForTab(tabID: string, workspaceRoot: string): Promise<WorkspaceChangesView>;
   WorkspaceGitHistory(tabID: string, path: string): Promise<GitCommitView[]>;
   WorkspaceGitCommitDetail(tabID: string, hash: string, path: string): Promise<GitCommitDetailView>;
   OpenWorkspacePathForTab(tabID: string, rel: string): Promise<void>;
@@ -1080,10 +1085,10 @@ function browserPlatformOverride(): "darwin" | "windows" | "linux" | "" {
   return value === "darwin" || value === "windows" || value === "linux" ? value : "";
 }
 
-function browserMockDesktopLayoutStyle(): "classic" | "workbench" | "creation" {
+function browserMockDesktopLayoutStyle(): "workbench" | "creation" {
   if (typeof window === "undefined" || desktopHost().app) return "workbench";
   const value = new URLSearchParams(window.location.search).get("layout");
-  return value === "classic" || value === "creation" ? value : "workbench";
+  return value === "creation" ? value : "workbench";
 }
 
 function browserPreviewBashSandboxMode(): "enforce" | "off" {
@@ -4011,8 +4016,15 @@ function makeMockApp(): AppBindings {
     async GitBranches() {
       return ["main", "dev", "feature/branch-switcher"];
     },
+    async GitBranchesForTab(_tabID: string, _workspaceRoot: string) { return this.GitBranches(); },
+    async GitCheckoutForTab(_tabID: string, _workspaceRoot: string, branch: string) { await this.GitCheckout(branch); },
+    async GitCreateBranchForTab(_tabID: string, _workspaceRoot: string, name: string) { await this.GitCreateBranch(name); },
+    async WorkspaceGitStatsForTab(tabID: string, _workspaceRoot: string) { return this.WorkspaceChanges(tabID); },
     async GitCheckout(_branch: string) {
       console.info("mock GitCheckout", _branch);
+    },
+    async GitCreateBranch(_name: string) {
+      console.info("mock GitCreateBranch", _name);
     },
     async WorkspaceGitHistory(_tabID: string, path: string) {
       return [
@@ -4886,7 +4898,7 @@ function makeMockApp(): AppBindings {
           return "";
         },
         async SetDesktopLayoutStyle(style: string) {
-          settings.desktopLayoutStyle = style === "workbench" || style === "creation" ? style : "classic";
+          settings.desktopLayoutStyle = style === "creation" ? "creation" : "workbench";
         },
         async SetDesktopZoomFactor(factor: number) {
           mockDesktopZoomFactor = Math.min(2.0, Math.max(0.5, Number.isFinite(factor) ? factor : 1.0));

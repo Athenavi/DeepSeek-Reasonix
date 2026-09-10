@@ -4457,6 +4457,38 @@
     },
     {
       "cancellation": "before-dispatch",
+      "domain": "desktop/workspace_git_branches.go",
+      "name": "GitBranchesForTab",
+      "owner": "App.GitBranchesForTab",
+      "params": [
+        {
+          "kind": "string"
+        },
+        {
+          "kind": "string"
+        }
+      ],
+      "result": {
+        "elem": {
+          "kind": "string"
+        },
+        "kind": "array"
+      },
+      "returnsError": true,
+      "scope": {
+        "inputs": [
+          "tabID",
+          "workspaceRoot"
+        ],
+        "kind": "owner-inputs",
+        "resolver": "App.GitBranchesForTab"
+      },
+      "sources": [
+        "desktop/workspace_git_branches.go"
+      ]
+    },
+    {
+      "cancellation": "before-dispatch",
       "domain": "desktop/workspace_changes.go",
       "name": "GitCheckout",
       "owner": "App.GitCheckout",
@@ -4475,6 +4507,88 @@
       },
       "sources": [
         "desktop/workspace_changes.go"
+      ]
+    },
+    {
+      "cancellation": "before-dispatch",
+      "domain": "desktop/workspace_git_branches.go",
+      "name": "GitCheckoutForTab",
+      "owner": "App.GitCheckoutForTab",
+      "params": [
+        {
+          "kind": "string"
+        },
+        {
+          "kind": "string"
+        },
+        {
+          "kind": "string"
+        }
+      ],
+      "returnsError": true,
+      "scope": {
+        "inputs": [
+          "tabID",
+          "workspaceRoot",
+          "branch"
+        ],
+        "kind": "owner-inputs",
+        "resolver": "App.GitCheckoutForTab"
+      },
+      "sources": [
+        "desktop/workspace_git_branches.go"
+      ]
+    },
+    {
+      "cancellation": "before-dispatch",
+      "domain": "desktop/workspace_changes.go",
+      "name": "GitCreateBranch",
+      "owner": "App.GitCreateBranch",
+      "params": [
+        {
+          "kind": "string"
+        }
+      ],
+      "returnsError": true,
+      "scope": {
+        "inputs": [
+          "name"
+        ],
+        "kind": "owner-inputs",
+        "resolver": "App.GitCreateBranch"
+      },
+      "sources": [
+        "desktop/workspace_changes.go"
+      ]
+    },
+    {
+      "cancellation": "before-dispatch",
+      "domain": "desktop/workspace_git_branches.go",
+      "name": "GitCreateBranchForTab",
+      "owner": "App.GitCreateBranchForTab",
+      "params": [
+        {
+          "kind": "string"
+        },
+        {
+          "kind": "string"
+        },
+        {
+          "kind": "string"
+        }
+      ],
+      "returnsError": true,
+      "scope": {
+        "inputs": [
+          "tabID",
+          "workspaceRoot",
+          "name"
+        ],
+        "kind": "owner-inputs",
+        "resolver": "App.GitCreateBranchForTab"
+      },
+      "sources": [
+        "desktop/workspace_git_branches.go"
       ]
     },
     {
@@ -15065,6 +15179,36 @@
       },
       "sources": [
         "desktop/workspace_changes.go"
+      ]
+    },
+    {
+      "cancellation": "before-dispatch",
+      "domain": "desktop/workspace_git_branches.go",
+      "name": "WorkspaceGitStatsForTab",
+      "owner": "App.WorkspaceGitStatsForTab",
+      "params": [
+        {
+          "kind": "string"
+        },
+        {
+          "kind": "string"
+        }
+      ],
+      "result": {
+        "kind": "object",
+        "ref": "main.WorkspaceChangesView"
+      },
+      "returnsError": true,
+      "scope": {
+        "inputs": [
+          "tabID",
+          "workspaceRoot"
+        ],
+        "kind": "owner-inputs",
+        "resolver": "App.WorkspaceGitStatsForTab"
+      },
+      "sources": [
+        "desktop/workspace_git_branches.go"
       ]
     },
     {
@@ -32808,6 +32952,27 @@
           "optional": true,
           "type": {
             "kind": "string"
+          }
+        },
+        {
+          "name": "added",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "removed",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "incomplete",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
           }
         }
       ]
