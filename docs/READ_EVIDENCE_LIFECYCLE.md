@@ -135,6 +135,17 @@ and gained `receipt_ids`; the file writers gained an optional `source_token`.
 Those schema edits change the stable system prefix once, on upgrade; within a
 session the prefix stays byte-stable.
 
+## Observability
+
+Transitions publish content-free counters to any sink that wants them:
+`operation_settled_total`, `operation_needs_user_total`,
+`operation_recovery_attempt_total`, `operation_duplicate_block_total`,
+`verification_auto_attached_total`, `verification_unclassified_total`,
+`read_source_changed_total` and `complete_step_optional_call_total`. They carry
+host identifiers only — never a path, an argument, a command, or tool output.
+The ones that answer whether this worked are the average recoveries per
+operation, the `needs_user` share, and the unclassified-command share.
+
 ## Validation
 
 Regressions cover three repeated edit/read/retry cycles, changed anchors,
