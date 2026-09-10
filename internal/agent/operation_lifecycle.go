@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"reasonix/internal/event"
@@ -212,7 +213,7 @@ func (a *Agent) applyOperationBreaker(receiptMark int) intervention {
 	for _, op := range stopped {
 		line := fmt.Sprintf("%s (%s)", op.ID, op.FailureCode)
 		if len(op.TargetPaths) > 0 {
-			line += " targeting " + strings.Join(op.TargetPaths, ", ")
+			line += " targeting " + strings.Join(slashPaths(op.TargetPaths), ", ")
 		}
 		lines = append(lines, line)
 	}
@@ -286,9 +287,20 @@ func describeReadinessGaps(gaps []ReadinessOperationGap) string {
 	for _, gap := range gaps {
 		part := gap.OperationID + " (" + gap.State + " → " + gap.Action + ")"
 		if len(gap.Paths) > 0 {
-			part += " " + strings.Join(gap.Paths, ", ")
+			part += " " + strings.Join(slashPaths(gap.Paths), ", ")
 		}
 		parts = append(parts, part)
 	}
 	return "unsettled operations: " + strings.Join(parts, "; ")
+}
+
+// slashPaths renders host paths slash-canonically. Display text reaches the
+// model and the user, and a backslash-separated path reads as an escape to
+// both; the structured fields keep the native separator for opening a file.
+func slashPaths(paths []string) []string {
+	out := make([]string, 0, len(paths))
+	for _, path := range paths {
+		out = append(out, filepath.ToSlash(path))
+	}
+	return out
 }
