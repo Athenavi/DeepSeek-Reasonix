@@ -548,18 +548,22 @@ console.log("\ncomposer run strip");
 
   ok(stripText().includes("18 tokens"), "the run strip carries the live token readout");
   ok(stripText().includes("10 t/s"), "an emitting model contributes throughput to the strip");
-  eq((stripText().match(/≈/g) ?? []).length, 1, "the strip marks the estimate once for the whole group");
+  eq((stripText().match(/≈/g) ?? []).length, 1, "the strip marks the estimate once");
+  ok(!/[()·]/.test(stripText()), "no grouping punctuation: colour and position do the separating");
   const readings = document.querySelector(".composer-run-strip__metrics");
   const readingsText = readings?.textContent ?? "";
-  ok(readingsText.startsWith(" (") && readingsText.endsWith(")"),
-    "the readings sit in a parenthesised clause the state word does not own");
-  ok(/\(\d+m \d+s |\(\d+s /.test(readingsText), "the clause leads with the turn clock");
-  ok(readingsText.includes("≈18 tokens") && readingsText.includes("10 t/s"),
-    "the clause carries both live readings");
+  ok(/^ \d+(m \d+)?s ≈18 tokens 10 t\/s$/.test(readingsText),
+    `readings read as clock, tokens, throughput (got "${readingsText}")`);
+  const shed = document.querySelector(".composer-run-strip__metric--optional");
+  eq(shed?.textContent, " 10 t/s", "throughput owns the trailing segment so a narrow strip sheds it whole");
+  ok(!(shed?.textContent ?? "").includes("tokens"),
+    "the clock and token count sit outside the shedable segment and are never cut");
 
   await rerender({ turnModelActiveAt: undefined });
   ok(stripText().includes("18 tokens"), "the token readout survives the model going quiet");
   ok(!stripText().includes("t/s"), "a quiet model withholds throughput instead of freezing a rate");
+  eq(document.querySelector(".composer-run-strip__metric--optional"), null,
+    "a quiet model contributes no shedable segment");
 
   await rerender({ running: false, turnDoneAt: Date.now() });
   ok(stripText() === "", "a settled turn drops the strip readings");

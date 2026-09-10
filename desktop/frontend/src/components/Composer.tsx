@@ -3823,19 +3823,26 @@ export function Composer({
     // cue: the clock is exact, and throughput is derived from it. The popover
     // keeps a per-value cue because it also shows settled, exact readings.
     const estimate = metrics.estimated ? "≈" : "";
-    const stripParts = metrics.tokens > 0
+    const live = metrics.tokens > 0 && !turnDoneAt;
+    // Punctuation is not what groups these: the readings are pinned right and
+    // dimmed, so a long state word ellipsises instead of cutting them. The
+    // throughput is returned apart because it is the one reading the strip may
+    // shed whole when the composer is narrow.
+    const stripParts = live
       ? [formatElapsedMs(metrics.elapsedMs),
-        `${estimate}${formatTokens(metrics.tokens)} ${t("status.tokens")}`,
-        (liveModelActiveAt ?? turnModelActiveAt) ? formatTps(metrics.tps) : null]
+        `${estimate}${formatTokens(metrics.tokens)} ${t("status.tokens")}`]
       : [];
-    const stripBody = stripParts.filter(Boolean).join(" · ");
+    const stripSpeed = live && (liveModelActiveAt ?? turnModelActiveAt) && metrics.tps !== null
+      ? formatTps(metrics.tps)
+      : "";
     return {
       elapsed: formatElapsedMs(metrics.elapsedMs),
       tokens: metrics.tokens > 0
         ? `${metrics.estimated ? "≈" : ""}${formatTokens(metrics.tokens)} ${t("status.tokens")}`
         : null,
       tps: formatTps(metrics.tps, metrics.estimated),
-      strip: !turnDoneAt && stripBody ? `(${stripBody})` : "",
+      stripParts,
+      stripSpeed,
     };
   }, [metricsTick, running, turnStartAt, turnDoneAt, waitAccumMs, lastTurnWaitAccumMs,
     turnTokens, turnOutputTokens, lastTurnOutputTokens, turnOutputCharsAtUsage, turnArgChars,
@@ -3843,7 +3850,7 @@ export function Composer({
     lastTurnOutputEstimated, t]);
   // The strip's own sr-only sibling keeps announcing the stable state alone, so
   // these churning numbers stay out of the live region.
-  const runStripMetrics = runMetrics?.strip ?? "";
+  const runStrip = runMetrics?.stripParts.length ? runMetrics : null;
   const submitEmpty = !text.trim() && attachments.length === 0 && workspaceRefs.length === 0 &&
     !invocations.some((invocation) => invocation.command.kind === "skill");
   const submitBlocked = submitting || (!pendingFollowup && (pendingPaste > 0 || (submitEmpty && !(goalModeOn && !activeGoal)) || disabled || (!running && submitDisabled) || readOnly));
@@ -4420,8 +4427,17 @@ export function Composer({
           <div className={`composer-run-strip${waitingPrompt ? " composer-run-strip--waiting" : ""}`}>
             {!finishing && !runtimeState.unknown && <span className="composer-run-strip__dot" aria-hidden="true" />}
             <span className="composer-run-strip__text">
-              {readStatusText || runStateText}
-              {runStripMetrics && <span className="composer-run-strip__metrics">{` ${runStripMetrics}`}</span>}
+              <span className="composer-run-strip__state">{readStatusText || runStateText}</span>
+              {runStrip && (
+                <span className="composer-run-strip__metrics">
+                  {runStrip.stripParts.map((part) => (
+                    <span className="composer-run-strip__metric" key={part}>{` ${part}`}</span>
+                  ))}
+                  {runStrip.stripSpeed && (
+                    <span className="composer-run-strip__metric composer-run-strip__metric--optional">{` ${runStrip.stripSpeed}`}</span>
+                  )}
+                </span>
+              )}
             </span>
           </div>
         )}
