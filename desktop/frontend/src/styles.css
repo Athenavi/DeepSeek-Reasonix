@@ -22268,6 +22268,31 @@ body > .mermaid-diagram--fullscreen {
   padding-left: var(--chrome-left-safe-offset);
 }
 
+/* Windows leads the bar with the app mark — the caption buttons already own the
+   window's right end — so the sidebar stops repeating the brand there. macOS
+   leads with the traffic lights and keeps its sidebar wordmark. */
+.topicbar__brand {
+  display: none;
+}
+.app--windows-frameless .topicbar__brand,
+:root[data-theme-style] .app--windows-frameless .topicbar__brand {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+.topicbar__brand-logo {
+  display: block;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+.app--windows-frameless .sidebar__head,
+.app--windows-frameless .sidebar__brand,
+:root[data-theme-style] .app--windows-frameless .sidebar__head,
+:root[data-theme-style] .app--windows-frameless .sidebar__brand {
+  display: none;
+}
+
 .topicbar__chrome-btn {
   flex: 0 0 auto;
   display: inline-flex;
@@ -33197,15 +33222,8 @@ body > .mermaid-diagram--fullscreen {
    Windows + Creation: Vertical alignment for titlebar elements
    ========================================================================= */
 
-/* Align sidebar logo with the shorter 40px Windows title strip center line */
-.app--windows.app--creation .sidebar__brand,
-:root[data-theme-style] .app--windows.app--creation .sidebar__brand {
-  margin-top: -32px !important;
-}
-
-/* Align topicbar (replaces app-chrome in Creation mode) with Windows controls
-/* Align topicbar (replaces app-chrome in Creation mode) with Windows controls
-   without changing the shared macOS/Linux Creation geometry above. */
+/* Match the bar to the shorter 40px Windows caption strip without changing the
+   shared macOS/Linux Creation geometry above. */
 .app--windows.app--creation .topicbar,
 :root[data-theme-style] .app--windows.app--creation .topicbar {
   position: relative;
