@@ -6874,6 +6874,11 @@ body > .mermaid-diagram--fullscreen {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+/* The state word owns the accent; the readings recede so the churning numbers
+   do not outrank the reason the strip is on screen. */
+.composer-run-strip__metrics {
+  color: var(--fg-dim);
+}
 .composer-run-strip--waiting {
   color: color-mix(in srgb, var(--warn) 74%, var(--fg));
 }
