@@ -11,6 +11,7 @@ import { addBreadcrumb } from "./breadcrumbs";
 import { app, onEvent, onReady, onRuntimeRebuilt, onTabMeta, onTopicActivation } from "./bridge";
 import { startControllerEventRecovery } from "./controllerEventRecovery";
 import { metaFromTab } from "./controllerTabMeta";
+import { tokensFromQuarters, unbilledOutputTokens } from "./turnMetrics";
 export { metaFromTab } from "./controllerTabMeta";
 import { invalidateCache } from "./composerHistory";
 import { formatInboxCancelError } from "./inboxError";
@@ -1141,8 +1142,11 @@ function endPromptWait(s: State, now = Date.now()): State {
   };
 }
 
+// An MCP interaction is a user wait like any other prompt: closing the interval
+// while one is outstanding would drop that wait from turnWaitAccumMs entirely,
+// because the later answer's endPromptWait finds no open interval to close.
 function endPromptWaitIfIdle(s: State, now = Date.now()): State {
-  if (s.approval || s.ask) return s;
+  if (s.approval || s.ask || s.mcpInteraction) return s;
   return endPromptWait(s, now);
 }
 
@@ -1187,11 +1191,11 @@ function endTurnModelActivity(s: State, now = Date.now(), stashForUsage = false)
 function snapshotCompletedTurnTelemetry(s: State, now = Date.now()): State {
   if (!s.turnStartAt || s.turnDoneAt > 0) return s;
   const settled = endPromptWait(endTurnModelActivity(s, now), now);
-  const liveChars = (settled.live?.text.length ?? 0) + (settled.live?.reasoning.length ?? 0);
-  const inFlightChars = settled.turnOutputTokens > 0
-    ? Math.max(0, liveChars - settled.turnOutputCharsAtUsage) + settled.turnArgChars
-    : settled.turnOutputChars + settled.turnArgChars;
-  const estimatedInFlightTokens = Math.round(inFlightChars / 4);
+  // `turnOutputChars` is a bare count with no buffer to weight, so the rolled
+  // back-attempt branch stays ASCII-priced.
+  const estimatedInFlightTokens = settled.turnOutputTokens > 0
+    ? unbilledOutputTokens(settled.live, settled.turnOutputCharsAtUsage, settled.turnArgChars)
+    : tokensFromQuarters(settled.turnOutputChars + settled.turnArgChars);
   return {
     ...settled,
     turnDoneAt: now,
@@ -2340,7 +2344,7 @@ export function reducer(s: State, a: Action): State {
     }
     case "local_notice": return { ...s, running: a.preserveRuntime ? s.running : false, turnActive: a.preserveRuntime ? s.turnActive : false, seq: s.seq + 1, items: [...s.items, { kind: "notice", id: `n${s.seq}`, level: a.level, text: a.text }] };
     case "clearApproval": {
-      const next = { ...s, approval: undefined, pendingPrompt: Boolean(s.ask), resolvedPromptId: s.approval?.id ?? s.resolvedPromptId };
+      const next = { ...s, approval: undefined, pendingPrompt: Boolean(s.ask || s.mcpInteraction), resolvedPromptId: s.approval?.id ?? s.resolvedPromptId };
       return endPromptWaitIfIdle(next);
     }
     case "clearAsk": {
@@ -2376,12 +2380,12 @@ export function reducer(s: State, a: Action): State {
     // drain result must also belong to this controller's prompt-id epoch.
     case "approval_drained": {
       if (s.promptEpoch !== a.epoch || !s.approval || !a.ids.includes(s.approval.id)) return s;
-      const next = { ...s, approval: undefined, pendingPrompt: Boolean(s.ask), resolvedPromptId: s.approval.id };
+      const next = { ...s, approval: undefined, pendingPrompt: Boolean(s.ask || s.mcpInteraction), resolvedPromptId: s.approval.id };
       return endPromptWaitIfIdle(next);
     }
     case "ask_submit_succeeded": {
       if (s.promptEpoch !== a.epoch || s.ask?.id !== a.id) return s;
-      const next = { ...s, ask: undefined, pendingPrompt: Boolean(s.approval), resolvedPromptId: a.id };
+      const next = { ...s, ask: undefined, pendingPrompt: Boolean(s.approval || s.mcpInteraction), resolvedPromptId: a.id };
       return endPromptWaitIfIdle(next);
     }
     // The optimistic clearApproval/clearAsk tombstone was wrong: the backend

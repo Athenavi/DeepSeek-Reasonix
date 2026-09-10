@@ -6770,6 +6770,9 @@ body > .mermaid-diagram--fullscreen {
   color: var(--accent);
   font-family: var(--sans);
   font-size: 12px;
+  /* Lets the readings drop the rate by width instead of grinding it down to a
+     half-cut number. */
+  container-type: inline-size;
 }
 .composer-card--waiting .composer-run-strip {
   /* inherited from the card border tint; no extra rule needed */
@@ -6783,11 +6786,50 @@ body > .mermaid-diagram--fullscreen {
   animation: pulse 1.2s ease-in-out infinite;
 }
 .composer-run-strip__text {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+/* Punctuation is not what groups these. The state word carries the accent and
+   the readings are pinned right, so a long state word ellipsises instead of
+   truncating a reading; a single ellipsised line would cut inside a number and
+   leave it reading as a whole one. */
+.composer-run-strip__state {
+  flex: 0 9 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+}
+/* The readings never shrink, so every pixel the strip gives up comes out of the
+   state word. That is what keeps a reading from being cut mid-number. */
+.composer-run-strip__metrics {
+  display: flex;
+  align-items: baseline;
+  flex: 0 0 auto;
+  column-gap: 14px;
+  color: var(--fg-dim);
+}
+/* `pre` keeps the space that separates the readings in the text layer too:
+   flex strips a leading space from the block's first character. */
+.composer-run-strip__metric {
+  flex: 0 0 auto;
+  white-space: pre;
+}
+/* Throughput is the only reading that may be shed, and it is shed whole: it
+   never shrinks, so it cannot be ground down to a half-cut number, and the
+   container query removes it before it would have to overflow. */
+.composer-run-strip__metric--optional {
+  flex: 0 0 auto;
+}
+@container (max-width: 350px) {
+  .composer-run-strip__metric--optional {
+    display: none;
+  }
 }
 .composer-run-strip--waiting {
   color: color-mix(in srgb, var(--warn) 74%, var(--fg));
