@@ -334,10 +334,8 @@ func remoteModelSettingsRequest(ctx context.Context, client *http.Client, base, 
 		return result, err
 	}
 	if err := json.Unmarshal(payload, &result); err != nil {
-		// A Serve older than the model-settings protocol answers unknown GET
-		// paths through its catch-all "GET /" route with status 200 and the HTML
-		// index, so a 200 whose body is a document is that legacy Serve — not a
-		// corrupt status payload from a capable one.
+		// Older Serves answer unknown routes with the HTML index; classify that
+		// document response as an unsupported model-settings protocol.
 		if trimmed := bytes.TrimSpace(payload); len(trimmed) > 0 && trimmed[0] == '<' {
 			return result, &remoteModelSettingsRejection{message: remoteModelSettingsUpgradeHint, unsupported: true}
 		}
@@ -390,11 +388,8 @@ func (a *App) ensureRemoteModelSettings(tabID string) (string, uint64, error) {
 		}
 		if err != nil {
 			if isRemoteModelSettingsUnsupported(err) {
-				// The Serve predates the model-settings protocol, so no snapshot
-				// can ever apply in this generation. Admit the turn without a
-				// revision instead of failing every send against a reused Serve
-				// that credential mode itself still supports — but only when the
-				// verdict was recorded on the connection the probe ran against.
+				// A legacy Serve cannot apply snapshots; admit without a revision
+				// only when the verdict belongs to the current connection.
 				a.remoteTabMu.Lock()
 				current := a.remoteTabs[tabID]
 				recorded := current == tab && current.gen == generation && current.routing.currentPath == path
@@ -452,10 +447,8 @@ func (a *App) appendRemoteModelSettingsStatus(result *ModelSettingsResult) {
 		// Generation 0 is an unrecorded verdict: a not-yet-attached tab has not
 		// probed any Serve and must stay pending, not claim not_required.
 		if tab.settings.unsupportedGen != 0 && tab.settings.unsupportedGen == tab.gen {
-			// The Serve predates the protocol and never applies snapshots in
-			// this generation, so the target does not participate: report it as
-			// not required instead of a pending application that would keep the
-			// Settings receipt waiting and polling forever.
+			// Legacy targets never apply snapshots, so report them as not required
+			// instead of leaving the settings receipt pending indefinitely.
 			result.Targets = append(result.Targets, ModelSettingsTarget{TabID: tab.id, Title: tab.topicTitle, Application: "not_required", AppliedRevision: tab.settings.revision, DesiredRevision: desired})
 			continue
 		}
@@ -481,10 +474,8 @@ type remoteModelApplicationState struct {
 	failureRevision string
 	generation      uint64
 	sessionPath     string
-	// unsupportedGen records the tab generation at which the remote Serve was
-	// found to predate the model-settings protocol. Turn admission then runs
-	// without a revision, like a Serve-only credential session, until a newer
-	// generation (reconnect or serve replacement) probes the protocol again.
+	// unsupportedGen records a generation whose Serve predates model-settings;
+	// a reconnect or replacement generation probes the protocol again.
 	unsupportedGen uint64
 }
 
