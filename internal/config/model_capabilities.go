@@ -236,7 +236,11 @@ func presetModelInfo(entry *ProviderEntry, model string) (provider.ModelInfo, bo
 			return provider.ModelInfo{}, false
 		}
 		modalities := []provider.ModelModality{provider.ModalityText}
-		if candidate.HasVisionModel(model) {
+		// The curated templates predate the V4.1 multimodal SKUs, so the vendor
+		// authority also decides here; otherwise a matching preset would lock a
+		// model that the builtin catalog already reports as image-capable.
+		if candidate.HasVisionModel(model) ||
+			(openai.IsDeepSeek(entry.BaseURL) && provider.IsOfficialDeepSeekImageModel(model)) {
 			modalities = append(modalities, provider.ModalityImage)
 		}
 		return provider.ModelInfo{ID: model, Name: model, InputModalities: modalities}, true

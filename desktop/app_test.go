@@ -5294,8 +5294,8 @@ func TestConnectKeyFreshInstallUsesDeepSeekChatAndIndependentSearchDefaults(t *t
 		t.Fatalf("default model %q did not resolve", cfg.DefaultModel)
 	}
 	if entry.Kind != "openai" || entry.BaseURL != "https://api.deepseek.com" ||
-		entry.Thinking != "enabled" || !config.EffectiveIndependentWebSearch(entry) || config.EffectiveVision(entry) {
-		t.Fatalf("fresh-install DeepSeek entry = %+v; want Chat Completions, thinking, independent search, and text-only vision", entry)
+		entry.Thinking != "enabled" || !config.EffectiveIndependentWebSearch(entry) || !config.EffectiveVision(entry) {
+		t.Fatalf("fresh-install DeepSeek entry = %+v; want Chat Completions, thinking, independent search, and native image input", entry)
 	}
 	if app.NeedsOnboarding() {
 		t.Fatal("fresh-install onboarding should close after the validated DeepSeek key is stored")
