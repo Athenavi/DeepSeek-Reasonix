@@ -108,6 +108,9 @@ func (a *Agent) resolveToolPolicy(ctx context.Context, turn *turnRuntime, plan *
 	if blocked, early := a.applyExecutionPreflight(turn, plan); early {
 		return blocked, true
 	}
+	if blocked, early := a.applyOperationGate(plan); early {
+		return blocked, true
+	}
 	if blocked, early := a.applyEvidenceGates(ctx, plan); early {
 		return blocked, true
 	}
@@ -653,7 +656,7 @@ func (a *Agent) finishToolExecution(ctx context.Context, plan *toolCallPlan) too
 	}
 	// Always re-read after post hooks —
 	// partialwritesandhooksideeffectscanchangethepreviewedpathevenwhentheconcrete tool returned an error.
-	a.finalizeObservedToolReceipts(plan, result, execution, err)
+	receipt := a.finalizeObservedToolReceipts(plan, result, execution, err)
 	result = a.withRecoveryObservation(ctx, evidenceName, evidenceArgs, readOnly, mutates, result, err, recoveryGen)
 	if err != nil {
 		detail := result
@@ -699,6 +702,7 @@ func (a *Agent) finishToolExecution(ctx context.Context, plan *toolCallPlan) too
 		result, visionSummary = processed.text, processed.summary
 	}
 	body, truncMsg, original, readObserver := a.boundIncompleteReadAwareResult(plan, result)
+	body = appendReceiptCitation(body, receipt)
 	out := toolOutcome{
 		runState: runState, output: body, images: images, visionSummary: visionSummary, truncated: truncMsg != "" || original != "", truncMsg: truncMsg,
 		execution: execution, mcpApp: toProviderMCPApp(plan.mcpApp), recoveryGeneration: recoveryGen,

@@ -106,6 +106,9 @@ func (a *Agent) checkOperationEvidence(ctx context.Context, call provider.ToolCa
 	}
 	check.Target = info
 
+	if token := citedSourceToken(call.Arguments); token != "" {
+		return a.checkCitedSourceToken(call, check, info, token)
+	}
 	observations := a.eligibleObservations(info.Path, boundary)
 	if info.Snapshot != "" {
 		observations = slices.DeleteFunc(observations, func(o evidence.TextObservation) bool {
@@ -334,48 +337,64 @@ func (a *Agent) applyEvidenceGates(ctx context.Context, plan *toolCallPlan) (too
 	switch {
 	case check.NativeError != nil:
 		a.recordRepeatFailure(call, resolved, check.NativeError)
-		return blockedEvidenceOutcome(check, call), true
+		return a.blockedEvidenceOutcome(check, call), true
 	case check.Satisfied:
 		plan.expectedWriteSource = check.Target
 		return toolOutcome{}, false
 	case !check.Supported:
-		if !evidence.ClassifyToolCall(call.Name, json.RawMessage(call.Arguments), plan.readOnly || resolved.ReadOnly()).ContentMutation {
-			return toolOutcome{}, false
-		}
-		// A writer that cannot declare its target is never granted a pass. While
-		// another writer is blocked for missing evidence, it must not become the
-		// way around that block.
-		outstanding := a.outstandingReadEvidence(ctx, boundary)
-		if (call.Name == "bash" || call.Name == "shell") && !toolHooksMayMutateWorkspace(a.svc.hooks) {
-			var args struct {
-				Command string `json:"command"`
-			}
-			if json.Unmarshal([]byte(call.Arguments), &args) == nil {
-				if paths, known := shellsafe.StaticWritePaths(args.Command); known {
-					outstanding = slices.DeleteFunc(outstanding, func(path string) bool {
-						for _, candidate := range paths {
-							if evidencePathsOverlap(resolveMaybeRelative(a.writeWorkspaceRoot, candidate), path) {
-								return false
-							}
-						}
-						return true
-					})
-				}
-			}
-		}
-		if len(outstanding) == 0 || plan.readOnly {
-			return toolOutcome{}, false
-		}
-		msg := fmt.Sprintf("blocked: [evidence required] %s cannot declare which files it changes while a read-evidence requirement is outstanding (%s); use the exact file tool for those paths",
-			plan.call.Name, strings.Join(outstanding, ", "))
-		d := &tool.OperationDiagnostic{Code: tool.WriteEvidenceMissing, OperationID: plan.call.ID, Recovery: "declare the exact write paths or use the dedicated file tool"}
-		if len(outstanding) > 0 {
-			d.Path = outstanding[0]
-		}
-		return toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg), diagnostic: d}, true
+		return a.blockUndeclaredWriter(ctx, plan, call, resolved, boundary)
 	}
 	a.turn.evidenceBlocked.record(check, call, boundary)
-	return blockedEvidenceOutcome(check, call), true
+	return a.blockedEvidenceOutcome(check, call), true
+}
+
+// blockUndeclaredWriter keeps a writer that cannot name what it changes from
+// becoming the way around another writer's outstanding read requirement. The
+// rejection is bounded like every other one: an opaque writer that keeps
+// hitting it converges on the user instead of costing a provider round each
+// time.
+func (a *Agent) blockUndeclaredWriter(ctx context.Context, plan *toolCallPlan, call provider.ToolCall, resolved tool.Tool, boundary uint64) (toolOutcome, bool) {
+	if !evidence.ClassifyToolCall(call.Name, json.RawMessage(call.Arguments), plan.readOnly || resolved.ReadOnly()).ContentMutation {
+		return toolOutcome{}, false
+	}
+	outstanding := a.outstandingReadEvidence(ctx, boundary)
+	if (call.Name == "bash" || call.Name == "shell") && !toolHooksMayMutateWorkspace(a.svc.hooks) {
+		outstanding = a.narrowToDeclaredShellWrites(call, outstanding)
+	}
+	if len(outstanding) == 0 || plan.readOnly {
+		return toolOutcome{}, false
+	}
+	msg := fmt.Sprintf("blocked: [evidence required] %s cannot declare which files it changes while a read-evidence requirement is outstanding (%s); use the exact file tool for those paths",
+		plan.call.Name, strings.Join(outstanding, ", "))
+	d := &tool.OperationDiagnostic{Code: tool.WriteEvidenceMissing, Path: outstanding[0], Recovery: "declare the exact write paths or use the dedicated file tool"}
+	a.noteOperationFailure(plan.operationID(), d.Code, d)
+	if recovery := d.ModelFacing(); recovery != "" {
+		msg += "\n" + recovery
+	}
+	return toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg), diagnostic: d}, true
+}
+
+// narrowToDeclaredShellWrites drops requirements a statically analyzable shell
+// command provably does not touch. An unanalyzable command keeps them all.
+func (a *Agent) narrowToDeclaredShellWrites(call provider.ToolCall, outstanding []string) []string {
+	var args struct {
+		Command string `json:"command"`
+	}
+	if json.Unmarshal([]byte(call.Arguments), &args) != nil {
+		return outstanding
+	}
+	paths, known := shellsafe.StaticWritePaths(args.Command)
+	if !known {
+		return outstanding
+	}
+	return slices.DeleteFunc(outstanding, func(path string) bool {
+		for _, candidate := range paths {
+			if evidencePathsOverlap(resolveMaybeRelative(a.writeWorkspaceRoot, candidate), path) {
+				return false
+			}
+		}
+		return true
+	})
 }
 
 func evidencePathsOverlap(left, right string) bool {
@@ -438,25 +457,35 @@ func (a *Agent) preflightEvidenceBatch(ctx context.Context, calls []provider.Too
 			continue
 		}
 		a.turn.evidenceBlocked.record(check, call, boundary)
-		blocked[i] = blockedEvidenceOutcome(check, call)
+		blocked[i] = a.blockedEvidenceOutcome(check, call)
 	}
 	return blocked
 }
 
-func blockedEvidenceOutcome(check evidenceCheck, call provider.ToolCall) toolOutcome {
+// blockedEvidenceOutcome renders one rejection. The operation ID is derived
+// from what the call targets, not from the provider's per-round call ID, so
+// the same rejected edit is recognizable when the model sends it again.
+func (a *Agent) blockedEvidenceOutcome(check evidenceCheck, call provider.ToolCall) toolOutcome {
 	code := tool.WriteEvidenceMissing
 	if check.Reason == "stale_or_partial_evidence" {
 		code = tool.WriteEvidenceStale
 	}
-	d := &tool.OperationDiagnostic{Code: code, Path: check.Path, OperationID: call.ID, ActualSnapshot: check.Target.Snapshot, RequiredRanges: slices.Clone(check.Missing), Recovery: check.Recovery}
+	operationID := evidence.OperationID(call.Name, json.RawMessage(call.Arguments))
+	d := &tool.OperationDiagnostic{Code: code, Path: check.Path, ActualSnapshot: check.Target.Snapshot, RequiredRanges: slices.Clone(check.Missing), Recovery: check.Recovery}
 	if check.Diagnostic != nil {
 		copy := *check.Diagnostic
-		copy.OperationID = call.ID
 		d = &copy
 	}
+	if ops := a.operations(); ops != nil {
+		ops.Open(operationID, call.Name, []string{check.Path})
+	}
+	a.noteOperationFailure(operationID, d.Code, d)
 	msg := describeEvidence(check, call.Name)
 	if check.NativeError != nil {
 		msg = "error: " + check.NativeError.Error()
+	}
+	if recovery := d.ModelFacing(); recovery != "" {
+		msg += "\n" + recovery
 	}
 	return toolOutcome{output: msg, blocked: true, errMsg: firstLine(msg), diagnostic: d}
 }

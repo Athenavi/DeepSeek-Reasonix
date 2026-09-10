@@ -95,7 +95,7 @@ func (a *Agent) recordToolExecutionAudit(readOnly, parallel bool, startedAt, dur
 
 func (a *Agent) storeBatchToolResult(ctx context.Context, call provider.ToolCall, o toolOutcome) {
 	if o.executed && o.errMsg == "" && !o.blocked {
-		a.turn.evidenceBlocked.retireWrittenSource(o.evidenceSource)
+		a.retireWrittenSource(o.evidenceSource)
 	}
 	state := outcomeRunState(o)
 	msg := provider.Message{Role: provider.RoleTool, Content: o.output, Images: o.images, VisionSummary: o.visionSummary, ToolCallID: call.ID, Name: call.Name, ToolRunState: state, ToolExecution: toProviderToolExecution(o.execution)}
@@ -130,7 +130,7 @@ func (a *Agent) storeBatchToolResult(ctx context.Context, call provider.ToolCall
 						observed.LineHashes = observed.LineHashes[:min(count, len(observed.LineHashes))]
 					}
 					observed.Snapshot = env.Source.Snapshot
-					a.recordModelTextObservationValue(observed)
+					a.recordModelTextObservation(observed, call.ID)
 				}
 			}
 		}
