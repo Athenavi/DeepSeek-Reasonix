@@ -25360,18 +25360,6 @@ body > .mermaid-diagram--fullscreen {
   color: var(--fg-faint);
 }
 
-.workbench-dock__tabs 
-
-.workbench-dock__tab 
-
-.workbench-dock__tab svg 
-
-.workbench-dock__tab-label 
-
-.workbench-dock__tab:hover 
-
-.workbench-dock__tab--active 
-
 @container (max-width: 520px) {
   .workbench-dock__tabs {
     width: 100%;
@@ -27294,12 +27282,6 @@ body > .mermaid-diagram--fullscreen {
   border-bottom-color: var(--border-soft);
 }
 
-.workbench-dock__tabs 
-
-.workbench-dock__tab 
-
-.workbench-dock__tab--active 
-
 .workspace-panel,
 .workspace-files,
 .workspace-preview,
@@ -29158,20 +29140,6 @@ body > .mermaid-diagram--fullscreen {
   padding: 0 12px;
   border-bottom: 1px solid var(--border-soft);
 }
-
-:root[data-theme-style] .workbench-dock__tabs 
-
-:root[data-theme-style] .workbench-dock__tab 
-
-:root[data-theme-style] .workbench-dock__tab svg 
-
-:root[data-theme-style] .workbench-dock__tab-label 
-
-:root[data-theme-style] .workbench-dock__tab--active 
-
-:root[data-theme-style] .workbench-dock__tab:hover 
-
-:root[data-theme-style] .workbench-dock__tab--active::after 
 
 /* Classic and Workbench use compact text tabs in the right dock. A restrained
 /* Classic and Workbench use compact text tabs in the right dock. A restrained
@@ -35187,9 +35155,6 @@ body > .mermaid-diagram--fullscreen {
   justify-content: flex-start;
 }
 
-.app--windows-frameless .workbench-dock__tabs,
-:root[data-theme-style] .app--windows-frameless .workbench-dock__tabs 
-
 @media (max-width: 820px) {
   .app .layout,
   :root[data-theme-style] .app .layout {
@@ -39758,8 +39723,10 @@ html[data-dock-launcher="full"] .app:not(.app--creation) .layout:not(.layout--wo
 .tab-container__content > .context-panel,
 .tab-container__content > .workspace-panel,
 .tab-container__content > .terminal-panel,
-.tab-container__content > .browser-panel,
-
+.tab-container__content > .browser-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}
 
 .tab-add-menu {
   --reasonix-draggable: no-drag;
