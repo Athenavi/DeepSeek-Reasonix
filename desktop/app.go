@@ -9935,6 +9935,7 @@ type WorkspaceChangesView struct {
 	GitBranch    string                `json:"gitBranch,omitempty"`
 	Added        int                   `json:"added,omitempty"`
 	Removed      int                   `json:"removed,omitempty"`
+	Incomplete   bool                  `json:"incomplete,omitempty"`
 }
 
 type WorkspaceChangeDetailView struct {

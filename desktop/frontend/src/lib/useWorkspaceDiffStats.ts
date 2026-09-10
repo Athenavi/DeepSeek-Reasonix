@@ -1,46 +1,57 @@
-// Polls the whole-tree diff tally behind the launcher's changed row. The
-// backend call is a bounded `git numstat` probe, cheap enough to repeat while
-// the launcher is visible. Non-git workspaces skip it entirely — the changed
-// entry is hidden there anyway.
-import { useCallback, useEffect, useRef, useState } from "react";
-import { app } from "./bridge";
-
-const DIFF_STATS_POLL_MS = 5000;
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { loadWorkspaceGitStats } from "./workspaceGitStats";
+import { createSerialWorkspacePoll } from "./serialWorkspacePoll";
 
 export interface DiffStats {
   added: number;
   removed: number;
+  incomplete: boolean;
 }
 
-export function useWorkspaceDiffStats(gitBranch: string | undefined) {
-  const [diffStats, setDiffStats] = useState<DiffStats | null>(null);
-  const reloadRef = useRef<() => void>(() => {});
+export function useWorkspaceDiffStats(tabId: string, scopeKey: string, workspaceRoot: string, enabled: boolean) {
+  const [snapshot, setSnapshot] = useState<{ key: string; stats: DiffStats } | null>(null);
+  const key = JSON.stringify([tabId, scopeKey, workspaceRoot]);
+  const pollRef = useRef<ReturnType<typeof createSerialWorkspacePoll> | null>(null);
+  if (!pollRef.current) pollRef.current = createSerialWorkspacePoll({
+    schedule: (callback, delay) => window.setTimeout(callback, delay),
+    cancel: (handle) => window.clearTimeout(handle as number),
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!gitBranch) {
-      setDiffStats(null);
-      return;
-    }
-    const load = async () => {
-      try {
-        // Empty tab id resolves to the active tab on the backend.
-        const result = await app.WorkspaceChanges("");
-        if (cancelled) return;
-        setDiffStats({ added: result?.added ?? 0, removed: result?.removed ?? 0 });
-      } catch {
-        // Keep the last known totals; a transient git failure must not blank the badge.
+  useLayoutEffect(() => {
+    const poll = pollRef.current!;
+    let generation = 0;
+    const reconcile = () => {
+      const request = ++generation;
+      if (!enabled || !tabId || document.visibilityState === "hidden") {
+        poll.setJob(null);
+        return;
       }
+      poll.setJob(async () => {
+        try {
+          const result = await loadWorkspaceGitStats(tabId, workspaceRoot, () => request === generation);
+          if (request !== generation) return;
+          setSnapshot({ key, stats: {
+            added: result?.added ?? 0, removed: result?.removed ?? 0,
+            incomplete: result?.incomplete === true || result?.gitAvailable !== true,
+          } });
+        } catch {
+          if (request !== generation) return;
+          setSnapshot(current => ({ key, stats: {
+            added: current?.key === key ? current.stats.added : 0,
+            removed: current?.key === key ? current.stats.removed : 0, incomplete: true,
+          } }));
+        }
+      });
     };
-    reloadRef.current = load;
-    void load();
-    const timer = window.setInterval(() => void load(), DIFF_STATS_POLL_MS);
+    reconcile();
+    document.addEventListener("visibilitychange", reconcile);
     return () => {
-      cancelled = true;
-      window.clearInterval(timer);
+      generation++;
+      poll.setJob(null);
+      document.removeEventListener("visibilitychange", reconcile);
     };
-  }, [gitBranch]);
+  }, [enabled, tabId, workspaceRoot, key]);
 
-  const reloadDiffStats = useCallback(() => reloadRef.current(), []);
-  return { diffStats, reloadDiffStats };
+  const reloadDiffStats = useCallback(() => pollRef.current?.refresh(), []);
+  return { diffStats: snapshot?.key === key ? snapshot.stats : null, reloadDiffStats };
 }

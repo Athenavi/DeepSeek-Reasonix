@@ -283,6 +283,7 @@ export const zh: Record<DictKey, string> = {
   "rightDock.branchMenuLoading": "正在加载分支…",
   "rightDock.branchSearchPlaceholder": "搜索分支",
   "rightDock.branchSection": "分支",
+  "rightDock.partialStats": "估算改动（统计不完整）",
   "rightDock.branchNoMatch": "没有匹配的分支",
   "rightDock.branchCreate": "创建并检出新分支…",
 

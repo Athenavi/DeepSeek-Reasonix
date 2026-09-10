@@ -282,6 +282,7 @@ export const en = {
   "rightDock.branchMenuLoading": "Loading branches…",
   "rightDock.branchSearchPlaceholder": "Search branches",
   "rightDock.branchSection": "Branches",
+  "rightDock.partialStats": "Estimated changes (count incomplete)",
   "rightDock.branchNoMatch": "No matching branches",
   "rightDock.branchCreate": "Create and check out new branch…",
 

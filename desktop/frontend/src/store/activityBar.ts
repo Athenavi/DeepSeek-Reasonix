@@ -36,23 +36,13 @@ const STORAGE_KEY = "reasonix.dock.tabs";
 // Tabs are scoped per project (workspace root), so switching projects shows
 // each one's own open tabs. A root of "" falls back to the legacy global key.
 let workspaceRoot = "";
+const closedByProject = new Map<string, ClosedTabRecord[]>();
 function storageKey(): string {
   return workspaceRoot ? `${STORAGE_KEY}.${workspaceRoot}` : STORAGE_KEY;
 }
 
-// tabSeq must not collide with ids restored from localStorage (which may
-// contain dock-tab-N from a previous session). Seed it past the highest
-// persisted id so fresh tabs never duplicate an existing key.
-let tabSeq = 0;
-function seedTabSeq(restoredTabs: TabItem[]): void {
-  for (const tab of restoredTabs) {
-    const match = /^dock-tab-(\d+)$/.exec(tab.id);
-    if (match) tabSeq = Math.max(tabSeq, Number(match[1]));
-  }
-}
 function nextTabId(): string {
-  tabSeq += 1;
-  return `dock-tab-${tabSeq}`;
+  return `dock-tab-${crypto.randomUUID()}`;
 }
 
 function loadTabs(): { tabs: TabItem[]; activeTabId: string | null } {
@@ -72,7 +62,6 @@ function loadTabs(): { tabs: TabItem[]; activeTabId: string | null } {
       seen.add(tab.id);
       return true;
     });
-    seedTabSeq(valid);
     return { tabs: valid, activeTabId: valid.some((tab) => tab.id === parsed.activeTabId) ? parsed.activeTabId ?? null : valid[valid.length - 1]?.id ?? null };
   } catch {
     return { tabs: [], activeTabId: null };
@@ -91,6 +80,7 @@ function persist(tabs: TabItem[], activeTabId: string | null): void {
 const initial = loadTabs();
 
 export type ActivityBarState = {
+  workspaceRoot: string;
   tabs: TabItem[];
   activeTabId: string | null;
   /** True while the tab container is expanded (dock shows the panel, not just
@@ -104,9 +94,6 @@ export type ActivityBarState = {
   openEntry: (type: TabType, label: string, meta?: Record<string, unknown>) => void;
   /** Append a new tab of the given type and activate it. */
   addTab: (type: TabType, label: string, meta?: Record<string, unknown>) => void;
-  /** Update a tab's label and meta (e.g. a file tab whose preview file changes
-   *  its title from 文件 to the file name). */
-  updateTab: (tabId: string, label: string, meta?: Record<string, unknown>) => void;
   closeTab: (tabId: string) => void;
   /** Re-open a tab from the recently-closed list. */
   reopenTab: (tabId: string) => void;
@@ -121,7 +108,8 @@ export type ActivityBarState = {
   setWorkspaceRoot: (root: string) => void;
 };
 
-export const useActivityBarStore = create<ActivityBarState>((set) => ({
+export const useActivityBarStore = create<ActivityBarState>((set, get) => ({
+  workspaceRoot,
   tabs: initial.tabs,
   activeTabId: initial.activeTabId,
   activityBarOpen: initial.tabs.length > 0,
@@ -145,12 +133,6 @@ export const useActivityBarStore = create<ActivityBarState>((set) => ({
       const tabs = [...state.tabs, tab];
       persist(tabs, tab.id);
       return { tabs, activeTabId: tab.id, activityBarOpen: true };
-    }),
-  updateTab: (tabId, label, meta) =>
-    set((state) => {
-      const tabs = state.tabs.map((tab) => (tab.id === tabId ? { ...tab, label, ...(meta ? { meta } : {}) } : tab));
-      persist(tabs, state.activeTabId);
-      return { tabs };
     }),
   closeTab: (tabId) =>
     set((state) => {
@@ -206,13 +188,16 @@ export const useActivityBarStore = create<ActivityBarState>((set) => ({
   setAddMenuOpen: (open) => set({ addMenuOpen: open }),
   setWorkspaceRoot: (root) => {
     if (root === workspaceRoot) return;
+    closedByProject.set(workspaceRoot, get().recentlyClosed);
     workspaceRoot = root;
     const loaded = loadTabs();
     set({
+      workspaceRoot: root,
       tabs: loaded.tabs,
       activeTabId: loaded.activeTabId,
       activityBarOpen: loaded.tabs.length > 0,
       addMenuOpen: false,
+      recentlyClosed: closedByProject.get(root) ?? [],
     });
   },
 }));

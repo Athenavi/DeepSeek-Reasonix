@@ -2,6 +2,9 @@ import { lazy, Suspense, type ComponentProps, type KeyboardEvent, type PointerEv
 import type { Translator } from "../lib/i18n";
 import type { RightDockMode } from "../store/layout";
 import type { TabItem } from "../store/activityBar";
+import { useActivityBarStore } from "../store/activityBar";
+import { readWorkspaceTreeMemory, workspaceViewMemoryKey } from "../lib/workspaceViewMemory";
+import { useDockViewRequests } from "./useDockViewRequests";
 
 // The tab strip, its drag state machine and the add menu are a deferred
 // surface: the dock is closed on most launches, so keep them out of the
@@ -32,6 +35,7 @@ export type WorkspaceDockRegionProps = {
   context: ComponentProps<typeof ContextPanel>;
   workspace: ComponentProps<typeof WorkspacePanel>;
   workspaceKey: string;
+  workspaceRoot?: string;
   resizer?: {
     min: number;
     max: number;
@@ -45,12 +49,20 @@ export type WorkspaceDockRegionProps = {
 /** Shared workbench/creation dock; layout variants change data, not component identity. */
 export function WorkspaceDockRegion(props: WorkspaceDockRegionProps) {
   const { visible, overlay, mode, creation, showContext, t } = props;
+  const firstFileTabId = useActivityBarStore(state => state.tabs.find(tab => tab.type === "file")?.id);
+  const loadedRoot = useActivityBarStore(state => state.workspaceRoot);
+  const activeTabId = useActivityBarStore(state => state.activeTabId);
+  const projectReady = loadedRoot === (props.workspaceRoot ?? props.workspace.cwd ?? "");
+  const requests = useDockViewRequests(props.workspaceKey, visible && projectReady ? activeTabId : null, props.workspace);
 
   const renderTab = (tab: TabItem): ReactNode => {
+    if (!projectReady) return null;
+    if (firstFileTabId) readWorkspaceTreeMemory(workspaceViewMemoryKey(props.workspaceKey, firstFileTabId, true));
     switch (tab.type) {
       case "context":
         if (showContext && !creation) return <ContextPanel {...props.context} />;
-        return <WorkspacePanel key={`${props.workspaceKey}::${tab.id}`} {...props.workspace} />;
+        return <WorkspacePanel key={`${props.workspaceKey}::${tab.id}`} {...props.workspace} {...requests}
+          workspaceMemoryKey={workspaceViewMemoryKey(props.workspaceKey, tab.id)} workspaceMemoryVisitId={0} />;
       case "remote":
         return <RemotePanel {...props.remote} />;
       case "browser":
@@ -60,6 +72,9 @@ export function WorkspaceDockRegion(props: WorkspaceDockRegionProps) {
           <WorkspacePanel
             key={`${props.workspaceKey}::${tab.id}`}
             {...props.workspace}
+            {...requests}
+            workspaceMemoryKey={workspaceViewMemoryKey(props.workspaceKey, tab.id, tab.id === firstFileTabId)}
+            workspaceMemoryVisitId={0}
             initialViewMode={tab.type === "changed" ? "changed" : "files"}
           />
         );
@@ -81,7 +96,7 @@ export function WorkspaceDockRegion(props: WorkspaceDockRegionProps) {
         <aside className={["workbench-dock", `workbench-dock--${mode}`, overlay ? "workbench-dock--overlay" : ""].join(" ")} aria-label={t("rightDock.workbench")}>
           <div className="workbench-dock__panel">
             <Suspense fallback={null}>
-              <TabContainer renderTab={renderTab} workspaceTabId={props.workspace.tabId} onPickEntry={props.onPickEntry} />
+              <TabContainer key={loadedRoot} renderTab={renderTab} onPickEntry={props.onPickEntry} />
             </Suspense>
           </div>
         </aside>

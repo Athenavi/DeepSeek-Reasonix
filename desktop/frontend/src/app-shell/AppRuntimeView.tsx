@@ -303,6 +303,10 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
             launcher={session.workspacePanelCommands.launcherCardMounted && !core.remoteSurfaceActive ? (
               <Suspense fallback={null}>
                 <DockLauncher
+                  tabId={activeTabId ?? ""}
+                  scopeKey={session.workspaceScopeKey}
+                  workspaceRoot={activeTab?.workspaceRoot ?? state.meta?.cwd ?? ""}
+                  visible={!shell.managementActive && !sidebarImDetailConnection}
                   onSelect={session.workspacePanelCommands.openDockEntry}
                   gitBranch={state.meta?.gitBranch}
                   onSpaceModeChange={session.workspacePanelCommands.setLauncherSpaceMode}
@@ -400,7 +404,7 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
           />
         </section>
 
-        <WorkspaceDockRegion {...buildWorkspaceDockProps({
+        <WorkspaceDockRegion workspaceRoot={activeTab?.workspaceRoot ?? state.meta?.cwd ?? ""} {...buildWorkspaceDockProps({
           surface: { renderable: surfaceWorkspacePanelRenderable, overlay: surfaceWorkspacePanelOverlay, gridOpen: surfaceWorkspacePanelGridOpen },
           creation: sidebarCreation,
           showContext: SHOW_CONTEXT_DOCK,

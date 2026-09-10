@@ -403,11 +403,11 @@ func (a *App) OpenRemoteProjectTab(hostID, workspace string, opts RemoteTabOpenO
 	}
 
 	a.emitRemoteTabState(tabID, "connecting", "")
-	meta, ok := a.remoteTabMetaSnapshot(tabID)
+	_, ok = a.remoteTabMetaSnapshot(tabID)
 	if !ok {
 		return TabMeta{}, fmt.Errorf("remote tab %q closed while opening", tabID)
 	}
-	meta, err = a.keepOnlyRemoteVisibleTab(tabID)
+	meta, err := a.keepOnlyRemoteVisibleTab(tabID)
 	if err != nil {
 		_ = a.closeRemoteTabRegistration(tabID, true)
 		return TabMeta{}, err

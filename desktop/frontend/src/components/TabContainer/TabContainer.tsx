@@ -15,14 +15,11 @@ import { TabContent } from "./TabContent";
 interface TabContainerProps {
   /** App-provided panel renderer for a given tab. */
   renderTab: (tab: TabItem) => ReactNode;
-  /** Active session tab id — forwarded to the tab bar for workspace-scoped
-   *  file operations in the file-tab context menu. */
-  workspaceTabId?: string;
   /** Opens (or activates) the view a tab-picker entry stands for. */
   onPickEntry: (entryId: string) => void;
 }
 
-export function TabContainer({ renderTab, workspaceTabId, onPickEntry }: TabContainerProps) {
+export function TabContainer({ renderTab, onPickEntry }: TabContainerProps) {
   const tabs = useActivityBarStore((s) => s.tabs);
   const activeTabId = useActivityBarStore((s) => s.activeTabId);
   const addMenuOpen = useActivityBarStore((s) => s.addMenuOpen);
@@ -55,7 +52,6 @@ export function TabContainer({ renderTab, workspaceTabId, onPickEntry }: TabCont
         onMoveTab={moveTab}
         onAdd={() => setAddMenuOpen(!addMenuOpen)}
         addButtonRef={addButtonRef}
-        workspaceTabId={workspaceTabId}
       />
       {addMenuOpen && <TabAddMenu anchorRef={addButtonRef} onPick={handlePickTab} onClose={() => setAddMenuOpen(false)} />}
       <div className="tab-container__content">

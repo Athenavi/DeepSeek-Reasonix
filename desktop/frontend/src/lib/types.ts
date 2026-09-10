@@ -1242,6 +1242,7 @@ export interface WorkspaceChangesView {
   gitBranch?: string;
   added?: number;
   removed?: number;
+  incomplete?: boolean;
 }
 
 export interface WorkspaceChangeDetailView {

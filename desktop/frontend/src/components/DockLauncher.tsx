@@ -23,6 +23,10 @@ import { useBranchSwitcher } from "../lib/useBranchSwitcher";
 import { useDockLauncherSpace } from "../lib/useDockLauncherSpace";
 import { useWorkspaceDiffStats } from "../lib/useWorkspaceDiffStats";
 interface DockLauncherProps {
+  tabId: string;
+  scopeKey: string;
+  workspaceRoot: string;
+  visible: boolean;
   onSelect: (entryId: string) => void;
   /** Current git branch for the active workspace; omitted when unknown. */
   gitBranch?: string;
@@ -34,12 +38,13 @@ interface DockLauncherProps {
   overlay?: boolean;
 }
 
-export function DockLauncher({ onSelect, gitBranch, onSpaceModeChange, overlay }: DockLauncherProps) {
+export function DockLauncher({ tabId, scopeKey, workspaceRoot, visible, onSelect, gitBranch, onSpaceModeChange, overlay }: DockLauncherProps) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const spaceMode = useDockLauncherSpace(rootRef, onSpaceModeChange);
-  const { diffStats, reloadDiffStats } = useWorkspaceDiffStats(gitBranch);
-  const branch = useBranchSwitcher({ gitBranch, rootRef, onBranchChanged: reloadDiffStats });
+  const enabled = visible && Boolean(gitBranch) && (overlay === true || spaceMode !== "hidden");
+  const { diffStats, reloadDiffStats } = useWorkspaceDiffStats(tabId, scopeKey, workspaceRoot, enabled);
+  const branch = useBranchSwitcher({ tabId, scopeKey, workspaceRoot, gitBranch, rootRef, onBranchChanged: reloadDiffStats });
 
   // The changed entry is git-derived (git status / diff), so it is only shown
   // when the active workspace is a git repo; the branch row below is gated the
@@ -47,7 +52,7 @@ export function DockLauncher({ onSelect, gitBranch, onSpaceModeChange, overlay }
   const isGitProject = Boolean(gitBranch);
   const entries = availableDockEntries(desktopHost().browser !== undefined)
     .filter((entry) => entry.id !== "changed" || isGitProject);
-  const showDiffStats = (diffStats?.added ?? 0) + (diffStats?.removed ?? 0) > 0;
+  const showDiffStats = diffStats?.incomplete || (diffStats?.added ?? 0) + (diffStats?.removed ?? 0) > 0;
 
   if (!overlay && spaceMode === "hidden") return null;
 
@@ -73,7 +78,8 @@ export function DockLauncher({ onSelect, gitBranch, onSpaceModeChange, overlay }
             <Icon size={16} />
             <span className="dock-launcher__entry-label">{t(entry.labelKey as never)}</span>
             {isChanged && diffStats && showDiffStats ? (
-              <span className="dock-launcher__entry-stats">
+              <span className="dock-launcher__entry-stats" title={diffStats.incomplete ? t("rightDock.partialStats") : undefined}>
+                {diffStats.incomplete ? <span aria-label={t("rightDock.partialStats")}>~</span> : null}
                 <span className="dock-launcher__entry-stats-added">+{diffStats.added.toLocaleString()}</span>
                 <span className="dock-launcher__entry-stats-removed">-{diffStats.removed.toLocaleString()}</span>
               </span>

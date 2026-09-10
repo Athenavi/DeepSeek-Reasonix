@@ -125,10 +125,6 @@ export function useWorkspacePanelCommands(input: Input) {
     if (!entry) return;
     openRightDockMode(dockModeForTab(entry.defaultTab));
   });
-  const openDockTab = useCommittedCommand((type: TabType, label: string, meta?: Record<string, unknown>) => {
-    openRightDockMode(dockModeForTab(type));
-    useActivityBarStore.getState().addTab(type, label, meta);
-  });
   // Plain open/close: expanding restores whatever tabs the project had and
   // leaves an empty dock to the tab picker instead of seeding a view the user
   // did not ask for. openRightDockMode stays the "open this view" command.
@@ -179,7 +175,7 @@ export function useWorkspacePanelCommands(input: Input) {
   }, [activeTabType]);
   // The tab list is per workspace root; switching projects restores that
   // project's own tabs instead of carrying the previous one's over.
-  useEffect(() => {
+  useLayoutEffect(() => {
     useActivityBarStore.getState().setWorkspaceRoot(input.workspaceRoot);
   }, [input.workspaceRoot]);
   useEffect(() => {
@@ -191,7 +187,7 @@ export function useWorkspacePanelCommands(input: Input) {
     if (hostCount === 0 && mode === "remote") useLayoutStore.getState().setRightDockMode("files");
   }, [hostCount, mode]);
   return {
-    openRightDockMode, closeWorkspacePanel, prepareBlankWorkspace, openDockEntry, openDockTab,
+    openRightDockMode, closeWorkspacePanel, prepareBlankWorkspace, openDockEntry,
     toggleWorkspacePanel, toggleWorkspaceMaximized, handleWorkspacePreviewModeChange,
     openRemoteDock, restoreWorkspaceDockWidths,
     launcherCard, launcherCardMounted, launcherCardOverlay: input.gridOpen,

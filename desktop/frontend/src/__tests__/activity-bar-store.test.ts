@@ -98,38 +98,16 @@ resetStore();
 useActivityBarStore.getState().setAddMenuOpen(true);
 check("addMenuOpen setter works", useActivityBarStore.getState().addMenuOpen === true, "expected open");
 
-// --- updateTab rewrites one tab's label/meta, keeps active, leaves others ---
-// The dock mirrors the current preview by updating the active file tab; this
-// must never activate a tab, never add one, and never touch other tabs.
-resetStore();
-useActivityBarStore.getState().addTab("file", "a.ts", { path: "/a.ts" });
-const fileA = useActivityBarStore.getState().tabs[0].id;
-useActivityBarStore.getState().addTab("file", "b.ts", { path: "/b.ts" });
-useActivityBarStore.getState().activateTab(fileA);
-useActivityBarStore.getState().updateTab(fileA, "c.ts", { path: "/c.ts" });
-check("updateTab rewrites label", useActivityBarStore.getState().tabs[0].label === "c.ts", "label mismatch");
-check("updateTab rewrites meta", useActivityBarStore.getState().tabs[0].meta?.path === "/c.ts", "meta mismatch");
-check("updateTab leaves the other tab untouched", useActivityBarStore.getState().tabs[1].label === "b.ts" && useActivityBarStore.getState().tabs[1].meta?.path === "/b.ts", "other tab changed");
-check("updateTab keeps the active tab", useActivityBarStore.getState().activeTabId === fileA, "activeTabId changed");
-check("updateTab adds no tabs", useActivityBarStore.getState().tabs.length === 2, "expected still 2 tabs");
-check("updateTab persists", JSON.parse(localStorage.getItem("reasonix.dock.tabs") ?? "{}").tabs[0].meta?.path === "/c.ts", "not persisted");
-useActivityBarStore.getState().updateTab(fileA, "files", {});
-check("updateTab with empty meta clears the path",
-  useActivityBarStore.getState().tabs[0].meta?.path === undefined && useActivityBarStore.getState().tabs.length === 2,
-  "path not cleared");
-
 // --- fresh tab ids never collide with restored/persisted ones ---
-// New tabs must always receive a unique id (React key uniqueness relies on
-// it). The seq seeder runs at module load against persisted ids; here we
-// verify consecutive adds stay unique and strictly increasing.
+// New identities remain unique even when closed tabs only exist in view memory.
 resetStore();
 useActivityBarStore.getState().addTab("file", "a");
 useActivityBarStore.getState().addTab("file", "b");
 useActivityBarStore.getState().addTab("file", "c");
 const freshIds = useActivityBarStore.getState().tabs.map((tab) => tab.id);
 check(
-  "fresh tab ids are unique and increasing",
-  freshIds.length === new Set(freshIds).size && freshIds.every((id) => /^dock-tab-\d+$/.test(id)),
+  "fresh tab ids are unique",
+  freshIds.length === new Set(freshIds).size && freshIds.every((id) => /^dock-tab-[a-f0-9-]+$/.test(id)),
   `ids=${freshIds.join(",")}`,
 );
 
@@ -178,6 +156,20 @@ for (let index = 0; index < 12; index += 1) {
 check("recently closed is bounded to 10 newest first",
   useActivityBarStore.getState().recentlyClosed.length === 10 && useActivityBarStore.getState().recentlyClosed[0].tab.label === "f11",
   `len=${useActivityBarStore.getState().recentlyClosed.length}`);
+
+const projectAClosed = useActivityBarStore.getState().recentlyClosed.map(record => record.tab.id);
+useActivityBarStore.getState().setWorkspaceRoot("/project-b");
+check("new project has no closed tabs", useActivityBarStore.getState().recentlyClosed.length === 0, "leaked A history");
+useActivityBarStore.getState().reopenTab(projectAClosed[0]);
+check("cannot reopen another project's tab", useActivityBarStore.getState().tabs.length === 0, "cross-project reopen");
+useActivityBarStore.getState().addTab("file", "B files");
+const projectBTab = useActivityBarStore.getState().activeTabId!;
+useActivityBarStore.getState().closeTab(projectBTab);
+useActivityBarStore.getState().setWorkspaceRoot("");
+check("returning restores A closed history", JSON.stringify(useActivityBarStore.getState().recentlyClosed.map(record => record.tab.id)) === JSON.stringify(projectAClosed), "A history changed");
+useActivityBarStore.getState().setWorkspaceRoot("/project-b");
+useActivityBarStore.getState().reopenTab(projectBTab);
+check("reopen preserves B identity", useActivityBarStore.getState().activeTabId === projectBTab, "B identity lost");
 
 console.log(`
 activity-bar-store: ${passed} passed, ${failed} failed`);

@@ -494,6 +494,10 @@ export interface AppBindings extends ToolRecoveryBindings, ModelSettingsBindings
   GitBranches(): Promise<string[]>;
   GitCheckout(branch: string): Promise<void>;
   GitCreateBranch(name: string): Promise<void>;
+  GitBranchesForTab(tabID: string, workspaceRoot: string): Promise<string[]>;
+  GitCheckoutForTab(tabID: string, workspaceRoot: string, branch: string): Promise<void>;
+  GitCreateBranchForTab(tabID: string, workspaceRoot: string, name: string): Promise<void>;
+  WorkspaceGitStatsForTab(tabID: string, workspaceRoot: string): Promise<WorkspaceChangesView>;
   WorkspaceGitHistory(tabID: string, path: string): Promise<GitCommitView[]>;
   WorkspaceGitCommitDetail(tabID: string, hash: string, path: string): Promise<GitCommitDetailView>;
   OpenWorkspacePathForTab(tabID: string, rel: string): Promise<void>;
@@ -4012,6 +4016,10 @@ function makeMockApp(): AppBindings {
     async GitBranches() {
       return ["main", "dev", "feature/branch-switcher"];
     },
+    async GitBranchesForTab(_tabID: string, _workspaceRoot: string) { return this.GitBranches(); },
+    async GitCheckoutForTab(_tabID: string, _workspaceRoot: string, branch: string) { await this.GitCheckout(branch); },
+    async GitCreateBranchForTab(_tabID: string, _workspaceRoot: string, name: string) { await this.GitCreateBranch(name); },
+    async WorkspaceGitStatsForTab(tabID: string, _workspaceRoot: string) { return this.WorkspaceChanges(tabID); },
     async GitCheckout(_branch: string) {
       console.info("mock GitCheckout", _branch);
     },
