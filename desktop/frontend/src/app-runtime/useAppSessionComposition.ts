@@ -169,8 +169,8 @@ export function useAppSessionComposition(input: AppSessionCompositionInput) {
   const {
     switchTab, switchRemoteTab, closeTab, reorderTabs, createIsolatedWorktree,
     noteNavigationIntent, registeredNavigationIntent, isNavigationIntentCurrent, reassertVisibleTabAfterStaleNavigation,
-    commitSingleSurfaceNavigation, openTopicSession, openGlobalTab, openProjectTab, activateTopic,
-    ensureBlankSurface, ensureBlankTab,
+    commitSingleSurfaceNavigation, activateTopic,
+    ensureBlankSurface,
   } = runtime.navigation;
   const {
     setTransientOverlayDismissSignal, managementActive, desktopLayoutStyle,
@@ -675,8 +675,8 @@ export function useAppSessionComposition(input: AppSessionCompositionInput) {
   const { openAutomationTopic, topicAccepted } = useAutomationNavigation({ noteIntent: noteNavigationIntent,
     enqueue: useCommittedCommand((intent, seq) => enqueueNavigationWithIntent(intent, seq)) });  const { enqueueNavigation, enqueueNavigationWithIntent, openRemoteProject } = useDesktopNavigation({
     visible: { tabId: activeTabId ?? "", sessionKey: activeSessionIdentity },
-    ports: { isNavigationIntentCurrent, activateTopic, openTopicSession, openGlobalTab, openProjectTab,
-      ensureBlankSurface, ensureBlankTab, createIsolatedWorktree, openChannelSession, resumeSession,
+    ports: { isNavigationIntentCurrent, activateTopic,
+      ensureBlankSurface, createIsolatedWorktree, openChannelSession, resumeSession,
       registeredNavigationIntent, switchRemoteTab, openRemoteProject: desktopBridge.openRemoteProjectTab,
       listTabs: desktopBridge.listTabs, applyTabs: setTabMetas, seedTab: seedActiveTabMeta, listSessions, topicAccepted },
     setTabRevealSignal, setTranscriptRevealSignal, setProjectRevision, setHistory: setHistView, t, showToast,

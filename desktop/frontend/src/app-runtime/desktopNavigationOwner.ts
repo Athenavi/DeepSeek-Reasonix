@@ -13,8 +13,8 @@ export type DesktopNavigationIntent =
   | { kind: "remote-project"; remote: RemoteTabRefView; options: RemoteTabOpenOptions };
 type Runtime = ReturnType<typeof useAppRuntimeAdapter>;
 export type DesktopNavigationPorts = Pick<Runtime["navigation"],
-  "isNavigationIntentCurrent" | "activateTopic" | "openTopicSession" | "openGlobalTab" | "openProjectTab"
-  | "ensureBlankSurface" | "ensureBlankTab" | "createIsolatedWorktree" | "registeredNavigationIntent" | "switchRemoteTab"> &
+  "isNavigationIntentCurrent" | "activateTopic"
+  | "ensureBlankSurface" | "createIsolatedWorktree" | "registeredNavigationIntent" | "switchRemoteTab"> &
   Pick<Runtime["sessionActions"], "openChannelSession" | "resumeSession"> & {
     listTabs(): Promise<TabMeta[]>;
     openRemoteProject(hostId: string, workspace: string, options: RemoteTabOpenOptions): Promise<TabMeta>;
