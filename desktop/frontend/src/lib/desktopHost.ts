@@ -20,6 +20,11 @@ export interface ServiceState {
   generation: string;
   error?: string;
 }
+export interface GraphicsSettingsState {
+  hardwareAcceleration: boolean; startupEnabled: boolean;
+  override: "none" | "environment" | "command-line"; restartRequired: boolean;
+  writable: boolean; warning: "invalid-config" | "unreadable-config" | "unsupported-version" | null;
+}
 
 // Mirrors docs/DESKTOP_HOST_PROTOCOL.md "Renderer preload API".
 export interface ReasonixDesktopHost {
@@ -43,6 +48,7 @@ export interface ReasonixDesktopHost {
       setAppZoom(factor: number): Promise<number>;
       resetAppZoom(): Promise<number>;
     };
+    graphics: { get(): Promise<GraphicsSettingsState>; setHardwareAcceleration(enabled: boolean): Promise<GraphicsSettingsState> };
     getPathForFile(file: File): string;
     onServiceState(cb: (state: ServiceState) => void): () => void;
   };
@@ -69,6 +75,7 @@ export interface DesktopHost {
     getAppZoom(): Promise<number>;
     setAppZoom(factor: number): Promise<number>;
     resetAppZoom(): Promise<number>;
+    graphics: { get(): Promise<GraphicsSettingsState>; setHardwareAcceleration(enabled: boolean): Promise<GraphicsSettingsState> };
     onFilesDropped(cb: (paths: string[]) => void): () => void;
     getPathForFile?(file: File): string;
     onServiceState(cb: (state: ServiceState) => void): () => void;
@@ -106,6 +113,7 @@ const serverHost: DesktopHost = {
     getAppZoom: async () => 1,
     setAppZoom: async () => 1,
     resetAppZoom: async () => 1,
+    graphics: { get: async () => ({ hardwareAcceleration: true, startupEnabled: true, override: "none", restartRequired: false, writable: false, warning: null }), setHardwareAcceleration: async () => { throw new Error("graphics settings unavailable"); } },
   },
 };
 
@@ -161,7 +169,8 @@ const electronHostFrom = (host: ReasonixDesktopHost): DesktopHost => {
       getWindowBounds: () => host.native.window.getBounds(),
       getAppZoom: () => host.native.window.getAppZoom(),
       setAppZoom: (factor) => host.native.window.setAppZoom(factor),
-      resetAppZoom: () => host.native.window.resetAppZoom(),
+    resetAppZoom: () => host.native.window.resetAppZoom(),
+      graphics: host.native.graphics,
       onFilesDropped: (cb) => {
         installElectronDropHandlers();
         dropListeners.add(cb);

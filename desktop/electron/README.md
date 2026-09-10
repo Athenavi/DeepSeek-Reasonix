@@ -30,6 +30,15 @@ renderer (reasonix://app) ──preload (window.reasonixDesktop)──▶ main p
 
 ## Browser surface
 
+## Hardware acceleration recovery
+
+The desktop UI exposes **Settings → General → System → Hardware acceleration**.
+The preference is stored in the Electron shell profile and only takes effect
+after a full application restart. If rendering fails before Settings can open,
+fully quit Reasonix and start it once with `REASONIX_DISABLE_GPU=1`; this is a
+temporary override and does not change the saved preference. The override is
+supported on Windows, macOS, and Linux.
+
 The shell can host real websites next to the app UI (contract:
 [`docs/DESKTOP_BROWSER.md`](../../docs/DESKTOP_BROWSER.md)). Every tab is a
 sandboxed `WebContentsView` managed by `browser/surfaceManager.ts`; the React
