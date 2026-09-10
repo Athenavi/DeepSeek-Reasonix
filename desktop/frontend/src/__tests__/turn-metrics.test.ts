@@ -99,14 +99,14 @@ for (const fixture of [
 eq(turnMetrics({ ...base, turnStartAt: 0 }), null, "a turn without a start anchor has no reading");
 eq(turnMetrics({ ...base, running: false, turnDoneAt: undefined }), null,
   "neither running nor completed yields no reading");
-eq(turnMetrics({ ...base, running: false, turnDoneAt: 20_000 }).tps, 5,
+eq(turnMetrics({ ...base, running: false, turnDoneAt: 20_000 })!.tps, 5,
   "a settled turn divides its billed output by the model-active window");
-eq(turnMetrics(base).tps, 10, "a streaming turn adds the in-flight estimate to the numerator");
-eq(turnMetrics({ ...base, turnModelActiveMs: 400 }).tps, null, "sub-500ms windows report no throughput");
-eq(turnMetrics({ ...base, running: false, turnDoneAt: 20_000, lastTurnOutputEstimated: true }).estimated,
+eq(turnMetrics(base)!.tps, 10, "a streaming turn adds the in-flight estimate to the numerator");
+eq(turnMetrics({ ...base, turnModelActiveMs: 400 })!.tps, null, "sub-500ms windows report no throughput");
+eq(turnMetrics({ ...base, running: false, turnDoneAt: 20_000, lastTurnOutputEstimated: true })!.estimated,
   true, "a settled estimate is flagged");
-eq(turnMetrics(base).estimated, true, "a streaming estimate is flagged");
-eq(turnMetrics({ ...base, turnOutputEstimated: false, live: buf("") }).estimated, false,
+eq(turnMetrics(base)!.estimated, true, "a streaming estimate is flagged");
+eq(turnMetrics({ ...base, turnOutputEstimated: false, live: buf("") })!.estimated, false,
   "a stream with nothing estimated is not flagged");
 
 // --- Elapsed label ----------------------------------------------------------

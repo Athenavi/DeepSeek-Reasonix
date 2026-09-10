@@ -239,10 +239,10 @@ func BuiltinModelInfo(kind, baseURL, model string) (ModelInfo, bool) {
 		u, err := url.Parse(strings.TrimSpace(baseURL))
 		if err == nil && strings.EqualFold(u.Scheme, "https") && strings.EqualFold(u.Hostname(), "api.deepseek.com") {
 			id := strings.TrimSpace(model)
-			if id == "deepseek-v4-flash-vision-exp" {
+			if IsOfficialDeepSeekImageModel(id) {
 				return ModelInfo{ID: id, InputModalities: []ModelModality{ModalityText, ModalityImage}}, true
 			}
-			if id == "deepseek-v4-flash" || id == "deepseek-v4-pro" {
+			if IsOfficialDeepSeekTextModel(id) {
 				return ModelInfo{ID: id, InputModalities: []ModelModality{ModalityText}}, true
 			}
 		}
