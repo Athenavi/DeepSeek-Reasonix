@@ -43,8 +43,16 @@ const CHAT_COMFORT_MIN_WIDTH = 560;
 
 console.log("\nworkspace dock layout");
 eq(/\.app__dock-toggle/.test(stylesSource), false, "the workspace toggle is a bar action button, not a fixed overlay the bar must dodge");
-eq(/\.app--darwin\.app--workbench \.workbench-dock__tabs,[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;/.test(stylesSource), true, "macOS workspace tabs fill the remaining title row");
-eq(/\.app--darwin\.app--workbench \.workbench-dock__tab,[\s\S]*?flex:\s*1 1 0;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*none;/.test(stylesSource), true, "macOS workspace tabs divide the available row without overlap");
+// Tabs size to their label and the strip to its tabs, so the add button sits
+// beside the last tab. A stretch rule (equal columns) or the removed
+// max-width: 520px container query would fill the row instead.
+eq(
+  /\.workbench-dock__tabs \{[\s\S]*?flex: 0 1 auto;[\s\S]*?width: max-content;/.test(stylesSource) &&
+    /\.workbench-dock__tab \{[\s\S]*?flex: 0 1 auto;[\s\S]*?min-width: 30px;[\s\S]*?max-width: 118px;/.test(stylesSource) &&
+    !/@container \(max-width: 520px\) \{\s*\.workbench-dock__tabs/.test(stylesSource),
+  true,
+  "right-dock tabs keep their content width instead of stretching to fill the strip",
+);
 
 const expandedAvailable = availableWorkspacePanelWidth({
   viewportWidth: 1280,

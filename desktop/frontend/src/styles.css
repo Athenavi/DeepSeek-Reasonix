@@ -24086,17 +24086,6 @@ body > .mermaid-diagram--fullscreen {
   --reasonix-draggable: no-drag;
 }
 
-@container (max-width: 520px) {
-  .workbench-dock__tabs {
-    width: 100%;
-  }
-
-  .workbench-dock__tab {
-    flex: 1 1 0;
-    max-width: none;
-  }
-}
-
 @container (max-width: 340px) {
   .workbench-dock__tabs {
     width: auto;
@@ -33074,22 +33063,17 @@ body > .mermaid-diagram--fullscreen {
   padding-right: var(--windows-window-controls-safe);
 }
 
-/* The shell bar spans the whole window, so it — not the dock's tools row —
-   carries the window-controls inset on Windows and hosts the fixed workspace
-   toggle on macOS. Neither platform reserves space inside the tools row now. */
+/* Tabs stay at their content width and the strip at theirs, so the add button
+   sits beside the last tab instead of at the far edge of an empty row. The
+   strip still shrinks down to each tab's min-width and then clips with the
+   overflow fade, so a crowded strip behaves as before. */
 .app--darwin.app--workbench .workbench-dock__tabs,
 :root[data-theme-style] .app--darwin.app--workbench .workbench-dock__tabs {
-  flex: 1 1 auto;
-  width: 100%;
-  min-width: 0;
   gap: 2px;
 }
 
 .app--darwin.app--workbench .workbench-dock__tab,
 :root[data-theme-style] .app--darwin.app--workbench .workbench-dock__tab {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: none;
   padding: 0 5px;
   gap: 4px;
   justify-content: center;
