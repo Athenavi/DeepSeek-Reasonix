@@ -80,7 +80,7 @@ export function buildSidebarRegionProps(input: {
       onTopicsChanged: topics.refreshProjectsAndTabs, onRenameTopic: topics.renameTopic, refreshSignal: input.projectTree.refreshSignal,
       onAddProject: topics.onAddProject,
       timeFilter: input.projectTree.timeFilter, onTimeFilterChange: input.projectTree.onTimeFilterChange,
-      variant: shell.sidebarWorkbench ? "workbench" : shell.sidebarCreation ? "creation" : "classic",
+      variant: shell.sidebarWorkbench ? "workbench" : "creation",
       searchExpanded: input.projectTree.searchExpanded, searchFocusSignal: input.projectTree.searchFocusSignal,
       showShortcutBadges: input.projectTree.showShortcutBadges, shortcutPlatform: input.projectTree.shortcutPlatform,
       onVisibleTopicsChange: input.projectTree.onVisibleTopicsChange,
@@ -152,7 +152,6 @@ export function buildAppShellClassNames(input: {
       input.browserPreview ? "app--browser-preview" : "",
       input.workbench ? "app--workbench" : "",
       input.creation ? "app--creation" : "",
-      !input.workbench && !input.creation ? "app--classic" : "",
     ].filter(Boolean).join(" "),
     layout: [
       "layout",

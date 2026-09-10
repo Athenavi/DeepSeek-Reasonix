@@ -1535,12 +1535,11 @@ function normalizeCloseBehavior(mode: string | undefined): CloseBehavior {
   return mode === "quit" ? "quit" : "background";
 }
 
-type DesktopLayoutStyle = "classic" | "workbench" | "creation";
+type DesktopLayoutStyle = "workbench" | "creation";
 
+// A stored "classic" predates the style's removal; those installs land on workbench.
 function normalizeDesktopLayoutStyle(style: string | undefined): DesktopLayoutStyle {
-  if (style === "classic") return "classic";
-  if (style === "creation") return "creation";
-  return "workbench";
+  return style === "creation" ? "creation" : "workbench";
 }
 
 function desktopLayoutStyleLabel(style: DesktopLayoutStyle, t: ReturnType<typeof useT>): string {

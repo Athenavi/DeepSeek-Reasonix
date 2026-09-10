@@ -153,18 +153,8 @@ try {
   await page.waitForFunction(() => document.querySelector('textarea.composer__input:not([aria-hidden=true])')?.disabled === false);
   assert(await page.evaluate(() => window.__appBrowserIdentity.composer === document.querySelector('textarea.composer__input:not([aria-hidden=true])')),
     'ordinary source-bound send and native Stop preserve Composer identity and restore writable readiness');
-  assert(pageErrors.length === 0, `three-layout replay emits no page errors (${pageErrors.length})`);
+  assert(pageErrors.length === 0, `layout replay emits no page errors (${pageErrors.length})`);
 
-  const classicPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-  const classicErrors = [];
-  classicPage.on("pageerror", (error) => classicErrors.push(error.message));
-  await classicPage.goto(`http://127.0.0.1:${port}/?mock=bench&bench=1&layout=classic`, { waitUntil: "domcontentloaded" });
-  await classicPage.locator(".app").waitFor();
-  process.stdout.write(`  INFO classic fixture class: ${await classicPage.locator(".app").getAttribute("class")}\n`);
-  await classicPage.locator(".app.app--classic textarea.composer__input:not([aria-hidden=true])").waitFor();
-  await classicPage.locator(".app.app--classic .project-tree").waitFor();
-  assert(classicErrors.length === 0, "classic compatibility snapshot renders the shared Composer and project tree without errors");
-  await classicPage.close();
   process.stdout.write("app browser lifecycle gate passed\n");
 } finally {
   await browser.close();

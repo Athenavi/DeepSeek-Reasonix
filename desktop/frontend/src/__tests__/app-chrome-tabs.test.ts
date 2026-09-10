@@ -8,7 +8,6 @@ import type { TabMeta } from "../lib/types";
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const appSource = readFileSync(resolve(testDir, "../AppRuntime.tsx"), "utf8"), workspaceFocusSource = readFileSync(resolve(testDir, "../lib/workspaceRefreshStore.ts"), "utf8");
-const appChromeSource = readFileSync(resolve(testDir, "../components/AppChrome.tsx"), "utf8");
 const commandPaletteSource = readFileSync(resolve(testDir, "../components/CommandPalette.tsx"), "utf8");
 const projectTreeSource = readFileSync(resolve(testDir, "../components/ProjectTree.tsx"), "utf8");
 const topicShortcutsSource = readFileSync(resolve(testDir, "../lib/topicShortcuts.ts"), "utf8");
@@ -16,6 +15,7 @@ const topicShortcutOwnerSource = readFileSync(resolve(testDir, "../app-runtime/u
 const runtimeHandlersSource = readFileSync(resolve(testDir, "../app-runtime/useRuntimeEventHandlers.ts"), "utf8");
 const sessionNavigationSource = readFileSync(resolve(testDir, "../app-runtime/useSessionNavigationCommands.ts"), "utf8");
 const chromeCommandsSource = readFileSync(resolve(testDir, "../app-runtime/useAppChromeCommands.ts"), "utf8");
+const desktopNavigationSource = readFileSync(resolve(testDir, "../app-runtime/useDesktopNavigation.ts"), "utf8");
 const dockToggleSource = readFileSync(resolve(testDir, "../app-shell/DockToggleButton.tsx"), "utf8");
 const chatPaneSource = readFileSync(resolve(testDir, "../app-shell/ChatPaneRegion.tsx"), "utf8");
 const transcriptSurfaceSource = readFileSync(resolve(testDir, "../app-runtime/useTranscriptSurfaceProjection.ts"), "utf8");
@@ -243,41 +243,6 @@ ok(
 
 
 ok(
-  /import \{ TabBar \} from "\.\/TabBar";/.test(appChromeSource),
-  "AppChrome keeps the classic top session tab strip implementation",
-);
-
-for (const propName of ["onTabChange", "onTabClose", "onTabsClose", "onTabsReorder", "onNewTab"]) {
-  ok(
-    new RegExp(`\\b${propName}\\b`).test(appChromeSource),
-    `AppChrome exposes ${propName} for classic tabs`,
-  );
-}
-
-ok(
-  /app-chrome__tab-strip/.test(appChromeSource),
-  "AppChrome markup includes classic tab strip containers",
-);
-
-ok(
-  /const titlebarDragRail = darwinChrome \|\| platform === "windows";/.test(appChromeSource) &&
-    /\{titlebarDragRail && <span className="app-chrome__drag-rail"/.test(appChromeSource),
-  "AppChrome exposes the classic drag rail on macOS and Windows",
-);
-
-ok(
-  finalDeclaration(".app--darwin .app-chrome--tabs .tabbar", "--reasonix-draggable") === "drag" &&
-    finalDeclaration(".app--windows-frameless:not(.app--workbench):not(.app--creation) .app-chrome--native-tabs .tabbar", "--reasonix-draggable") === "drag",
-  "classic tabbar whitespace drags the window on macOS and frameless Windows",
-);
-
-ok(
-  finalDeclaration(".app--darwin .app-chrome--tabs .tabbar *", "--reasonix-draggable") === "no-drag" &&
-    finalDeclaration(".app--windows .app-chrome--native-tabs .tabbar *", "--reasonix-draggable") === "no-drag",
-  "classic tabbar controls and tab gaps remain interactive no-drag regions",
-);
-
-ok(
   /const WORKSPACE_PANEL_DEFAULT_OPEN = true;/.test(layoutStoreSource) &&
     /workspacePanelOpen:\s*loadWorkspacePanelOpen\(""\)/.test(layoutStoreSource) &&
     /export function saveWorkspacePanelOpen\(open: boolean, workspaceRoot = ""\)/.test(layoutStoreSource) &&
@@ -286,95 +251,8 @@ ok(
 );
 
 ok(
-  finalDeclaration(".app-chrome__tab-strip", "overflow") === "hidden",
-  "AppChrome tab strip clips tabs to the available chrome width",
-);
-
-ok(
-  finalDeclaration(".app-chrome__tab-strip", "min-width") === "0",
-  "AppChrome tab strip can shrink beside the right dock",
-);
-
-ok(
-  finalDeclaration(":root[data-theme-style] .app-chrome--tabs .tabbar__tabs", "max-width")?.includes("--chrome-panel-control-size"),
-  "themed AppChrome tab lists reserve a flowing new-tab button slot",
-);
-
-ok(
-  finalDeclaration(":root[data-theme-style] .app-chrome--tabs .tabbar__tabs", "flex") === "0 1 auto",
-  "themed AppChrome tab lists size to tab content before shrinking",
-);
-
-ok(
-  finalDeclaration(":root[data-theme-style] .app-chrome--tabs .tabbar__tabs", "width") === "max-content",
-  "themed AppChrome tab lists keep the new-tab button next to the last tab",
-);
-
-ok(
-  finalDeclaration(":root[data-theme-style] .app-chrome--tabs .tabbar > .tooltip-trigger:has(.tabbar__new)", "flex")?.includes("--chrome-panel-control-size"),
-  "themed AppChrome new-tab button keeps a stable slot beside the tabs",
-);
-
-ok(
-  finalDeclaration(":root[data-theme-style] .tabbar__tab--active", "box-shadow")?.includes(
-    "inset 0 -2px 0 var(--project-accent, var(--accent))",
-  ),
-  "active themed tab carries the project-accent underline",
-);
-
-ok(
-  finalDeclaration(":root[data-theme-style] .tabbar__tab--active:focus-visible", "box-shadow")?.includes(
-    "inset 0 -2px 0 var(--project-accent, var(--accent))",
-  ) &&
-    finalDeclaration(":root[data-theme-style] .tabbar__tab--active:focus-visible", "box-shadow")?.includes(
-      "0 0 0 3px var(--accent-soft)",
-    ),
-  "keyboard focus on the active tab keeps both the focus ring and the accent underline",
-);
-
-ok(
-  matchingBlocks(".app--darwin .app-chrome--tabs .tabbar__tab--active").every(
-    (block) => !block.includes("inset 0 2px"),
-  ),
-  "macOS active tab declares no dead top-edge accent (the themed bottom-edge layer owns it)",
-);
-
-ok(
-  finalDeclaration(":root[data-theme-style] .tabbar__tabs", "gap") === "6px" &&
-    finalDeclaration(":root[data-theme-style] .tabbar__tab", "border") === "1px solid var(--border)",
-  "themed tabs keep distinct full outlines with visible spacing",
-);
-
-ok(
-  finalDeclaration(":root[data-theme-style] .app-chrome--tabs .tabbar__tab + .tabbar__tab:not(.tabbar__tab--drop-before)::before", "width") === "1px" &&
-    finalDeclaration(":root[data-theme-style] .app-chrome--tabs .tabbar__tab + .tabbar__tab:not(.tabbar__tab--drop-before)::before", "background") === "var(--border-2)",
-  "adjacent AppChrome tabs render a stronger divider inside their gap",
-);
-
-ok(
-  finalDeclaration(":root[data-theme-style] .tabbar__tab--active", "border-color") === "var(--border-2)" &&
-    finalDeclaration(":root[data-theme-style] .tabbar__tab--active", "font-weight") === "600",
-  "active themed tabs combine a stronger border outline and heavier label weight",
-);
-
-ok(
-  /workbenchChrome \? \(\s*<span className="app-chrome__spacer" aria-hidden="true" \/>/s.test(appChromeSource),
-  "AppChrome workbench branch skips the tab strip",
-);
-
-ok(
-  /app-chrome__tools--fixed/.test(appChromeSource),
-  "AppChrome renders the command search as a fixed chrome tool",
-);
-
-ok(
   /workbenchChromeHidden\s*=\s*sidebarWorkbench/.test(appViewSource),
   "workbench chrome is hidden for every desktop platform",
-);
-
-ok(
-  /\{!appChromeHidden && \(/.test(appViewSource),
-  "workbench skips rendering the top AppChrome row",
 );
 
 ok(
@@ -382,11 +260,13 @@ ok(
   "workbench keeps chrome controls in the topic bar",
 );
 
+// The app tab strip that consumed the tab reveal signal is gone; the transcript
+// keeps its own cell and the shared reveal still has to bump both independently.
 ok(
   /const \[transcriptRevealSignal, setTranscriptRevealSignal\] = useState\(0\);/.test(appSource) &&
-    /revealActiveSignal={local.tabRevealSignal}/.test(appViewSource) &&
-    /revealSignal=\{transcript\.revealSignal\}/.test(chatPaneSource),
-  "transcript bottom reveal is decoupled from tab-strip reveal",
+    /revealSignal=\{transcript\.revealSignal\}/.test(chatPaneSource) &&
+    /input\.setTabRevealSignal\(value => value \+ 1\); input\.setTranscriptRevealSignal\(value => value \+ 1\);/.test(desktopNavigationSource),
+  "transcript bottom reveal keeps its own signal and still settles with the shared reveal",
 );
 
 
@@ -492,61 +372,6 @@ ok(
 );
 
 
-for (const selector of [
-  ".app--darwin .app-chrome--tabs",
-  ":root[data-theme-style] .app--darwin .app-chrome--tabs",
-]) {
-  const rightSpace = finalDeclaration(selector, "padding-right") ?? finalDeclaration(selector, "padding") ?? "";
-  ok(
-    rightSpace.includes("--chrome-toggle-size") && !rightSpace.includes("--chrome-right-toggle-offset"),
-    `${selector} reserves fixed chrome tool width without shrinking for the right dock`,
-  );
-}
-
-for (const selector of [
-  ".app--windows .app-chrome--native-tabs",
-  ".app--linux .app-chrome--native-tabs",
-  ":root[data-theme-style] .app--windows .app-chrome--native-tabs",
-  ":root[data-theme-style] .app--linux .app-chrome--native-tabs",
-]) {
-  const rightSpace = finalDeclaration(selector, "padding-right") ?? finalDeclaration(selector, "padding") ?? "";
-  ok(
-    rightSpace.includes("--chrome-right-toggle-offset"),
-    `${selector} reserves right-dock width before rendering tabs`,
-  );
-}
-
-for (const selector of [
-  ".app--windows-frameless .app-chrome--native-tabs",
-  ":root[data-theme-style] .app--windows-frameless .app-chrome--native-tabs",
-]) {
-  const paddingRight = finalDeclaration(selector, "padding-right") ?? "";
-  ok(
-    finalDeclaration(selector, "--windows-frameless-titlebar-tools-offset") === "var(--windows-window-controls-safe)" &&
-      paddingRight.includes("--windows-frameless-titlebar-tools-offset") &&
-      paddingRight.includes("--chrome-panel-control-size") &&
-      !paddingRight.includes("--chrome-right-toggle-offset"),
-    `${selector} keeps titlebar tools fixed beside the Windows controls`,
-  );
-}
-
-for (const selector of [
-  ".app--windows-frameless .app-chrome--native-tabs .app-chrome__panel-toggle--right",
-  ":root[data-theme-style] .app--windows-frameless .app-chrome--native-tabs .app-chrome__panel-toggle--right",
-]) {
-  ok(
-    finalDeclaration(selector, "right") === "calc(var(--windows-frameless-titlebar-tools-offset) + 8px)",
-    `${selector} stays fixed outside the Windows window controls`,
-  );
-}
-
-ok(
-  finalDeclaration(".app--windows-frameless:not(.app--workbench):not(.app--creation) .app-chrome--native-tabs .app-chrome__drag-rail", "--reasonix-draggable") === "drag" &&
-    finalDeclaration(".app--windows-frameless:not(.app--workbench):not(.app--creation) .app-chrome--native-tabs .app-chrome__drag-rail", "right")?.includes("--windows-window-controls-safe") &&
-    finalDeclaration(".app--windows .app-chrome--native-tabs .tabbar", "--reasonix-draggable") === "no-drag",
-  "Windows classic chrome keeps a draggable rail while tabs remain clickable",
-);
-
 ok(
   finalDeclaration(".sidebar", "--reasonix-draggable") === "drag" &&
     finalDeclaration(".app--windows .sidebar", "--reasonix-draggable") === "no-drag" &&
@@ -610,17 +435,12 @@ ok(
   "active dock tab underline is removed in favor of the rounded-rect selected state",
 );
 
-for (const selector of [
-  ".app--classic .workbench-dock__tab + .workbench-dock__tab::before",
-  ".app--workbench .workbench-dock__tab + .workbench-dock__tab::before",
-]) {
-  ok(
-    finalDeclaration(selector, "width") === "1px" &&
-      finalDeclaration(selector, "height") === "16px" &&
-      finalDeclaration(selector, "background")?.includes("--border-soft"),
-    `${selector} renders a restrained divider between right-dock tabs`,
-  );
-}
+ok(
+  finalDeclaration(".app--workbench .workbench-dock__tab + .workbench-dock__tab::before", "width") === "1px" &&
+    finalDeclaration(".app--workbench .workbench-dock__tab + .workbench-dock__tab::before", "height") === "16px" &&
+    finalDeclaration(".app--workbench .workbench-dock__tab + .workbench-dock__tab::before", "background")?.includes("--border-soft"),
+  ".app--workbench .workbench-dock__tab + .workbench-dock__tab::before renders a restrained divider between right-dock tabs",
+);
 
 ok(
   finalDeclaration(".app--creation .workbench-dock__tab + .workbench-dock__tab::before", "content") === undefined,
@@ -652,14 +472,8 @@ for (const selector of [
 }
 
 ok(
-  finalDeclaration(".app--windows-frameless:not(.app--workbench) .workbench-dock__tools", "padding-right") === undefined &&
-    finalDeclaration(":root[data-theme-style] .app--windows-frameless:not(.app--workbench) .workbench-dock__tools", "padding-right") === undefined,
-  "classic dock tabs do not reserve native window-control space on their separate chrome row",
-);
-
-ok(
-  /@container \(max-width: 420px\) \{[\s\S]*?\.app--classic \.workbench-dock__tab,[\s\S]*?\.app--workbench \.workbench-dock__tab,[\s\S]*?padding-left:\s*10px;[\s\S]*?padding-right:\s*10px;[\s\S]*?gap:\s*4px;/.test(stylesSource),
-  "classic and workbench share the same compact four-tab spacing at narrow dock widths",
+  /@container \(max-width: 420px\) \{[\s\S]*?\.app--workbench \.workbench-dock__tab,[\s\S]*?:root\[data-theme-style\] \.app--workbench \.workbench-dock__tab \{[\s\S]*?padding-left:\s*10px;[\s\S]*?padding-right:\s*10px;[\s\S]*?gap:\s*4px;/.test(stylesSource),
+  "workbench keeps compact four-tab spacing at narrow dock widths",
 );
 
 for (const selector of [

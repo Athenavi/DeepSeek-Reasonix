@@ -1081,10 +1081,10 @@ function browserPlatformOverride(): "darwin" | "windows" | "linux" | "" {
   return value === "darwin" || value === "windows" || value === "linux" ? value : "";
 }
 
-function browserMockDesktopLayoutStyle(): "classic" | "workbench" | "creation" {
+function browserMockDesktopLayoutStyle(): "workbench" | "creation" {
   if (typeof window === "undefined" || desktopHost().app) return "workbench";
   const value = new URLSearchParams(window.location.search).get("layout");
-  return value === "classic" || value === "creation" ? value : "workbench";
+  return value === "creation" ? value : "workbench";
 }
 
 function browserPreviewBashSandboxMode(): "enforce" | "off" {
@@ -4890,7 +4890,7 @@ function makeMockApp(): AppBindings {
           return "";
         },
         async SetDesktopLayoutStyle(style: string) {
-          settings.desktopLayoutStyle = style === "workbench" || style === "creation" ? style : "classic";
+          settings.desktopLayoutStyle = style === "creation" ? "creation" : "workbench";
         },
         async SetDesktopZoomFactor(factor: number) {
           mockDesktopZoomFactor = Math.min(2.0, Math.max(0.5, Number.isFinite(factor) ? factor : 1.0));

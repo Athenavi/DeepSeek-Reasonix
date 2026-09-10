@@ -19,7 +19,6 @@ import { StartupGateLifecycle } from "../app-runtime/StartupGateLifecycle";
 import { AppRuntimeEffects } from "../app-runtime/AppRuntimeEffects";
 import { ThemeBackground } from "../components/ThemeBackground";
 import { useTopicbarHeightVar } from "../lib/useTopicbarHeightVar";
-import { AppChrome } from "../components/AppChrome";
 import { SidebarRegion } from "./SidebarRegion";
 import { TopicbarRegion } from "./TopicbarRegion";
 import { buildTopicbarView, TopicbarActionsStack } from "./TopicbarActionsStack";
@@ -107,9 +106,6 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
   const runtimeTransitioning = core.surface.transitioning;
   const browserPreviewChrome = navigation.browserPreviewChrome;
 
-  // Creation keeps the classic sidebar/chat structure while gating chrome tweaks
-  // behind its own style flag so classic/workbench remain unchanged.
-  const appChromeHidden = sidebarWorkbench || sidebarCreation;
   const workbenchChromeHidden = sidebarWorkbench;
   const sidebarClassName = [
     "sidebar",
@@ -214,32 +210,6 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
         className={shellClassNames.layout}
         style={layoutStyle}
       >
-        {!appChromeHidden && (
-          <AppChrome
-            platform={shell.desktopPlatform}
-            browserPreviewChrome={browserPreviewChrome}
-            workbenchChrome={sidebarWorkbench}
-            tabs={session.visibleTabs}
-            activeTabId={session.visibleTabId}
-            revealActiveSignal={local.tabRevealSignal}
-            commandCompact={true}
-            sidebarTogglePressed={shell.sidebarTogglePressed}
-            sidebarExpandBlocked={navigation.sidebarExpandBlocked}
-            sidebarCollapsed={shell.sidebarCollapsed}
-            sidebarToggleTitle={navigation.sidebarToggleTitle}
-            workspacePanelMaximized={shell.workspacePanelMaximized}
-            workspacePanelRenderable={surfaceWorkspacePanelRenderable}
-            workspacePanelLabel={surfaceWorkspacePanelRenderable ? t("rightDock.collapse") : t("rightDock.expand")}
-            onToggleSidebar={shellGeometry.toggleSidebar}
-            onToggleWorkspacePanel={session.workspacePanelCommands.toggleWorkspacePanel}
-            onTabChange={(id) => void session.tabBarCommands.handleTabChange(id)}
-            onTabClose={(id) => void session.tabBarCommands.handleTabClose(id)}
-            onTabsClose={(ids, nextActiveTabId) => void session.tabBarCommands.handleTabsClose(ids, nextActiveTabId)}
-            onTabsReorder={(ids) => void session.tabBarCommands.handleTabsReorder(ids)}
-            onNewTab={() => void navigationCommands.handleNewTab()}
-            onOpenPalette={() => void navigation.paletteCommands.openPalette()}
-          />
-        )}
         <a className="skip-to-composer" href="#composer-input">
           {t("shortcuts.skipToComposer")}
         </a>
