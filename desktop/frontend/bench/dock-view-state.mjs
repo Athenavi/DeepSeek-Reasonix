@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import { startPreviewServer } from "./vite-preview-server.mjs";
 
 const frontendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-process.env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH || path.join(frontendDir, ".pw-browsers");
+process.env.PLAYWRIGHT_BROWSERS_PATH = !process.env.PLAYWRIGHT_BROWSERS_PATH || process.env.PLAYWRIGHT_BROWSERS_PATH === ".pw-browsers"
+  ? path.join(frontendDir, ".pw-browsers")
+  : process.env.PLAYWRIGHT_BROWSERS_PATH;
 const { chromium } = await import("playwright");
 const preview = process.env.REASONIX_DOCK_URL ? null : await startPreviewServer(frontendDir, 4663);
 const url = process.env.REASONIX_DOCK_URL ?? "http://127.0.0.1:4663";
