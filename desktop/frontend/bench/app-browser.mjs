@@ -108,8 +108,10 @@ try {
   assert(await page.locator(".footer.footer--compact").count() === 1, "open terminal compacts the shared footer without remounting Composer");
   assert(await composer.inputValue() === "layout-owned draft", "terminal drawer lifecycle preserves the Composer draft");
   await terminalToggle.click();
-  await page.locator('.terminal-drawer[aria-hidden="true"][inert]').waitFor({ state: "attached" });
-  assert(!await page.locator('.terminal-drawer[aria-hidden="true"][inert]').isVisible(), "closed warm terminal remains mounted and hidden");
+  const closedTerminal = page.locator('.terminal-drawer[aria-hidden="true"][inert]');
+  await closedTerminal.waitFor({ state: "attached" });
+  await closedTerminal.waitFor({ state: "hidden" });
+  assert(await closedTerminal.count() === 1, "closed warm terminal remains mounted and hidden");
   assert(await page.locator('.terminal-drawer-resizer[tabindex="-1"]').count() === 1, "closed warm terminal is inert and leaves keyboard navigation");
 
   await page.locator('.project-tree__topic-main:has-text("bench:geometry")').click();
