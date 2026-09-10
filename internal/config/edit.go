@@ -307,14 +307,15 @@ func (c *Config) SetDesktopTerminalTheme(theme string) error {
 // affect CLI output or provider-visible request data.
 func (c *Config) SetDesktopLayoutStyle(style string) error {
 	switch strings.ToLower(strings.TrimSpace(style)) {
-	case "classic":
-		c.Desktop.LayoutStyle = "classic"
-	case "", "workbench", "workspace":
-		c.Desktop.LayoutStyle = "workbench"
 	case "creation":
 		c.Desktop.LayoutStyle = "creation"
+	case "", "classic", "workbench", "workspace":
+		// "classic" is retired and stores as workbench, matching the read path
+		// in normalizeDesktopLayoutStyle. An older caller that still sends it
+		// gets the surviving style rather than an error.
+		c.Desktop.LayoutStyle = "workbench"
 	default:
-		return fmt.Errorf("desktop layout style %q: must be classic|workbench|creation", style)
+		return fmt.Errorf("desktop layout style %q: must be workbench|creation", style)
 	}
 	return nil
 }

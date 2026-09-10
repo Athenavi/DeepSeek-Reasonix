@@ -67,12 +67,7 @@ func (a *App) CreateIsolatedWorktree(workspaceRoot string) (IsolatedWorktreeOpen
 		return IsolatedWorktreeOpenResult{}, err
 	}
 
-	var tab TabMeta
-	if a.singleSurfaceLayoutEnabled() {
-		tab, err = a.ensureBlankSurface("project", created.WorkspaceRoot)
-	} else {
-		tab, err = a.ensureBlankTab("project", created.WorkspaceRoot)
-	}
+	tab, err := a.ensureBlankSurface("project", created.WorkspaceRoot)
 	if err != nil {
 		return IsolatedWorktreeOpenResult{}, fmt.Errorf("isolated worktree was created at %s but Reasonix could not open it: %w", created.WorktreeRoot, err)
 	}
