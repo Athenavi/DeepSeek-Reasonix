@@ -133,13 +133,15 @@ func TestExplicitMaxStepsOwnsTheOrdinaryTurn(t *testing.T) {
 	}
 }
 
-// This is a round-ceiling regression, not a disk-throughput benchmark. Keep a
-// five-second no-progress watchdog while bounding the entire 121-round run.
+// This is a round-ceiling regression, not a disk-throughput benchmark. The
+// five-second no-progress watchdog is the detector; the total bound only stops
+// a wedged run, so it carries headroom for the slowest leg — Windows CI drives
+// all 121 rounds through a real session writer and has measured ~45s.
 func waitForChatBudgetProgress(t *testing.T, done <-chan event.Event, progress <-chan struct{}) {
 	t.Helper()
 	idle := time.NewTimer(5 * time.Second)
 	defer idle.Stop()
-	total := time.NewTimer(30 * time.Second)
+	total := time.NewTimer(90 * time.Second)
 	defer total.Stop()
 	for {
 		select {
