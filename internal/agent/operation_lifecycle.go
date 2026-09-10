@@ -127,7 +127,7 @@ func allowedRecoveryFor(code string, decision evidence.RecoveryDecision) []strin
 	switch code {
 	case tool.WriteEvidenceStale, tool.WriteEvidenceMissing, tool.ReadSourceChanged:
 		return []string{tool.RecoveryRereadTarget, tool.RecoveryAbandonEdit}
-	case tool.VerificationReceiptMissing:
+	case tool.VerificationReceiptMissing, tool.VerificationReceiptMismatch:
 		return []string{tool.RecoveryRunVerifier, tool.RecoveryMarkManual}
 	default:
 		return []string{tool.RecoveryAbandonEdit}

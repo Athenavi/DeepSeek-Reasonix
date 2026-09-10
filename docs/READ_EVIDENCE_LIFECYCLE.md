@@ -93,8 +93,8 @@ expire with the batch. Cleanup removes only the identical requirement key.
 
 Diagnostics use `READ_PARTIAL`, `READ_CURSOR_INVALID`, `READ_SOURCE_CHANGED`,
 `READ_HARD_STOP`, `WRITE_EVIDENCE_MISSING`, `WRITE_EVIDENCE_STALE`,
-`WRITE_TARGET_ABSENT`, `WRITE_TARGET_AMBIGUOUS`, `VERIFICATION_RECEIPT_MISSING`
-and `OPERATION_NEEDS_USER`. They carry available path, operation,
+`WRITE_TARGET_ABSENT`, `WRITE_TARGET_AMBIGUOUS`, `VERIFICATION_RECEIPT_MISSING`,
+`VERIFICATION_RECEIPT_MISMATCH` and `OPERATION_NEEDS_USER`. They carry available path, operation,
 version/range and recovery information, never file content.
 
 A rejection is machine-executable rather than prose: it names the receipt IDs
