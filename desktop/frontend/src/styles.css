@@ -22401,14 +22401,6 @@ body > .mermaid-diagram--fullscreen {
   position: relative;
   --reasonix-draggable: no-drag;
 }
-/* When the dock is closed in workbench mode, the fixed top-right dock-toggle
-/* When the dock is closed in workbench mode, the fixed top-right dock-toggle
-   overlaps the bar's right edge whether or not the dock is open — the bar spans
-   the whole window either way — so workbench always leaves room for it.
-   Creation keeps its toggle inside the actions row, so it needs no margin. */
-.app--workbench .topicbar__actions {
-  margin-right: 36px;
-}
 
 .topicbar__actions > .tooltip-trigger {
   display: inline-flex;
@@ -24084,37 +24076,6 @@ body > .mermaid-diagram--fullscreen {
   padding: 7px 10px 3px;
   border-bottom: 1px solid transparent;
   --reasonix-draggable: drag;
-}
-
-/* Dock collapse/expand toggle pinned to the top-right corner of the window.
-/* Dock collapse/expand toggle pinned to the top-right corner of the window.
-   Fixed position keeps it at the same spot whether the dock is open (it
-   overlaps the dock's tools row) or closed (it sits on the topic bar's
-   right edge) — the icon never shifts. */
-.app__dock-toggle {
-  position: fixed;
-  top: 0;
-  right: 12px;
-  height: 45px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--z-app-chrome);
-  --reasonix-draggable: no-drag;
-  pointer-events: auto;
-}
-.app__dock-toggle .topicbar__chrome-btn {
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-.app__dock-toggle .topicbar__chrome-btn:hover:not(:disabled),
-.app__dock-toggle .topicbar__chrome-btn:focus-visible:not(:disabled) {
-  background: var(--button-bg) !important;
-  color: var(--fg) !important;
-}
-.app__dock-toggle .topicbar__chrome-btn--workspace:not(:hover):not(:focus-visible) {
-  color: var(--fg-faint);
 }
 
 @container (max-width: 520px) {
@@ -29532,15 +29493,10 @@ body > .mermaid-diagram--fullscreen {
   opacity: 1;
 }
 
-.app--creation .topicbar__actions .topicbar__chrome-btn--workspace,
-:root[data-theme-style] .app--creation .topicbar__actions .topicbar__chrome-btn--workspace {
+.topicbar__actions .topicbar__chrome-btn--workspace {
   color: color-mix(in srgb, var(--fg-dim) 78%, transparent);
 }
 
-.app--creation .topicbar__actions .topicbar__chrome-btn--workspace.topicbar__chrome-btn--active,
-:root[data-theme-style] .app--creation .topicbar__actions .topicbar__chrome-btn--workspace.topicbar__chrome-btn--active {
-  color: var(--fg);
-}
 
 /* Creation topicbar: slim ExternalOpener split control to match utility icons. */
 .app--creation .topicbar__actions .external-opener,
@@ -33136,16 +33092,6 @@ body > .mermaid-diagram--fullscreen {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* Workbench keeps its workspace toggle in the fixed top-right dock-toggle
-/* Workbench keeps its workspace toggle in the fixed top-right dock-toggle
-   instead of an AppChrome rail; shift it left of the Windows caption strip
-   (min/max/close) so it never sits under the window controls. Same safe inset
-   as the classic-mode panel toggle. */
-.app--windows-frameless.app--workbench .app__dock-toggle,
-:root[data-theme-style] .app--windows-frameless.app--workbench .app__dock-toggle {
-  right: calc(var(--windows-window-controls-safe) + 8px);
 }
 
 /* Creation sets tools padding via shorthand; re-assert the Windows safe

@@ -42,7 +42,7 @@ const PREVIEW_DEFAULT_WIDTH = 660;
 const CHAT_COMFORT_MIN_WIDTH = 560;
 
 console.log("\nworkspace dock layout");
-eq(/\.app--workbench \.topicbar__actions \{\s*margin-right:\s*36px;/.test(stylesSource), true, "the workbench bar reserves the fixed workspace toggle's hit area");
+eq(/\.app__dock-toggle/.test(stylesSource), false, "the workspace toggle is a bar action button, not a fixed overlay the bar must dodge");
 eq(/\.app--darwin\.app--workbench \.workbench-dock__tabs,[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*100%;[\s\S]*?min-width:\s*0;/.test(stylesSource), true, "macOS workspace tabs fill the remaining title row");
 eq(/\.app--darwin\.app--workbench \.workbench-dock__tab,[\s\S]*?flex:\s*1 1 0;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*none;/.test(stylesSource), true, "macOS workspace tabs divide the available row without overlap");
 

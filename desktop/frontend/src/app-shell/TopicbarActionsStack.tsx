@@ -109,7 +109,7 @@ export function TopicbarActionsStack(props: {
           openSessionSummary: () => props.setTasksOpen((open) => open ? false : "session"), tasksOpen: Boolean(props.tasksOpen),
         } : undefined}
       />
-      {props.creation && props.dockToggle}
+      {props.dockToggle}
       {props.tasksOpen && (
         <div className="taskmonitor-popover" role="dialog" aria-label={t("summary.session")}>
           <Suspense fallback={null}>

@@ -95,7 +95,7 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
   useTopicbarHeightVar();
   const { core, shell, session, navigation, runtime, local } = props;
   const { state, activeTab, activeTabId, t, locale } = core;
-  const { sidebarWorkbench, sidebarCreation, windowsFramelessChrome, managementActive, mainWindowMaximised } = shell;
+  const { sidebarWorkbench, sidebarCreation, windowsFramelessChrome, mainWindowMaximised } = shell;
   const {
     conversationView, visibleRuntimeState, sidebarImDetailConnection,
     surfaceWorkspacePanelRenderable, surfaceWorkspacePanelGridOpen, surfaceWorkspacePanelOverlay, terminalSurfaceOpen,
@@ -204,7 +204,6 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
         className={shellClassNames.app}
     >
       <ThemeBackground />
-      {sidebarWorkbench && <div className="app__dock-toggle" inert={managementActive}><DockToggleButton renderable={surfaceWorkspacePanelRenderable} t={t} onToggle={session.workspacePanelCommands.toggleWorkspacePanel} /></div>}
       <div
         ref={layoutRef}
         className={shellClassNames.layout}
