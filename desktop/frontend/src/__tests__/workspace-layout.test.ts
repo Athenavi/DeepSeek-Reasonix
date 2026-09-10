@@ -178,6 +178,16 @@ eq(
   true,
   "terminal-drawer-open layout keeps the shell bar's row and reserves one for the status bar below the terminal drawer",
 );
+// grid-template-columns interpolates only between track lists of equal length,
+// so the closed state must keep the dock's track at zero width rather than
+// dropping it — otherwise the toggle snaps while the sidebar's column animates.
+eq(
+  /\.layout--sidebar-collapsed \{\s*--sidebar-width: 0px;\s*grid-template-columns: 0px minmax\(0, 1fr\) minmax\(0px, 0px\);/.test(stylesSource) &&
+    /grid-template-columns: var\(--sidebar-expanded-width\) minmax\(0, 1fr\) minmax\(0px, 0px\);/.test(stylesSource) &&
+    /\.layout--workspace-open \{[\s\S]*?grid-template-columns: var\(--sidebar-width\) minmax\(0, 1fr\) minmax\(0, var\(--workspace-width\)\);/.test(stylesSource),
+  true,
+  "the dock keeps a zero-width third track while closed so opening and closing it interpolates",
+);
 eq(
   /@media \(max-width: 820px\) \{[\s\S]*?\.layout--terminal-drawer-open \.terminal-drawer,[\s\S]*?display: flex !important;[\s\S]*?grid-column: 1 !important;[\s\S]*?grid-row: 3;[\s\S]*?\.layout--terminal-drawer-open \.terminal-drawer-resizer,[\s\S]*?grid-column: 1 !important/.test(stylesSource),
   true,

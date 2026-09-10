@@ -2093,7 +2093,11 @@ a[href] {
   display: grid;
   justify-content: start;
   grid-template-rows: auto minmax(0, 1fr) var(--statusbar-height);
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  /* The dock's track is always present, collapsed to zero when it is closed.
+     grid-template-columns only interpolates between track lists of the same
+     length, so dropping the third track on close would make the dock snap
+     instead of animating the way the sidebar column does. */
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) minmax(0px, 0px);
   height: 100%;
   min-height: 0;
   width: 100%;
@@ -2125,10 +2129,10 @@ a[href] {
 }
 .layout--sidebar-collapsed {
   --sidebar-width: 0px;
-  grid-template-columns: 0px minmax(0, 1fr);
+  grid-template-columns: 0px minmax(0, 1fr) minmax(0px, 0px);
 }
 .layout:not(.layout--sidebar-collapsed):not(.layout--workspace-open):not(.layout--workspace-maximized) {
-  grid-template-columns: var(--sidebar-expanded-width) minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-expanded-width) minmax(0, 1fr) minmax(0px, 0px);
 }
 .layout--workspace-open {
   min-width: min(780px, 100vw);
