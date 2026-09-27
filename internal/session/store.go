@@ -772,9 +772,8 @@ func readStoredManifest(path string) (Manifest, error) {
 	return manifest, nil
 }
 
-// Append writes already-committed batches in order. Sequence allocation,
-// validation, and idempotency belong to Session; this method is only the
-// physical hand-off and reports uncertainty rather than guessing.
+// Append writes committed batches in order. Session owns sequence allocation,
+// validation, and idempotency; this method reports physical write uncertainty.
 func (s *Store) Append(ctx context.Context, commits []Commit) error {
 	if s == nil {
 		return fmt.Errorf("session: nil store")
@@ -851,6 +850,7 @@ func (s *Store) persist(ctx context.Context, file *os.File, commits []Commit) er
 	if err != nil {
 		return err
 	}
+	s.adoptPersistedIndex(file, start)
 	if err := copyStagedAppend(ctx, staged, file, s.writeFn); err != nil {
 		end, statErr := file.Seek(0, io.SeekEnd)
 		if statErr == nil && end == start {
