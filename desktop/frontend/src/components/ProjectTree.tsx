@@ -128,6 +128,7 @@ export function ProjectTree({
   const compactTopics = variant === "workbench";
   const creationTopics = variant === "creation";
   const [tree, setTree] = useState<ProjectNode[]>([]);
+  const [shellStage, setShellStage] = useState<"loading" | "slow" | "ready">("loading");
   const treeRef = useRef<ProjectNode[]>([]);
   const latestRevisionRef = useRef(0);
   const shellRequestRef = useRef(0);
@@ -490,10 +491,11 @@ export function ProjectTree({
       })));
       await reloadRequestedProjects(projects);
     } catch (err) {
-      // A shell snapshot is metadata-only. If it fails, the resident folder
-      // identity can still drive the requested canonical topic reload.
+      // A failed shell read can still reload topics from resident folders.
       if (request === shellRequestRef.current) await reloadRequestedProjects(treeRef.current);
       if (throwOnSnapshotError) throw err;
+    } finally {
+      if (request === shellRequestRef.current) setShellStage("ready");
     }
   }, [applyRuntimeProjection, reloadProjectTopicLists]);
   refreshRef.current = refresh;
@@ -561,6 +563,10 @@ export function ProjectTree({
     return () => { shellRequestRef.current++; };
   }, [refresh, refreshSignal]);
 
+  useEffect(() => {
+    if (shellStage !== "loading") return;
+    const timer = setTimeout(() => setShellStage("slow"), 250); return () => clearTimeout(timer);
+  }, [shellStage]);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let latest: Parameters<Parameters<typeof onProjectTreeChangedV2>[0]>[0] | undefined;
@@ -2010,6 +2016,11 @@ export function ProjectTree({
   );
 
   const renderEmptyState = () => {
+    if (shellStage !== "ready") return <div className="project-tree__empty-state" role="status"><div className="project-tree__empty project-tree__empty--subtle">{t("projectTree.loadingProjects")}</div>
+      {shellStage === "slow" && <div className="project-tree__skeleton" aria-hidden="true">
+        <span className="project-tree__skeleton-bar" /><span className="project-tree__skeleton-bar project-tree__skeleton-bar--short" />
+      </div>}
+    </div>;
     if (query.trim()) return <div className="project-tree__empty">{t("projectTree.emptyNoMatch")}</div>;
     return (
       <div className="project-tree__empty-state">

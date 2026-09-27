@@ -1437,6 +1437,7 @@ export const zhTW: Record<DictKey, string> = {
   "projectTree.colorPink": "粉色",
   "projectTree.emptyNoMatch": "沒有匹配的專案或會話",
   "projectTree.emptyNoProjects": "還沒有專案",
+  "projectTree.loadingProjects": "正在讀取專案…",
   "projectTree.newTopicTooltip": "新建會話",
   "projectTree.addProjectTooltip": "新增專案",
   "projectTree.remoteOpenWindow": "在遠端視窗開啟",

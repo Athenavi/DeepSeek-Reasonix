@@ -25,8 +25,9 @@ const { ToastProvider } = await import("../lib/toast");
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>(done => { resolve = done; });
-  return { promise, resolve };
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
 }
 
 const pending: ReturnType<typeof deferred<ProjectTreeSnapshot>>[] = [];
@@ -78,9 +79,21 @@ try {
     try {
       await render(0);
       assert.equal(pending.length, 1, "mount starts one shell read");
+      assert.match(container.querySelector(".project-tree__empty-state")?.textContent ?? "", /读取|讀取|Reading/,
+        "an unanswered shell read must say it is loading");
+      assert.doesNotMatch(container.textContent ?? "", /No projects yet|还没有项目|還沒有專案/,
+        "pending shell read must not claim there are no projects");
+      if (scenario.name === "addition") {
+        assert.equal(container.querySelector(".project-tree__empty-state .project-tree__skeleton"), null,
+          "fast shell reads must not flash a skeleton");
+        await act(async () => mock.timers.tick(250));
+        assert.ok(container.querySelector(".project-tree__empty-state .project-tree__skeleton"),
+          "a delayed shell read shows a skeleton");
+      }
       await act(async () => pending[0].resolve(snapshot(scenario.before)));
       await flush();
       assert.deepEqual(labels(), scenario.before.map(item => item.label));
+      assert.equal(container.querySelector(".project-tree__empty-state .project-tree__skeleton"), null);
 
       // A read started before the mutation retains the old shell contents.
       // Its scalar revision may equal the post-mutation read: this fixture
@@ -113,6 +126,44 @@ try {
     } finally {
       await act(async () => root.unmount());
     }
+  }
+
+  pending.length = 0;
+  localStorage.clear();
+  const emptyRoot = createRoot(container);
+  try {
+    await act(async () => emptyRoot.render(<LocaleProvider><ToastProvider><ProjectTree
+      onOpenTopic={noop} onAddProject={addProject}
+    /></ToastProvider></LocaleProvider>));
+    await flush();
+    assert.doesNotMatch(container.textContent ?? "", /No projects yet|还没有项目|還沒有專案/);
+    await act(async () => pending[0].resolve(snapshot([])));
+    await flush();
+    assert.match(container.textContent ?? "", /No projects yet|还没有项目|還沒有專案/,
+      "an empty answer restores the true empty state");
+  } finally {
+    await act(async () => emptyRoot.unmount());
+  }
+
+  pending.length = 0;
+  localStorage.clear();
+  const failedRoot = createRoot(container);
+  try {
+    await act(async () => failedRoot.render(<LocaleProvider><ToastProvider><ProjectTree
+      onOpenTopic={noop} onAddProject={addProject}
+    /></ToastProvider></LocaleProvider>));
+    await flush();
+    assert.match(container.querySelector(".project-tree__empty-state")?.textContent ?? "", /读取|讀取|Reading/);
+    await act(async () => pending[0].reject(new Error("snapshot unavailable")));
+    await flush();
+    assert.doesNotMatch(container.textContent ?? "", /读取项目|讀取專案|Reading projects/,
+      "a failed first shell read must settle the loading state");
+    assert.match(container.textContent ?? "", /Add new project|添加新项目|新增專案/,
+      "the empty-state project action must remain available after a failed read");
+    assert.match(container.textContent ?? "", /Remote connection|远程连接|遠端連線/,
+      "the empty-state remote action must remain available after a failed read");
+  } finally {
+    await act(async () => failedRoot.unmount());
   }
 } finally {
   mock.timers.reset();

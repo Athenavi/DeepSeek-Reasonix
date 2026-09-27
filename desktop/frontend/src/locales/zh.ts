@@ -1684,6 +1684,7 @@ export const zh: Record<DictKey, string> = {
   "projectTree.colorPink": "粉色",
   "projectTree.emptyNoMatch": "没有匹配的项目或会话",
   "projectTree.emptyNoProjects": "还没有项目",
+  "projectTree.loadingProjects": "正在读取项目…",
   "projectTree.newTopicTooltip": "新建会话",
   "projectTree.addProjectTooltip": "添加新项目",
   "projectTree.remoteOpenWindow": "在远程窗口打开",
