@@ -57,7 +57,7 @@ func (b bash) startBackground(ctx context.Context, p bashParams, sh sandbox.Shel
 		runErr = normalizeBashRunError(jobCtx, runErr, p.PreserveBackgroundProcesses)
 		execution, classifiedErr := classifyBackgroundShellExecution(jobCtx, sh, argv, capture.String(), runErr, started)
 		if classifiedErr != nil && execution.FailurePhase == tool.ShellPhaseExecution && wrapped {
-			writeBackgroundSandboxHint(out, capture.String(), classifiedErr, p, jobSpec, permissionPreset)
+			writeBackgroundSandboxHint(out, capture.String(), classifiedErr, p, jobSpec, permissionPreset, b.workDir)
 		}
 		jobs.SetExecution(jobCtx, execution)
 		return "", classifiedErr
@@ -80,8 +80,8 @@ func (b bash) startBackground(ctx context.Context, p bashParams, sh sandbox.Shel
 	}, nil
 }
 
-func writeBackgroundSandboxHint(out io.Writer, captured string, runErr error, p bashParams, spec sandbox.Spec, permissionPreset string) {
-	hinted := appendSandboxWriteHint(captured, runErr, p, spec, permissionPreset)
+func writeBackgroundSandboxHint(out io.Writer, captured string, runErr error, p bashParams, spec sandbox.Spec, permissionPreset, workDir string) {
+	hinted := appendSandboxWriteHint(captured, runErr, p, spec, permissionPreset, workDir)
 	if hint := strings.TrimPrefix(hinted, captured); hint != "" {
 		_, _ = io.WriteString(out, hint+"\n")
 	}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -97,7 +99,7 @@ func bashLaunchFailure(ex *tool.ShellExecution, start time.Time, err error) (too
 func (b bash) appendWriteHints(ctx context.Context, out string, err error, p bashParams, wrapped bool) string {
 	out = appendSessionDataHint(out, b.guard.CommandHint(b.workDir, p.Command))
 	if wrapped {
-		out = appendSandboxWriteHint(out, err, p, b.specForCall(ctx), string(sandbox.PermissionPresetFrom(ctx)))
+		out = appendSandboxWriteHint(out, err, p, b.specForCall(ctx), string(sandbox.PermissionPresetFrom(ctx)), b.workDir)
 	}
 	return out
 }
@@ -176,16 +178,78 @@ func looksLikeSandboxWriteDenial(out string, err error) bool {
 var localFilePermissionDenied = regexp.MustCompile(`(?m)^(?:bash|zsh|sh|dash|fish|mkdir|touch|cp|mv|rm|ln|install|tee|cat|chmod|chown):[^\n]*permission denied\b`)
 var windowsChildProcessDenied = regexp.MustCompile(`\b(?:spawn(?:sync)?|exec(?:file|sync)?)\s+eperm\b`)
 
-func appendSandboxWriteHint(out string, err error, p bashParams, spec sandbox.Spec, preset string) string {
+func appendSandboxWriteHint(out string, err error, p bashParams, spec sandbox.Spec, preset, workDir string) string {
 	if !spec.Enforce() || strings.TrimSpace(preset) == string(permissionpreset.DangerFullAccess) || !looksLikeSandboxWriteDenial(out, err) {
 		return out
 	}
 	hint := bashWriteDeniedHint()
 	if len(p.AdditionalWriteDirs) > 0 || windowsChildProcessDenied.MatchString(strings.ToLower(out+"\n"+err.Error())) {
 		hint = "The command encountered a permission denial under the OS sandbox. Additional writable directories may not resolve a child-process or named-object denial."
+	} else if dirs := gitWorktreeWriteDirs(workDir, out, spec.WriteRoots); len(dirs) > 0 {
+		paths, _ := json.Marshal(dirs)
+		hint = "Git worktree metadata is outside the writable workspace. Retry this command with additional_write_dirs: " + string(paths) + " and a justification; the host will request approval for these directories."
 	}
 	if denialID := sandbox.IssueDenial(p.Command, preset); denialID != "" {
 		hint += " If the command cannot be expressed with additional_write_dirs, request danger-full-access for this exact retry with denial_id " + denialID + "."
 	}
 	return appendSessionDataHint(out, hint)
+}
+
+func gitWorktreeWriteDirs(workDir, output string, writeRoots []string) []string {
+	for dir := filepath.Clean(workDir); filepath.IsAbs(dir); dir = filepath.Dir(dir) {
+		gitPath := filepath.Join(dir, ".git")
+		info, err := os.Lstat(gitPath)
+		if err == nil {
+			if !info.Mode().IsRegular() || info.Size() > 4096 {
+				return nil
+			}
+			pointer, err := os.ReadFile(gitPath)
+			if err != nil || !strings.HasPrefix(string(pointer), "gitdir: ") {
+				return nil
+			}
+			gitDir := strings.TrimSpace(strings.TrimPrefix(string(pointer), "gitdir: "))
+			if !filepath.IsAbs(gitDir) {
+				gitDir = filepath.Join(dir, gitDir)
+			}
+			gitDir, err = filepath.EvalSymlinks(gitDir)
+			if err != nil || !strings.Contains(output, gitDir) {
+				return nil
+			}
+			commonPath := filepath.Join(gitDir, "commondir")
+			commonInfo, err := os.Stat(commonPath)
+			if err != nil || !commonInfo.Mode().IsRegular() || commonInfo.Size() > 4096 {
+				return nil
+			}
+			common, err := os.ReadFile(commonPath)
+			if err != nil {
+				return nil
+			}
+			commonDir := strings.TrimSpace(string(common))
+			if !filepath.IsAbs(commonDir) {
+				commonDir = filepath.Join(gitDir, commonDir)
+			}
+			commonDir, err = filepath.EvalSymlinks(commonDir)
+			if err != nil {
+				return nil
+			}
+			var missing []string
+			for _, path := range []string{gitDir, commonDir} {
+				covered := false
+				for _, root := range writeRoots {
+					if sandbox.PathWithin(root, path) {
+						covered = true
+						break
+					}
+				}
+				if !covered {
+					missing = append(missing, path)
+				}
+			}
+			return sandbox.CollapseWriteRoots(missing)
+		}
+		if filepath.Dir(dir) == dir {
+			break
+		}
+	}
+	return nil
 }
