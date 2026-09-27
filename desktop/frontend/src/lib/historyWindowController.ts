@@ -102,7 +102,7 @@ export async function loadHistoryWindow(input: LoadInput): Promise<HistoryWindow
         return "empty";
       }
       if (!result) { input.dispatch({ type: "history_older_error", error: "history page unavailable" }); return "empty"; }
-      if (!fingerprintMatches(expectedRevision, result.revisionKnown ? result.revision : undefined) || !digestMatches(expectedDigest, result.digest)) {
+      if (result.kind !== "reload" && (!fingerprintMatches(expectedRevision, result.revisionKnown ? result.revision : undefined) || !digestMatches(expectedDigest, result.digest))) {
         input.dispatch({ type: "history_older_error", error: "history identity changed" });
         return "empty";
       }
