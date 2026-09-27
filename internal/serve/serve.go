@@ -130,6 +130,7 @@ func New(ctrl control.SessionAPI, bc *Broadcaster, serveCfg config.ServeConfig) 
 	s.auth.capabilities = s.capabilities
 	s.initTitleProvider()
 	if concrete, ok := ctrl.(*control.Controller); ok {
+		concrete.EnableServeSessionPermissionPresets()
 		concrete.SetBeforeInboxDispatch(s.beforeInboxDispatch)
 	}
 	return s
@@ -363,9 +364,6 @@ func inheritSessionAxes(prev, newCtrl *control.Controller) error {
 	if nextRef, bound := newCtrl.SessionRef(); bound {
 		prevRef, same := prev.SessionRef()
 		copyPreset = same && prevRef == nextRef
-		if _, runtime, ok := newCtrl.SessionBinding(); ok && runtime.Session().ExplicitPermissionPreset() != "" {
-			copyPreset = false
-		}
 	}
 	if copyPreset {
 		newCtrl.SetToolApprovalMode(prev.ToolApprovalMode())

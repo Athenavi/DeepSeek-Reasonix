@@ -431,12 +431,9 @@ func (c *Controller) publishSessionRuntimeWithCommit(ctx context.Context, candid
 	if err := validateSessionDomainProjection(projection); err != nil {
 		return nil, err
 	}
-	preset, sequence := explicitSessionPermissionPreset(candidate.Session(), projection)
-	if sequence > snapshot.DurableSequence {
-		// Failed writes leave accepted events in memory; never publish an unflushed preset.
-		if _, err := candidate.Session().FlushThrough(ctx, sequence); err != nil {
-			return nil, fmt.Errorf("persist session permission preset: %w", err)
-		}
+	preset, err := c.presetForSessionPublication(ctx, candidate, snapshot)
+	if err != nil {
+		return nil, err
 	}
 	binding, err := service.Bind(candidate)
 	if err != nil {
@@ -465,8 +462,8 @@ func (c *Controller) publishSessionRuntimeWithCommit(ctx context.Context, candid
 	c.mu.Lock()
 	oldGen := c.turns.generation
 	c.mu.Unlock()
-	// Publish identity and preset atomically; an unrecorded session gets its own safe default.
-	preset = string(permissionpreset.NormalizeDefault(preset))
+	// Serve restores the selected remote session's choice. Other frontends keep
+	// their current permission posture when changing canonical identities.
 	c.promptResolveMu.Lock()
 	c.permissionStateMu.Lock()
 	c.v3BindingMu.Lock()
@@ -478,11 +475,13 @@ func (c *Controller) publishSessionRuntimeWithCommit(ctx context.Context, candid
 	c.exclusiveSession = true
 	c.nativeLegacySession = false
 	c.v3BindingMu.Unlock()
-	c.approval.setMode(preset)
-	if c.subagentGate != nil {
-		c.subagentGate.Update(preset)
+	if c.servePresetRestore {
+		c.approval.setMode(preset)
+		if c.subagentGate != nil {
+			c.subagentGate.Update(preset)
+		}
+		c.refreshInteractiveGate()
 	}
-	c.refreshInteractiveGate()
 	c.permissionRevision.Add(1)
 	c.permissionStateMu.Unlock()
 	c.promptResolveMu.Unlock()
@@ -536,9 +535,47 @@ func explicitSessionPermissionPreset(source *session.Session, projection session
 	sequence := projection.PermissionPresetSequence
 	manifest := source.Manifest()
 	if sequence == 0 || (manifest.Source != nil && sequence <= manifest.InheritedEvents) {
+		// A fork does not inherit a broad permission grant. It may start at
+		// the narrower inherited read-only posture until the child makes an
+		// explicit choice of its own.
+		if manifest.Source != nil && projection.PermissionPreset == ToolApprovalReadOnly {
+			return ToolApprovalReadOnly, 0
+		}
 		return "", 0
 	}
 	return projection.PermissionPreset, sequence
+}
+
+func (c *Controller) presetForSessionPublication(ctx context.Context, candidate *session.Runtime, snapshot session.Snapshot) (string, error) {
+	if !c.servePresetRestore {
+		return "", nil
+	}
+	preset, sequence := explicitSessionPermissionPreset(candidate.Session(), snapshot.Projection)
+	if sequence > snapshot.DurableSequence {
+		// Failed writes leave accepted events in memory; never publish an unflushed preset.
+		if _, err := candidate.Session().FlushThrough(ctx, sequence); err != nil {
+			return "", fmt.Errorf("persist session permission preset: %w", err)
+		}
+	}
+	return string(permissionpreset.NormalizeDefault(preset)), nil
+}
+
+// EnableServeSessionPermissionPresets opts a Serve-owned controller into
+// restoring per-session choices. Other frontends keep their live mode.
+func (c *Controller) EnableServeSessionPermissionPresets() {
+	c.permissionMu.Lock()
+	defer c.permissionMu.Unlock()
+	c.servePresetRestore = true
+	_, runtime, bound := c.v3Binding()
+	if !bound || runtime == nil {
+		return
+	}
+	snapshot := runtime.Session().StateSnapshot()
+	preset, sequence := explicitSessionPermissionPreset(runtime.Session(), snapshot.Projection)
+	if sequence > snapshot.DurableSequence {
+		preset = ToolApprovalReadOnly
+	}
+	c.applyToolApprovalModeLocked(string(permissionpreset.NormalizeDefault(preset)))
 }
 
 func validateSessionDomainProjection(projection session.Projection) error {

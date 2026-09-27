@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"reasonix/internal/agent"
+	"reasonix/internal/agent/testutil"
 	"reasonix/internal/event"
 	"reasonix/internal/session"
 	"reasonix/internal/tool"
@@ -32,6 +33,7 @@ func TestCanonicalPermissionPresetFollowsSessionIdentity(t *testing.T) {
 	}
 	exec := agent.New(nil, tool.NewRegistry(), agent.NewSession("system"), agent.Options{}, event.Discard)
 	c := newOwnedTestController(t, Options{Executor: exec, Sink: event.Discard, SessionService: service, SessionRuntime: first, ExclusiveSession: true})
+	c.EnableServeSessionPermissionPresets()
 	initial := c.PermissionSnapshot()
 	if initial.SessionID != "first" || initial.Preset != ToolApprovalWorkspaceWrite {
 		t.Fatalf("initial snapshot = %+v", initial)
@@ -103,6 +105,7 @@ func TestCanonicalComposerProfilePersistsLegacyPermissionAlias(t *testing.T) {
 	}
 	exec := agent.New(nil, tool.NewRegistry(), agent.NewSession("system"), agent.Options{}, event.Discard)
 	c := newOwnedTestController(t, Options{Executor: exec, Sink: event.Discard, SessionService: service, SessionRuntime: runtime, ExclusiveSession: true})
+	c.EnableServeSessionPermissionPresets()
 	if _, err := c.ApplyComposerProfileAtDurable(t.Context(), false, "ask", "", c.PermissionSnapshot().Revision); err != nil {
 		t.Fatal(err)
 	}
@@ -136,6 +139,7 @@ func TestCanonicalPermissionDowngradeFailsClosedAfterFlushError(t *testing.T) {
 	}
 	exec := agent.New(nil, tool.NewRegistry(), agent.NewSession("system"), agent.Options{}, event.Discard)
 	c := newOwnedTestController(t, Options{Executor: exec, Sink: event.Discard, SessionService: service, SessionRuntime: runtime, ExclusiveSession: true})
+	c.EnableServeSessionPermissionPresets()
 	full, _, err := c.SetSessionPermissionPreset(t.Context(), ToolApprovalDangerFullAccess, c.PermissionSnapshot().Revision)
 	if err != nil {
 		t.Fatal(err)
@@ -162,6 +166,7 @@ func TestCanonicalPermissionDowngradeFailsClosedAfterFlushError(t *testing.T) {
 		Executor: agent.New(nil, tool.NewRegistry(), agent.NewSession("system"), agent.Options{}, event.Discard),
 		Sink:     event.Discard, SessionService: service, SessionRuntime: runtime, ExclusiveSession: true,
 	})
+	rebuilt.EnableServeSessionPermissionPresets()
 	if got := rebuilt.PermissionSnapshot().Preset; got != ToolApprovalReadOnly {
 		t.Fatalf("rebuilt controller exposed unflushed preset %q", got)
 	}
@@ -184,6 +189,7 @@ func TestCanonicalPermissionSnapshotNeverMixesSessionAndPreset(t *testing.T) {
 	}
 	exec := agent.New(nil, tool.NewRegistry(), agent.NewSession("system"), agent.Options{}, event.Discard)
 	c := newOwnedTestController(t, Options{Executor: exec, Sink: event.Discard, SessionService: service, SessionRuntime: first, ExclusiveSession: true})
+	c.EnableServeSessionPermissionPresets()
 	if _, _, err := c.SetSessionPermissionPreset(t.Context(), ToolApprovalDangerFullAccess, c.PermissionSnapshot().Revision); err != nil {
 		t.Fatal(err)
 	}
@@ -241,6 +247,7 @@ func TestCanonicalPermissionPresetRestoresAfterServiceRestart(t *testing.T) {
 	}
 	exec := agent.New(nil, tool.NewRegistry(), agent.NewSession("system"), agent.Options{}, event.Discard)
 	c := New(Options{Executor: exec, Sink: event.Discard, SessionService: service, SessionRuntime: runtime, ExclusiveSession: true})
+	c.EnableServeSessionPermissionPresets()
 	before := c.PermissionSnapshot()
 	if _, _, err := c.SetSessionPermissionPreset(t.Context(), ToolApprovalDangerFullAccess, before.Revision); err != nil {
 		t.Fatal(err)
@@ -262,7 +269,68 @@ func TestCanonicalPermissionPresetRestoresAfterServiceRestart(t *testing.T) {
 	defer binding.Release(context.Background())
 	exec = agent.New(nil, tool.NewRegistry(), agent.NewSession("system"), agent.Options{}, event.Discard)
 	reopened := newOwnedTestController(t, Options{Executor: exec, Sink: event.Discard, SessionService: restarted, SessionRuntime: binding.Runtime(), ExclusiveSession: true})
+	reopened.EnableServeSessionPermissionPresets()
 	if got := reopened.PermissionSnapshot(); got.SessionID != "reopened" || got.Preset != ToolApprovalDangerFullAccess {
 		t.Fatalf("restarted controller did not restore durable preset: %+v", got)
+	}
+}
+
+func TestUnmanagedCanonicalSessionKeepsReadOnlyAcrossTransitions(t *testing.T) {
+	service, err := session.NewService("desktop", session.NewFilesystemPersistence(filepath.Join(t.TempDir(), "sessions")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := service.Create(t.Context(), session.CreateOptions{SessionID: "first"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := newOwnedTestController(t, Options{
+		Executor: agent.New(nil, tool.NewRegistry(), agent.NewSession("system"), agent.Options{}, event.Discard),
+		Sink:     event.Discard, SessionService: service, SessionRuntime: first, ExclusiveSession: true,
+	})
+	if _, _, err := c.SetSessionPermissionPreset(t.Context(), ToolApprovalDangerFullAccess, c.PermissionSnapshot().Revision); err != nil {
+		t.Fatal(err)
+	}
+	c.SetToolApprovalMode(ToolApprovalReadOnly)
+	if err := c.rotateExclusiveSession(false); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.ToolApprovalMode(); got != ToolApprovalReadOnly {
+		t.Fatalf("new session widened read-only to %q", got)
+	}
+	if _, err := c.OpenSession(t.Context(), first.Ref()); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.ToolApprovalMode(); got != ToolApprovalReadOnly {
+		t.Fatalf("resume widened read-only to stored preset %q", got)
+	}
+}
+
+func TestServeForkStartsNoBroaderThanInheritedReadOnly(t *testing.T) {
+	service, _, c := newForkTargetsHarness(t, "readonly-parent", testutil.Turn{Text: "answer"})
+	c.EnableServeSessionPermissionPresets()
+	if _, _, err := c.SetSessionPermissionPreset(t.Context(), ToolApprovalReadOnly, c.PermissionSnapshot().Revision); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.RunTurn(t.Context(), "one"); err != nil {
+		t.Fatal(err)
+	}
+	targets, err := c.ForkTargets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := targets.Targets[0]
+	result, err := service.CreateFork(t.Context(), session.ForkRequest{
+		Source: targets.Source, TurnID: target.TurnID, BoundarySequence: target.BoundarySequence,
+		OperationID: "fork-readonly",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.OpenSession(t.Context(), result.Child); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.ToolApprovalMode(); got != ToolApprovalReadOnly {
+		t.Fatalf("fork widened inherited read-only to %q", got)
 	}
 }

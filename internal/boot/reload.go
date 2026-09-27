@@ -245,12 +245,9 @@ func migrateRuntimeState(ctrl, old *control.Controller, m runtimeMigration, crea
 		}
 	}
 
-	// Explicit canonical presets were restored from the session projection while
-	// constructing ctrl. Carry a transient mode only when that session has never
-	// recorded a choice, or when this is a legacy controller.
-	if _, runtime, bound := ctrl.SessionBinding(); !bound || runtime.Session().ExplicitPermissionPreset() == "" {
-		ctrl.SetToolApprovalMode(m.toolApprovalMode)
-	}
+	// Rebuilds preserve the live frontend mode, including a transient TUI
+	// downgrade inside a session that once stored a remote Serve preset.
+	ctrl.SetToolApprovalMode(m.toolApprovalMode)
 	ctrl.SetPlanMode(m.planMode)
 	if m.goalRunning && strings.TrimSpace(m.goal) != "" && strings.TrimSpace(ctrl.Goal()) == "" {
 		ctrl.SetGoal(m.goal)

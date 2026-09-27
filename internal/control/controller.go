@@ -425,7 +425,10 @@ type controllerSessionBinding struct {
 	sessionBinding       *session.ClientBinding
 	exclusiveSession     bool
 	nativeLegacySession  bool
-	v3BindingMu          sync.RWMutex
+	// Only Serve opts into session-scoped preset restoration. TUI and Desktop
+	// keep their own live permission policy across canonical session binds.
+	servePresetRestore bool
+	v3BindingMu        sync.RWMutex
 }
 
 type controllerPromptRouting struct {
@@ -888,18 +891,6 @@ func (c *Controller) initializeOwnedResources(opts Options) {
 	c.installGoalLifecycle(opts.SessionRuntime)
 	c.managedSessionEvents.Store(opts.OnSessionTransition != nil)
 	c.permissionRevision.Store(1)
-	if _, runtime, exclusive := c.v3Binding(); exclusive && runtime != nil {
-		snapshot := runtime.Session().StateSnapshot()
-		preset, sequence := explicitSessionPermissionPreset(runtime.Session(), snapshot.Projection)
-		if sequence > snapshot.DurableSequence {
-			preset = ToolApprovalReadOnly
-		}
-		preset = string(permissionpreset.NormalizeDefault(preset))
-		c.approval.setMode(preset)
-		if c.subagentGate != nil {
-			c.subagentGate.Update(preset)
-		}
-	}
 	// Session-private temporary directory: reuse a shared Manager on hot
 	// rebuild, otherwise create one. Retain so ReleaseResources/Close drop the
 	// owner reference without racing a replacement Controller.
