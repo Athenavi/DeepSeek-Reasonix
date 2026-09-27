@@ -35,5 +35,5 @@ jobs:
           RELEASE_OPERATION: recover
           CLI_TAG: v${{ inputs.version }}
           DESKTOP_TAG: desktop-v${{ inputs.version }}
-          VERIFY_HOMEPAGE: "true"
+          VERIFY_PUBLIC_POINTERS: "true"
         run: bash scripts/verify-stable-release-artifacts.sh

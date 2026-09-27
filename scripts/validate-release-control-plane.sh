@@ -18,8 +18,7 @@ required=(
 	scripts/release-candidate.mjs
 	scripts/release-candidate-tags.sh
 	scripts/test-release-control-contracts.sh
-	scripts/sync-release-site.sh
-	scripts/observe-release-site.sh
+	scripts/reconcile-release-publication.sh
 	scripts/release-publication-ledger.mjs
 	scripts/check-release-public-access.sh
 	scripts/fetch-stable-release-manifest.sh
