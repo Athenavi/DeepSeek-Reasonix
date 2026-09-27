@@ -42,3 +42,24 @@ func TestUnmatchableRuleNoticeSilentWhenRulesWork(t *testing.T) {
 		t.Fatalf("a correct config emitted %d events: %+v", len(sink.events), sink.events)
 	}
 }
+
+// TestUnmatchableRuleNoticeNamesAnUnclosedParenthesis keeps the warning
+// diagnostic: an entry that only lacks its ")" should be described as that,
+// not as a rule that names no tool.
+func TestUnmatchableRuleNoticeNamesAnUnclosedParenthesis(t *testing.T) {
+	sink := &captureSink{}
+	emitUnmatchableRuleNotice(sink, nil, nil, []string{"Bash(git status:*"})
+	if len(sink.events) != 1 {
+		t.Fatalf("got %d events, want 1", len(sink.events))
+	}
+	detail := sink.events[0].Detail
+	if !strings.Contains(detail, "without a closing") {
+		t.Errorf("detail does not name the missing parenthesis: %q", detail)
+	}
+	if !strings.Contains(detail, `write Bash(git status:*) instead`) {
+		t.Errorf("detail does not carry the repaired rule: %q", detail)
+	}
+	if strings.Contains(detail, "Bash(Bash(") {
+		t.Errorf("detail wraps the entry in a second Bash(...): %q", detail)
+	}
+}
