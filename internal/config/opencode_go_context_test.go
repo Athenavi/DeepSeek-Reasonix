@@ -211,3 +211,57 @@ func TestNormalizeLegacyOpenCodeGoRouteCatalogLeavesCustomRequestURLUntouched(t 
 		t.Fatalf("custom request_url provider changed = %+v", got)
 	}
 }
+
+func TestOpenCodeGoShippedChatPresetMovesMiniMaxM27ToAnthropicSibling(t *testing.T) {
+	for _, shipped := range shippedMiniMaxChatOpenCodeGoModels {
+		installed := ProviderEntry{
+			Name: "opencode-go", Kind: "openai", BaseURL: "https://opencode.ai/zen/go/v1",
+			Models: append([]string(nil), shipped...), Default: "minimax-m2.7",
+			APIKeyEnv: "OPENCODE_GO_API_KEY", PresetID: "opencode-go",
+		}
+		c := &Config{ConfigVersion: openCodeGoUpgradeVersion, DefaultModel: "opencode-go/minimax-m2.7", Providers: []ProviderEntry{installed}}
+		if !normalizeLegacyOpenCodeGoInstalls(c) {
+			t.Fatal("shipped chat preset kept minimax-m2.7 on the Chat Completions route")
+		}
+		chat, _ := c.Provider("opencode-go")
+		anthropic, ok := c.Provider("opencode-go-anthropic")
+		if !ok || anthropic.Kind != "anthropic" || anthropic.BaseURL != "https://opencode.ai/zen/go" || !stringSlicesEqual(anthropic.ModelList(), []string{"minimax-m2.7"}) {
+			t.Fatalf("anthropic sibling = %+v, %t", anthropic, ok)
+		}
+		for _, id := range []string{"qwen3.6-plus", "qwen3.7-max", "qwen3.7-plus", "qwen3.8-max", "glm-5.3"} {
+			if !chat.HasModel(id) {
+				t.Errorf("%s left the Chat Completions connection", id)
+			}
+		}
+		if chat.HasModel("minimax-m2.7") || c.DefaultModel != "opencode-go-anthropic/minimax-m2.7" {
+			t.Fatalf("chat=%v default=%q", chat.ModelList(), c.DefaultModel)
+		}
+	}
+	if preset, _ := CuratedProviderPreset("opencode-go"); preset.Entries[0].HasModel("minimax-m2.7") {
+		t.Fatal("Chat Completions preset ships minimax-m2.7")
+	}
+}
+
+func TestOpenCodeGoManualConnectionKeepsItsRoute(t *testing.T) {
+	for _, models := range [][]string{{"glm-5.3", "qwen3.7-plus"}, {"qwen3.7-plus"}, {"glm-5.3", "minimax-m2.7"}, {"minimax-m2.7"}} {
+		manual := ProviderEntry{
+			Name: "custom-opencode-ai", Kind: "openai", BaseURL: "https://opencode.ai/zen/go/v1",
+			Models: append([]string(nil), models...), Default: models[len(models)-1],
+		}
+		ref := "custom-opencode-ai/" + manual.Default
+		c := &Config{ConfigVersion: openCodeGoUpgradeVersion, DefaultModel: ref, Providers: []ProviderEntry{manual}}
+		normalizeLegacyOpenCodeGoInstalls(c)
+		got := c.Providers[0]
+		if len(c.Providers) != 1 || got.Kind != "openai" || got.PresetID != "" || !stringSlicesEqual(got.ModelList(), models) || c.DefaultModel != ref {
+			t.Errorf("%v: providers=%d kind=%q preset=%q models=%v default=%q", models, len(c.Providers), got.Kind, got.PresetID, got.ModelList(), c.DefaultModel)
+		}
+
+		legacy := &Config{ConfigVersion: openCodeGoUpgradeVersion - 1, DefaultModel: ref, Providers: []ProviderEntry{manual}}
+		planOpenCodeGoUpgrade(legacy)
+		for _, p := range legacy.Providers {
+			if p.Name != "custom-opencode-ai" && (p.HasModel("minimax-m2.7") || p.HasModel("qwen3.7-plus")) {
+				t.Errorf("%v: journaled upgrade moved a manual model to %s %v", models, p.Name, p.ModelList())
+			}
+		}
+	}
+}

@@ -205,3 +205,45 @@ func TestBuiltinModelInfoIncludesDeepSeekVisionSKU(t *testing.T) {
 		t.Fatalf("DeepSeek text metadata = %+v, ok=%t", text, ok)
 	}
 }
+
+func TestOpenCodeGoMiniMaxM27ServedOnlyOnAnthropicRoute(t *testing.T) {
+	const chatURL, anthropicURL = "https://opencode.ai/zen/go/v1", "https://opencode.ai/zen/go"
+	const id = "minimax-m2.7"
+	if route, ok := OpenCodeGoRecommendedRoute(id); !ok || route != OpenCodeGoRouteAnthropic {
+		t.Fatalf("recommended route = %q, %t; want anthropic", route, ok)
+	}
+	if _, ok := OpenCodeGoChatModels()[id]; ok {
+		t.Fatal("listed on the Chat Completions route")
+	}
+	if _, ok := LookupOfficialOpenCodeGo("openai", chatURL, id); ok {
+		t.Fatal("resolves on the Chat Completions route")
+	}
+	if _, ok := PiCatalogModelInfo("openai", chatURL, id); ok {
+		t.Fatal("inherits Chat Completions catalog facts")
+	}
+	if _, ok := PiCatalogModelInfoForProvider("opencode-go", "openai", chatURL, id); ok {
+		t.Fatal("inherits provider catalog facts on the Chat Completions route")
+	}
+	if _, ok := LookupOfficialOpenCodeGo("anthropic", anthropicURL, id); !ok {
+		t.Fatal("missing from the Anthropic route")
+	}
+}
+
+// models.dev serves these Qwen models over the OpenAI-compatible SDK while the
+// docs table lists /v1/messages; both routes stay available.
+func TestOpenCodeGoQwenModelsKeepBothRoutes(t *testing.T) {
+	for _, id := range []string{"qwen3.6-plus", "qwen3.7-max", "qwen3.7-plus", "qwen3.8-max"} {
+		if route, ok := OpenCodeGoRecommendedRoute(id); !ok || route != OpenCodeGoRouteChat {
+			t.Errorf("%s recommended route = %q, %t", id, route, ok)
+		}
+		if _, ok := LookupOfficialOpenCodeGo("openai", "https://opencode.ai/zen/go/v1", id); !ok {
+			t.Errorf("%s dropped from the Chat Completions route", id)
+		}
+		if _, ok := LookupOfficialOpenCodeGo("anthropic", "https://opencode.ai/zen/go", id); !ok {
+			t.Errorf("%s dropped from the Anthropic route", id)
+		}
+		if OpenCodeGoRouteCorrected(id) {
+			t.Errorf("%s carries a route correction", id)
+		}
+	}
+}
