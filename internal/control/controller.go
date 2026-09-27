@@ -888,6 +888,18 @@ func (c *Controller) initializeOwnedResources(opts Options) {
 	c.installGoalLifecycle(opts.SessionRuntime)
 	c.managedSessionEvents.Store(opts.OnSessionTransition != nil)
 	c.permissionRevision.Store(1)
+	if _, runtime, exclusive := c.v3Binding(); exclusive && runtime != nil {
+		snapshot := runtime.Session().StateSnapshot()
+		preset, sequence := explicitSessionPermissionPreset(runtime.Session(), snapshot.Projection)
+		if sequence > snapshot.DurableSequence {
+			preset = ToolApprovalReadOnly
+		}
+		preset = string(permissionpreset.NormalizeDefault(preset))
+		c.approval.setMode(preset)
+		if c.subagentGate != nil {
+			c.subagentGate.Update(preset)
+		}
+	}
 	// Session-private temporary directory: reuse a shared Manager on hot
 	// rebuild, otherwise create one. Retain so ReleaseResources/Close drop the
 	// owner reference without racing a replacement Controller.
@@ -5312,6 +5324,43 @@ func (c *Controller) ApplyComposerProfileAt(plan bool, toolApprovalMode, goal st
 		return nil, fmt.Errorf("permission revision changed: have %d, expected %d", current, expectedPermissionRevision)
 	}
 	return c.applyComposerProfileLocked(plan, toolApprovalMode, goal)
+}
+
+// ApplyComposerProfileAtDurable is the canonical-session protocol entry point.
+// The explicit preset reaches durable storage before it changes enforcement.
+func (c *Controller) ApplyComposerProfileAtDurable(ctx context.Context, plan bool, toolApprovalMode, goal string, expectedPermissionRevision uint64) ([]string, error) {
+	c.permissionMu.Lock()
+	defer c.permissionMu.Unlock()
+	if current := c.permissionRevision.Load(); current != expectedPermissionRevision {
+		return nil, fmt.Errorf("permission revision changed: have %d, expected %d", current, expectedPermissionRevision)
+	}
+	raw := strings.ToLower(strings.TrimSpace(toolApprovalMode))
+	if raw != "ask" && raw != "auto" && raw != "yolo" && !permissionpreset.Valid(raw) {
+		return nil, fmt.Errorf("permission preset must be read-only, workspace-write, or danger-full-access")
+	}
+	raw = normalizeToolApprovalMode(raw)
+	capabilities := platformPermissionCapabilities()
+	if !slices.Contains(capabilities.SupportedPresets, raw) {
+		return nil, fmt.Errorf("permission preset %q is unavailable: %s", raw, capabilities.UnavailableReason)
+	}
+	_, runtime, exclusive := c.v3Binding()
+	if !exclusive || runtime == nil {
+		return nil, session.ErrSessionNotRunning
+	}
+	goal = strings.TrimSpace(goal)
+	if strings.TrimSpace(c.Goal()) != goal {
+		if err := c.SetGoalDurable(goal); err != nil {
+			return nil, fmt.Errorf("persist goal state: %w", err)
+		}
+	}
+	if err := c.persistSessionPermissionPreset(ctx, runtime, raw); err != nil {
+		return c.applyFailedPermissionDowngradeLocked(raw, err)
+	}
+	if goal != "" {
+		plan = false
+	}
+	c.applyPlanMode(plan)
+	return c.applyDurablePermissionPresetLocked(raw), nil
 }
 
 func (c *Controller) applyComposerProfileLocked(plan bool, toolApprovalMode, goal string) ([]string, error) {

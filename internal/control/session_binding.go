@@ -13,6 +13,7 @@ import (
 	"reasonix/internal/event"
 	"reasonix/internal/extension"
 	"reasonix/internal/extension/dispatch"
+	"reasonix/internal/permissionpreset"
 	"reasonix/internal/provider"
 	"reasonix/internal/session"
 )
@@ -423,9 +424,19 @@ func (c *Controller) publishSessionRuntimeWithCommit(ctx context.Context, candid
 	if current, ok := service.Runtime(candidate.Ref()); !ok || current != candidate {
 		return nil, errors.New("v3 runtime candidate is not the exact published service instance")
 	}
-	projection := candidate.Session().ExecutionSnapshot().Projection
+	c.permissionMu.Lock()
+	defer c.permissionMu.Unlock()
+	snapshot := candidate.Session().ExecutionSnapshot()
+	projection := snapshot.Projection
 	if err := validateSessionDomainProjection(projection); err != nil {
 		return nil, err
+	}
+	preset, sequence := explicitSessionPermissionPreset(candidate.Session(), projection)
+	if sequence > snapshot.DurableSequence {
+		// Failed writes leave accepted events in memory; never publish an unflushed preset.
+		if _, err := candidate.Session().FlushThrough(ctx, sequence); err != nil {
+			return nil, fmt.Errorf("persist session permission preset: %w", err)
+		}
 	}
 	binding, err := service.Bind(candidate)
 	if err != nil {
@@ -437,8 +448,7 @@ func (c *Controller) publishSessionRuntimeWithCommit(ctx context.Context, candid
 			_ = binding.Release(context.Background())
 		}
 	}()
-	// Durable desktop membership must commit before the controller changes
-	// identity. A failed registry write leaves the old binding usable.
+	// Commit desktop membership before publication; failures preserve the old binding.
 	if commit != nil {
 		if err := commit(ctx, candidate.Ref()); err != nil {
 			return nil, err
@@ -455,6 +465,10 @@ func (c *Controller) publishSessionRuntimeWithCommit(ctx context.Context, candid
 	c.mu.Lock()
 	oldGen := c.turns.generation
 	c.mu.Unlock()
+	// Publish identity and preset atomically; an unrecorded session gets its own safe default.
+	preset = string(permissionpreset.NormalizeDefault(preset))
+	c.promptResolveMu.Lock()
+	c.permissionStateMu.Lock()
 	c.v3BindingMu.Lock()
 	old := c.sessionRuntime
 	oldBinding := c.sessionBinding
@@ -464,6 +478,14 @@ func (c *Controller) publishSessionRuntimeWithCommit(ctx context.Context, candid
 	c.exclusiveSession = true
 	c.nativeLegacySession = false
 	c.v3BindingMu.Unlock()
+	c.approval.setMode(preset)
+	if c.subagentGate != nil {
+		c.subagentGate.Update(preset)
+	}
+	c.refreshInteractiveGate()
+	c.permissionRevision.Add(1)
+	c.permissionStateMu.Unlock()
+	c.promptResolveMu.Unlock()
 	c.bindAttachmentService()
 	c.bindExecutionControl()
 	if old != nil && old != candidate {
@@ -508,6 +530,15 @@ func (c *Controller) publishSessionRuntimeWithCommit(ctx context.Context, candid
 		}
 	}
 	return old, nil
+}
+
+func explicitSessionPermissionPreset(source *session.Session, projection session.Projection) (string, uint64) {
+	sequence := projection.PermissionPresetSequence
+	manifest := source.Manifest()
+	if sequence == 0 || (manifest.Source != nil && sequence <= manifest.InheritedEvents) {
+		return "", 0
+	}
+	return projection.PermissionPreset, sequence
 }
 
 func validateSessionDomainProjection(projection session.Projection) error {
