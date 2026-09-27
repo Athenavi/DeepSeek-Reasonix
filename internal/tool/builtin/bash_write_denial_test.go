@@ -69,20 +69,72 @@ func TestSandboxWriteHintNamesGitWorktreeMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	gitDir := filepath.Join(main, ".git", "worktrees", "linked")
+	objects := filepath.Join(main, ".git", "objects")
 	denial := "fatal: Unable to create '" + filepath.Join(gitDir, "index.lock") + "': Operation not permitted"
 	hint := appendSandboxWriteHint(denial, errors.New("exit status 128"), bashParams{Command: "git add ."}, sandbox.Spec{Mode: "enforce", WriteRoots: []string{worktree}}, "", subdir)
-	if !strings.Contains(hint, filepath.Join(main, ".git")) || !strings.Contains(hint, "additional_write_dirs") {
+	if !strings.Contains(hint, gitDir) || !strings.Contains(hint, objects) || strings.Contains(hint, `"`+filepath.Join(main, ".git")+`"`) || !strings.Contains(hint, "additional_write_dirs") {
 		t.Fatalf("missing actionable worktree metadata hint: %s", hint)
 	}
 	if got := gitWorktreeWriteDirs(subdir, "touch: /outside: Operation not permitted", []string{worktree}); len(got) != 0 {
 		t.Fatalf("unrelated denial must not suggest Git metadata: %v", got)
 	}
+	if got := gitWorktreeWriteDirs(subdir, "note: "+gitDir+"\ntouch: '/outside/file': Operation not permitted", []string{worktree}); len(got) != 0 {
+		t.Fatalf("metadata mention outside the denied path must not trigger a hint: %v", got)
+	}
+	if got := gitWorktreeWriteDirs(subdir, "note: '"+filepath.Join(gitDir, "index.lock")+"':\nOperation not permitted", []string{worktree}); len(got) != 0 {
+		t.Fatalf("denial must share the diagnostic line with the metadata path: %v", got)
+	}
+	alias := filepath.Join(root, "metadata-alias")
+	if err := os.Symlink(gitDir, alias); err == nil {
+		aliasDenial := "fatal: Unable to create '" + filepath.Join(alias, "index.lock") + "': Operation not permitted"
+		if got := gitWorktreeWriteDirs(subdir, aliasDenial, []string{worktree}); len(got) != 2 || got[0] != gitDir || got[1] != objects {
+			t.Fatalf("symlinked diagnostic path must resolve to Git metadata: %v", got)
+		}
+	}
 	if got := gitWorktreeWriteDirs(subdir, denial, []string{worktree, filepath.Join(main, ".git")}); len(got) != 0 {
 		t.Fatalf("already writable metadata must not be suggested: %v", got)
 	}
 	commonDenial := "fatal: cannot lock ref 'refs/heads/linked': Unable to create '" + filepath.Join(main, ".git", "refs", "heads", "linked.lock") + "': Operation not permitted"
-	if got := gitWorktreeWriteDirs(subdir, commonDenial, []string{worktree, gitDir}); len(got) != 1 || got[0] != filepath.Join(main, ".git") {
-		t.Fatalf("common metadata still needs approval after a narrow gitdir grant: %v", got)
+	if got := gitWorktreeWriteDirs(subdir, commonDenial, []string{worktree, gitDir}); len(got) != 2 || got[0] != objects || got[1] != filepath.Join(main, ".git", "refs") {
+		t.Fatalf("ref denial must suggest only needed metadata subdirectories: %v", got)
+	}
+	commonPath := filepath.Join(gitDir, "commondir")
+	originalCommon, err := os.ReadFile(commonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	private := filepath.Join(root, "private")
+	for _, path := range []string{private, filepath.Join(private, "objects"), filepath.Join(private, "refs")} {
+		if err := os.Mkdir(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(private, "HEAD"), []byte("ref: refs/heads/main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(commonPath, []byte(private+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	forgedDenial := "fatal: Unable to create '" + filepath.Join(private, "refs", "heads", "main.lock") + "': Operation not permitted"
+	if got := gitWorktreeWriteDirs(subdir, forgedDenial, []string{worktree}); len(got) != 0 {
+		t.Fatalf("forged commondir must not be suggested: %v", got)
+	}
+	if err := os.WriteFile(commonPath, originalCommon, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	backlinkPath := filepath.Join(gitDir, "gitdir")
+	originalBacklink, err := os.ReadFile(backlinkPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(backlinkPath, []byte(filepath.Join(private, ".git")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := gitWorktreeWriteDirs(subdir, denial, []string{worktree}); len(got) != 0 {
+		t.Fatalf("invalid worktree backlink must not be suggested: %v", got)
+	}
+	if err := os.WriteFile(backlinkPath, originalBacklink, 0o644); err != nil {
+		t.Fatal(err)
 	}
 	if runtime.GOOS != "darwin" {
 		return
@@ -98,10 +150,10 @@ func TestSandboxWriteHintNamesGitWorktreeMetadata(t *testing.T) {
 	if err == nil || !strings.Contains(string(blocked), "index.lock") {
 		t.Fatalf("git add must fail at external worktree metadata: %v: %s", err, blocked)
 	}
-	if hint := appendSandboxWriteHint(string(blocked), err, bashParams{Command: "git add note.txt"}, sandbox.Spec{Mode: "enforce", WriteRoots: []string{worktree}}, "", worktree); !strings.Contains(hint, filepath.Join(main, ".git")) {
+	if hint := appendSandboxWriteHint(string(blocked), err, bashParams{Command: "git add note.txt"}, sandbox.Spec{Mode: "enforce", WriteRoots: []string{worktree}}, "", worktree); !strings.Contains(hint, gitDir) || !strings.Contains(hint, objects) {
 		t.Fatalf("actual Seatbelt denial did not name the needed directory: %s", hint)
 	}
-	profile = fmt.Sprintf("(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\") (subpath %q) (subpath %q))", worktree, filepath.Join(main, ".git"))
+	profile = fmt.Sprintf("(version 1) (allow default) (deny file-write*) (allow file-write* (literal \"/dev/null\") (subpath %q) (subpath %q) (subpath %q))", worktree, gitDir, objects)
 	if out, err := exec.Command("sandbox-exec", "-p", profile, "git", "-C", worktree, "add", "note.txt").CombinedOutput(); err != nil {
 		t.Fatalf("approved metadata must permit git add: %v: %s", err, out)
 	}

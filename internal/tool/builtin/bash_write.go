@@ -198,63 +198,120 @@ func appendSandboxWriteHint(out string, err error, p bashParams, spec sandbox.Sp
 }
 
 func gitWorktreeWriteDirs(workDir, output string, writeRoots []string) []string {
+	gitDir, commonDir := linkedGitMetadataDirs(workDir)
+	if gitDir == "" {
+		return nil
+	}
+	match := gitWriteDeniedPath.FindStringSubmatch(output)
+	if len(match) != 2 || !filepath.IsAbs(match[1]) {
+		return nil
+	}
+	denied, err := sandbox.ResolveAbsPath(match[1])
+	if err != nil {
+		return nil
+	}
+	objects := filepath.Join(commonDir, "objects")
+	refs := filepath.Join(commonDir, "refs")
+	logs := filepath.Join(commonDir, "logs")
+	if !sandbox.PathWithin(gitDir, denied) && !sandbox.PathWithin(objects, denied) && !sandbox.PathWithin(refs, denied) && !sandbox.PathWithin(logs, denied) {
+		return nil
+	}
+	paths := []string{gitDir, objects}
+	if sandbox.PathWithin(refs, denied) {
+		paths = append(paths, refs)
+	}
+	if sandbox.PathWithin(logs, denied) {
+		paths = append(paths, logs)
+	}
+	var missing []string
+	for _, path := range paths {
+		covered := false
+		for _, root := range writeRoots {
+			if sandbox.PathWithin(root, path) {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			missing = append(missing, path)
+		}
+	}
+	return missing
+}
+
+var gitWriteDeniedPath = regexp.MustCompile(`(?im)['"]([^'"\n]+)['"]:[ \t]*(?:operation not permitted|read-only file system|permission denied)`)
+
+func linkedGitMetadataDirs(workDir string) (string, string) {
 	for dir := filepath.Clean(workDir); filepath.IsAbs(dir); dir = filepath.Dir(dir) {
 		gitPath := filepath.Join(dir, ".git")
-		info, err := os.Lstat(gitPath)
+		pointer, err := readSmallGitFile(gitPath)
 		if err == nil {
-			if !info.Mode().IsRegular() || info.Size() > 4096 {
-				return nil
+			if !strings.HasPrefix(pointer, "gitdir: ") {
+				return "", ""
 			}
-			pointer, err := os.ReadFile(gitPath)
-			if err != nil || !strings.HasPrefix(string(pointer), "gitdir: ") {
-				return nil
-			}
-			gitDir := strings.TrimSpace(strings.TrimPrefix(string(pointer), "gitdir: "))
+			gitDir := strings.TrimSpace(strings.TrimPrefix(pointer, "gitdir: "))
 			if !filepath.IsAbs(gitDir) {
 				gitDir = filepath.Join(dir, gitDir)
 			}
 			gitDir, err = filepath.EvalSymlinks(gitDir)
 			if err != nil {
-				return nil
+				return "", ""
 			}
-			commonPath := filepath.Join(gitDir, "commondir")
-			commonInfo, err := os.Stat(commonPath)
-			if err != nil || !commonInfo.Mode().IsRegular() || commonInfo.Size() > 4096 {
-				return nil
-			}
-			common, err := os.ReadFile(commonPath)
+			common, err := readSmallGitFile(filepath.Join(gitDir, "commondir"))
 			if err != nil {
-				return nil
+				return "", ""
 			}
-			commonDir := strings.TrimSpace(string(common))
+			commonDir := common
 			if !filepath.IsAbs(commonDir) {
 				commonDir = filepath.Join(gitDir, commonDir)
 			}
 			commonDir, err = filepath.EvalSymlinks(commonDir)
+			if err != nil || filepath.Dir(gitDir) != filepath.Join(commonDir, "worktrees") {
+				return "", ""
+			}
+			backlink, err := readSmallGitFile(filepath.Join(gitDir, "gitdir"))
 			if err != nil {
-				return nil
+				return "", ""
 			}
-			if !strings.Contains(output, gitDir) && !strings.Contains(output, commonDir) {
-				return nil
+			if !filepath.IsAbs(backlink) {
+				backlink = filepath.Join(gitDir, backlink)
 			}
-			var missing []string
-			for _, path := range []string{gitDir, commonDir} {
-				covered := false
-				for _, root := range writeRoots {
-					if sandbox.PathWithin(root, path) {
-						covered = true
-						break
-					}
+			backlink, err = sandbox.ResolveAbsPath(backlink)
+			if err != nil {
+				return "", ""
+			}
+			actualGitPath, err := sandbox.ResolveAbsPath(gitPath)
+			if err != nil || backlink != actualGitPath {
+				return "", ""
+			}
+			for _, path := range []string{"objects", "refs"} {
+				info, err := os.Lstat(filepath.Join(commonDir, path))
+				if err != nil || !info.IsDir() {
+					return "", ""
 				}
-				if !covered {
-					missing = append(missing, path)
-				}
 			}
-			return sandbox.CollapseWriteRoots(missing)
+			if info, err := os.Lstat(filepath.Join(commonDir, "HEAD")); err != nil || !info.Mode().IsRegular() {
+				return "", ""
+			}
+			return gitDir, commonDir
+		} else if !os.IsNotExist(err) {
+			return "", ""
 		}
 		if filepath.Dir(dir) == dir {
 			break
 		}
 	}
-	return nil
+	return "", ""
+}
+
+func readSmallGitFile(path string) (string, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() || info.Size() > 4096 {
+		return "", fmt.Errorf("not a small regular Git metadata file: %s", path)
+	}
+	data, err := os.ReadFile(path)
+	return strings.TrimSpace(string(data)), err
 }
