@@ -45,7 +45,9 @@ export function SidebarRegion(props: SidebarRegionProps) {
           </button>
         </div>
         <section className="sidebar__section sidebar__section--projects">
-          <Suspense fallback={null}><ProjectTree {...props.projectTree} /></Suspense>
+          <Suspense fallback={<div className="project-tree__empty project-tree__empty--subtle" role="status">{t("projectTree.loadingProjects")}</div>}>
+            <ProjectTree {...props.projectTree} />
+          </Suspense>
         </section>
         <nav className="sidebar__nav sidebar__nav--footer">
           <div className="sidebar__utility-row" aria-label={t("sidebar.utilityActions")}>

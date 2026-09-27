@@ -78,9 +78,21 @@ try {
     try {
       await render(0);
       assert.equal(pending.length, 1, "mount starts one shell read");
+      assert.match(container.querySelector(".project-tree__empty-state")?.textContent ?? "", /读取|讀取|Reading/,
+        "an unanswered shell read must say it is loading");
+      assert.doesNotMatch(container.textContent ?? "", /No projects yet|还没有项目|還沒有專案/,
+        "pending shell read must not claim there are no projects");
+      if (scenario.name === "addition") {
+        assert.equal(container.querySelector(".project-tree__empty-state .project-tree__skeleton"), null,
+          "fast shell reads must not flash a skeleton");
+        await act(async () => mock.timers.tick(250));
+        assert.ok(container.querySelector(".project-tree__empty-state .project-tree__skeleton"),
+          "a delayed shell read shows a skeleton");
+      }
       await act(async () => pending[0].resolve(snapshot(scenario.before)));
       await flush();
       assert.deepEqual(labels(), scenario.before.map(item => item.label));
+      assert.equal(container.querySelector(".project-tree__empty-state .project-tree__skeleton"), null);
 
       // A read started before the mutation retains the old shell contents.
       // Its scalar revision may equal the post-mutation read: this fixture
@@ -113,6 +125,23 @@ try {
     } finally {
       await act(async () => root.unmount());
     }
+  }
+
+  pending.length = 0;
+  localStorage.clear();
+  const emptyRoot = createRoot(container);
+  try {
+    await act(async () => emptyRoot.render(<LocaleProvider><ToastProvider><ProjectTree
+      onOpenTopic={noop} onAddProject={addProject}
+    /></ToastProvider></LocaleProvider>));
+    await flush();
+    assert.doesNotMatch(container.textContent ?? "", /No projects yet|还没有项目|還沒有專案/);
+    await act(async () => pending[0].resolve(snapshot([])));
+    await flush();
+    assert.match(container.textContent ?? "", /No projects yet|还没有项目|還沒有專案/,
+      "an empty answer restores the true empty state");
+  } finally {
+    await act(async () => emptyRoot.unmount());
   }
 } finally {
   mock.timers.reset();
