@@ -561,11 +561,15 @@ func (c *Controller) presetForSessionPublication(ctx context.Context, candidate 
 }
 
 // EnableServeSessionPermissionPresets opts a Serve-owned controller into
-// restoring per-session choices. Other frontends keep their live mode.
-func (c *Controller) EnableServeSessionPermissionPresets() {
+// restoring per-session choices. A same-session rebuild keeps its already
+// migrated live mode by passing restoreCurrent=false.
+func (c *Controller) EnableServeSessionPermissionPresets(restoreCurrent bool) {
 	c.permissionMu.Lock()
 	defer c.permissionMu.Unlock()
 	c.servePresetRestore = true
+	if !restoreCurrent {
+		return
+	}
 	_, runtime, bound := c.v3Binding()
 	if !bound || runtime == nil {
 		return

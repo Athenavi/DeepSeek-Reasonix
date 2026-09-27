@@ -130,7 +130,7 @@ func New(ctrl control.SessionAPI, bc *Broadcaster, serveCfg config.ServeConfig) 
 	s.auth.capabilities = s.capabilities
 	s.initTitleProvider()
 	if concrete, ok := ctrl.(*control.Controller); ok {
-		concrete.EnableServeSessionPermissionPresets()
+		concrete.EnableServeSessionPermissionPresets(true)
 		concrete.SetBeforeInboxDispatch(s.beforeInboxDispatch)
 	}
 	return s
@@ -458,26 +458,25 @@ func (s *Server) rebuild(ctx context.Context, old *control.Controller, ref strin
 }
 
 func (s *Server) rebuildWithOptions(ctx context.Context, old *control.Controller, ref string, opts boot.Options, tag *sessionTagSink) (*control.Controller, error) {
+	var ctrl *control.Controller
+	var err error
 	if s.rebuildControllerWithOptions != nil {
-		ctrl, err := s.rebuildControllerWithOptions(ctx, old, ref, opts)
+		ctrl, err = s.rebuildControllerWithOptions(ctx, old, ref, opts)
+	} else if s.rebuildController != nil {
+		ctrl, err = s.rebuildController(ctx, old, ref)
+	} else {
+		var res *boot.BuildResult
+		res, err = boot.Rebuild(ctx, old, opts)
 		if err == nil {
-			s.RegisterSessionTag(ctrl, tag)
+			ctrl = res.Controller
 		}
-		return ctrl, err
 	}
-	if s.rebuildController != nil {
-		ctrl, err := s.rebuildController(ctx, old, ref)
-		if err == nil {
-			s.RegisterSessionTag(ctrl, tag)
-		}
-		return ctrl, err
-	}
-	res, err := boot.Rebuild(ctx, old, opts)
 	if err != nil {
 		return nil, err
 	}
-	s.RegisterSessionTag(res.Controller, tag)
-	return res.Controller, nil
+	ctrl.EnableServeSessionPermissionPresets(false)
+	s.RegisterSessionTag(ctrl, tag)
+	return ctrl, nil
 }
 
 // switchEffort persists a new reasoning-effort level for the active provider and
