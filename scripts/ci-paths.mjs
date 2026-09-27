@@ -56,7 +56,7 @@ export function classifyPaths(input, { full = false } = {}) {
       flags.site = true;
       setReason(reasons, "site", path, "site source");
     }
-    const releaseControl = RELEASE_CONTROL.test(path) || /^scripts\/(?:sync-release-site|observe-release-site|fetch-stable-release-manifest|check-release-public-access|test-release-control-contracts|validate-release-control-plane)[^/]*$/.test(path);
+    const releaseControl = RELEASE_CONTROL.test(path) || /^scripts\/(?:reconcile-release-publication|fetch-stable-release-manifest|check-release-public-access|test-release-control-contracts|validate-release-control-plane)[^/]*$/.test(path);
     if (releaseControl) {
       flags.release_control = true;
       setReason(reasons, "release_control", path, "release control plane");

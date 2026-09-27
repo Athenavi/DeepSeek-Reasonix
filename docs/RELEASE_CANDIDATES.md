@@ -27,7 +27,7 @@ fix or an API outage after sealing cannot change or block what ships. A
 candidate sealed before this has no `renderedPath` and is rendered offline from
 its own source, as before.
 
-## Public-site recovery / 官网独立恢复
+## Public checks / 公开渠道检查
 
 Candidate preparation and publication execute offline identity, resolver-output,
 archive-integrity, atomic-tag, and publication-ledger contracts before expensive
@@ -39,34 +39,23 @@ a new release, but rejects HTTP errors, browser challenges, and malformed JSON.
 另从 runner 以无凭据请求检查公开 Stable 清单；发新版前允许清单仍为旧版，但 HTTP 错误、浏览器挑战及
 无效 JSON 必须失败。离线契约测试与在线可访问性检查相互独立。
 
-For an already-published release whose website deployment or public verification
-failed, dispatch **Recover release site** (`release-site-recovery.yml`) on
-protected `main-v2` with `version=X.Y.Z`. It resolves all existing tags on protected
-history, re-reads public package identities, and requires one `release` approval.
-After approval it rechecks the public state, requires an existing matching release
-event, and uses the same site-sync owner as full publication. No candidate artifact
-is needed, so this remains usable after candidate payload expiry. It does not
-build, sign, create tags, upload release assets, publish packages, or move pointers.
-Missing packages or a missing release event require full publication recovery.
+After every publisher succeeds, postflight verifies the tags, the CLI and
+Desktop GitHub Releases, npm, the Desktop Stable manifest on `dl.reasonix.io`
+and the Homebrew cask, then attaches `release-event.json`. Publication is
+complete when those product surfaces are verified. A 90-day ledger records the
+source/control SHA, observed surfaces, and the exact failed stage. On recovery
+a proven newer Stable pointer is preserved, never a failed HTTP observation.
 
-已发布版本若官网部署或公开验收失败，可在受保护 `main-v2` 上运行 **Recover release site**，输入
-`version=X.Y.Z`。它校验三个已有标签属于受保护历史，重新读取公开包身份，并要求一次 `release`
-审批。审批后再次核验公开状态及已有的匹配发布事件，复用完整发布的官网同步脚本。不依赖候选产物，
-因此候选 payload 过期后仍可使用；不构建、不签名、不建标签、不上传安装包、不发布 npm、不移动指针。
-缺少包或发布事件时，应使用完整发布恢复。
+发布任务全部成功后，postflight 核验三个标签、CLI 与桌面端 GitHub Release、npm、`dl.reasonix.io`
+上的桌面端 Stable 清单和 Homebrew cask，再附上 `release-event.json`；这些产品渠道全部核验通过即发布完成。
+90 天台账保留产品/控制 SHA、已验证渠道及失败阶段。恢复时只有确证存在更新的 Stable 指针才予以保留，
+HTTP 失败不会被当作“新版已发布”。
 
-The workflow shares the global publication lock. A proven newer Stable pointer
-preserves the newer site. Each Pages dispatch has a unique run/attempt correlation
-ID, and Pages rechecks ownership immediately before deploying. The final verifier
-checks the hydrated download page. A 90-day ledger records the source/control SHA,
-Pages run, observed surfaces, and exact failed stage; a failed HTTP observation
-never becomes a successful newer-pointer result. Recovery success is not a claim
-that unavailable services were verified.
+The website is not part of this pipeline. It is built and deployed from the
+`website` branch, and its changelog renders from that branch's own release
+catalog, so a new version's page is released there, not here.
 
-流程共用全局发布锁；只有确证存在更新 Stable 版本才保留新官网。Pages 调度带当前 run/attempt 的
-唯一关联 ID，部署前再次检查版本归属，最后验证浏览器渲染后的下载页。90 天台账保留产品/控制 SHA、
-Pages run、已验证渠道及失败阶段；HTTP 失败不会再被当作“新版已部署”。外部访问未恢复时不会报告验收完成。
-
+官网不在此流程内：它由 `website` 分支独立构建和部署，更新日志由该分支自己的发布目录渲染，新版本页面在那里发布。
 
 For qualification without publication, dispatch `Prepare release candidate` on
 protected `main-v2` with `version` and `rehearsal=true`. An already reviewed
@@ -75,7 +64,7 @@ version may be used for this isolated run. It uses separate
 cannot pass the normal publish resolver or payload verifier. The Desktop child
 accepts the existing version tag only in this non-publishing mode. The run must
 still complete source CI, signing, and native acceptance. It creates no tags,
-GitHub Releases, npm packages, Homebrew updates, R2 pointers, or site changes.
+GitHub Releases, npm packages, Homebrew updates, or R2 pointers.
 
 After sealing, run `Verify release candidate rehearsal` on `main-v2` with its
 candidate ID. This independent workflow downloads the exact record and payload
@@ -88,7 +77,7 @@ not a publication or a substitute for a later formal release's public checks.
 The candidate payload lasts 30 days and its record/evidence 90 days. If the
 payload expires before publication, prepare a new candidate. The release
 skill's public postflight remains the authority for tags, npm, Desktop
-updates, Homebrew, and the hydrated website after an authorized publication.
+updates, and Homebrew after an authorized publication.
 
 ## Tag publisher identity / 标签发布身份
 

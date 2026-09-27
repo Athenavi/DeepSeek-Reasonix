@@ -1296,7 +1296,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # gh release download + compatibility manifest upload
-      actions: write # dispatch pages.yml to re-bake the site version
     # Stable keeps GitHub as a fallback when R2 is unavailable. Preview has no
     # GitHub release, so it must fail closed before attempting publication.
     if: ${{ always() && !cancelled() && needs.resolve.result == 'success' && needs.publish.result == 'success' && github.repository_owner == 'esengine' }}
@@ -1822,11 +1821,3 @@ jobs:
           else
             echo "CLI release $VERSION does not exist yet; release.yml will attach the compatibility latest.json when it publishes."
           fi
-
-      # Stable release moved R2 latest/ — rebuild the site so its build-time baked
-      # version + JSON-LD follow (site.js's runtime .rxv refresh can't touch first paint / SEO).
-      - name: Refresh site to the new version
-        if: env.HAS_R2 == 'true' && needs.resolve.outputs.channel != 'preview' && needs.resolve.outputs.prerelease != 'true' && steps.mirror_r2.outputs.pointer_moved == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run pages.yml --ref website

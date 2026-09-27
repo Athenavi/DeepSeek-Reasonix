@@ -232,7 +232,6 @@ jobs:
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
-      actions: write
       contents: write
     steps:
       - name: Require every publisher to succeed
@@ -309,7 +308,3 @@ jobs:
           else
             gh release upload "$CLI_TAG" /tmp/release-event.json
           fi
-      - name: Refresh public changelog
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run pages.yml --ref website

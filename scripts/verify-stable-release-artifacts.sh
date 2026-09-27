@@ -9,8 +9,7 @@ desktop_tag="${DESKTOP_TAG:?DESKTOP_TAG is required}"
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 attempts="${VERIFY_ATTEMPTS:-6}"
 delay="${VERIFY_DELAY_SECONDS:-10}"
-verify_homepage="${VERIFY_HOMEPAGE:-false}"
-site_only="${VERIFY_PUBLIC_SITE_ONLY:-false}"
+verify_pointers="${VERIFY_PUBLIC_POINTERS:-false}"
 operation="${RELEASE_OPERATION:-publish}"
 ledger_output="${RELEASE_LEDGER_OUTPUT:-}"
 
@@ -46,54 +45,23 @@ cleanup() {
 }
 trap cleanup EXIT
 
-verify_site() {
-	local manifest="$tmp_dir/desktop-pointer.json"
-	local homepage="$tmp_dir/homepage.html"
-	local changelog="$tmp_dir/changelog.html"
+# The Desktop updater pointer and the Homebrew cask are product channels. The
+# contents API reads the tap's branch head; raw.githubusercontent.com is cached.
+verify_pointers() {
+	local manifest="$1"
 	local cask="$tmp_dir/reasonix.rb"
-	bash "$script_dir/fetch-stable-release-manifest.sh" "$version" "$manifest"
+	local homebrew_version
 	jq -e --arg version "v$version" '
 		.version == $version and
 		([.platforms[], (.native_packages // {})[], (.downloads // {})[]] |
 		 all(.url | type == "string" and startswith("https://dl.reasonix.io/desktop-" + $version + "/")))
 	' "$manifest" >/dev/null
-	go run "$script_dir/release-site-fetch/main.go" homepage "$version" "$homepage"
-	! grep -Eq 'href="[^"]*(tag|download)/desktop-v[0-9]+\.[0-9]+\.[0-9]+' "$homepage"
-	go run "$script_dir/release-site-fetch/main.go" changelog "$version" "$changelog"
-	grep -Fq "v$version" "$changelog"
-	curl -fsSL https://raw.githubusercontent.com/esengine/homebrew-reasonix/main/Casks/reasonix.rb >"$cask"
-	grep -Eq "version ['\"]$version['\"]" "$cask"
-	local browser="${CHROME_BIN:-}"
-	if [ -z "$browser" ]; then
-		for candidate in google-chrome google-chrome-stable chromium chromium-browser; do
-			if command -v "$candidate" >/dev/null 2>&1; then browser="$candidate"; break; fi
-		done
-	fi
-	[ -n "$browser" ] || { echo "::error::a Chromium browser is required for hydrated homepage verification" >&2; return 1; }
-	# GitHub's default HeadlessChrome identity is challenged by Cloudflare. Use the
-	# ordinary Chrome browser identity proven by the protected site probe.
-	"$browser" --headless=new --disable-gpu --no-sandbox --virtual-time-budget=10000 \
-		--user-agent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' \
-		--dump-dom "https://reasonix.io/?download=desktop&release-postflight=v$version" \
-		>"$tmp_dir/homepage-hydrated.html"
-	grep -Fq "data-release-version=\"desktop\">v$version<" "$tmp_dir/homepage-hydrated.html"
-	while IFS= read -r asset; do
-		url="$(jq -er --arg asset "$asset" '
-			[.platforms[], (.native_packages // {})[], (.downloads // {})[]]
-			| map(select(.url | endswith("/" + $asset)))
-			| if length == 1 then .[0].url else error("visible asset is missing or ambiguous") end
-		' "$manifest")"
-		grep -Fq "$url" "$tmp_dir/homepage-hydrated.html"
-	done < <(grep -Eo 'data-desktop-asset="[^"]+"' "$homepage" | cut -d '"' -f 2 | sort -u)
+	gh api -H 'Accept: application/vnd.github.raw' \
+		repos/esengine/homebrew-reasonix/contents/Casks/reasonix.rb >"$cask"
+	homebrew_version="$(sed -nE "s/^[[:space:]]*version ['\"]([^'\"]+)['\"].*/\1/p" "$cask" | head -n 1)"
+	node "$script_dir/release-publication-ledger.mjs" pointers "$version" "$cli_sha" "$operation" \
+		"$manifest" "$homebrew_version" "$tmp_dir/pointer-ledger.json"
 }
-
-if [ "$site_only" = "true" ]; then
-	verify_site
-	node "$script_dir/release-publication-ledger.mjs" site "$version" "$cli_sha" "$operation" \
-		"$tmp_dir/desktop-pointer.json" "${ledger_output:-$tmp_dir/site-ledger.json}"
-	echo "public site release inputs OK: v$version"
-	exit 0
-fi
 
 gh release view "$cli_tag" --repo "$repository" --json isDraft,isPrerelease,assets >"$tmp_dir/cli.json"
 jq -e '
@@ -179,16 +147,16 @@ for attempt in $(seq 1 "$attempts"); do
 		jq -s '.' "$tmp_dir"/npm/[0-9].json >"$tmp_dir/npm.json"
 		if node "$script_dir/release-publication-ledger.mjs" core "$version" "$cli_sha" "$operation" \
 			"$tmp_dir/cli.json" "$tmp_dir/desktop.json" "$tmp_dir/npm.json" "$tmp_dir/core-ledger.json"; then
-			if [ "$verify_homepage" = "true" ]; then
-				owns_site="$(bash "$script_dir/observe-release-site.sh" "$version" "$operation")"
-				if [ "$owns_site" = true ]; then
-					verify_site
-					node "$script_dir/release-publication-ledger.mjs" site "$version" "$cli_sha" "$operation" \
-						"$tmp_dir/desktop-pointer.json" "$tmp_dir/site-ledger.json"
+			if [ "$verify_pointers" = "true" ]; then
+				manifest="$tmp_dir/desktop-pointer.json"
+				bash "$script_dir/fetch-stable-release-manifest.sh" "$version" "$manifest"
+				owns_pointer="$(node "$script_dir/release-publication-ledger.mjs" pointer-owner "$version" "$operation" "$manifest")"
+				if [ "$owns_pointer" = true ]; then
+					verify_pointers "$manifest"
 					node "$script_dir/release-publication-ledger.mjs" merge "$tmp_dir/core-ledger.json" \
-						"$tmp_dir/site-ledger.json" "${ledger_output:-$tmp_dir/publication-ledger.json}"
+						"$tmp_dir/pointer-ledger.json" "${ledger_output:-$tmp_dir/publication-ledger.json}"
 				else
-					echo "A verified newer Stable release owns the site; recovered immutable v$version files only."
+					echo "A verified newer Stable release owns the public pointers; recovered immutable v$version files only."
 					[ -z "$ledger_output" ] || cp "$tmp_dir/core-ledger.json" "$ledger_output"
 				fi
 			elif [ -n "$ledger_output" ]; then

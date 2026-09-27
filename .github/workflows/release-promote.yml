@@ -315,7 +315,6 @@ jobs:
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
-      actions: write
       contents: write
     steps:
       - name: Require every publisher
@@ -335,7 +334,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: Reconcile public artifacts, owned Pages deployment, and durable ledger
+      - name: Reconcile public artifacts, release event, and durable ledger
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_REPOSITORY: ${{ github.repository }}
@@ -343,7 +342,7 @@ jobs:
           RELEASE_OPERATION: ${{ inputs.operation }}
           RELEASE_EXPECTED_SHA: ${{ needs.preflight.outputs.source_sha }}
           RELEASE_LEDGER_OUTPUT: /tmp/publication-ledger.json
-        run: bash scripts/sync-release-site.sh
+        run: bash scripts/reconcile-release-publication.sh
       - name: Upload publication ledger
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

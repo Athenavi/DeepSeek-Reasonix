@@ -25,7 +25,7 @@ function compareStable(a, b) {
   return 0;
 }
 
-export function ownsPublicSite(version, operation, manifest) {
+export function ownsStablePointer(version, operation, manifest) {
   if (!["publish", "recover"].includes(operation)) throw new Error("invalid publication operation");
   const current = manifest?.version;
   if (typeof current !== "string" || !current.startsWith("v")) throw new Error("missing or invalid Stable manifest version");
@@ -104,9 +104,10 @@ export function createCoreLedger({ version, sourceSHA, operation, cliRelease, de
   };
 }
 
-export function createSiteLedger({ version, sourceSHA, operation, manifest, observedAt = new Date().toISOString() }) {
+export function createPointerLedger({ version, sourceSHA, operation, manifest, homebrewVersion, observedAt = new Date().toISOString() }) {
   requireIdentity(version, sourceSHA, operation);
   if (manifest?.version !== `v${version}`) throw new Error("Stable manifest does not match the publication ledger");
+  if (homebrewVersion !== version) throw new Error("Homebrew cask does not match the publication ledger");
   return {
     schema: 1,
     version,
@@ -115,19 +116,17 @@ export function createSiteLedger({ version, sourceSHA, operation, manifest, obse
     observedAt,
     surfaces: {
       stableManifest: { state: "public-entry-updated", version: manifest.version },
-      homepage: { state: "public-entry-updated", version: `v${version}` },
-      changelog: { state: "public-entry-updated", version: `v${version}` },
       homebrew: { state: "public-entry-updated", version },
     },
   };
 }
 
-export function mergeLedgers(core, site, observedAt = new Date().toISOString()) {
-  if (core.schema !== 1 || site.schema !== 1 || core.version !== site.version
-      || core.sourceSHA !== site.sourceSHA || core.operation !== site.operation) {
+export function mergeLedgers(core, pointers, observedAt = new Date().toISOString()) {
+  if (core.schema !== 1 || pointers.schema !== 1 || core.version !== pointers.version
+      || core.sourceSHA !== pointers.sourceSHA || core.operation !== pointers.operation) {
     throw new Error("publication ledger fragments do not describe one release");
   }
-  return { ...core, observedAt, surfaces: { ...core.surfaces, ...site.surfaces } };
+  return { ...core, observedAt, surfaces: { ...core.surfaces, ...pointers.surfaces } };
 }
 
 function read(file) {
@@ -136,19 +135,19 @@ function read(file) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const [command, ...args] = process.argv.slice(2);
-  if (command === "site-owner" && args.length === 3) {
+  if (command === "pointer-owner" && args.length === 3) {
     const [version, operation, manifestPath] = args;
-    console.log(ownsPublicSite(version, operation, read(manifestPath)));
+    console.log(ownsStablePointer(version, operation, read(manifestPath)));
   } else if (command === "core" && args.length === 7) {
     const [version, sourceSHA, operation, cliPath, desktopPath, npmPath, output] = args;
     writeFileSync(output, `${JSON.stringify(createCoreLedger({ version, sourceSHA, operation, cliRelease: read(cliPath), desktopRelease: read(desktopPath), npmPackages: read(npmPath) }), null, 2)}\n`);
-  } else if (command === "site" && args.length === 5) {
-    const [version, sourceSHA, operation, manifestPath, output] = args;
-    writeFileSync(output, `${JSON.stringify(createSiteLedger({ version, sourceSHA, operation, manifest: read(manifestPath) }), null, 2)}\n`);
+  } else if (command === "pointers" && args.length === 6) {
+    const [version, sourceSHA, operation, manifestPath, homebrewVersion, output] = args;
+    writeFileSync(output, `${JSON.stringify(createPointerLedger({ version, sourceSHA, operation, manifest: read(manifestPath), homebrewVersion }), null, 2)}\n`);
   } else if (command === "merge" && args.length === 3) {
-    const [corePath, sitePath, output] = args;
-    writeFileSync(output, `${JSON.stringify(mergeLedgers(read(corePath), read(sitePath)), null, 2)}\n`);
+    const [corePath, pointersPath, output] = args;
+    writeFileSync(output, `${JSON.stringify(mergeLedgers(read(corePath), read(pointersPath)), null, 2)}\n`);
   } else {
-    throw new Error("usage: release-publication-ledger.mjs core VERSION SHA OPERATION CLI DESKTOP NPM OUTPUT | site VERSION SHA OPERATION MANIFEST OUTPUT | merge CORE SITE OUTPUT");
+    throw new Error("usage: release-publication-ledger.mjs pointer-owner VERSION OPERATION MANIFEST | core VERSION SHA OPERATION CLI DESKTOP NPM OUTPUT | pointers VERSION SHA OPERATION MANIFEST HOMEBREW_VERSION OUTPUT | merge CORE POINTERS OUTPUT");
   }
 }
