@@ -87,7 +87,7 @@ export function projectConversation({ local, remote, tab, activeTabId, backgroun
       cacheMissTokens: runtime.usage?.cacheMissTokens, balance: runtime.balance,
     },
     context: {
-      tabId: remote ? undefined : activeTabId,
+      tabId: activeTabId,
       items: runtime.items, context: runtime.context, usage: runtime.usage,
       sessionTokens: runtime.sessionTokens, sessionCost: runtime.sessionCost,
       sessionCurrency: runtime.sessionCurrency, turnTokens: runtime.turnTotalTokens,
