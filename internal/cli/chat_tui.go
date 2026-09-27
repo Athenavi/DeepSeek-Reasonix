@@ -350,6 +350,10 @@ type chatTUI struct {
 	// toggle's non-persistent semantics.
 	mcp         *mcpManager
 	mcpDisabled map[string]bool
+	// mcpConnecting holds servers whose connect runs off the UI loop. It lives
+	// here, not on the manager, so closing and reopening /mcp cannot start a
+	// second handshake for the same server.
+	mcpConnecting map[string]bool
 
 	// clearConfirm is the destructive "/clear" confirmation overlay. It is separate
 	// from /new because /clear discards the current transcript instead of saving it.
@@ -1984,7 +1988,12 @@ func (m chatTUI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case mcpExternalDoneMsg:
-		m.handleMCPExternalDone(msg)
+		if cmd := m.handleMCPExternalDone(msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+	case mcpConnectDoneMsg:
+		m.handleMCPConnectDone(msg)
 
 	case refsResolvedMsg:
 		for _, e := range msg.errs {
@@ -4645,6 +4654,9 @@ func (m *chatTUI) runMCPSubcommand(input string) {
 			m.notice("usage: /mcp connect <name>")
 			return
 		}
+		if m.mcpConnectBusy(args[2]) {
+			return
+		}
 		n, err := m.ctrl.ConnectConfiguredMCPServer(args[2])
 		if err != nil {
 			m.notice("mcp connect: " + err.Error())
@@ -4658,6 +4670,9 @@ func (m *chatTUI) runMCPSubcommand(input string) {
 			return
 		}
 		name := args[2]
+		if m.mcpConnectBusy(name) {
+			return
+		}
 		disconnected, err := m.ctrl.RemoveMCPServer(name)
 		if err != nil {
 			m.notice("mcp remove: " + err.Error())
