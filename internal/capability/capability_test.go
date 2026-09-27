@@ -33,9 +33,11 @@ func TestRouteDoesNotTreatTextMentionAsInvocation(t *testing.T) {
 		Scope:       skill.ScopeProject,
 	}}, []tool.ContractEntry{{Name: "run_skill"}})
 
-	decision := Route("请使用 audit skill 检查一下", entries)
-	if len(decision.Candidates) != 0 {
-		t.Fatalf("text mention must not create a structural skill invocation: %+v", decision.Candidates)
+	for _, text := range []string{"/audit 检查一下", "then run /audit", "请使用 audit skill 检查一下"} {
+		decision := Route(text, entries)
+		if len(decision.Candidates) != 0 {
+			t.Errorf("%q must not create a structural skill invocation: %+v", text, decision.Candidates)
+		}
 	}
 }
 
