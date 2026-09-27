@@ -256,7 +256,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 	if stderr == nil {
 		stderr = os.Stderr
 	}
-	root := resolveWorkspaceRoot(opts.WorkspaceRoot)
+	root := ResolveWorkspaceRoot(opts.WorkspaceRoot)
 	additionalDirs, err := normalizeAdditionalDirs(root, opts.AdditionalDirs)
 	if err != nil {
 		return nil, err
@@ -787,6 +787,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 		OAuthHTTPClient:       balanceClient,
 	}
 	autoStartEntries := cfg.EnabledPlugins(root, config.DefaultMCPActivationStore())
+	emitProjectMCPDecisionNotice(sink, cfg, root)
 	enabledMCPNames := make(map[string]bool, len(autoStartEntries))
 	for _, enabled := range autoStartEntries {
 		if name := strings.TrimSpace(enabled.Name); name != "" {
@@ -2289,7 +2290,9 @@ func currentWorkspacePromptLine(root string) string {
 	return "Current workspace: " + strconv.Quote(root)
 }
 
-func resolveWorkspaceRoot(explicit string) string {
+// ResolveWorkspaceRoot is the workspace a session in the current directory uses:
+// explicit, else the nearest git root, else the working directory.
+func ResolveWorkspaceRoot(explicit string) string {
 	if explicit != "" {
 		return explicit
 	}

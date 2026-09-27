@@ -3936,6 +3936,7 @@ command = "reasonix-missing-legacy-eager-mcp"
 tier = "eager"
 `)
 
+	enableProjectMCPForTest(t, dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	ctrl, err := Build(ctx, Options{})
@@ -3981,6 +3982,7 @@ command = "reasonix-missing-legacy-lazy-mcp"
 tier = "lazy"
 `)
 
+	enableProjectMCPForTest(t, dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	ctrl, err := Build(ctx, Options{})
@@ -4302,6 +4304,7 @@ tier = "eager"
 `)
 
 	var notices []event.Event
+	enableProjectMCPForTest(t, dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	ctrl, err := Build(ctx, Options{

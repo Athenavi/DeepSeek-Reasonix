@@ -4628,7 +4628,7 @@ func (c *Controller) syncCapabilityRuntimeFromConfig(name string, enabledOverrid
 		if strings.TrimSpace(entry.Name) != name {
 			continue
 		}
-		enabled := entry.ShouldAutoStart()
+		enabled := config.DeclaredDefaultOn(entry)
 		if enabledOverride != nil {
 			enabled = *enabledOverride
 		} else if resolved, resolveErr := config.DefaultMCPActivationStore().IsEnabled(entry, c.workspaceRoot); resolveErr == nil {
@@ -4735,9 +4735,14 @@ func (c *Controller) DisconnectedMCPNames() []string {
 	return names
 }
 
+// ConnectConfiguredMCPServer starts a configured server at the user's request;
+// for a project-declared one that request is the approval, and is recorded.
 func (c *Controller) ConnectConfiguredMCPServer(name string) (int, error) {
 	p, err := c.configuredMCPServer(name)
 	if err != nil {
+		return 0, err
+	}
+	if err := config.RecordExplicitStart(p, c.workspaceRoot); err != nil {
 		return 0, err
 	}
 	return c.connectMCPServer(p)
@@ -4789,10 +4794,7 @@ func (c *Controller) RemoveMCPServer(name string) (disconnected bool, err error)
 	// cached/on-demand surface without starting a process; otherwise ensure the
 	// removed name stays absent.
 	if removedState.fallbackFound {
-		enabled := removedState.fallback.ShouldAutoStart()
-		if resolved, resolveErr := config.DefaultMCPActivationStore().IsEnabled(removedState.fallback, c.workspaceRoot); resolveErr == nil {
-			enabled = resolved
-		}
+		enabled := config.MCPServerEnabled(removedState.fallback, c.workspaceRoot)
 		if enabled {
 			_, _ = c.RegisterMCPServerOnDemand(removedState.fallback)
 		} else {

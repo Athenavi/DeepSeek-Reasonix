@@ -358,7 +358,7 @@ func (m chatTUI) buildMCPSnapshot() mcpSnapshot {
 		}
 		v := mcpServerView{Name: p.Name}
 		switch {
-		case m.mcpDisabled[p.Name] || !p.ShouldAutoStart():
+		case m.mcpDisabled[p.Name] || !config.MCPServerEnabled(p, workspace):
 			v.Status = "disabled"
 		default:
 			v.Status = "deferred"

@@ -178,10 +178,13 @@ stalled_warning_seconds = 900   # heads-up once per background job after this ma
 
 # A custom status line: a command whose first stdout line replaces the built-in
 # data row. It receives {"model","contextUsed","contextWindow"} as JSON on stdin.
+# user/global only: set it in <Reasonix home>/config.toml; ./reasonix.toml cannot.
 # [statusline]
 # command = "my-statusline.sh"
 
 # External stdio plugins (MCP-compatible); each is a standalone executable.
+# Servers declared in ./reasonix.toml or .mcp.json stay off in that project until
+# you enable them there (`reasonix mcp enable <name>`, or the MCP panel).
 # [[plugins]]
 # name    = "example"
 # command = "reasonix-plugin-example"

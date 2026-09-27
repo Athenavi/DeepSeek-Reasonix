@@ -21,8 +21,8 @@ func TestUseCapabilityListSummarizesMCPWithoutExpandingCachedDirectories(t *test
 		{Name: "enabled", Type: "stdio", Command: "enabled-mcp", Authorized: true},
 	}
 	entries := []config.PluginEntry{
-		{Name: "disabled", Type: "stdio", Command: "disabled-mcp"},
-		{Name: "enabled", Type: "stdio", Command: "enabled-mcp"},
+		{Name: "disabled", Type: "stdio", Command: "disabled-mcp", Source: config.MCPSourceUserConfig},
+		{Name: "enabled", Type: "stdio", Command: "enabled-mcp", Source: config.MCPSourceUserConfig},
 	}
 	for _, spec := range specs {
 		cached := make([]plugin.CachedTool, 64)

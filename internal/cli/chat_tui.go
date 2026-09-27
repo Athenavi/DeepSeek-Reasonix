@@ -572,9 +572,16 @@ func runStatuslineCmd(cmd, stdinPayload string) string {
 }
 
 func runStatuslineCmdWithTimeout(cmd, stdinPayload string, timeout time.Duration) string {
-	res := hook.DefaultSpawner(context.Background(), hook.SpawnInput{
+	return runStatuslineCmdWith(hook.DefaultSpawner, cmd, stdinPayload, timeout)
+}
+
+// runStatuslineCmdWith spawns from the workspace, which the user does not
+// author, so a bare command name resolves through PATH alone.
+func runStatuslineCmdWith(spawn hook.Spawner, cmd, stdinPayload string, timeout time.Duration) string {
+	res := spawn(context.Background(), hook.SpawnInput{
 		Command: cmd,
 		Stdin:   stdinPayload + "\n",
+		Env:     map[string]string{hook.NoCwdCommandSearchEnv: "1"},
 		Timeout: timeout,
 	})
 	out := strings.TrimSpace(res.Stdout)

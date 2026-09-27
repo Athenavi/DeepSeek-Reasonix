@@ -152,7 +152,7 @@ func loadForRoot(root string, opts loadForRootOptions) (*Config, error) {
 	globalDesktopLanguage := cfg.Desktop.Language
 	globalPricingCurrency := cfg.Desktop.Currency
 	globalBillingDisplayCurrency := cfg.Billing.DisplayCurrency
-	globalTelemetry, globalLegacyAnchorSafetyGate := cfg.Telemetry, cfg.Agent.LegacyAnchorSafetyGate
+	globalTelemetry, globalLegacyAnchorSafetyGate, globalStatusline := cfg.Telemetry, cfg.Agent.LegacyAnchorSafetyGate, cfg.Statusline
 
 	tomlSources = append(tomlSources, projectTOML)
 	projectMeta, err := mergeTOML(cfg, projectTOML)
@@ -185,9 +185,9 @@ func loadForRoot(root string, opts loadForRootOptions) (*Config, error) {
 	cfg.Desktop.Language = globalDesktopLanguage
 	cfg.Desktop.Currency = globalPricingCurrency
 	cfg.Billing.DisplayCurrency = globalBillingDisplayCurrency
-	// CLI telemetry is an explicit user-global privacy choice. Project config
-	// cannot opt a user in or out, including when the global value is absent.
-	cfg.Telemetry, cfg.Agent.LegacyAnchorSafetyGate = globalTelemetry, globalLegacyAnchorSafetyGate
+	// Telemetry is a user-global privacy choice and the statusline a command the
+	// TUI runs unprompted: project config sets neither, even with no global value.
+	cfg.Telemetry, cfg.Agent.LegacyAnchorSafetyGate, cfg.Statusline = globalTelemetry, globalLegacyAnchorSafetyGate, globalStatusline
 	// TOML decoding replaces [[plugins]] wholesale, so cfg.Plugins now holds
 	// only the last file's. Re-merge by name across all sources (later wins) so a
 	// project reasonix.toml doesn't drop the global config's MCP servers.
@@ -280,7 +280,12 @@ func (c *Config) setExpansionEnv(env map[string]string) {
 	}
 	c.expansionEnv = cloneStringMap(env)
 	for i := range c.Plugins {
-		c.Plugins[i].expansionEnv = c.expansionEnv
+		// A project .env belongs to the project: it expands only servers the
+		// project declares, whose decision covers the values it supplies.
+		c.Plugins[i].expansionEnv = nil
+		if RepositoryDeclared(c.Plugins[i]) {
+			c.Plugins[i].expansionEnv = c.expansionEnv
+		}
 	}
 }
 
