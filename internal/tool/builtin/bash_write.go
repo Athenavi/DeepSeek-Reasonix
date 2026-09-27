@@ -183,11 +183,13 @@ func appendSandboxWriteHint(out string, err error, p bashParams, spec sandbox.Sp
 		return out
 	}
 	hint := bashWriteDeniedHint()
-	if len(p.AdditionalWriteDirs) > 0 || windowsChildProcessDenied.MatchString(strings.ToLower(out+"\n"+err.Error())) {
+	if windowsChildProcessDenied.MatchString(strings.ToLower(out + "\n" + err.Error())) {
 		hint = "The command encountered a permission denial under the OS sandbox. Additional writable directories may not resolve a child-process or named-object denial."
 	} else if dirs := gitWorktreeWriteDirs(workDir, out, spec.WriteRoots); len(dirs) > 0 {
 		paths, _ := json.Marshal(dirs)
 		hint = "Git worktree metadata is outside the writable workspace. Retry this command with additional_write_dirs: " + string(paths) + " and a justification; the host will request approval for these directories."
+	} else if len(p.AdditionalWriteDirs) > 0 {
+		hint = "The command encountered a permission denial under the OS sandbox. Additional writable directories may not resolve a child-process or named-object denial."
 	}
 	if denialID := sandbox.IssueDenial(p.Command, preset); denialID != "" {
 		hint += " If the command cannot be expressed with additional_write_dirs, request danger-full-access for this exact retry with denial_id " + denialID + "."
@@ -212,7 +214,7 @@ func gitWorktreeWriteDirs(workDir, output string, writeRoots []string) []string 
 				gitDir = filepath.Join(dir, gitDir)
 			}
 			gitDir, err = filepath.EvalSymlinks(gitDir)
-			if err != nil || !strings.Contains(output, gitDir) {
+			if err != nil {
 				return nil
 			}
 			commonPath := filepath.Join(gitDir, "commondir")
@@ -230,6 +232,9 @@ func gitWorktreeWriteDirs(workDir, output string, writeRoots []string) []string 
 			}
 			commonDir, err = filepath.EvalSymlinks(commonDir)
 			if err != nil {
+				return nil
+			}
+			if !strings.Contains(output, gitDir) && !strings.Contains(output, commonDir) {
 				return nil
 			}
 			var missing []string

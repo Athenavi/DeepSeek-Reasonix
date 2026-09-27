@@ -80,6 +80,10 @@ func TestSandboxWriteHintNamesGitWorktreeMetadata(t *testing.T) {
 	if got := gitWorktreeWriteDirs(subdir, denial, []string{worktree, filepath.Join(main, ".git")}); len(got) != 0 {
 		t.Fatalf("already writable metadata must not be suggested: %v", got)
 	}
+	commonDenial := "fatal: cannot lock ref 'refs/heads/linked': Unable to create '" + filepath.Join(main, ".git", "refs", "heads", "linked.lock") + "': Operation not permitted"
+	if got := gitWorktreeWriteDirs(subdir, commonDenial, []string{worktree, gitDir}); len(got) != 1 || got[0] != filepath.Join(main, ".git") {
+		t.Fatalf("common metadata still needs approval after a narrow gitdir grant: %v", got)
+	}
 	if runtime.GOOS != "darwin" {
 		return
 	}
