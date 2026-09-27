@@ -10,15 +10,35 @@ import (
 	"reasonix/internal/plugin"
 )
 
+type invokedSkillsKey struct{}
+
+func withInvokedSkills(ctx context.Context, names []string) context.Context {
+	if len(names) == 0 {
+		return ctx
+	}
+	invoked := make(map[string]bool, len(names))
+	for _, name := range names {
+		invoked[strings.ToLower(name)] = true
+	}
+	return context.WithValue(ctx, invokedSkillsKey{}, invoked)
+}
+
+func invokedSkills(ctx context.Context) map[string]bool {
+	invoked, _ := ctx.Value(invokedSkillsKey{}).(map[string]bool)
+	return invoked
+}
+
 func (c *Controller) withCapabilityRoute(ctx context.Context, composed, routeInput string) string {
 	if c == nil {
 		return composed
 	}
 	routeInput = strings.TrimSpace(agent.StripTransientUserBlocks(routeInput))
-	if routeInput == "" {
+	// A resolved inline invocation already supplies the skill body. With no
+	// typed task, routing on that body would invent a second skill request.
+	if routeInput == "" && len(invokedSkills(ctx)) == 0 {
 		routeInput = strings.TrimSpace(agent.StripTransientUserBlocks(composed))
 	}
-	if routeInput == "" {
+	if routeInput == "" && len(invokedSkills(ctx)) == 0 {
 		return composed
 	}
 	decision := c.routeCapabilities(ctx, routeInput)
@@ -93,6 +113,15 @@ func (c *Controller) routeCapabilities(ctx context.Context, routeInput string) c
 		}
 	}
 	catalog := capability.BuildCatalog(opts)
+	if invoked := invokedSkills(ctx); len(invoked) > 0 {
+		entries := make([]capability.Entry, 0, len(catalog.Entries))
+		for _, entry := range catalog.Entries {
+			if entry.Kind != capability.KindSkill || !invoked[strings.ToLower(entry.Name)] {
+				entries = append(entries, entry)
+			}
+		}
+		catalog.Entries = entries
+	}
 	decision := capability.Route(routeInput, catalog.Entries)
 	if c.capabilityProxy {
 		decision.CapabilityProxy = true

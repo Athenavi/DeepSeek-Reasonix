@@ -26,19 +26,18 @@ func TestRoutePrefersReviewSkillForReviewRequest(t *testing.T) {
 	}
 }
 
-func TestRouteRequiresExplicitSkill(t *testing.T) {
+func TestRouteDoesNotTreatTextMentionAsInvocation(t *testing.T) {
 	entries := SkillEntries([]skill.Skill{{
 		Name:        "audit",
 		Description: "audit something",
 		Scope:       skill.ScopeProject,
 	}}, []tool.ContractEntry{{Name: "run_skill"}})
 
-	decision := Route("请使用 audit skill 检查一下", entries)
-	if len(decision.Candidates) == 0 {
-		t.Fatal("Route returned no candidates")
-	}
-	if got := decision.Candidates[0].Policy; got != AutoUseRequire {
-		t.Fatalf("policy = %s, want require", got)
+	for _, text := range []string{"/audit 检查一下", "then run /audit", "请使用 audit skill 检查一下"} {
+		decision := Route(text, entries)
+		if len(decision.Candidates) != 0 {
+			t.Errorf("%q must not create a structural skill invocation: %+v", text, decision.Candidates)
+		}
 	}
 }
 
