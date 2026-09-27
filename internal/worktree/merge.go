@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"reasonix/internal/gitcmd"
 )
 
 // MergeBlocker is a stable, structured reason why merge or cleanup cannot
@@ -48,6 +50,7 @@ type MergeInspection struct {
 	SourceDirty        bool           `json:"sourceDirty"`
 	Blockers           []MergeBlocker `json:"blockers"`
 	CleanupBlockers    []MergeBlocker `json:"cleanupBlockers"`
+	source, worktree   gitcmd.Repo    // the identities the merge runs against
 }
 
 // MergeRequest proves that the user confirmed a specific inspection. A target
@@ -137,11 +140,10 @@ func identifyMergeWorkspace(ctx context.Context, workspaceRoot, managedRoot stri
 	if workspaceRoot == "" {
 		return mergeMetadata{}, errors.New("workspace root is required")
 	}
-	worktreeRoot, stderr, err := runGit(ctx, workspaceRoot, "rev-parse", "--show-toplevel")
+	worktreeRoot, err := managedWorktreeRoot(workspaceRoot, managedRoot)
 	if err != nil {
-		return mergeMetadata{}, fmt.Errorf("resolve worktree root: %w%s", err, stderrSuffix(stderr))
+		return mergeMetadata{}, fmt.Errorf("resolve worktree root: %w", err)
 	}
-	worktreeRoot = filepath.Clean(strings.TrimSpace(worktreeRoot))
 	metadata, _, err := readMergeMetadata(worktreeRoot, managedRoot)
 	if err != nil {
 		return mergeMetadata{}, err
@@ -154,64 +156,99 @@ func identifyMergeWorkspace(ctx context.Context, workspaceRoot, managedRoot stri
 	if err := sameDirectory(worktreeRoot, metadata.WorktreeRoot); err != nil {
 		return mergeMetadata{}, errors.New("workspace is not the metadata worktree root")
 	}
-	if err := verifySameCommonDir(ctx, metadata.SourceRoot, metadata.WorktreeRoot); err != nil {
+	if err := pinMergeRepos(ctx, &metadata); err != nil {
 		return mergeMetadata{}, err
 	}
-	if err := verifyRepositoryRoot(ctx, metadata.SourceRoot); err != nil {
-		return mergeMetadata{}, fmt.Errorf("source checkout identity changed: %w", err)
-	}
+	inspection.source, inspection.worktree = metadata.SourceRepo, metadata.WorktreeRepo
 	if metadata.TargetBranch == "" {
 		inspection.Blockers = append(inspection.Blockers, blocker("target_branch_missing", "creation metadata does not contain a target branch"))
-	} else if _, _, err := runGit(ctx, metadata.SourceRoot, "check-ref-format", "refs/heads/"+metadata.TargetBranch); err != nil {
+	} else if _, _, err := runGit(ctx, metadata.SourceRepo, "check-ref-format", "refs/heads/"+metadata.TargetBranch); err != nil {
 		inspection.Blockers = append(inspection.Blockers, blocker("target_branch_missing", "creation metadata does not contain a valid target branch"))
 	}
-	if _, _, err := runGit(ctx, metadata.WorktreeRoot, "check-ref-format", "refs/heads/"+metadata.WorktreeBranch); err != nil {
+	if _, _, err := runGit(ctx, metadata.WorktreeRepo, "check-ref-format", "refs/heads/"+metadata.WorktreeBranch); err != nil {
 		return mergeMetadata{}, errors.New("worktree metadata contains an invalid branch")
 	}
 	return metadata, nil
 }
 
+// pinMergeRepos settles the source and worktree identities every later call
+// runs against, and checks they still share one repository.
+func pinMergeRepos(ctx context.Context, metadata *mergeMetadata) error {
+	source, err := metadata.source(ctx)
+	if err != nil {
+		return err
+	}
+	worktree, err := metadata.worktreeAt(ctx, metadata.WorktreeRoot)
+	if err != nil {
+		return fmt.Errorf("resolve worktree repository: %w", err)
+	}
+	if err := verifySameCommonDir(source, worktree); err != nil {
+		return err
+	}
+	metadata.SourceRepo, metadata.WorktreeRepo = source, worktree
+	return nil
+}
+
+// managedWorktreeRoot is the allocation root under managedRoot that holds
+// workspaceRoot, read from the managed layout rather than asked of git.
+func managedWorktreeRoot(workspaceRoot, managedRoot string) (string, error) {
+	realManaged, err := filepath.EvalSymlinks(strings.TrimSpace(managedRoot))
+	if err != nil {
+		return "", err
+	}
+	realWorkspace, err := filepath.EvalSymlinks(workspaceRoot)
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(realManaged, realWorkspace)
+	parts := strings.Split(filepath.Clean(rel), string(filepath.Separator))
+	if err != nil || len(parts) < 3 || parts[0] == ".." {
+		return "", errors.New("workspace is not inside Reasonix-managed worktree storage")
+	}
+	return filepath.Join(realManaged, parts[0], parts[1], parts[2]), nil
+}
+
 func inspectCheckoutStates(ctx context.Context, metadata mergeMetadata, inspection *MergeInspection) (string, error) {
-	worktreeBranch, stderr, err := gitValue(ctx, metadata.WorktreeRoot, "symbolic-ref", "--quiet", "--short", "HEAD")
+	worktreeBranch, stderr, err := gitValue(ctx, metadata.WorktreeRepo, "symbolic-ref", "--quiet", "--short", "HEAD")
 	if err != nil {
 		return "", fmt.Errorf("worktree is detached or unreadable%s", stderrSuffix(stderr))
 	}
 	if worktreeBranch != metadata.WorktreeBranch {
 		return "", fmt.Errorf("worktree branch changed from %q to %q", metadata.WorktreeBranch, worktreeBranch)
 	}
-	inspection.WorktreeHead, stderr, err = gitValue(ctx, metadata.WorktreeRoot, "rev-parse", "--verify", "HEAD")
+	inspection.WorktreeHead, stderr, err = gitValue(ctx, metadata.WorktreeRepo, "rev-parse", "--verify", "HEAD")
 	if err != nil {
 		return "", fmt.Errorf("read worktree HEAD: %w%s", err, stderrSuffix(stderr))
 	}
-	sourceBranch, _, branchErr := gitValue(ctx, metadata.SourceRoot, "symbolic-ref", "--quiet", "--short", "HEAD")
+	sourceBranch, _, branchErr := gitValue(ctx, metadata.SourceRepo, "symbolic-ref", "--quiet", "--short", "HEAD")
 	if branchErr != nil {
 		inspection.Blockers = append(inspection.Blockers, blocker("source_detached", "the recorded source checkout is detached"))
 	} else if sourceBranch != metadata.TargetBranch {
 		inspection.Blockers = append(inspection.Blockers, blocker("target_branch_drift", fmt.Sprintf("source checkout is on %q, expected %q", sourceBranch, metadata.TargetBranch)))
 	}
-	inspection.TargetHead, stderr, err = gitValue(ctx, metadata.SourceRoot, "rev-parse", "--verify", "HEAD")
+	inspection.TargetHead, stderr, err = gitValue(ctx, metadata.SourceRepo, "rev-parse", "--verify", "HEAD")
 	if err != nil {
 		return "", fmt.Errorf("read target HEAD: %w%s", err, stderrSuffix(stderr))
 	}
-	worktreeStatus, stderr, err := runGit(ctx, metadata.WorktreeRoot, "status", "--porcelain=v1", "--untracked-files=all")
+	worktreeStatus, stderr, err := runGit(ctx, metadata.WorktreeRepo, "status", "--porcelain=v1", "--untracked-files=all")
 	if err != nil {
 		return "", fmt.Errorf("inspect worktree changes: %w%s", err, stderrSuffix(stderr))
 	}
 	inspection.WorktreeDirty = strings.TrimSpace(worktreeStatus) != ""
-	inspection.WorktreeStateToken, err = worktreeStateToken(ctx, metadata.WorktreeRoot)
+	inspection.WorktreeStateToken, err = worktreeStateToken(ctx, metadata.WorktreeRepo)
 	if err != nil {
 		return "", fmt.Errorf("snapshot worktree changes: %w", err)
 	}
 	if inspection.WorktreeDirty {
 		inspection.Blockers = append(inspection.Blockers, blocker("worktree_dirty", "worktree has uncommitted changes"))
 	}
-	if err := inspectSourceState(ctx, metadata.SourceRoot, inspection); err != nil {
+	if err := inspectSourceState(ctx, metadata.SourceRepo, inspection); err != nil {
 		return "", err
 	}
 	return worktreeStatus, nil
 }
 
-func inspectSourceState(ctx context.Context, sourceRoot string, inspection *MergeInspection) error {
+func inspectSourceState(ctx context.Context, sourceRoot gitcmd.Repo, inspection *MergeInspection) error {
 	status, stderr, err := runGit(ctx, sourceRoot, "status", "--porcelain=v1", "--untracked-files=all")
 	if err != nil {
 		return fmt.Errorf("inspect source changes: %w%s", err, stderrSuffix(stderr))
@@ -234,23 +271,23 @@ func inspectMergeDivergence(ctx context.Context, metadata mergeMetadata, worktre
 	if metadata.TargetBranch == "" {
 		return nil
 	}
-	behind, ahead, err := aheadBehind(ctx, metadata.WorktreeRoot, inspection.TargetHead, inspection.WorktreeHead)
+	behind, ahead, err := aheadBehind(ctx, metadata.WorktreeRepo, inspection.TargetHead, inspection.WorktreeHead)
 	if err != nil {
 		return err
 	}
 	inspection.AheadCount, inspection.BehindCount = ahead, behind
-	inspection.FilesChanged, inspection.Insertions, inspection.Deletions, inspection.ChangedFiles, err = diffStats(ctx, metadata.WorktreeRoot, inspection.TargetHead, inspection.WorktreeHead, worktreeStatus)
+	inspection.FilesChanged, inspection.Insertions, inspection.Deletions, inspection.ChangedFiles, err = diffStats(ctx, metadata.WorktreeRepo, inspection.TargetHead, inspection.WorktreeHead, worktreeStatus)
 	if err != nil {
 		return err
 	}
-	inspection.AlreadyMerged, err = isAncestor(ctx, metadata.SourceRoot, inspection.WorktreeHead, inspection.TargetHead)
+	inspection.AlreadyMerged, err = isAncestor(ctx, metadata.SourceRepo, inspection.WorktreeHead, inspection.TargetHead)
 	if err != nil {
 		return fmt.Errorf("check merged ancestry: %w", err)
 	}
 	if inspection.AlreadyMerged {
 		return nil
 	}
-	_, inspection.HasConflicts, inspection.ConflictFiles, err = mergeTree(ctx, metadata.SourceRoot, inspection.TargetHead, inspection.WorktreeHead)
+	_, inspection.HasConflicts, inspection.ConflictFiles, err = mergeTree(ctx, metadata.SourceRepo, inspection.TargetHead, inspection.WorktreeHead)
 	if err != nil {
 		return err
 	}
@@ -261,7 +298,7 @@ func inspectMergeDivergence(ctx context.Context, metadata mergeMetadata, worktre
 }
 
 func inspectCleanupBlockers(ctx context.Context, metadata mergeMetadata, inspection *MergeInspection) error {
-	status, stderr, err := runGitEnv(ctx, metadata.WorktreeRoot, gitNoOptionalLocks, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignored")
+	status, stderr, err := runGitEnv(ctx, metadata.WorktreeRepo, gitNoOptionalLocks, "status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignored")
 	if err != nil {
 		return fmt.Errorf("inspect cleanup safety: %w%s", err, stderrSuffix(stderr))
 	}
@@ -335,21 +372,26 @@ func FinalizeMerge(ctx context.Context, managedRoot string, request CleanupReque
 	if err := verifyCleanupIdentity(metadata, request); err != nil {
 		return cleanupFailure(result, err)
 	}
-	if err := verifyRepositoryRoot(ctx, metadata.SourceRoot); err != nil {
+	source, err := metadata.source(ctx)
+	if err == nil {
+		err = verifyRepositoryRoot(ctx, source)
+	}
+	if err != nil {
 		return cleanupFailure(result, fmt.Errorf("source checkout identity changed: %w", err))
 	}
-	sourceBranch, stderr, err := gitValue(ctx, metadata.SourceRoot, "symbolic-ref", "--quiet", "--short", "HEAD")
+	metadata.SourceRepo = source
+	sourceBranch, stderr, err := gitValue(ctx, metadata.SourceRepo, "symbolic-ref", "--quiet", "--short", "HEAD")
 	if err != nil || sourceBranch != metadata.TargetBranch {
 		return cleanupFailure(result, fmt.Errorf("source checkout is not on target branch %q%s", metadata.TargetBranch, stderrSuffix(stderr)))
 	}
-	targetHead, stderr, err := gitValue(ctx, metadata.SourceRoot, "rev-parse", "--verify", "HEAD")
+	targetHead, stderr, err := gitValue(ctx, metadata.SourceRepo, "rev-parse", "--verify", "HEAD")
 	if err != nil {
 		return cleanupFailure(result, fmt.Errorf("read target HEAD: %w%s", err, stderrSuffix(stderr)))
 	}
-	if ok, err := isAncestor(ctx, metadata.SourceRoot, request.MergedCommit, targetHead); err != nil || !ok {
+	if ok, err := isAncestor(ctx, metadata.SourceRepo, request.MergedCommit, targetHead); err != nil || !ok {
 		return cleanupFailure(result, errors.New("the recorded merge commit is no longer contained in the target branch"))
 	}
-	if ok, err := isAncestor(ctx, metadata.SourceRoot, request.WorktreeHead, targetHead); err != nil || !ok {
+	if ok, err := isAncestor(ctx, metadata.SourceRepo, request.WorktreeHead, targetHead); err != nil || !ok {
 		return cleanupFailure(result, errors.New("worktree HEAD is not contained in the target branch"))
 	}
 
@@ -366,7 +408,7 @@ func FinalizeMerge(ctx context.Context, managedRoot string, request CleanupReque
 		if err := os.Remove(cleanupJournalPath(metadata)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return cleanupFailure(result, fmt.Errorf("remove completed legacy cleanup state: %w", err))
 		}
-		if err := os.Remove(metadataFile); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := removeMergeMetadata(metadataFile); err != nil {
 			return cleanupFailure(result, fmt.Errorf("remove completed merge metadata: %w", err))
 		}
 		result.Completed = true
@@ -392,20 +434,22 @@ func blocker(code, message string) MergeBlocker {
 	return MergeBlocker{Code: code, Message: message, Paths: []string{}}
 }
 
-func verifyRepositoryRoot(ctx context.Context, expected string) error {
-	reported, stderr, err := runGit(ctx, expected, "rev-parse", "--show-toplevel")
+// verifyRepositoryRoot checks the pinned identity still opens, with its work
+// tree at the directory it was pinned to.
+func verifyRepositoryRoot(ctx context.Context, repo gitcmd.Repo) error {
+	reported, stderr, err := runGit(ctx, repo, "rev-parse", "--show-toplevel")
 	if err != nil {
 		return fmt.Errorf("resolve repository root: %w%s", err, stderrSuffix(stderr))
 	}
-	return sameDirectory(expected, strings.TrimSpace(reported))
+	return sameDirectory(repo.WorkTree, strings.TrimSpace(reported))
 }
 
-func gitValue(ctx context.Context, dir string, args ...string) (string, string, error) {
-	out, stderr, err := runGit(ctx, dir, args...)
+func gitValue(ctx context.Context, repo gitcmd.Repo, args ...string) (string, string, error) {
+	out, stderr, err := runGit(ctx, repo, args...)
 	return strings.TrimSpace(out), stderr, err
 }
 
-func aheadBehind(ctx context.Context, root, targetHead, worktreeHead string) (behind, ahead int, err error) {
+func aheadBehind(ctx context.Context, root gitcmd.Repo, targetHead, worktreeHead string) (behind, ahead int, err error) {
 	out, stderr, err := runGit(ctx, root, "rev-list", "--left-right", "--count", targetHead+"..."+worktreeHead)
 	if err != nil {
 		return 0, 0, fmt.Errorf("inspect branch divergence: %w%s", err, stderrSuffix(stderr))
@@ -425,7 +469,7 @@ func aheadBehind(ctx context.Context, root, targetHead, worktreeHead string) (be
 	return behind, ahead, nil
 }
 
-func diffStats(ctx context.Context, root, targetHead, worktreeHead, status string) (files, insertions, deletions int, paths []string, err error) {
+func diffStats(ctx context.Context, root gitcmd.Repo, targetHead, worktreeHead, status string) (files, insertions, deletions int, paths []string, err error) {
 	paths = []string{}
 	seen := map[string]struct{}{}
 	out, stderr, err := runGit(ctx, root, "diff", "--numstat", targetHead+"..."+worktreeHead)
@@ -485,7 +529,7 @@ func statusPaths(status string) []string {
 	return paths
 }
 
-func isAncestor(ctx context.Context, root, ancestor, descendant string) (bool, error) {
+func isAncestor(ctx context.Context, root gitcmd.Repo, ancestor, descendant string) (bool, error) {
 	_, stderr, err := runGit(ctx, root, "merge-base", "--is-ancestor", ancestor, descendant)
 	if err == nil {
 		return true, nil

@@ -3,6 +3,8 @@ package main
 import (
 	"path/filepath"
 	"testing"
+
+	"reasonix/internal/gitcmd"
 )
 
 func TestWorkspaceGitCheckoutInvalidatesInFlightBranchProbe(t *testing.T) {
@@ -14,11 +16,12 @@ func TestWorkspaceGitCheckoutInvalidatesInFlightBranchProbe(t *testing.T) {
 	workspaceGitBranchCache.Unlock()
 	started, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	original := workspaceGitBranchForMetaProbe
-	workspaceGitBranchForMetaProbe = func(string) string { close(started); <-release; return "main" }
+	workspaceGitBranchForMetaProbe = func(gitcmd.Repo) string { close(started); <-release; return "main" }
 	defer func() { workspaceGitBranchForMetaProbe = original }()
-	go func() { refreshWorkspaceGitBranchForMeta(key, base, request); close(done) }()
+	repo := openWorkspaceRepo(base)
+	go func() { refreshWorkspaceGitBranchForMeta(key, base, repo, request); close(done) }()
 	<-started
-	err := workspaceCheckoutBranch(base, "shared", false)
+	err := workspaceCheckoutBranch(repo, "shared", false)
 	close(release)
 	<-done
 	if err != nil {

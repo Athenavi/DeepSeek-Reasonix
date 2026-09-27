@@ -40,6 +40,7 @@ import (
 	"reasonix/internal/extension/providerext"
 	"reasonix/internal/extension/sidecar"
 	"reasonix/internal/extension/uihub"
+	"reasonix/internal/gitcmd"
 	"reasonix/internal/guardian"
 	"reasonix/internal/history"
 	"reasonix/internal/hook"
@@ -234,6 +235,7 @@ type Options struct {
 	WorkspaceOnly          bool
 	PinnedContextLoader    control.PinnedContextLoader
 	SessionTemp            *sessiontemp.Manager // session-private temp manager; Rebuild reuses old's
+	WorkspaceRepo          gitcmd.Repo          // git identity the session opened with; Rebuild reuses old's
 	PersistentShell        *persistentshell.Manager
 	RuntimeReload
 	// deferPublish keeps a replacement generation private until migration and
@@ -257,6 +259,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 		stderr = os.Stderr
 	}
 	root := ResolveWorkspaceRoot(opts.WorkspaceRoot)
+	repo := workspaceRepo(ctx, opts.WorkspaceRepo, root)
 	additionalDirs, err := normalizeAdditionalDirs(root, opts.AdditionalDirs)
 	if err != nil {
 		return nil, err
@@ -1887,6 +1890,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 		},
 		CapabilityRuntime:      capRuntime,
 		WorkspaceRoot:          root,
+		WorkspaceRepo:          repo,
 		ExternalFolderToolRefs: readPathResolver,
 		ResponseLanguage:       cfg.ResponseLanguage(),
 		ReasoningLanguage:      config.ReasoningLanguageForEntry(entry, cfg.ReasoningLanguage()),

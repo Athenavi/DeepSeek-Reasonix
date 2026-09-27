@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"reasonix/internal/gitcmd"
 )
 
 const (
@@ -15,11 +17,12 @@ const (
 	workspaceDiffTallyReadLimit = 16 << 20
 )
 
-func workspaceGitDiffTally(ctx context.Context, base string, untracked []string) (added, removed int, incomplete bool) {
-	raw, err := workspaceGitCommand(ctx, "-C", base, "diff", "--numstat", "--no-textconv", "HEAD", "--", ".").Output()
+func workspaceGitDiffTally(ctx context.Context, repo gitcmd.Repo, untracked []string) (added, removed int, incomplete bool) {
+	base := repo.Dir
+	raw, err := workspaceGitCommand(ctx, repo, "-C", base, "diff", "--numstat", "--no-textconv", "HEAD", "--", ".").Output()
 	if err != nil && ctx.Err() == nil {
 		incomplete = true
-		raw, err = workspaceGitCommand(ctx, "-C", base, "diff", "--numstat", "--no-textconv", "--", ".").Output()
+		raw, err = workspaceGitCommand(ctx, repo, "-C", base, "diff", "--numstat", "--no-textconv", "--", ".").Output()
 	}
 	if err != nil {
 		return 0, 0, true

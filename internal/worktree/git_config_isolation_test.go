@@ -78,10 +78,10 @@ func TestCodeUnderTestDoesNotRunAnAmbientHook(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(repo, "change.txt"), []byte("change\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, stderr, err := runGit(context.Background(), repo, "add", "change.txt"); err != nil {
+	if _, stderr, err := runGit(context.Background(), opened(t, repo), "add", "change.txt"); err != nil {
 		t.Fatalf("git add: %v%s", err, stderrSuffix(stderr))
 	}
-	if _, stderr, err := runGit(context.Background(), repo,
+	if _, stderr, err := runGit(context.Background(), opened(t, repo),
 		"-c", "user.name=Reasonix Test", "-c", "user.email=reasonix@example.invalid",
 		"commit", "-m", "change"); err != nil {
 		t.Fatalf("git commit: %v%s", err, stderrSuffix(stderr))

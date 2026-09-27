@@ -42,6 +42,7 @@ import (
 	"reasonix/internal/extension"
 	"reasonix/internal/extension/dispatch"
 	"reasonix/internal/extension/uihub"
+	"reasonix/internal/gitcmd"
 	goaldomain "reasonix/internal/goal"
 	"reasonix/internal/guardian"
 	"reasonix/internal/hook"
@@ -287,6 +288,8 @@ type Controller struct {
 	// command discovery, and the guard root for checkpoint restore writes. It is
 	// surfaced to frontends via WorkspaceRoot().
 	workspaceRoot string
+	// workspaceRepo is workspaceRoot's git identity, resolved before any turn ran.
+	workspaceRepo gitcmd.Repo
 
 	// externalFolderRefs maps session-generated @ tokens to user-dropped
 	// directories outside workspaceRoot. It is intentionally per-controller:
@@ -673,6 +676,7 @@ type Options struct {
 	// WorkspaceRoot is the project root checkpoint restores are confined to ("" =
 	// no confinement). Frontends pass the cwd they launched the session in.
 	WorkspaceRoot          string
+	WorkspaceRepo          gitcmd.Repo // WorkspaceRoot's identity, resolved when the session opened
 	ExternalFolderToolRefs externalFolderToolRefs
 	// ResponseLanguage controls final-answer language preference. Empty/auto
 	// means no transient injection because the stable language policy follows the
@@ -862,6 +866,7 @@ func New(opts Options) *Controller {
 		capabilityRuntime:      opts.CapabilityRuntime,
 		ablation:               opts.Ablation,
 		workspaceRoot:          opts.WorkspaceRoot,
+		workspaceRepo:          opts.WorkspaceRepo,
 		externalFolderToolRefs: opts.ExternalFolderToolRefs,
 		providerResolver:       opts.ProviderResolver,
 		runtimeGeneration:      opts.RuntimeGeneration,
@@ -4850,6 +4855,11 @@ func (c *Controller) ModelSelectionIdentity() string { return c.selection.identi
 // (the directory that file-writers and @-references are scoped to).
 // Empty means no scoping is in effect.
 func (c *Controller) WorkspaceRoot() string { return c.workspaceRoot }
+
+// WorkspaceRepo is the workspace's git identity as the session resolved it when
+// it opened. Host git reads the workspace through it rather than rediscovering
+// the repository from files the session's own commands may have written.
+func (c *Controller) WorkspaceRepo() gitcmd.Repo { return c.workspaceRepo }
 
 func (c *Controller) imageInputEnabled() bool {
 	if c.frozenImageInput != nil {

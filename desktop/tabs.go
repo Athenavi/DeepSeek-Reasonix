@@ -2138,7 +2138,7 @@ type wireEventTab struct {
 
 func enrichTabMeta(meta TabMeta) TabMeta {
 	if meta.Active {
-		meta.GitBranch = workspaceGitBranchForMeta(meta.WorkspaceRoot)
+		meta.GitBranch = workspaceGitBranchForMeta(meta.WorkspaceRoot, meta.repo)
 	}
 	return meta
 }
@@ -2146,7 +2146,7 @@ func enrichTabMeta(meta TabMeta) TabMeta {
 func enrichTabMetas(metas []TabMeta) []TabMeta {
 	for i := range metas {
 		if metas[i].Active {
-			metas[i].GitBranch = workspaceGitBranchForMeta(metas[i].WorkspaceRoot)
+			metas[i].GitBranch = workspaceGitBranchForMeta(metas[i].WorkspaceRoot, metas[i].repo)
 		}
 	}
 	return metas
@@ -2191,6 +2191,9 @@ func (a *App) tabMeta(tab *WorkspaceTab, active bool) TabMeta {
 		Active:            active,
 		Cwd:               tab.WorkspaceRoot,
 		IsolatedWorktree:  floor.isolated,
+	}
+	if repo, ok := sessionWorkspaceRepo(tab.Ctrl, tab.WorkspaceRoot); ok {
+		m.repo = repo
 	}
 	if strings.TrimSpace(tab.SessionID) != "" {
 		m.Session = &session.SessionRef{HostID: "local", SessionID: strings.TrimSpace(tab.SessionID)}

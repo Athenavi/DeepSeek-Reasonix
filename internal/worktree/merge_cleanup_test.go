@@ -15,7 +15,7 @@ func mergedWorktreeFixture(t *testing.T) (string, string, Result, MergeResult) {
 	t.Helper()
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +67,7 @@ func TestFinalizeMergeRetainsRegisteredRecoveryWorktreeAndBranch(t *testing.T) {
 	}
 	assertRetainedCleanup(t, repo, result, retried)
 	other := filepath.Join(t.TempDir(), "other")
-	if _, _, err := runGit(context.Background(), repo, "worktree", "add", other, result.WorktreeBranch); err == nil {
+	if _, _, err := runGit(context.Background(), opened(t, repo), "worktree", "add", other, result.WorktreeBranch); err == nil {
 		t.Fatal("retained branch could be checked out in a second worktree")
 	}
 }

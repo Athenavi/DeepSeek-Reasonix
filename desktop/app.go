@@ -9873,10 +9873,6 @@ func previewMediaKind(path string) (kind string, mime string) {
 	return "", ""
 }
 
-func (a *App) activeWorkspaceBase() (string, error) {
-	return workspaceBaseFromRoot(a.activeWorkspaceRoot())
-}
-
 func (a *App) workspaceTargetForTab(tabID string) (string, control.SessionAPI, bool) {
 	tabID = strings.TrimSpace(tabID)
 	a.mu.RLock()

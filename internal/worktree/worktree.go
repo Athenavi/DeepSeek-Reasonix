@@ -49,7 +49,11 @@ func RollbackCreate(ctx context.Context, result Result) error {
 	if !strings.HasPrefix(branch, "reasonix/delivery-") {
 		return fmt.Errorf("refuse to roll back unmanaged branch %q", branch)
 	}
-	if _, _, err := runGit(ctx, sourceRoot, "check-ref-format", "refs/heads/"+branch); err != nil {
+	source, created, err := result.repos(ctx)
+	if err != nil {
+		return fmt.Errorf("resolve rollback repositories: %w", err)
+	}
+	if _, _, err := runGit(ctx, source, "check-ref-format", "refs/heads/"+branch); err != nil {
 		return fmt.Errorf("refuse to roll back invalid branch %q", branch)
 	}
 
@@ -70,26 +74,22 @@ func RollbackCreate(ctx context.Context, result Result) error {
 	if os.SameFile(sourceInfo, worktreeInfo) {
 		return errors.New("refuse to remove the source worktree")
 	}
-	reportedRoot, _, err := runGit(ctx, worktreeRoot, "rev-parse", "--show-toplevel")
-	if err != nil {
-		return fmt.Errorf("verify rollback worktree root: %w", err)
-	}
-	reportedInfo, err := os.Stat(strings.TrimSpace(reportedRoot))
+	reportedInfo, err := os.Stat(created.WorkTree)
 	if err != nil || !os.SameFile(worktreeInfo, reportedInfo) {
 		return errors.New("rollback target is not the exact created worktree root")
 	}
-	if err := verifySameCommonDir(ctx, sourceRoot, worktreeRoot); err != nil {
+	if err := verifySameCommonDir(source, created); err != nil {
 		return err
 	}
-	currentBranch, _, err := runGit(ctx, worktreeRoot, "symbolic-ref", "--quiet", "--short", "HEAD")
+	currentBranch, _, err := runGit(ctx, created, "symbolic-ref", "--quiet", "--short", "HEAD")
 	if err != nil || strings.TrimSpace(currentBranch) != branch {
 		return fmt.Errorf("rollback worktree branch changed from %q", branch)
 	}
-	currentHead, _, err := runGit(ctx, worktreeRoot, "rev-parse", "--verify", "HEAD")
+	currentHead, _, err := runGit(ctx, created, "rev-parse", "--verify", "HEAD")
 	if err != nil || strings.TrimSpace(currentHead) != head {
 		return errors.New("rollback worktree HEAD changed after creation")
 	}
-	status, _, err := runGit(ctx, worktreeRoot, "status", "--porcelain=v1", "--untracked-files=all", "--ignored")
+	status, _, err := runGit(ctx, created, "status", "--porcelain=v1", "--untracked-files=all", "--ignored")
 	if err != nil {
 		return fmt.Errorf("inspect rollback worktree changes: %w", err)
 	}
@@ -100,35 +100,29 @@ func RollbackCreate(ctx context.Context, result Result) error {
 	if err != nil {
 		return err
 	}
-	if _, stderr, err := runGit(ctx, sourceRoot, "worktree", "remove", worktreeRoot); err != nil {
+	// --force after the clean-tree check above: a bare remove runs status
+	// inside the linked worktree, whose config.worktree the source-root
+	// listing never saw. The check already confirmed the tree is clean.
+	if _, stderr, err := runGit(ctx, source, "worktree", "remove", "--force", worktreeRoot); err != nil {
 		return fmt.Errorf("remove unused worktree: %w%s", err, stderrSuffix(stderr))
 	}
-	if _, stderr, err := runGit(ctx, sourceRoot, "update-ref", "-d", "refs/heads/"+branch, head); err != nil {
+	if _, stderr, err := runGit(ctx, source, "update-ref", "-d", "refs/heads/"+branch, head); err != nil {
 		return fmt.Errorf("remove unused worktree branch %q: %w%s", branch, err, stderrSuffix(stderr))
 	}
-	if err := os.Remove(metadataFile); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := removeMergeMetadata(metadataFile); err != nil {
 		return fmt.Errorf("remove unused worktree metadata: %w", err)
 	}
 	return nil
 }
 
-func verifySameCommonDir(ctx context.Context, sourceRoot, worktreeRoot string) error {
-	resolve := func(root string) (os.FileInfo, error) {
-		commonDir, _, err := runGit(ctx, root, "rev-parse", "--git-common-dir")
-		if err != nil {
-			return nil, err
-		}
-		commonDir = strings.TrimSpace(commonDir)
-		if !filepath.IsAbs(commonDir) {
-			commonDir = filepath.Join(root, commonDir)
-		}
-		return os.Stat(filepath.Clean(commonDir))
-	}
-	sourceInfo, err := resolve(sourceRoot)
+// verifySameCommonDir compares the common dirs the two identities were pinned
+// with; neither is rediscovered from its checkout.
+func verifySameCommonDir(source, worktree gitcmd.Repo) error {
+	sourceInfo, err := os.Stat(source.CommonDir)
 	if err != nil {
 		return fmt.Errorf("resolve rollback source repository: %w", err)
 	}
-	worktreeInfo, err := resolve(worktreeRoot)
+	worktreeInfo, err := os.Stat(worktree.CommonDir)
 	if err != nil || !os.SameFile(sourceInfo, worktreeInfo) {
 		return errors.New("rollback source and worktree do not share a Git repository")
 	}
@@ -137,24 +131,42 @@ func verifySameCommonDir(ctx context.Context, sourceRoot, worktreeRoot string) e
 
 // Result identifies one newly created isolated Delivery workspace.
 type Result struct {
-	WorkspaceRoot string `json:"workspaceRoot"`
-	WorktreeRoot  string `json:"worktreeRoot"`
-	SourceRoot    string `json:"sourceRoot"`
-	Branch        string `json:"branch"`
-	Head          string `json:"head"`
-	SourceDirty   bool   `json:"sourceDirty"`
+	WorkspaceRoot string      `json:"workspaceRoot"`
+	WorktreeRoot  string      `json:"worktreeRoot"`
+	SourceRoot    string      `json:"sourceRoot"`
+	Branch        string      `json:"branch"`
+	Head          string      `json:"head"`
+	SourceDirty   bool        `json:"sourceDirty"`
+	SourceRepo    gitcmd.Repo `json:"-"` // the source's identity, at its root
+	WorktreeRepo  gitcmd.Repo `json:"-"` // resolved as the worktree was added
+}
+
+// repos is the pinned source and worktree identities; a Result built without
+// them resolves each from its root.
+func (r Result) repos(ctx context.Context) (source, worktree gitcmd.Repo, err error) {
+	source, worktree = r.SourceRepo, r.WorktreeRepo
+	if !source.Valid() {
+		if source, err = gitcmd.Open(ctx, r.SourceRoot); err != nil {
+			return source, worktree, err
+		}
+	}
+	if !worktree.Valid() {
+		worktree, err = gitcmd.Open(ctx, r.WorktreeRoot)
+	}
+	return source.Top(), worktree.Top(), err
 }
 
 type inspection struct {
 	Availability
-	head      string
-	prefix    string
-	commonDir string
+	repo   gitcmd.Repo // pinned at the work tree root
+	head   string
+	prefix string
 }
 
 // Inspect checks Git and repository prerequisites without changing state.
-func Inspect(ctx context.Context, workspaceRoot string) Availability {
-	info, err := inspect(ctx, workspaceRoot)
+// repo is the workspace's identity, resolved when it was opened.
+func Inspect(ctx context.Context, repo gitcmd.Repo) Availability {
+	info, err := inspect(ctx, repo)
 	if err != nil {
 		return Availability{Available: false, Reason: err.Error()}
 	}
@@ -165,9 +177,9 @@ func Inspect(ctx context.Context, workspaceRoot string) Availability {
 // source repository's committed HEAD. Uncommitted source changes are reported
 // but never copied or modified. When workspaceRoot names a repository
 // subdirectory, Result.WorkspaceRoot points at the corresponding subdirectory
-// in the new worktree.
-func Create(ctx context.Context, workspaceRoot, managedRoot string) (Result, error) {
-	info, err := inspect(ctx, workspaceRoot)
+// in the new worktree. repo is the workspace's identity, resolved when it opened.
+func Create(ctx context.Context, repo gitcmd.Repo, managedRoot string) (Result, error) {
+	info, err := inspect(ctx, repo)
 	if err != nil {
 		return Result{}, err
 	}
@@ -179,7 +191,7 @@ func Create(ctx context.Context, workspaceRoot, managedRoot string) (Result, err
 		return Result{}, fmt.Errorf("create Reasonix worktree storage: %w", err)
 	}
 
-	repoSum := sha256.Sum256([]byte(info.commonDir))
+	repoSum := sha256.Sum256([]byte(info.repo.CommonDir))
 	repoKey := hex.EncodeToString(repoSum[:8])
 	repoBase := safePathComponent(filepath.Base(info.RepoRoot))
 	if repoBase == "" {
@@ -202,7 +214,20 @@ func Create(ctx context.Context, workspaceRoot, managedRoot string) (Result, err
 			return Result{}, fmt.Errorf("create worktree parent: %w", err)
 		}
 
-		_, stderr, addErr := runGit(ctx, info.RepoRoot, "worktree", "add", "-b", branch, worktreeRoot, info.head)
+		// --no-checkout, then populate through gitcmd inside the new worktree,
+		// where the reset's driver listing sees an includeIf keyed on that
+		// worktree's gitdir or new branch (a checkout during add would not).
+		_, stderr, addErr := runGit(ctx, info.repo, "worktree", "add", "--no-checkout", "-b", branch, worktreeRoot, info.head)
+		var created gitcmd.Repo
+		if addErr == nil {
+			var resetStderr string
+			var resetErr error
+			if created, resetStderr, resetErr = populate(ctx, worktreeRoot, info.head); resetErr != nil {
+				_, _, _ = runGit(ctx, info.repo, "worktree", "remove", "--force", worktreeRoot)
+				_, _, _ = runGit(ctx, info.repo, "update-ref", "-d", "refs/heads/"+branch, info.head)
+				return Result{}, fmt.Errorf("populate Git worktree: %w%s", resetErr, stderrSuffix(resetStderr))
+			}
+		}
 		if addErr != nil {
 			// A random branch collision is retryable. We deliberately leave any
 			// non-empty partial directory untouched rather than risk deleting user
@@ -228,6 +253,8 @@ func Create(ctx context.Context, workspaceRoot, managedRoot string) (Result, err
 			Branch:        branch,
 			Head:          info.head,
 			SourceDirty:   info.SourceDirty,
+			SourceRepo:    info.repo,
+			WorktreeRepo:  created,
 		}
 		if err := writeMergeMetadata(result, info.Branch); err != nil {
 			rollbackErr := RollbackCreate(ctx, result)
@@ -264,8 +291,8 @@ func IsManagedPath(path, managedRoot string) bool {
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
-func inspect(ctx context.Context, workspaceRoot string) (inspection, error) {
-	workspaceRoot = strings.TrimSpace(workspaceRoot)
+func inspect(ctx context.Context, repo gitcmd.Repo) (inspection, error) {
+	workspaceRoot := strings.TrimSpace(repo.Dir)
 	if workspaceRoot == "" {
 		return inspection{}, errors.New("project folder is required")
 	}
@@ -279,83 +306,78 @@ func inspect(ctx context.Context, workspaceRoot string) (inspection, error) {
 	if _, err := exec.LookPath("git"); err != nil {
 		return inspection{}, errors.New("Git is not installed; Delivery remains safe and will serialize writes in this folder")
 	}
-
-	repoRoot, stderr, err := runGit(ctx, workspaceRoot, "rev-parse", "--show-toplevel")
-	if err != nil {
-		return inspection{}, fmt.Errorf("project folder is not inside a Git repository%s", stderrSuffix(stderr))
+	if !repo.Valid() {
+		return inspection{}, fmt.Errorf("project folder is not inside a Git repository: %w", gitcmd.ErrNotRepository)
 	}
-	repoRoot = filepath.Clean(strings.TrimSpace(repoRoot))
-	if repoRoot == "" {
-		return inspection{}, errors.New("Git did not report a repository root")
-	}
-	bare, _, err := runGit(ctx, workspaceRoot, "rev-parse", "--is-bare-repository")
-	if err != nil || strings.EqualFold(strings.TrimSpace(bare), "true") {
-		return inspection{}, errors.New("bare Git repositories cannot be opened as Delivery workspaces")
-	}
-	head, _, err := runGit(ctx, repoRoot, "rev-parse", "--verify", "HEAD")
+	top := repo.Top()
+	head, _, err := runGit(ctx, top, "rev-parse", "--verify", "HEAD")
 	if err != nil || strings.TrimSpace(head) == "" {
 		return inspection{}, errors.New("the Git repository needs an initial commit before a worktree can be created")
 	}
 	head = strings.TrimSpace(head)
-	prefix, _, err := runGit(ctx, workspaceRoot, "rev-parse", "--show-prefix")
+	prefix, _, err := runGit(ctx, repo, "rev-parse", "--show-prefix")
 	if err != nil {
 		return inspection{}, fmt.Errorf("resolve selected project path inside repository: %w", err)
 	}
 	prefix = strings.TrimSpace(prefix)
 	if prefix != "" {
-		objectType, _, objectErr := runGit(ctx, repoRoot, "cat-file", "-t", head+":"+strings.TrimSuffix(prefix, "/"))
+		objectType, _, objectErr := runGit(ctx, top, "cat-file", "-t", head+":"+strings.TrimSuffix(prefix, "/"))
 		if objectErr != nil || strings.TrimSpace(objectType) != "tree" {
 			return inspection{}, errors.New("the selected project folder is not present in the committed HEAD; commit it before creating a worktree")
 		}
 	}
-	commonDir, _, err := runGit(ctx, repoRoot, "rev-parse", "--git-common-dir")
-	if err != nil {
-		return inspection{}, fmt.Errorf("resolve Git common directory: %w", err)
-	}
-	commonDir = strings.TrimSpace(commonDir)
-	if !filepath.IsAbs(commonDir) {
-		commonDir = filepath.Join(repoRoot, commonDir)
-	}
-	commonDir = filepath.Clean(commonDir)
-	branch, _, _ := runGit(ctx, repoRoot, "symbolic-ref", "--quiet", "--short", "HEAD")
-	status, _, statusErr := runGit(ctx, repoRoot, "status", "--porcelain=v1", "--untracked-files=normal")
+	branch, _, _ := runGit(ctx, top, "symbolic-ref", "--quiet", "--short", "HEAD")
+	status, _, statusErr := runGit(ctx, top, "status", "--porcelain=v1", "--untracked-files=normal")
 	if statusErr != nil {
 		return inspection{}, fmt.Errorf("inspect Git working tree: %w", statusErr)
 	}
 	return inspection{
 		Availability: Availability{
 			Available:   true,
-			RepoRoot:    repoRoot,
+			RepoRoot:    top.WorkTree,
 			Branch:      strings.TrimSpace(branch),
 			SourceDirty: strings.TrimSpace(status) != "",
 		},
-		head:      head,
-		prefix:    prefix,
-		commonDir: commonDir,
+		repo:   top,
+		head:   head,
+		prefix: prefix,
 	}, nil
 }
 
-func runGit(parent context.Context, dir string, args ...string) (stdout, stderr string, err error) {
-	return runGitEnvInput(parent, dir, "", nil, args...)
+// populate checks head out into a worktree the host just added, under the
+// identity that worktree resolves to now, before anything else has run in it.
+func populate(ctx context.Context, root, head string) (gitcmd.Repo, string, error) {
+	repo, err := gitcmd.Open(ctx, root)
+	if err != nil {
+		return repo, "", err
+	}
+	_, stderr, err := runGit(ctx, repo, "reset", "--hard", head)
+	return repo, stderr, err
 }
 
-func runGitInput(parent context.Context, dir, input string, args ...string) (stdout, stderr string, err error) {
-	return runGitEnvInput(parent, dir, input, nil, args...)
+func runGit(parent context.Context, repo gitcmd.Repo, args ...string) (stdout, stderr string, err error) {
+	return runGitEnvInput(parent, repo, "", nil, args...)
 }
 
-func runGitEnv(parent context.Context, dir string, env []string, args ...string) (stdout, stderr string, err error) {
-	return runGitEnvInput(parent, dir, "", env, args...)
+func runGitInput(parent context.Context, repo gitcmd.Repo, input string, args ...string) (stdout, stderr string, err error) {
+	return runGitEnvInput(parent, repo, input, nil, args...)
 }
 
-func runGitEnvInput(parent context.Context, dir, input string, env []string, args ...string) (stdout, stderr string, err error) {
+func runGitEnv(parent context.Context, repo gitcmd.Repo, env []string, args ...string) (stdout, stderr string, err error) {
+	return runGitEnvInput(parent, repo, "", env, args...)
+}
+
+// runGitEnvInput runs git against repo's identity, pinned when the repository
+// was opened, never one rediscovered from the directory.
+func runGitEnvInput(parent context.Context, repo gitcmd.Repo, input string, env []string, args ...string) (stdout, stderr string, err error) {
 	if parent == nil {
 		parent = context.Background()
 	}
 	ctx, cancel := context.WithTimeout(parent, gitTimeout(args))
 	defer cancel()
-	cmd := gitcmd.Command(ctx, dir, args...)
+	cmd := repo.Command(ctx, args...)
 	if len(env) > 0 {
-		cmd.Env = append(os.Environ(), env...)
+		cmd.Env = append(cmd.Env, env...)
 	}
 	var outBuf, errBuf bytes.Buffer
 	if input != "" {
@@ -372,6 +394,10 @@ func runGitEnvInput(parent context.Context, dir, input string, env []string, arg
 
 func gitTimeout(args []string) time.Duration {
 	if len(args) >= 2 && args[0] == "worktree" && (args[1] == "add" || args[1] == "move" || args[1] == "remove") {
+		return gitWorktreeMutationTimeout
+	}
+	// The reset after worktree add is where the checkout happens.
+	if len(args) >= 1 && args[0] == "reset" {
 		return gitWorktreeMutationTimeout
 	}
 	return gitProbeTimeout

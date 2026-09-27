@@ -12,12 +12,14 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"reasonix/internal/gitcmd"
 )
 
 // worktreeStateToken fingerprints the real index and dirty filesystem state
 // without modifying either. Porcelain and ls-files -z keep unusual paths
 // unambiguous, while the index entries bind staged-only content and modes.
-func worktreeStateToken(ctx context.Context, root string) (string, error) {
+func worktreeStateToken(ctx context.Context, root gitcmd.Repo) (string, error) {
 	status, stderr, err := runGitEnv(ctx, root, gitNoOptionalLocks, "status", "--porcelain=v1", "-z", "--untracked-files=all")
 	if err != nil {
 		return "", fmt.Errorf("list changed paths: %w%s", err, stderrSuffix(stderr))
@@ -37,7 +39,7 @@ func worktreeStateToken(ctx context.Context, root string) (string, error) {
 	_, _ = io.WriteString(hash, index)
 	_, _ = io.WriteString(hash, "\x00filesystem\x00")
 	for _, relative := range paths {
-		if err := hashWorktreePath(ctx, hash, root, relative); err != nil {
+		if err := hashWorktreePath(ctx, hash, root.WorkTree, relative); err != nil {
 			return "", err
 		}
 	}
@@ -120,15 +122,9 @@ func hashWorktreePath(ctx context.Context, stateHash hash.Hash, root, relative s
 		}
 		_, _ = io.WriteString(stateHash, target)
 	case info.IsDir():
-		head, stderr, err := gitValue(ctx, path, "rev-parse", "--verify", "HEAD")
-		if err != nil {
-			return fmt.Errorf("inspect changed Git directory %q: %w%s", relative, err, stderrSuffix(stderr))
-		}
-		status, stderr, err := runGitEnv(ctx, path, gitNoOptionalLocks, "status", "--porcelain=v1", "-z", "--untracked-files=all")
-		if err != nil {
-			return fmt.Errorf("inspect changed Git directory status %q: %w%s", relative, err, stderrSuffix(stderr))
-		}
-		_, _ = io.WriteString(stateHash, head+"\x00"+status)
+		// A nested repository: host git never runs inside it, and staging keeps
+		// it out of the commit, so its index entry above is what the token binds.
+		_, _ = io.WriteString(stateHash, "directory")
 	default:
 		return fmt.Errorf("changed path %q has unsupported file type %s", relative, info.Mode().Type())
 	}
@@ -164,7 +160,7 @@ func digestWorktreeStateFile(ctx context.Context, path string) (string, error) {
 	}
 }
 
-func gitOperation(ctx context.Context, root string) (string, error) {
+func gitOperation(ctx context.Context, root gitcmd.Repo) (string, error) {
 	operations := []struct{ name, marker string }{
 		{"merge", "MERGE_HEAD"}, {"rebase", "rebase-merge"}, {"rebase", "rebase-apply"},
 		{"cherry-pick", "CHERRY_PICK_HEAD"}, {"revert", "REVERT_HEAD"}, {"bisect", "BISECT_LOG"},
@@ -175,7 +171,7 @@ func gitOperation(ctx context.Context, root string) (string, error) {
 			return "", fmt.Errorf("inspect Git operation %s: %w%s", operation.name, err, stderrSuffix(stderr))
 		}
 		if !filepath.IsAbs(path) {
-			path = filepath.Join(root, path)
+			path = filepath.Join(root.Dir, path)
 		}
 		if _, err := os.Stat(path); err == nil {
 			return operation.name, nil

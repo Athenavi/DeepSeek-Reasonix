@@ -1,6 +1,7 @@
 package gitcmd
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -8,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestLocalFilterDriversReadsRealLinkedWorktreeConfigs(t *testing.T) {
+func TestDriverOverridesReadRealLinkedWorktreeConfigs(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")
 	}
@@ -31,15 +32,21 @@ func TestLocalFilterDriversReadsRealLinkedWorktreeConfigs(t *testing.T) {
 	run(main, "config", "filter.common.process", "malicious-process")
 	run(main, "worktree", "add", "--quiet", "--detach", linked, "HEAD")
 	run(linked, "config", "--worktree", "filter.local.clean", "malicious-clean")
+	run(linked, "config", "--worktree", "merge.ours-too.driver", "malicious-merge")
 
-	want := []string{"common", "local"}
-	if got := localFilterDrivers(linked); !slices.Equal(got, want) {
-		t.Fatalf("localFilterDrivers(real linked worktree) = %v, want %v", got, want)
-	}
-	args := argsFor("linux", linked, nil, "diff", "HEAD")
-	for _, cfg := range []string{"filter.common.process=", "filter.local.process="} {
-		if !hasConfig(args, cfg) {
-			t.Fatalf("linked worktree diff args = %v, want -c %s", args, cfg)
+	for _, args := range [][]string{{"diff", "HEAD"}, {"-C", linked, "status"}} {
+		dir := linked
+		if args[0] == "-C" {
+			dir = ""
+		}
+		got, err := driverOverrides(context.Background(), dir, nil, args)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range []string{"filter.common.process=", "filter.local.clean=", "merge.ours-too.driver="} {
+			if !slices.Contains(got, want) {
+				t.Fatalf("driverOverrides(%v) = %v, want %s", args, got, want)
+			}
 		}
 	}
 }

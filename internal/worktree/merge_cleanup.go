@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"reasonix/internal/gitcmd"
 )
 
 type cleanupRetention struct {
@@ -41,7 +43,7 @@ func finalizeCleanupWorktree(ctx context.Context, metadata mergeMetadata, expect
 		return migrateLegacyCleanup(ctx, metadata, *journal.Legacy)
 	}
 
-	entries, err := registeredWorktreesForBranch(ctx, metadata.SourceRoot, metadata.WorktreeBranch)
+	entries, err := registeredWorktreesForBranch(ctx, metadata.SourceRepo, metadata.WorktreeBranch)
 	if err != nil {
 		return emptyCleanupRetention(), err
 	}
@@ -62,7 +64,7 @@ func finalizeCleanupWorktree(ctx context.Context, metadata mergeMetadata, expect
 		return resumeRetainedCleanup(ctx, metadata, state)
 	}
 	if !rootExists {
-		branchHead, branchExists, branchErr := cleanupBranchHead(ctx, metadata.SourceRoot, metadata.WorktreeBranch)
+		branchHead, branchExists, branchErr := cleanupBranchHead(ctx, metadata.SourceRepo, metadata.WorktreeBranch)
 		if branchErr != nil {
 			return emptyCleanupRetention(), branchErr
 		}
@@ -122,7 +124,7 @@ func beginRetainedCleanup(ctx context.Context, metadata mergeMetadata, expectedH
 func resumeRetainedCleanup(ctx context.Context, metadata mergeMetadata, state cleanupState) (cleanupRetention, error) {
 	retention := emptyCleanupRetention()
 	retention.RecoveryRoot = state.RecoveryRoot
-	branchHead, branchExists, err := cleanupBranchHead(ctx, metadata.SourceRoot, metadata.WorktreeBranch)
+	branchHead, branchExists, err := cleanupBranchHead(ctx, metadata.SourceRepo, metadata.WorktreeBranch)
 	if err != nil {
 		return retention, err
 	}
@@ -130,7 +132,7 @@ func resumeRetainedCleanup(ctx context.Context, metadata mergeMetadata, state cl
 	if !branchExists || branchHead != state.WorktreeHead {
 		return retention, errors.New("recovery_required: temporary branch identity changed; the checkout was preserved")
 	}
-	entries, err := registeredWorktreesForBranch(ctx, metadata.SourceRoot, metadata.WorktreeBranch)
+	entries, err := registeredWorktreesForBranch(ctx, metadata.SourceRepo, metadata.WorktreeBranch)
 	if err != nil {
 		return retention, err
 	}
@@ -155,11 +157,11 @@ func resumeRetainedCleanup(ctx context.Context, metadata mergeMetadata, state cl
 			return retention, verifyErr
 		}
 		noteMergeStep("before_cleanup_recovery_move")
-		if _, stderr, moveErr := runGit(ctx, metadata.SourceRoot, "worktree", "move", state.OriginalRoot, state.RecoveryRoot); moveErr != nil {
+		if _, stderr, moveErr := runGit(ctx, metadata.SourceRepo, "worktree", "move", state.OriginalRoot, state.RecoveryRoot); moveErr != nil {
 			return retention, fmt.Errorf("move worktree to retained recovery path: %w%s", moveErr, stderrSuffix(stderr))
 		}
 		noteMergeStep("after_cleanup_recovery_move")
-		entries, err = registeredWorktreesForBranch(ctx, metadata.SourceRoot, metadata.WorktreeBranch)
+		entries, err = registeredWorktreesForBranch(ctx, metadata.SourceRepo, metadata.WorktreeBranch)
 		if err != nil {
 			return retention, err
 		}
@@ -201,7 +203,7 @@ func resumeRetainedCleanup(ctx context.Context, metadata mergeMetadata, state cl
 
 func migrateLegacyCleanup(ctx context.Context, metadata mergeMetadata, legacy legacyCleanupState) (cleanupRetention, error) {
 	retention := emptyCleanupRetention()
-	branchHead, branchExists, err := cleanupBranchHead(ctx, metadata.SourceRoot, metadata.WorktreeBranch)
+	branchHead, branchExists, err := cleanupBranchHead(ctx, metadata.SourceRepo, metadata.WorktreeBranch)
 	if err != nil {
 		return retention, err
 	}
@@ -217,7 +219,7 @@ func migrateLegacyCleanup(ctx context.Context, metadata mergeMetadata, legacy le
 	if registeredExists && detachedExists {
 		return retention, errors.New("recovery_required: both legacy cleanup roots exist; both were preserved")
 	}
-	entries, err := registeredWorktreesForBranch(ctx, metadata.SourceRoot, metadata.WorktreeBranch)
+	entries, err := registeredWorktreesForBranch(ctx, metadata.SourceRepo, metadata.WorktreeBranch)
 	if err != nil {
 		return retention, err
 	}
@@ -280,11 +282,15 @@ func verifyLegacyManifest(ctx context.Context, root string, expected []cleanupMa
 	return nil
 }
 
-func verifyCleanupWorktree(ctx context.Context, metadata mergeMetadata, root, expectedHead string) ([]string, error) {
-	if err := verifyRepositoryRoot(ctx, root); err != nil {
+func verifyCleanupWorktree(ctx context.Context, metadata mergeMetadata, dir, expectedHead string) ([]string, error) {
+	root, err := metadata.worktreeAt(ctx, dir)
+	if err == nil {
+		err = verifyRepositoryRoot(ctx, root)
+	}
+	if err != nil {
 		return nil, fmt.Errorf("recovery checkout identity changed: %w", err)
 	}
-	if err := verifySameCommonDir(ctx, metadata.SourceRoot, root); err != nil {
+	if err := verifySameCommonDir(metadata.SourceRepo, root); err != nil {
 		return nil, fmt.Errorf("recovery repository identity changed: %w", err)
 	}
 	branch, stderr, err := gitValue(ctx, root, "symbolic-ref", "--quiet", "--short", "HEAD")
@@ -316,7 +322,7 @@ func verifyCleanupWorktree(ctx context.Context, metadata mergeMetadata, root, ex
 	return []string{}, nil
 }
 
-func registeredWorktreesForBranch(ctx context.Context, sourceRoot, branch string) ([]registeredWorktree, error) {
+func registeredWorktreesForBranch(ctx context.Context, sourceRoot gitcmd.Repo, branch string) ([]registeredWorktree, error) {
 	out, stderr, err := runGit(ctx, sourceRoot, "worktree", "list", "--porcelain", "-z")
 	if err != nil {
 		return nil, fmt.Errorf("inspect registered worktrees: %w%s", err, stderrSuffix(stderr))
@@ -345,7 +351,7 @@ func registeredWorktreesForBranch(ctx context.Context, sourceRoot, branch string
 	return entries, nil
 }
 
-func cleanupBranchHead(ctx context.Context, sourceRoot, branch string) (string, bool, error) {
+func cleanupBranchHead(ctx context.Context, sourceRoot gitcmd.Repo, branch string) (string, bool, error) {
 	head, stderr, err := gitValue(ctx, sourceRoot, "rev-parse", "--verify", "refs/heads/"+branch)
 	if err == nil {
 		return head, true, nil
