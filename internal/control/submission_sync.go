@@ -16,13 +16,18 @@ import (
 // composition, checkpoints, hooks, and plan approval. It is for transports that
 // need a blocking request/response boundary, such as ACP session/prompt.
 func (c *Controller) RunTurn(ctx context.Context, input string) error {
-	prepared, failures := c.prepareSubmissionImagesContext(ctx, SubmissionRequest{Input: input})
+	return c.RunTurnWithRaw(ctx, input, input)
+}
+
+// RunTurnWithRaw runs a blocking turn with the user's text separate from the composed input.
+func (c *Controller) RunTurnWithRaw(ctx context.Context, input, raw string) error {
+	prepared, failures := c.prepareSubmissionImagesContext(ctx, SubmissionRequest{Input: raw})
 	if len(failures) > 0 {
 		return ImageReferenceFailures(failures)
 	}
 	ctx = contextWithPreparedImageReferences(ctx, prepared)
 	err := c.runSynchronousTurn(ctx, nil, func(runCtx context.Context) error {
-		return c.runTurn(runCtx, input)
+		return c.runGoalLoopWithRaw(runCtx, input, raw)
 	})
 	if err != nil {
 		return err

@@ -263,6 +263,7 @@ func (s *service) bindClientIO(p *SessionParams, sessionID string) {
 type acpController interface {
 	control.Lifecycle
 	control.TurnControl
+	RunTurnWithRaw(ctx context.Context, input, raw string) error
 	RunFinalReadinessRecoveryWithAdmission(ctx context.Context, input string, onAdmitted func()) error
 	TrySteer(text string) bool
 	control.Approvals
@@ -1158,6 +1159,7 @@ func (s *service) sessionPrompt(ctx context.Context, raw json.RawMessage) (any, 
 		return nil, &RPCError{Code: ErrInvalidParams, Message: "session/prompt: unknown session " + p.SessionID}
 	}
 	text := FlattenPrompt(p.Prompt)
+	rawText := text
 	if text == "" && p.Action != control.ProtocolRecoveryAction {
 		return nil, &RPCError{Code: ErrInvalidParams, Message: "session/prompt: empty prompt"}
 	}
@@ -1217,7 +1219,7 @@ func (s *service) sessionPrompt(ctx context.Context, raw json.RawMessage) (any, 
 		runErr = sess.ctrl.RunFinalReadinessRecoveryWithAdmission(runCtx, text, beginTurn)
 	} else {
 		beginTurn()
-		runErr = sess.ctrl.RunTurn(runCtx, text)
+		runErr = sess.ctrl.RunTurnWithRaw(runCtx, text, rawText)
 	}
 	if errors.Is(runErr, agent.ErrProtocolRecoveryUnavailable) && !statusStarted {
 		return nil, &RPCError{Code: ErrInvalidRequest, Message: "session/prompt: protocol recovery is unavailable or stale"}
