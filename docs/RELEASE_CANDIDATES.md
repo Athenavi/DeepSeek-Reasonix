@@ -8,6 +8,25 @@ record, checks its provenance and bytes, and requires one `release` approval
 before creating the three tags and publishing. `recover` reuses the same sealed
 files; it must not rebuild or sign them.
 
+Rendering the notes credits people: each `refs` number that is a pull request
+gains `by @author`; an issue gains `fixed in #M by @author` for each merged pull
+request GitHub links as closing it. A closing Contributors list names those
+humans once, in first-appearance order. Issues fixed by a direct push and bot
+authors are left plain. The lookup needs a GitHub token (`GH_TOKEN`, else
+`gh auth token` locally) and `issues: read` plus `pull-requests: read`.
+Transient failures (5xx, rate limits, dropped connections) are retried with
+backoff; one that persists, or an authorisation failure, fails the render with
+a `release_credits.*` code instead of publishing notes without that credit. A
+number that names a discussion or nothing stays plain with a warning.
+
+The seal job renders the notes once into `evidence/release-notes.md` inside the
+candidate payload and records it as `notes.renderedPath`, bound to
+`notes.renderedSha256`. Promotion verifies the payload and publishes those
+bytes without calling GitHub, so an author renamed, an issue newly linked to a
+fix or an API outage after sealing cannot change or block what ships. A
+candidate sealed before this has no `renderedPath` and is rendered offline from
+its own source, as before.
+
 ## Public-site recovery / 官网独立恢复
 
 Candidate preparation and publication execute offline identity, resolver-output,

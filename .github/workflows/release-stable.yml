@@ -55,6 +55,8 @@ concurrency:
 permissions:
   actions: write
   contents: write
+  issues: read # release-notes credits read PR and issue authors
+  pull-requests: read
 
 jobs:
   preflight:
@@ -63,6 +65,8 @@ jobs:
     permissions:
       actions: read
       contents: read
+      issues: read # release-notes credits read PR and issue authors
+      pull-requests: read
     outputs:
       version: ${{ steps.release.outputs.version }}
       cli_tag: ${{ steps.release.outputs.cli_tag }}
@@ -111,6 +115,8 @@ jobs:
           bash scripts/validate-stable-candidate.sh "$RELEASE_VERSION" "$RELEASE_SHA"
           bash scripts/verify-release-push-ci.sh "$RELEASE_SHA"
       - name: Validate reviewed release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/release-notes.mjs render --version "${{ steps.release.outputs.cli_tag }}" --output /tmp/release-notes.md
       # Recovery builds deliberately check out the immutable tagged candidate,
       # which can predate its reviewed release-note entry. Carry the exact file

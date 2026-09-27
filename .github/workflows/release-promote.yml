@@ -23,6 +23,8 @@ permissions:
   actions: write
   attestations: read
   contents: write
+  issues: read # granted to the nested release workflows, which can render notes
+  pull-requests: read
 
 jobs:
   preflight:
@@ -146,12 +148,19 @@ jobs:
             echo "- Payload files: \`$(jq '.files | length' record/record.json)\`"
             echo "- Native acceptance: \`$(jq -r '[.acceptance[] | select(.status == "passed") | .kind] | join(", ")' record/record.json)\`"
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Render and bind reviewed release notes
+      # A candidate sealed with its notes publishes those bytes without touching
+      # the network. One sealed before that renders offline from its own source.
+      - name: Bind reviewed release notes
         run: |
-          worktree="$(mktemp -d "$RUNNER_TEMP/reasonix-notes.XXXXXX")"
-          git worktree add --detach "$worktree" "${{ steps.record.outputs.source_sha }}"
-          node "$worktree/scripts/release-notes.mjs" render --version "v${{ steps.record.outputs.version }}" --output release-notes.md
-          git worktree remove "$worktree"
+          sealed="$(jq -r '.notes.renderedPath // empty' record/record.json)"
+          if [ -n "$sealed" ]; then
+            cp "payload/$sealed" release-notes.md
+          else
+            worktree="$(mktemp -d "$RUNNER_TEMP/reasonix-notes.XXXXXX")"
+            git worktree add --detach "$worktree" "${{ steps.record.outputs.source_sha }}"
+            node "$worktree/scripts/release-notes.mjs" render --version "v${{ steps.record.outputs.version }}" --output release-notes.md
+            git worktree remove "$worktree"
+          fi
           test "$(sha256sum release-notes.md | awk '{print $1}')" = "$(jq -r .notes.renderedSha256 record/record.json)"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

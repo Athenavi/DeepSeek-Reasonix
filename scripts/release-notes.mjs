@@ -3,6 +3,15 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  contributorLogins,
+  creditSuffix,
+  githubRefLookup,
+  reportWarnings,
+  resolveCredits,
+  tokenFromEnvironment,
+  unresolvedError,
+} from "./release-credits.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const defaultCatalogPath = resolve(repoRoot, "release-notes/releases.json");
@@ -237,9 +246,11 @@ function localized(value, lang) {
   return value[lang] || value.en;
 }
 
-function refsSuffix(refs = []) {
+function refsSuffix(refs = [], credits) {
   if (!refs.length) return "";
-  return ` (${refs.map((ref) => `[#${ref}](https://github.com/esengine/DeepSeek-Reasonix/pull/${ref})`).join(", ")})`;
+  return ` (${refs
+    .map((ref) => `[#${ref}](https://github.com/esengine/DeepSeek-Reasonix/pull/${ref})${creditSuffix(credits.get(ref))}`)
+    .join(", ")})`;
 }
 
 function targetLabel(target) {
@@ -251,9 +262,12 @@ function targetsPrefix(item) {
   return `**[${item.targets.map(targetLabel).join(" · ")}]** `;
 }
 
-function renderItems(items, lang) {
+function renderItems(items, lang, credits) {
   return items
-    .map((item) => `- ${targetsPrefix(item)}**${localized(item.title, lang)}** — ${localized(item.body, lang)}${refsSuffix(item.refs)}`)
+    .map(
+      (item) =>
+        `- ${targetsPrefix(item)}**${localized(item.title, lang)}** — ${localized(item.body, lang)}${refsSuffix(item.refs, credits)}`,
+    )
     .join("\n");
 }
 
@@ -265,7 +279,7 @@ function targetItemCount(release, target) {
   return releaseItems(release).filter((item) => hasTarget(item, target)).length;
 }
 
-function appendTargetSection(lines, release, target, lang) {
+function appendTargetSection(lines, release, target, lang, credits) {
   const isZh = lang === "zh";
   const title = target === "desktop"
     ? (isZh ? "桌面端更新" : "Desktop updates")
@@ -274,7 +288,7 @@ function appendTargetSection(lines, release, target, lang) {
 
   const highlights = release.highlights.filter((item) => hasTarget(item, target));
   if (highlights.length) {
-    lines.push(`### ${isZh ? "重点内容" : "Highlights"}`, "", renderItems(highlights, lang), "");
+    lines.push(`### ${isZh ? "重点内容" : "Highlights"}`, "", renderItems(highlights, lang, credits), "");
   }
   const headings = {
     new: isZh ? "新增" : "New",
@@ -283,7 +297,7 @@ function appendTargetSection(lines, release, target, lang) {
   };
   for (const kind of changeKinds) {
     const items = release.changes[kind].filter((item) => hasTarget(item, target));
-    if (items.length) lines.push(`### ${headings[kind]}`, "", renderItems(items, lang), "");
+    if (items.length) lines.push(`### ${headings[kind]}`, "", renderItems(items, lang, credits), "");
   }
 
   if (!highlights.length && !changeKinds.some((kind) => release.changes[kind].some((item) => hasTarget(item, target)))) {
@@ -297,7 +311,7 @@ function appendTargetSection(lines, release, target, lang) {
   }
 }
 
-function appendOtherTargetSection(lines, release, lang) {
+function appendOtherTargetSection(lines, release, lang, credits) {
   const isZh = lang === "zh";
   const isOtherOnly = (item) => item.targets?.length && !hasTarget(item, "desktop") && !hasTarget(item, "cli");
   const highlights = release.highlights.filter(isOtherOnly);
@@ -305,13 +319,18 @@ function appendOtherTargetSection(lines, release, lang) {
   if (!highlights.length && !changeKinds.some((kind) => changes[kind].length)) return;
 
   lines.push(`## ${isZh ? "其他项目更新" : "Other project updates"}`, "");
-  if (highlights.length) lines.push(renderItems(highlights, lang), "");
+  if (highlights.length) lines.push(renderItems(highlights, lang, credits), "");
   for (const kind of changeKinds) {
-    if (changes[kind].length) lines.push(renderItems(changes[kind], lang), "");
+    if (changes[kind].length) lines.push(renderItems(changes[kind], lang, credits), "");
   }
 }
 
-export function renderGitHubRelease(release, lang = "zh") {
+export function releaseRefs(release) {
+  return releaseItems(release).flatMap((item) => item.refs || []);
+}
+
+// credits maps a ref to its lookup result; a ref absent from it renders plain.
+export function renderGitHubRelease(release, lang = "zh", credits = new Map()) {
   const isZh = lang === "zh";
   const isPreview = release.channel === "prerelease";
   const channelLabel = isPreview ? (isZh ? "预览版" : "Preview") : (isZh ? "稳定版" : "Stable");
@@ -350,11 +369,11 @@ export function renderGitHubRelease(release, lang = "zh") {
       `**Desktop ${targetItemCount(release, "desktop")} · CLI ${targetItemCount(release, "cli")}**`,
       "",
     );
-    appendTargetSection(lines, release, "desktop", lang);
-    appendTargetSection(lines, release, "cli", lang);
-    appendOtherTargetSection(lines, release, lang);
+    appendTargetSection(lines, release, "desktop", lang, credits);
+    appendTargetSection(lines, release, "cli", lang, credits);
+    appendOtherTargetSection(lines, release, lang, credits);
   } else {
-    lines.push(`## ${isZh ? "重点内容" : "Highlights"}`, "", renderItems(release.highlights, lang), "");
+    lines.push(`## ${isZh ? "重点内容" : "Highlights"}`, "", renderItems(release.highlights, lang, credits), "");
     const headings = {
       new: isZh ? "新功能" : "New",
       improved: isZh ? "改进" : "Improved",
@@ -363,30 +382,19 @@ export function renderGitHubRelease(release, lang = "zh") {
     for (const kind of changeKinds) {
       const items = release.changes[kind];
       if (!items.length) continue;
-      lines.push(`## ${headings[kind]}`, "", renderItems(items, lang), "");
+      lines.push(`## ${headings[kind]}`, "", renderItems(items, lang, credits), "");
     }
   }
 
   lines.push(`## ${isZh ? "升级提醒" : "Upgrade notes"}`, "");
-  if (release.upgrade.length) lines.push(renderItems(release.upgrade, lang));
+  if (release.upgrade.length) lines.push(renderItems(release.upgrade, lang, credits));
   else lines.push(isZh ? "本版本无需手动迁移。" : "No manual migration is required.");
   lines.push("");
 
   lines.push(`## ${isZh ? "风险提示" : "Risk notes"}`, "");
-  if (release.risks.length) lines.push(renderItems(release.risks, lang));
+  if (release.risks.length) lines.push(renderItems(release.risks, lang, credits));
   else lines.push(isZh ? "当前没有需要额外操作的已知风险。" : "There are no known risks requiring extra action.");
   lines.push("");
-
-  if (release.contributors.length) {
-    lines.push(
-      `## ${isZh ? "致谢" : "Thanks"}`,
-      "",
-      `${isZh ? "感谢本版本的贡献者" : "Thanks to the contributors in this release"}：${release.contributors
-        .map((name) => `[@${name}](https://github.com/${name})`)
-        .join("、")}`,
-      "",
-    );
-  }
 
   lines.push(
     `## ${isZh ? "下载与安装" : "Download and install"}`,
@@ -395,6 +403,18 @@ export function renderGitHubRelease(release, lang = "zh") {
     `- [${isZh ? "查看完整差异" : "Full comparison"}](${release.links.compare})`,
     "",
   );
+
+  const contributors = contributorLogins(releaseRefs(release), credits);
+  if (contributors.length) {
+    lines.push(
+      `## ${isZh ? "贡献者" : "Contributors"}`,
+      "",
+      `${isZh ? "感谢本版本的贡献者：" : "Thanks to the contributors in this release: "}${contributors
+        .map((login) => `@${login}`)
+        .join(isZh ? "、" : ", ")}`,
+      "",
+    );
+  }
   return `${lines.join("\n").trim()}\n`;
 }
 
@@ -434,14 +454,18 @@ async function main() {
   invariant(args.version, "render requires --version");
   invariant(args.output, "render requires --output");
   const release = releaseForVersion(catalog, args.version);
+  const lookup = githubRefLookup({ token: tokenFromEnvironment() });
+  const { credits, failures, warnings } = await resolveCredits(releaseRefs(release), lookup);
+  reportWarnings(warnings);
   const output = resolve(args.output);
-  await writeFile(output, renderGitHubRelease(release, args.lang === "en" ? "en" : "zh"));
+  await writeFile(output, renderGitHubRelease(release, args.lang === "en" ? "en" : "zh", credits));
+  if (failures.length) throw unresolvedError(failures);
   console.log(`Rendered v${release.version} release notes to ${output}`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((error) => {
-    console.error(error.message);
+    console.error(error.code ? `${error.code}: ${error.message}` : error.message);
     process.exitCode = 1;
   });
 }
