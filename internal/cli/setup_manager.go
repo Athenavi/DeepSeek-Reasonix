@@ -25,6 +25,7 @@ type providerSetupSession struct {
 	// Credentials are owned by selected connections, never by their previous
 	// shared environment variable. The legacy map above is summary-only.
 	pendingConnectionCredentials map[string]string
+	typedKeyEnv                  map[string]string // provider -> api_key_env the user typed; its pending key is saved there
 	removed                      map[string]bool
 	accessDeclared               bool
 	projectScoped                bool
@@ -97,6 +98,7 @@ func newProviderSetupSession(cfg *config.Config) *providerSetupSession {
 		originalDefault:              cfg.DefaultModel,
 		pendingCredentials:           map[string]string{},
 		pendingConnectionCredentials: map[string]string{},
+		typedKeyEnv:                  map[string]string{},
 		removed:                      map[string]bool{},
 	}
 	for _, p := range cfg.Providers {
@@ -231,6 +233,7 @@ func (s *providerSetupSession) remove(name string) error {
 		return err
 	}
 	s.recordProviderMutation(name, before, nil)
+	delete(s.typedKeyEnv, name)
 	s.removeProviderAccess(name)
 	if _, existed := s.originalProviders[name]; existed {
 		s.removed[name] = true
@@ -578,31 +581,7 @@ func addProviderToSession(s *providerSetupSession, anthropic bool) bool {
 		}
 		return false
 	}
-	for _, entry := range result.entries {
-		if !confirmSharedCredential(s.cfg, entry, "") {
-			return false
-		}
-	}
-	if err := s.add(result.entries); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return false
-	}
-	s.addProviderAccess(result.entries)
-	for key, value := range result.credentials {
-		var names []string
-		for _, entry := range result.entries {
-			if entry.APIKeyEnv == key {
-				names = append(names, entry.Name)
-			}
-		}
-		if err := s.setCredentialForProviders(names, key, value); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return false
-		}
-	}
-	// After the new keys are staged, so usability sees them.
-	s.promoteDefaultToNewProviders(result.entries)
-	return true
+	return s.addPrompted(bufio.NewScanner(os.Stdin), os.Stdout, result)
 }
 
 func manageProvider(s *providerSetupSession, providerIndex int) {
@@ -698,9 +677,12 @@ func confirmSharedCredential(cfg *config.Config, candidate config.ProviderEntry,
 
 func updateProviderKey(s *providerSetupSession, p config.ProviderEntry) {
 	in := bufio.NewScanner(os.Stdin)
-	keyEnvChanged := false
+	keyEnvChanged, typed := false, false
 	if p.APIKeyEnv == "" {
-		p.APIKeyEnv = promptAPIKeyEnvName(in, os.Stdout, i18n.M.CustomPromptKeyEnv, apiKeyEnvFromProviderName(p.Name))
+		draft := apiKeyEnvFromProviderName(p.Name)
+		if p.APIKeyEnv, typed = promptAPIKeyEnvName(in, os.Stdout, i18n.M.CustomPromptKeyEnv, draft); typed {
+			p.APIKeyEnv, typed = s.settleTypedKeyEnv(in, os.Stdout, i18n.M.CustomPromptKeyEnv, []string{p.Name}, p.APIKeyEnv, draft)
+		}
 		keyEnvChanged = true
 	}
 	if !confirmSharedCredential(s.cfg, p, p.Name) {
@@ -718,6 +700,10 @@ func updateProviderKey(s *providerSetupSession, p config.ProviderEntry) {
 	}
 	if err := s.setCredentialForProviders([]string{p.Name}, p.APIKeyEnv, value); err != nil {
 		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+	if typed {
+		s.typedKeyEnv[p.Name] = p.APIKeyEnv
 	}
 }
 
@@ -928,20 +914,23 @@ func commitProviderSetupSession(s *providerSetupSession, configPath string) (boo
 		return false, err
 	}
 	for name, value := range s.pendingConnectionCredentials {
-		slot, err := fresh.StageModelCredentialLocked(value)
+		entry, ok := fresh.Provider(name)
+		if !ok {
+			return false, &providerSetupConflictError{field: fmt.Sprintf("provider %q", name)}
+		}
+		var slot string
+		if typed := s.typedKeyEnv[name]; typed != "" && typed == entry.APIKeyEnv {
+			slot, err = fresh.StageNamedModelCredentialLocked(typed, name, value)
+		} else {
+			slot, err = fresh.StageModelCredentialLocked(value)
+		}
 		if err != nil {
 			return false, err
 		}
-		{
-			entry, ok := fresh.Provider(name)
-			if !ok {
-				return false, &providerSetupConflictError{field: fmt.Sprintf("provider %q", name)}
-			}
-			updated := *entry
-			updated.APIKeyEnv = slot
-			if err := fresh.UpsertProvider(updated); err != nil {
-				return false, err
-			}
+		updated := *entry
+		updated.APIKeyEnv = slot
+		if err := fresh.UpsertProvider(updated); err != nil {
+			return false, err
 		}
 	}
 	current, err := readProviderSetupFileSnapshot(configPath)
@@ -983,6 +972,8 @@ func saveProviderSetupSession(s *providerSetupSession, configPath, envPath strin
 		var conflict *providerSetupConflictError
 		if errors.As(err, &conflict) {
 			fmt.Fprintf(os.Stderr, i18n.M.SetupConcurrentChangeFmt+"\n", conflict.field)
+		} else if errors.Is(err, config.ErrCredentialKeyInUse) {
+			fmt.Fprintln(os.Stderr, i18n.M.WriteConfigErr, keyEnvInUseText(err))
 		} else {
 			fmt.Fprintln(os.Stderr, i18n.M.WriteConfigErr, err)
 		}

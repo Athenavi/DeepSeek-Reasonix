@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -10,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -28,9 +28,11 @@ type modelCredentialCommitJournal struct {
 	AfterRevision  string   `json:"afterRevision,omitempty"`
 	ResultRevision string   `json:"resultRevision,omitempty"`
 	Slots          []string `json:"slots"`
-	Phase          string   `json:"phase"`
-	UpdatedAt      string   `json:"updatedAt"`
-	journalPath    string
+	// SlotDigests: slot -> keyed digest of the staged value; removal needs the store to still hold it.
+	SlotDigests map[string]string `json:"slotDigests,omitempty"`
+	Phase       string            `json:"phase"`
+	UpdatedAt   string            `json:"updatedAt"`
+	journalPath string
 }
 
 // ModelSettingsReceipt is durable evidence that a request crossed the config
@@ -229,16 +231,28 @@ func (c *Config) StageModelCredentialLocked(value string) (string, error) {
 	if _, err := rand.Read(id[:]); err != nil {
 		return "", err
 	}
-	key := fmt.Sprintf("REASONIX_CONNECTION_%X_KEY", id)
+	return c.stageModelCredentialLocked(fmt.Sprintf("REASONIX_CONNECTION_%X_KEY", id), value)
+}
+
+func (c *Config) stageModelCredentialLocked(key, value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if strings.ContainsAny(value, "\r\n") {
 		return "", fmt.Errorf("credential value contains a newline")
 	}
-	if c.modelCredentialCommit != nil {
-		c.modelCredentialCommit.Slots = append(c.modelCredentialCommit.Slots, key)
-		c.modelCredentialCommit.Phase = "prepared"
-		if err := writeModelCredentialJournal(c.modelCredentialCommit); err != nil {
-			c.modelCredentialCommit.Slots = c.modelCredentialCommit.Slots[:len(c.modelCredentialCommit.Slots)-1]
+	if j := c.modelCredentialCommit; j != nil {
+		digest, err := stagedCredentialDigest(value)
+		if err != nil {
+			return "", err
+		}
+		if j.SlotDigests == nil {
+			j.SlotDigests = map[string]string{}
+		}
+		j.Slots = append(j.Slots, key)
+		j.SlotDigests[key] = digest
+		j.Phase = "prepared"
+		if err := writeModelCredentialJournal(j); err != nil {
+			j.Slots = j.Slots[:len(j.Slots)-1]
+			delete(j.SlotDigests, key)
 			return "", err
 		}
 	}
@@ -312,15 +326,16 @@ func (c *Config) CleanupStagedModelCredentialsLocked(path string) {
 		}
 		return
 	}
-	raw, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
-		return
-	}
 	referenced := false
 	for _, key := range c.stagedModelCredentials {
-		// Check the entire document to retain references in unknown fields too.
-		if bytes.Contains(raw, []byte(key)) {
+		digest := ""
+		if c.modelCredentialCommit != nil {
+			digest = c.modelCredentialCommit.SlotDigests[key]
+		}
+		if configReferencesCredential(path, key) {
 			referenced = true
+		} else if !stagedValueUnchanged(key, digest) {
+			continue // Another writer owns the slot now.
 		} else {
 			if err := removeCredentialFromFile(UserCredentialsPath(), key); err == nil {
 				_ = os.Unsetenv(key)
@@ -474,17 +489,10 @@ func RecoverModelCredentialCommitsLocked(configPath string) error {
 		if json.Unmarshal(raw, &j) != nil || j.Schema != modelCredentialCommitSchema || filepath.Clean(j.ConfigPath) != configPath {
 			continue
 		}
-		configRaw, configErr := os.ReadFile(configPath)
-		if configErr != nil && !os.IsNotExist(configErr) {
+		if _, statErr := os.Stat(configPath); statErr != nil && !os.IsNotExist(statErr) {
 			continue
 		}
-		anyReferenced := false
-		for _, slot := range j.Slots {
-			if bytes.Contains(configRaw, []byte(slot)) {
-				anyReferenced = true
-				break
-			}
-		}
+		anyReferenced := slices.ContainsFunc(j.Slots, func(slot string) bool { return configReferencesCredential(configPath, slot) })
 		committed := false
 		if anyReferenced || j.AfterRevision != "" {
 			var committedErr error
@@ -516,15 +524,27 @@ func RecoverModelCredentialCommitsLocked(configPath string) error {
 		if fileContentRevision(configPath) != j.BeforeRevision {
 			continue
 		}
-		for _, slot := range j.Slots {
-			if err := removeCredentialFromFile(UserCredentialsPath(), slot); err != nil {
-				return err
-			}
-			_ = os.Unsetenv(slot)
+		if err := removeUnpublishedSlots(&j); err != nil {
+			return err
 		}
 		if err := os.Remove(journalPath); err != nil && !os.IsNotExist(err) {
 			return err
 		}
+	}
+	return nil
+}
+
+// removeUnpublishedSlots skips a slot whose value is no longer the staged one:
+// another writer owns it now.
+func removeUnpublishedSlots(j *modelCredentialCommitJournal) error {
+	for _, slot := range j.Slots {
+		if !stagedValueUnchanged(slot, j.SlotDigests[slot]) {
+			continue
+		}
+		if err := removeCredentialFromFile(UserCredentialsPath(), slot); err != nil {
+			return err
+		}
+		_ = os.Unsetenv(slot)
 	}
 	return nil
 }

@@ -159,11 +159,25 @@ entirely of non-ASCII characters get a stable hash suffix such as
 generated environment variable remains valid; for example, `9router` becomes
 `CUSTOM_9ROUTER_API_KEY`.
 
-The CLI custom-provider wizard uses this rule while building its draft. For example
+The CLI custom-provider wizard uses this rule for its draft name. For example
 `https://token.sensenova.cn/v1` creates provider name
-`custom-token-sensenova-cn`, whose default key env is
-`CUSTOM_TOKEN_SENSENOVA_CN_API_KEY`; commit then switches the saved connection
-to its newly allocated private slot.
+`custom-token-sensenova-cn`, whose draft key env is
+`CUSTOM_TOKEN_SENSENOVA_CN_API_KEY`. Pressing Enter at the variable-name
+prompt keeps that draft only until the key is saved; the saved connection then
+uses a newly allocated private slot.
+
+A variable name you type at that prompt in `reasonix setup` is kept, so scripts
+can refer to a stable name, as long as saving under it changes nothing another
+connection reads: no other provider, bot or remote-host setting in the config
+reads it, the global `.env` holds no value (or cleared marker) for it, and the
+environment Reasonix runs in does not already set it. Otherwise the wizard says
+what holds the name and asks again; Enter falls back to a
+private slot. If the name is claimed between the prompt and saving, the save is
+refused and nothing is written.
+
+Saving a new key later for a provider that uses a typed name moves that
+provider to a private slot; the old value stays under the typed name. Rotating
+in place is tracked in #11010.
 
 Existing configs are not rewritten on upgrade. If an old custom provider already
 uses `CUSTOM_API_KEY`, it will keep working with that key. If several old custom
