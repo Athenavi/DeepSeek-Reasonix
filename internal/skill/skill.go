@@ -337,9 +337,6 @@ func (s *Store) Prepare(sk Skill) Skill {
 	return sk
 }
 
-// Render prepares and renders a skill for a direct slash invocation.
-func (s *Store) Render(sk Skill, args string) string { return Render(s.Prepare(sk), args) }
-
 func bindAllowedTools(refs []string, bindings []tool.MCPBinding) []string {
 	if len(refs) == 0 {
 		return refs
