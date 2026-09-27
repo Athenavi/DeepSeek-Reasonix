@@ -276,6 +276,8 @@ func TestCanonicalPermissionPresetRestoresAfterServiceRestart(t *testing.T) {
 }
 
 func TestUnmanagedCanonicalSessionKeepsReadOnlyAcrossTransitions(t *testing.T) {
+	restoreSandbox := SetPresetSandboxForTest(true)
+	t.Cleanup(restoreSandbox)
 	service, err := session.NewService("desktop", session.NewFilesystemPersistence(filepath.Join(t.TempDir(), "sessions")))
 	if err != nil {
 		t.Fatal(err)
