@@ -63,7 +63,7 @@ func TestCanonicalRuntimeModelRefUsesCatalogOwnedValue(t *testing.T) {
 // switchModel / switch_recovery tests.
 func TestModelAndEffortRoutesValidateInput(t *testing.T) {
 	s := &Server{ctrl: &control.Controller{}, auth: newAuthGate(config.ServeConfig{AuthMode: "none"})}
-	srv := httptest.NewServer(s.handler())
+	srv := httptest.NewServer(operatorHandler(s))
 	defer srv.Close()
 
 	for _, tc := range []struct{ path, body string }{

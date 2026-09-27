@@ -19,7 +19,7 @@ func recoveryHTTPFixture(t *testing.T) (*httptest.Server, control.ToolRecoverySn
 	a := agent.New(nil, tool.NewRegistry(), agent.NewSession("sys"), agent.Options{}, bc)
 	c := control.New(control.Options{Executor: a, Sink: bc})
 	t.Cleanup(c.Close)
-	s := httptest.NewServer(New(c, bc, config.ServeConfig{}).Handler())
+	s := httptest.NewServer(operatorHandler(New(c, bc, config.ServeConfig{})))
 	t.Cleanup(s.Close)
 	return s, c.ToolRecoverySnapshot()
 }

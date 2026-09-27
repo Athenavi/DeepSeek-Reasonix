@@ -246,8 +246,30 @@ the terminal; stop it with Ctrl-C.
 An explicit `reasonix web --auth none` disables the default token and should be
 used only when the listener is intentionally trusted. `reasonix serve` keeps its
 backward-compatible, config-driven `auth_mode = "none"` default on
-`127.0.0.1:8787`. If you bind Serve outside loopback, expose it through a tunnel,
-or put it behind a reverse proxy, enable authentication before sharing the URL:
+`127.0.0.1:8787`.
+
+Without authentication (`auth_mode = "none"`, the `serve` default) reads stay
+open on the listener, but every state-changing request, approvals included,
+needs the launch token:
+
+- Serve writes the token to a 0600 file under `<Reasonix home>/remote/` and
+  prints only its path next to an `approvals:` link; append
+  `#token=<file contents>` to open it in a browser. A managed launch with
+  `--token-file` names that file instead. Token mode prints its `share:` link
+  the same way.
+- Send it as `Authorization: Bearer <token>`, or open the link once so the page
+  sets its cookie. Without it the request answers 403 `launch_token_required`.
+- Prefer `--token-file` over `--token`: argv is visible to other processes,
+  sandboxed ones included. A plaintext `[serve].token` in the global
+  config is readable from inside the sandbox; keep the secret in a file.
+- On macOS and Linux the OS sandbox denies the remote state directory and any
+  `--token-file`. Windows has no bash sandbox, so there nothing keeps an agent
+  command from reading the file.
+- `[serve]` is read from the user config only; a project `reasonix.toml`
+  cannot set it.
+
+If you bind Serve outside loopback, expose it through a tunnel, or put it behind
+a reverse proxy, enable authentication before sharing the URL:
 
 ```bash
 reasonix serve --auth token

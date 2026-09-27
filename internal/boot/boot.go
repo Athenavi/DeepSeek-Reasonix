@@ -2398,6 +2398,7 @@ func runtimeForbidReadRootsForGOOS(cfg *config.Config, root, goos string) []stri
 	if goos == "windows" {
 		return append([]string(nil), base...)
 	}
+	base = appendUniquePaths(base, config.HostSecretReadRoots()...)
 	credentialPath := strings.TrimSpace(config.UserCredentialsPath())
 	if credentialPath == "" {
 		return append([]string(nil), base...)

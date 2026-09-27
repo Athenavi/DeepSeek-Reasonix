@@ -23,7 +23,7 @@ func TestServeComposerProfileAndCheckedAnswer(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := control.New(control.Options{Sink: bc})
 	api := &checkedAnswerAPI{SessionAPI: ctrl}
-	srv := httptest.NewServer(New(api, bc, config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(New(api, bc, config.ServeConfig{})))
 	defer srv.Close()
 	post := func(path, body string) int {
 		resp, err := http.Post(srv.URL+path, "application/json", strings.NewReader(body))

@@ -148,7 +148,7 @@ func loadForRoot(root string, opts loadForRootOptions) (*Config, error) {
 	userDefaultModel := cfg.DefaultModel
 	globalCLI := cfg.CLI
 	globalSecrets := cfg.Secrets
-	globalRemote := cfg.Remote.Clone()
+	globalRemote, globalServe := cfg.Remote.Clone(), cfg.Serve
 	globalDesktopLanguage := cfg.Desktop.Language
 	globalPricingCurrency := cfg.Desktop.Currency
 	globalBillingDisplayCurrency := cfg.Billing.DisplayCurrency
@@ -176,10 +176,10 @@ func loadForRoot(root string, opts loadForRootOptions) (*Config, error) {
 	// reasonix.toml must not be able to flip on the workflow-breaking env/path
 	// protections.
 	cfg.Secrets = globalSecrets
-	// Remote SSH hosts are equally user-global: a cloned repo's reasonix.toml
-	// must not be able to inject hosts, jump chains, or port forwards that
-	// steer where Reasonix opens connections.
-	cfg.Remote = globalRemote
+	// Remote SSH hosts and serve authentication are equally user-global: a repo
+	// must not inject hosts, jump chains, or port forwards, nor choose serve's
+	// launch token, auth mode, or trust in forwarded headers.
+	cfg.Remote, cfg.Serve = globalRemote, globalServe
 	// Desktop language and pricing currency are user-level regional preferences.
 	// A repository must not be able to alter how the user's spend is shown.
 	cfg.Desktop.Language = globalDesktopLanguage

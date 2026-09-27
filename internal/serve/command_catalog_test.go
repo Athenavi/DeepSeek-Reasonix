@@ -19,7 +19,7 @@ func TestServeCommandsUsesActiveControllerCatalog(t *testing.T) {
 		Commands: []command.Command{{Name: "remote-review", Description: "Review remotely", ArgHint: "<scope>"}},
 		Skills:   []skill.Skill{{Name: "remote-skill", Description: "Remote skill", RunAs: skill.RunSubagent}},
 	})
-	srv := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer srv.Close()
 	resp, err := http.Get(srv.URL + "/commands")
 	if err != nil {

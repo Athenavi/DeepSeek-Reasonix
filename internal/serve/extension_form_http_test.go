@@ -40,7 +40,7 @@ func (c *extensionFormController) SubmitExtensionForm(_ context.Context, pluginI
 func TestServeExactExtensionFormChecksSessionBeforeController(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := &extensionFormController{SessionAPI: control.New(control.Options{Sink: bc}), sessionID: "session-a"}
-	srv := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer srv.Close()
 	post := func(sessionID string) int {
 		resp, err := http.Post(srv.URL+"/extension-form", "application/json", strings.NewReader(
@@ -63,7 +63,7 @@ func TestServeExactExtensionFormChecksSessionBeforeController(t *testing.T) {
 func TestServeExtensionFormSubmissionRoutesToController(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := &extensionFormController{SessionAPI: control.New(control.Options{Sink: bc})}
-	srv := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer srv.Close()
 	resp, err := http.Post(srv.URL+"/extension-form", "application/json", strings.NewReader(
 		`{"pluginId":"remote-plugin","surfaceId":"setup","values":{"region":"us-west"}}`,

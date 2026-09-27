@@ -4084,7 +4084,7 @@ func TestRuntimeForbidReadRootsAddsGlobalCredentialFileExceptOnWindows(t *testin
 	cfg := config.Default()
 	cfg.Sandbox.ForbidRead = []string{configured}
 	withoutCredentials := RuntimeForbidReadRoots(cfg, ".")
-	if !reflect.DeepEqual(withoutCredentials, []string{configured}) {
+	if want := appendUniquePaths([]string{configured}, config.HostSecretReadRoots()...); runtime.GOOS != "windows" && !reflect.DeepEqual(withoutCredentials, want) {
 		t.Fatalf("roots without global credentials = %v", withoutCredentials)
 	}
 	credentialPath := config.UserCredentialsPath()

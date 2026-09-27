@@ -220,8 +220,17 @@ reasonix web
 
 显式传入 `reasonix web --auth none` 可以关闭默认 Token，只应在监听地址确定可信时使用。
 `reasonix serve` 则保持向后兼容：默认监听 `127.0.0.1:8787`，认证模式仍由配置决定，空配置为
-`auth_mode = "none"`。如果要绑定到非 loopback 地址、通过 tunnel 暴露，或放到反向代理后面，
-请先开启认证再分享 URL：
+`auth_mode = "none"`。
+
+未开启认证时读取接口保持开放，但所有会改变状态的请求（包括审批）都需要本次启动的令牌：
+
+- serve 把令牌写进 `<Reasonix home>/remote/` 下权限 0600 的文件，终端只打印文件路径和 `approvals:` 链接；在链接后拼上 `#token=<文件内容>` 用浏览器打开。带 `--token-file` 的托管启动则打印该文件路径。token 模式的 `share:` 链接同样处理。
+- 以 `Authorization: Bearer <token>` 发送，或打开一次链接让页面写入 Cookie；否则返回 403 `launch_token_required`。
+- 优先用 `--token-file` 而不是 `--token`：命令行参数对其他进程可见，沙盒内的进程也能看到。全局配置里明文的 `[serve].token` 在沙盒内可读，密钥请放文件。
+- macOS 和 Linux 的系统沙盒会拒绝读取该状态目录和 `--token-file`；Windows 没有 bash 沙盒，agent 命令可以读到该文件。
+- `[serve]` 只从用户配置读取，项目里的 `reasonix.toml` 不能设置它。
+
+如果要绑定到非 loopback 地址、通过 tunnel 暴露，或放到反向代理后面，请先开启认证再分享 URL：
 
 ```bash
 reasonix serve --auth token

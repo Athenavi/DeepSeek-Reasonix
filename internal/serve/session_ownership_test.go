@@ -95,7 +95,7 @@ func newOwnershipFixture(t *testing.T) *ownershipFixture {
 		ctrl.Close()
 	})
 	fixture := &ownershipFixture{server: server, leases: leases, active: active, dir: dir}
-	fixture.srv = httptest.NewServer(server.Handler())
+	fixture.srv = httptest.NewServer(operatorHandler(server))
 	t.Cleanup(fixture.srv.Close)
 	return fixture
 }
@@ -252,7 +252,7 @@ func TestHandoffSnapshotFailureKeepsServeLeaseAndMirrorUnpublished(t *testing.T)
 		t.Fatal(err)
 	}
 	server.SetSessionLeases(leases)
-	srv := httptest.NewServer(server.Handler())
+	srv := httptest.NewServer(operatorHandler(server))
 	defer srv.Close()
 	payload, _ := json.Marshal(map[string]any{
 		"sessionPath": active, "targetWriterId": "target", "force": true, "mode": "wait",
@@ -541,7 +541,7 @@ func TestHandoffWaitsOnRunningForeground(t *testing.T) {
 		t.Fatal(err)
 	}
 	server.SetSessionLeases(leases)
-	srv := httptest.NewServer(server.Handler())
+	srv := httptest.NewServer(operatorHandler(server))
 	defer srv.Close()
 
 	payload, _ := json.Marshal(map[string]any{"sessionPath": active, "targetWriterId": agent.SessionWriterID(), "force": true, "mode": "wait", "timeoutMs": 400})

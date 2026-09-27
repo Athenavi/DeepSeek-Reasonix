@@ -73,7 +73,7 @@ func TestRemoteInboxTargetLostReceiptOnlyQueriesOriginalRequest(t *testing.T) {
 	if err := ctrl.SetInboxPaused(true); err != nil {
 		t.Fatal(err)
 	}
-	server := httptest.NewServer(serve.New(ctrl, nil, config.ServeConfig{}).Handler())
+	server := httptest.NewServer(operatorServeHandler(serve.New(ctrl, nil, config.ServeConfig{})))
 	defer server.Close()
 	posts, lookups := 0, 0
 	client := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {

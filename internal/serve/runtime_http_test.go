@@ -41,7 +41,7 @@ func TestGoalPauseAndResumeRoutes(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := control.New(control.Options{Sink: bc})
 	ctrl.SetGoal("ship the remote surface")
-	srv := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer srv.Close()
 
 	resp := postRuntimeJSON(t, srv.URL+"/goal/pause", `{}`)
@@ -61,7 +61,7 @@ func TestGoalRouteReportsPersistenceFailureBeforeChangingPlanMode(t *testing.T) 
 	base := control.New(control.Options{Sink: bc})
 	base.SetPlanMode(true)
 	api := &rejectingGoalAPI{SessionAPI: base, err: errors.New("disk full")}
-	srv := httptest.NewServer(New(api, bc, config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(New(api, bc, config.ServeConfig{})))
 	defer srv.Close()
 	defer base.Close()
 
@@ -99,7 +99,7 @@ func TestGoalEditRoutePreservesGoalIdentity(t *testing.T) {
 	if err != nil || before == nil {
 		t.Fatalf("goal before edit = %+v, %v", before, err)
 	}
-	srv := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer srv.Close()
 
 	resp := postRuntimeJSON(t, srv.URL+"/goal/edit", `{"objective":"revised","maxGoalRounds":12}`)
@@ -116,7 +116,7 @@ func TestGoalEditRoutePreservesGoalIdentity(t *testing.T) {
 func TestQualityFloorRouteAcceptsLegacyValueWithoutChangingStatus(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := control.New(control.Options{Sink: bc})
-	srv := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer srv.Close()
 
 	resp := postRuntimeJSON(t, srv.URL+"/quality-floor", `{"floor":"delivery"}`)
@@ -155,7 +155,7 @@ func TestJobsCancelRouteCancelsOwnedJobs(t *testing.T) {
 		<-ctx.Done()
 		return "", ctx.Err()
 	})
-	srv := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer srv.Close()
 
 	resp := postRuntimeJSON(t, srv.URL+"/jobs/cancel", `{"ids":["`+job.ID+`","`+job.ID+`","missing"]}`)

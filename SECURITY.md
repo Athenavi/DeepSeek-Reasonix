@@ -56,9 +56,9 @@ Supported boundaries include:
 - Sandbox behavior for built-in shell execution where the platform supports it.
 - Secret handling for provider keys, bot credentials, OAuth tokens, plugin
   headers, and credential-store fallback files.
-- HTTP `serve` protections for the unauthenticated local server, including
-  localhost binding assumptions, JSON-only state-changing requests, and CORS
-  restrictions.
+- HTTP `serve` protections, including the launch token every state-changing
+  request requires when authentication is off, localhost binding assumptions,
+  JSON-only state-changing requests, and CORS restrictions.
 - Desktop and bot session isolation, including per-workspace session metadata
   and configured bot allowlists.
 - Updater, install, and release verification paths.
