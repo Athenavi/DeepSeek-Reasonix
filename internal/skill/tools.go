@@ -185,7 +185,7 @@ func (t *runSkillTool) Execute(ctx context.Context, args json.RawMessage) (strin
 	if opts.ContinueFrom != "" || opts.ForkFrom != "" {
 		return "", fmt.Errorf("run_skill: subagent continuation is only valid for runAs=subagent skills")
 	}
-	return renderInline(sk, rawArgs), nil
+	return RenderInvocation(sk, rawArgs), nil
 }
 
 func (t *runSkillTool) ResolveProfile(args json.RawMessage) *event.Profile {
@@ -334,7 +334,7 @@ func (t *readOnlySkillTool) Execute(ctx context.Context, args json.RawMessage) (
 		}
 		return tool.GuardSubagentHostDecisionText(out), nil
 	}
-	return renderInline(sk, rawArgs), nil
+	return RenderInvocation(sk, rawArgs), nil
 }
 
 func (t *readOnlySkillTool) ResolveProfile(args json.RawMessage) *event.Profile {
@@ -681,11 +681,9 @@ func RenderSkillFile(opts SkillFileOptions) string {
 
 // shared helpers
 
-// Render builds a skill's invocation text: a header (name, description, source)
-// followed by the body and any arguments. Used directly when a user invokes a
-// skill via "/<name>" (sent as a turn); the run_skill tool wraps the same text
-// in a skill-pin sentinel (see renderInline).
-func Render(sk Skill, args string) string {
+// render builds a skill's text: a header (name, description, source) followed
+// by the body and any arguments.
+func render(sk Skill, args string) string {
 	var b strings.Builder
 	b.WriteString("# Skill: " + sk.Name)
 	if sk.Description != "" {
@@ -699,10 +697,10 @@ func Render(sk Skill, args string) string {
 	return b.String()
 }
 
-// renderInline wraps Render's output in a skill-pin sentinel so context
-// compaction preserves the body verbatim instead of paraphrasing it.
-func renderInline(sk Skill, args string) string {
-	return "<skill-pin name=" + strconv.Quote(sk.Name) + ">\n" + Render(sk, args) + "\n</skill-pin>"
+// RenderInvocation is the single form every skill invocation reaches the model
+// in, whether the user or the model invoked it.
+func RenderInvocation(sk Skill, args string) string {
+	return "<skill-pin name=" + strconv.Quote(sk.Name) + ">\n" + render(sk, args) + "\n</skill-pin>"
 }
 
 var bracketTagRe = regexp.MustCompile(`\[[^\]]*\]`)

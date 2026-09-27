@@ -1478,7 +1478,9 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 				slashEntries = append(slashEntries, command.SlashEntry{
 					Name:        sk.SlashName(),
 					Description: sk.Description,
-					Render:      func(args []string) string { return skillStore.Render(sk, strings.Join(args, " ")) },
+					Render: func(args []string) string {
+						return skill.RenderInvocation(skillStore.Prepare(sk), strings.Join(args, " "))
+					},
 				})
 			}
 		}

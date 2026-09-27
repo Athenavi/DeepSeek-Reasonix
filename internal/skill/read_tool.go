@@ -70,5 +70,5 @@ func (t *readSkillTool) Execute(_ context.Context, args json.RawMessage) (string
 		}
 		return renderEmbeddedReference(sk, reference)
 	}
-	return renderInline(sk, strings.TrimSpace(p.Arguments)), nil
+	return RenderInvocation(sk, strings.TrimSpace(p.Arguments)), nil
 }

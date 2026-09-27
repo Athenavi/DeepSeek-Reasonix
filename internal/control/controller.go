@@ -1403,20 +1403,21 @@ func (c *Controller) prepareInvocationTurn(input string, requests []InvocationRe
 		}
 	}
 
+	if strings.TrimSpace(input) == "" && len(subagents) > 0 {
+		return preparedInvocationTurn{}, fmt.Errorf("subagent invocation requires a task")
+	}
+	// A lone inline skill takes the typed text as its arguments, as "/name task" does.
+	if len(inline) == 1 && len(subagents) == 0 {
+		return preparedInvocationTurn{composed: c.skills.renderInvocation(inline[0], strings.TrimSpace(input))}, nil
+	}
 	parts := make([]string, 0, len(inline)+1)
 	for _, sk := range inline {
-		parts = append(parts, c.skills.render(sk, ""))
+		parts = append(parts, c.skills.renderInvocation(sk, ""))
 	}
 	if strings.TrimSpace(input) != "" {
 		parts = append(parts, input)
 	}
-	composed := strings.Join(parts, "\n\n")
-	if strings.TrimSpace(input) == "" {
-		if len(subagents) > 0 {
-			return preparedInvocationTurn{}, fmt.Errorf("subagent invocation requires a task")
-		}
-	}
-	return preparedInvocationTurn{composed: composed, subagents: subagents}, nil
+	return preparedInvocationTurn{composed: strings.Join(parts, "\n\n"), subagents: subagents}, nil
 }
 
 func (c *Controller) runPreparedInvocationTurn(
@@ -1693,7 +1694,7 @@ func (c *Controller) submitCommandOrTurnReady(trimmed, input, display string, sc
 				c.runSubagentSkillSlash(sk, task, trimmed, display, admission)
 				return
 			}
-			sent := c.skills.render(sk, task)
+			sent := c.skills.renderInvocation(sk, task)
 			c.runGuardedWithAdmission(func(ctx context.Context) error {
 				return runGoalLoop(ctx, sent, sent, display)
 			}, admission)
@@ -4354,7 +4355,7 @@ func (c *Controller) ReloadCommands(ctx context.Context) error {
 		entries = append(entries, command.SlashEntry{
 			Name:        sk.SlashName(),
 			Description: sk.Description,
-			Render:      func(args []string) string { return c.skills.render(sk, strings.Join(args, " ")) },
+			Render:      func(args []string) string { return c.skills.renderInvocation(sk, strings.Join(args, " ")) },
 		})
 	}
 	for _, cmd := range cmds {

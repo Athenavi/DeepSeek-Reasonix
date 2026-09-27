@@ -78,11 +78,8 @@ func (s *skillSet) prepare(sk skill.Skill) skill.Skill {
 	return sk
 }
 
-func (s *skillSet) render(sk skill.Skill, args string) string {
-	if s.store != nil {
-		return s.store.Render(sk, args)
-	}
-	return skill.Render(sk, args)
+func (s *skillSet) renderInvocation(sk skill.Skill, args string) string {
+	return skill.RenderInvocation(s.prepare(sk), args)
 }
 
 // writer returns the live store to use for authoring (create/delete), preferring
