@@ -565,10 +565,8 @@ export function ProjectTree({
 
   useEffect(() => {
     if (shellStage !== "loading") return;
-    const timer = setTimeout(() => setShellStage("slow"), 250);
-    return () => clearTimeout(timer);
+    const timer = setTimeout(() => setShellStage("slow"), 250); return () => clearTimeout(timer);
   }, [shellStage]);
-
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let latest: Parameters<Parameters<typeof onProjectTreeChangedV2>[0]>[0] | undefined;
@@ -2018,15 +2016,11 @@ export function ProjectTree({
   );
 
   const renderEmptyState = () => {
-    if (shellStage !== "ready") return (
-      <div className="project-tree__empty-state" role="status">
-        <div className="project-tree__empty project-tree__empty--subtle">{t("projectTree.loadingProjects")}</div>
-        {shellStage === "slow" && <div className="project-tree__skeleton" aria-hidden="true">
-          <span className="project-tree__skeleton-bar" />
-          <span className="project-tree__skeleton-bar project-tree__skeleton-bar--short" />
-        </div>}
-      </div>
-    );
+    if (shellStage !== "ready") return <div className="project-tree__empty-state" role="status"><div className="project-tree__empty project-tree__empty--subtle">{t("projectTree.loadingProjects")}</div>
+      {shellStage === "slow" && <div className="project-tree__skeleton" aria-hidden="true">
+        <span className="project-tree__skeleton-bar" /><span className="project-tree__skeleton-bar project-tree__skeleton-bar--short" />
+      </div>}
+    </div>;
     if (query.trim()) return <div className="project-tree__empty">{t("projectTree.emptyNoMatch")}</div>;
     return (
       <div className="project-tree__empty-state">
