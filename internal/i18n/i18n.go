@@ -511,6 +511,11 @@ type Messages struct {
 	SetupBack                string
 	SetupPromptModels        string
 	SetupSharedKeyWarningFmt string
+	SetupKeyEnvTakenFmt      string
+	SetupKeyEnvStoredFmt     string
+	SetupKeyEnvSettingFmt    string
+	SetupKeyEnvShellFmt      string
+	SetupKeyEnvRetry         string
 	SetupPromptAPIKeyFmt     string
 	SetupSelectDefaultModel  string
 	SetupConfirmRemoveFmt    string

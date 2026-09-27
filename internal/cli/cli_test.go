@@ -1838,6 +1838,7 @@ func TestPromptCustomProviderManualDefaultsKeyEnvFromBaseURL(t *testing.T) {
 		bufio.NewScanner(strings.NewReader("sensenova-chat\n\n\n")),
 		"https://token.sensenova.cn/v1",
 		"",
+		false,
 		"",
 	)
 	if err != nil {
@@ -1857,6 +1858,7 @@ func TestPromptCustomProviderManualPreservesExplicitKeyEnv(t *testing.T) {
 		bufio.NewScanner(strings.NewReader("manual-chat\n\n")),
 		"https://token.sensenova.cn/v1",
 		"CUSTOM_API_KEY",
+		true,
 		"",
 	)
 	if err != nil {
@@ -1874,14 +1876,14 @@ func TestPromptCustomProviderManualPreservesExplicitKeyEnv(t *testing.T) {
 func TestPromptAPIKeyEnvNameRejectsModelName(t *testing.T) {
 	i18n.DetectLanguage("en")
 	var out bytes.Buffer
-	got := promptAPIKeyEnvName(
+	got, typed := promptAPIKeyEnvName(
 		bufio.NewScanner(strings.NewReader("grok-4.5\n\n")),
 		&out,
 		i18n.M.CustomPromptKeyEnv,
 		"CUSTOM_API_YAIROUTER_COM_API_KEY",
 	)
-	if got != "CUSTOM_API_YAIROUTER_COM_API_KEY" {
-		t.Fatalf("key env = %q, want generated default", got)
+	if got != "CUSTOM_API_YAIROUTER_COM_API_KEY" || typed {
+		t.Fatalf("key env = %q (typed %v), want the untyped generated default", got, typed)
 	}
 	if text := out.String(); !strings.Contains(text, "not a valid API Key variable name") || !strings.Contains(text, "do not enter a model name") {
 		t.Fatalf("validation guidance missing from prompt output: %q", text)
@@ -1893,6 +1895,7 @@ func TestPromptCustomProviderManualAsksForModelBeforeCredentialName(t *testing.T
 		bufio.NewScanner(strings.NewReader("grok-4.5\ngrok-4.5\n\n\n")),
 		"https://api.example.com/v1",
 		"",
+		false,
 		"",
 	)
 	if err != nil {
@@ -1914,6 +1917,7 @@ func TestPromptCustomProviderStagesExplicitKeyEvenWhenProcessEnvMatches(t *testi
 		bufio.NewScanner(strings.NewReader("grok-4.5\n")),
 		"https://api.example.com/v1",
 		key,
+		true,
 		"same-secret",
 	)
 	if err != nil {
@@ -1929,6 +1933,7 @@ func TestPromptCustomProviderStagesExplicitKeyEvenWhenProcessEnvMatches(t *testi
 		bufio.NewScanner(strings.NewReader("grok-4.5\n")),
 		"https://api.example.com/v1",
 		key,
+		true,
 		"new-secret",
 	)
 	if err != nil {

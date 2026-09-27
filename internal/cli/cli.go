@@ -1851,11 +1851,16 @@ func repairInvalidProviderKeyEnvs(providers []config.ProviderEntry) ([]config.Pr
 	return providers, repairs
 }
 
-func promptAPIKeyEnvName(in *bufio.Scanner, w io.Writer, label, def string) string {
+// promptAPIKeyEnvName reports explicit=false when the user pressed Enter: def
+// is then only a draft name, and a saved key goes to a private slot instead.
+func promptAPIKeyEnvName(in *bufio.Scanner, w io.Writer, label, def string) (keyEnv string, explicit bool) {
 	for {
-		keyEnv := ask(in, w, label, def)
+		keyEnv = ask(in, w, label, "")
+		if keyEnv == "" {
+			return def, false
+		}
 		if config.IsValidCredentialKey(keyEnv) {
-			return keyEnv
+			return keyEnv, true
 		}
 		fmt.Fprintf(w, i18n.M.InvalidAPIKeyEnvFmt+"\n", keyEnv)
 	}
@@ -1891,10 +1896,13 @@ func familyOf(name string) providerFamily {
 type providerPromptResult struct {
 	entries     []config.ProviderEntry
 	credentials map[string]string
+	// keyEnvTyped: the user typed the entries' api_key_env rather than accepting keyEnvDraft.
+	keyEnvTyped bool
+	keyEnvDraft string
 }
 
-func newProviderPromptResult(entries []config.ProviderEntry, key, value string) providerPromptResult {
-	result := providerPromptResult{entries: entries}
+func newProviderPromptResult(entries []config.ProviderEntry, key, value string, typed bool, draft string) providerPromptResult {
+	result := providerPromptResult{entries: entries, keyEnvTyped: typed, keyEnvDraft: draft}
 	if key != "" && value != "" {
 		result.credentials = map[string]string{key: value}
 	}
@@ -1918,7 +1926,7 @@ func promptCustomProvider(proxy netclient.ProxySpec) (providerPromptResult, erro
 
 // promptCustomProviderManual handles manual model entry.
 func promptCustomProviderManual() (providerPromptResult, error) {
-	return promptCustomProviderManualWith(bufio.NewScanner(os.Stdin), "", "", "")
+	return promptCustomProviderManualWith(bufio.NewScanner(os.Stdin), "", "", false, "")
 }
 
 // promptCustomProviderManualWith is the shared backend for manual entry.
@@ -1926,7 +1934,7 @@ func promptCustomProviderManual() (providerPromptResult, error) {
 // so the URL-fetch flow can fall through to manual entry without re-asking
 // the user for information they've already typed. An empty apiKey is allowed
 // — the key step happens later in the wizard and Reasonix's global .env is updated then.
-func promptCustomProviderManualWith(in *bufio.Scanner, baseURL, keyEnv, apiKey string) (providerPromptResult, error) {
+func promptCustomProviderManualWith(in *bufio.Scanner, baseURL, keyEnv string, keyEnvTyped bool, apiKey string) (providerPromptResult, error) {
 	fmt.Println()
 	if baseURL == "" {
 		baseURL = ask(in, os.Stdout, i18n.M.CustomPromptBaseURL, "")
@@ -1939,8 +1947,9 @@ func promptCustomProviderManualWith(in *bufio.Scanner, baseURL, keyEnv, apiKey s
 	if modelName == "" {
 		return providerPromptResult{}, fmt.Errorf("model name is required")
 	}
+	draft := apiKeyEnvFromProviderName(providerName)
 	if keyEnv == "" {
-		keyEnv = promptAPIKeyEnvName(in, os.Stdout, i18n.M.CustomPromptKeyEnv, apiKeyEnvFromProviderName(providerName))
+		keyEnv, keyEnvTyped = promptAPIKeyEnvName(in, os.Stdout, i18n.M.CustomPromptKeyEnv, draft)
 	} else if !config.IsValidCredentialKey(keyEnv) {
 		return providerPromptResult{}, fmt.Errorf("invalid API key variable name %q", keyEnv)
 	}
@@ -1952,7 +1961,7 @@ func promptCustomProviderManualWith(in *bufio.Scanner, baseURL, keyEnv, apiKey s
 		Model: modelName, APIKeyEnv: keyEnv, ContextWindow: askContextWindow(in, os.Stdout),
 	}
 	fmt.Printf("  %s\n", green(fmt.Sprintf(i18n.M.CustomAddedFmt, entry.Name+"/"+modelName)))
-	return newProviderPromptResult([]config.ProviderEntry{entry}, keyEnv, apiKey), nil
+	return newProviderPromptResult([]config.ProviderEntry{entry}, keyEnv, apiKey, keyEnvTyped, draft), nil
 }
 
 // promptCustomProviderFromURL tries the OpenAI-compatible GET /models
@@ -1968,7 +1977,8 @@ func promptCustomProviderFromURL(proxy netclient.ProxySpec) (providerPromptResul
 		return providerPromptResult{}, fmt.Errorf("base URL is required")
 	}
 	providerName := providerSlug("custom", baseURL)
-	keyEnv := promptAPIKeyEnvName(in, os.Stdout, i18n.M.CustomPromptKeyEnv, apiKeyEnvFromProviderName(providerName))
+	draft := apiKeyEnvFromProviderName(providerName)
+	keyEnv, keyEnvTyped := promptAPIKeyEnvName(in, os.Stdout, i18n.M.CustomPromptKeyEnv, draft)
 	apiKey := askSecret(in, os.Stdout, i18n.M.CustomPromptAPIKey)
 
 	fmt.Printf("  %s\n", dim(fmt.Sprintf(i18n.M.FetchingModelsFmt, "custom")))
@@ -1981,7 +1991,7 @@ func promptCustomProviderFromURL(proxy netclient.ProxySpec) (providerPromptResul
 		} else {
 			fmt.Fprintf(os.Stderr, "  %s\n", dim(i18n.M.CustomFetchEmpty))
 		}
-		return promptCustomProviderManualWith(in, baseURL, keyEnv, apiKey)
+		return promptCustomProviderManualWith(in, baseURL, keyEnv, keyEnvTyped, apiKey)
 	}
 	fmt.Printf("  %s\n", green(fmt.Sprintf(i18n.M.FetchModelsSuccessFmt, len(models), "custom")))
 
@@ -2002,7 +2012,7 @@ func promptCustomProviderFromURL(proxy netclient.ProxySpec) (providerPromptResul
 		Models: selected, Model: selected[0], APIKeyEnv: keyEnv, ContextWindow: askContextWindow(in, os.Stdout),
 	}
 	fmt.Printf("  %s\n", green(fmt.Sprintf(i18n.M.CustomAddedFmt, entry.Name+"/"+selected[0])))
-	return newProviderPromptResult([]config.ProviderEntry{entry}, keyEnv, apiKey), nil
+	return newProviderPromptResult([]config.ProviderEntry{entry}, keyEnv, apiKey, keyEnvTyped, draft), nil
 }
 
 // promptAnthropicProvider handles the Anthropic compatible provider entry flow.
@@ -2022,14 +2032,14 @@ func promptAnthropicProvider(proxy netclient.ProxySpec) (providerPromptResult, e
 
 // promptAnthropicProviderManual handles manual model entry.
 func promptAnthropicProviderManual() (providerPromptResult, error) {
-	return promptAnthropicProviderManualWith(bufio.NewScanner(os.Stdin), "", "", "")
+	return promptAnthropicProviderManualWith(bufio.NewScanner(os.Stdin), "", "", false, "")
 }
 
 // promptAnthropicProviderManualWith is the shared backend for manual entry
 // of an Anthropic-compatible custom provider. Pre-filled values (baseURL,
 // keyEnv, apiKey) are reused as-is when non-empty so the URL-fetch flow
 // can fall through to manual entry without re-asking the user.
-func promptAnthropicProviderManualWith(in *bufio.Scanner, baseURL, keyEnv, apiKey string) (providerPromptResult, error) {
+func promptAnthropicProviderManualWith(in *bufio.Scanner, baseURL, keyEnv string, keyEnvTyped bool, apiKey string) (providerPromptResult, error) {
 	fmt.Println()
 	if baseURL == "" {
 		baseURL = ask(in, os.Stdout, i18n.M.AnthropicPromptBaseURL, "")
@@ -2042,7 +2052,7 @@ func promptAnthropicProviderManualWith(in *bufio.Scanner, baseURL, keyEnv, apiKe
 		return providerPromptResult{}, fmt.Errorf("model name is required")
 	}
 	if keyEnv == "" {
-		keyEnv = promptAPIKeyEnvName(in, os.Stdout, i18n.M.AnthropicPromptKeyEnv, "ANTHROPIC_API_KEY")
+		keyEnv, keyEnvTyped = promptAPIKeyEnvName(in, os.Stdout, i18n.M.AnthropicPromptKeyEnv, "ANTHROPIC_API_KEY")
 	} else if !config.IsValidCredentialKey(keyEnv) {
 		return providerPromptResult{}, fmt.Errorf("invalid API key variable name %q", keyEnv)
 	}
@@ -2054,7 +2064,7 @@ func promptAnthropicProviderManualWith(in *bufio.Scanner, baseURL, keyEnv, apiKe
 		Model: modelName, APIKeyEnv: keyEnv, ContextWindow: askContextWindow(in, os.Stdout),
 	}
 	fmt.Printf("  %s\n", green(fmt.Sprintf(i18n.M.AnthropicAddedFmt, entry.Name+"/"+modelName)))
-	return newProviderPromptResult([]config.ProviderEntry{entry}, keyEnv, apiKey), nil
+	return newProviderPromptResult([]config.ProviderEntry{entry}, keyEnv, apiKey, keyEnvTyped, "ANTHROPIC_API_KEY"), nil
 }
 
 // promptAnthropicProviderFromURL tries the OpenAI-compatible GET /models
@@ -2070,7 +2080,7 @@ func promptAnthropicProviderFromURL(proxy netclient.ProxySpec) (providerPromptRe
 	if baseURL == "" {
 		return providerPromptResult{}, fmt.Errorf("base URL is required")
 	}
-	keyEnv := promptAPIKeyEnvName(in, os.Stdout, i18n.M.AnthropicPromptKeyEnv, "ANTHROPIC_API_KEY")
+	keyEnv, keyEnvTyped := promptAPIKeyEnvName(in, os.Stdout, i18n.M.AnthropicPromptKeyEnv, "ANTHROPIC_API_KEY")
 	apiKey := askSecret(in, os.Stdout, i18n.M.AnthropicPromptAPIKey)
 
 	fmt.Printf("  %s\n", dim(fmt.Sprintf(i18n.M.AnthropicFetchingModelsFmt, "anthropic")))
@@ -2083,7 +2093,7 @@ func promptAnthropicProviderFromURL(proxy netclient.ProxySpec) (providerPromptRe
 		} else {
 			fmt.Fprintf(os.Stderr, "  %s\n", dim(i18n.M.AnthropicFetchEmpty))
 		}
-		return promptAnthropicProviderManualWith(in, baseURL, keyEnv, apiKey)
+		return promptAnthropicProviderManualWith(in, baseURL, keyEnv, keyEnvTyped, apiKey)
 	}
 	fmt.Printf("  %s\n", green(fmt.Sprintf(i18n.M.AnthropicFetchModelsSuccessFmt, len(models), "anthropic")))
 
@@ -2104,7 +2114,7 @@ func promptAnthropicProviderFromURL(proxy netclient.ProxySpec) (providerPromptRe
 		Models: selected, Model: selected[0], APIKeyEnv: keyEnv, ContextWindow: askContextWindow(in, os.Stdout),
 	}
 	fmt.Printf("  %s\n", green(fmt.Sprintf(i18n.M.AnthropicAddedFmt, entry.Name+"/"+selected[0])))
-	return newProviderPromptResult([]config.ProviderEntry{entry}, keyEnv, apiKey), nil
+	return newProviderPromptResult([]config.ProviderEntry{entry}, keyEnv, apiKey, keyEnvTyped, "ANTHROPIC_API_KEY"), nil
 }
 
 func groupByFamily(providers []config.ProviderEntry) ([]string, map[string][]int, map[string]providerFamily) {
