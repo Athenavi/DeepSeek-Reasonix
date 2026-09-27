@@ -200,7 +200,7 @@ export function ComposerWorkspaceContextBar({ context }: { context: ComposerWork
     try {
       const snapshot = await app.GetProjectTreeSnapshot();
       if (projectRequest.current !== request) return;
-      setProjects(asArray(snapshot.projects).filter((project) => project.kind === "project" && Boolean(project.root)));
+      setProjects(asArray(snapshot.projects).filter((project) => project.kind === "project" && Boolean(project.root) && !project.remote));
     } catch (reason) {
       if (projectRequest.current === request) setProjectsError(reason instanceof Error ? reason.message : String(reason));
     } finally {
