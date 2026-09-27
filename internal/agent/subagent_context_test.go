@@ -29,7 +29,7 @@ func TestComposeChildTaskPromptUsesFactsPack(t *testing.T) {
 func TestApplyReviewBudgetDefaults(t *testing.T) {
 	spec := ProfileExecSpec{Worker: WorkerSpec{Profile: "review"}}
 	applyReviewBudget(&spec)
-	if spec.Sched.MaxSteps != defaultReviewMaxSteps || spec.Sched.MaxOutputTokens != defaultReviewOutputTokens {
+	if spec.Sched.MaxSteps != 0 || spec.Sched.MaxOutputTokens != defaultReviewOutputTokens {
 		t.Fatalf("budget = %+v", spec.Sched)
 	}
 }
@@ -64,7 +64,7 @@ func TestChildMaxStepsForSpecStampsReviewOutputBudget(t *testing.T) {
 	task := &TaskTool{}
 	spec := ProfileExecSpec{Worker: WorkerSpec{Profile: "review"}}
 	ctx, steps := task.childMaxStepsForSpec(context.Background(), &spec)
-	if steps != defaultReviewMaxSteps {
+	if steps != 0 {
 		t.Fatalf("steps = %d", steps)
 	}
 	if childOutputBudgetFrom(ctx) != defaultReviewOutputTokens {
@@ -83,16 +83,16 @@ func TestPrepareReviewSubagentContextAddsBoundedVerifiedFacts(t *testing.T) {
 		ToolName: "go_test", Success: true, Read: true, Paths: []string{"z.go", "a.go"},
 		OutputBytes: 42, OutputDigest: "0123456789abcdef", ExitCode: &exit, Verification: evidence.VerificationPassed,
 	})
-	prompt, steps, tokens, ok := PrepareReviewSubagentContext(evidence.WithLedger(context.Background(), ledger), "review", "review change")
-	if !ok || steps != defaultReviewMaxSteps || tokens != defaultReviewOutputTokens {
-		t.Fatalf("review budget = ok:%v steps:%d tokens:%d", ok, steps, tokens)
+	prompt, tokens, ok := PrepareReviewSubagentContext(evidence.WithLedger(context.Background(), ledger), "review", "review change")
+	if !ok || tokens != defaultReviewOutputTokens {
+		t.Fatalf("review budget = ok:%v tokens:%d", ok, tokens)
 	}
 	for _, want := range []string{"tool=go_test", "output_bytes=42", "output_digest=0123456789ab", "verification=passed", "a.go", "verdict"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("review prompt missing %q:\n%s", want, prompt)
 		}
 	}
-	if _, _, _, ok := PrepareReviewSubagentContext(context.Background(), "explore", "look"); ok {
+	if _, _, ok := PrepareReviewSubagentContext(context.Background(), "explore", "look"); ok {
 		t.Fatal("non-review profile must retain its existing runner budget")
 	}
 }
