@@ -424,7 +424,7 @@ func TestACPCtrlReadPathsDoNotRaceWithRebuild(t *testing.T) {
 		}
 		_ = svc.sessionDir()
 		svc.sendAvailableCommands(sess)
-		if got := svc.resolveSlashPrompt(context.Background(), sess, "/no-such-command args"); got != "/no-such-command args" {
+		if got, _ := svc.resolveSlashPrompt(context.Background(), sess, "/no-such-command args"); got != "/no-such-command args" {
 			t.Fatalf("resolveSlashPrompt rewrote unknown command to %q", got)
 		}
 	}

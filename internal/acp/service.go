@@ -263,6 +263,8 @@ func (s *service) bindClientIO(p *SessionParams, sessionID string) {
 type acpController interface {
 	control.Lifecycle
 	control.TurnControl
+	RunTurnWithRaw(ctx context.Context, input, raw, invokedSkill string) error
+	RunSkillWithName(input string) (sent, name string, found bool)
 	RunFinalReadinessRecoveryWithAdmission(ctx context.Context, input string, onAdmitted func()) error
 	TrySteer(text string) bool
 	control.Approvals
@@ -1158,6 +1160,8 @@ func (s *service) sessionPrompt(ctx context.Context, raw json.RawMessage) (any, 
 		return nil, &RPCError{Code: ErrInvalidParams, Message: "session/prompt: unknown session " + p.SessionID}
 	}
 	text := FlattenPrompt(p.Prompt)
+	rawText := text
+	invokedSkill := ""
 	if text == "" && p.Action != control.ProtocolRecoveryAction {
 		return nil, &RPCError{Code: ErrInvalidParams, Message: "session/prompt: empty prompt"}
 	}
@@ -1178,7 +1182,7 @@ func (s *service) sessionPrompt(ctx context.Context, raw json.RawMessage) (any, 
 			recovery = true
 			text = prompt
 		} else {
-			text = s.resolveSlashPrompt(ctx, sess, text)
+			text, invokedSkill = s.resolveSlashPrompt(ctx, sess, text)
 		}
 	}
 
@@ -1217,7 +1221,7 @@ func (s *service) sessionPrompt(ctx context.Context, raw json.RawMessage) (any, 
 		runErr = sess.ctrl.RunFinalReadinessRecoveryWithAdmission(runCtx, text, beginTurn)
 	} else {
 		beginTurn()
-		runErr = sess.ctrl.RunTurn(runCtx, text)
+		runErr = sess.ctrl.RunTurnWithRaw(runCtx, text, rawText, invokedSkill)
 	}
 	if errors.Is(runErr, agent.ErrProtocolRecoveryUnavailable) && !statusStarted {
 		return nil, &RPCError{Code: ErrInvalidRequest, Message: "session/prompt: protocol recovery is unavailable or stale"}
@@ -2588,28 +2592,28 @@ func availableCommandsFor(ctrl acpController) []AvailableCommand {
 	return out
 }
 
-func (s *service) resolveSlashPrompt(ctx context.Context, sess *acpSession, text string) string {
+func (s *service) resolveSlashPrompt(ctx context.Context, sess *acpSession, text string) (string, string) {
 	line := strings.TrimSpace(text)
 	if sess == nil || !strings.HasPrefix(line, "/") {
-		return text
+		return text, ""
 	}
 	ctrl := sess.currentCtrl()
 	if ctrl == nil {
-		return text
+		return text, ""
 	}
 	if sent, ok := ctrl.CustomCommand(line); ok {
-		return sent
+		return sent, ""
 	}
-	if sent, ok := ctrl.RunSkill(line); ok {
-		return sent
+	if sent, name, ok := ctrl.RunSkillWithName(line); ok {
+		return sent, name
 	}
 	if sent, ok, err := ctrl.MCPPrompt(ctx, line); err == nil && ok {
-		return sent
+		return sent, ""
 	}
 	if sent, ok := invokeExtensionAction(ctx, ctrl, line); ok {
-		return sent
+		return sent, ""
 	}
-	return text
+	return text, ""
 }
 
 // invokeExtensionAction resolves a "/<plugin>:<action> args…" line against the
