@@ -27,7 +27,10 @@ func (f *skillRawFactory) NewSession(_ context.Context, p SessionParams) (*contr
 	ctrl := control.New(control.Options{
 		Runner: executor, Executor: executor, Sink: p.Sink,
 		SessionDir: f.dir,
-		Skills:     []skill.Skill{{Name: "probe", Description: "probe skill", Body: "PROBE BODY\nthen /other"}},
+		Skills: []skill.Skill{
+			{Name: "probe", Description: "probe skill", Body: "PROBE BODY\nthen /other", Triggers: []string{"probe", "tidy"}, AutoUse: "require"},
+			{Name: "other", Description: "other skill", Body: "OTHER BODY", Triggers: []string{"other"}, AutoUse: "require"},
+		},
 	})
 	f.executor <- executor
 	return ctrl, nil
@@ -66,6 +69,9 @@ func TestACPSkillPromptKeepsTypedTextAsRawInput(t *testing.T) {
 	}
 	if !strings.Contains(delivered, "PROBE BODY") || !strings.Contains(delivered, "Arguments: tidy the notes") {
 		t.Fatalf("provider did not receive the rendered skill invocation: %q", delivered)
+	}
+	if strings.Contains(delivered, "<capability-route") {
+		t.Fatalf("already-pinned skill was routed again: %q", delivered)
 	}
 	for _, msg := range executor.Session().Snapshot() {
 		if msg.Role == provider.RoleUser && strings.Contains(msg.Content, "PROBE BODY") {
