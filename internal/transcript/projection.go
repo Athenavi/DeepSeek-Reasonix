@@ -172,7 +172,7 @@ func (p *Projection) Apply(envelope turnevent.Envelope) error {
 	if envelope.Sequence != p.covered+1 {
 		return errors.New("transcript projection sequence gap")
 	}
-	return p.applyLocked(envelope, envelope.Sequence)
+	return p.applyLocked(envelope, envelope.Sequence, envelope.Sequence)
 }
 
 // ApplyFrame uses an independent display revision. The caller supplies the
@@ -186,14 +186,16 @@ func (p *Projection) ApplyFrame(envelope turnevent.Envelope, covered uint64) err
 	if covered < p.covered {
 		return errors.New("transcript business coverage regression")
 	}
-	if err := p.applyLocked(envelope, covered); err != nil {
+	if err := p.applyLocked(envelope, covered, 0); err != nil {
 		return err
 	}
 	p.trimSettledLocked()
 	return nil
 }
 
-func (p *Projection) applyLocked(envelope turnevent.Envelope, covered uint64) error {
+// first is the business sequence the envelope itself occupies, or zero for a
+// display frame that rides an existing cut.
+func (p *Projection) applyLocked(envelope turnevent.Envelope, covered, first uint64) error {
 	// Detach pointer payloads before retaining them. Event publication cannot
 	// mutate a previously committed snapshot through an aliased tool slice.
 	encoded, err := json.Marshal(envelope)
@@ -225,8 +227,14 @@ func (p *Projection) applyLocked(envelope turnevent.Envelope, covered uint64) er
 	p.revision++
 	// Legacy ledger numbering is never a chat coverage cursor.
 	w.Sequence = 0
+	if first != 0 && owned.Kind == "message" && w.MessageID != "" {
+		if p.results == nil {
+			p.results = make(map[string]uint64)
+		}
+		p.results[w.MessageID] = first
+	}
 	state := p.runtime
-	change := Change{Event: &w, Runtime: &state}
+	change := Change{Event: &w, Runtime: &state, FirstSeq: first}
 	if owned.Kind == "text" || owned.Kind == "reasoning" || owned.Kind == "tool_call_delta" || (owned.Kind == "tool_dispatch" && w.Tool != nil && w.Tool.Partial) {
 		if attempt, ok := p.attempts[w.AttemptID]; ok {
 			change.AttemptID, change.Index = attempt.ID, attempt.NextIndex
@@ -236,6 +244,14 @@ func (p *Projection) applyLocked(envelope turnevent.Envelope, covered uint64) er
 	}
 	if owned.Kind == "stream_attempt" && w.StreamAttempt != nil && w.StreamAttempt.Action == "commit" {
 		change.AttemptID, change.ResultSeq = w.StreamAttempt.ID, p.results[w.MessageID]
+		if first != 0 {
+			// A tool-only or interrupted round publishes no message event; its
+			// commit follows the durable write, so its own sequence is committed.
+			if change.ResultSeq == 0 {
+				change.ResultSeq = first
+			}
+			delete(p.results, w.MessageID)
+		}
 		change.ResultKind = "message/complete"
 		if w.StreamAttempt.Reason == "interrupted" {
 			change.ResultKind = "message/interrupted"
