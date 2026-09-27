@@ -25,8 +25,9 @@ const { ToastProvider } = await import("../lib/toast");
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>(done => { resolve = done; });
-  return { promise, resolve };
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
 }
 
 const pending: ReturnType<typeof deferred<ProjectTreeSnapshot>>[] = [];
@@ -142,6 +143,27 @@ try {
       "an empty answer restores the true empty state");
   } finally {
     await act(async () => emptyRoot.unmount());
+  }
+
+  pending.length = 0;
+  localStorage.clear();
+  const failedRoot = createRoot(container);
+  try {
+    await act(async () => failedRoot.render(<LocaleProvider><ToastProvider><ProjectTree
+      onOpenTopic={noop} onAddProject={addProject}
+    /></ToastProvider></LocaleProvider>));
+    await flush();
+    assert.match(container.querySelector(".project-tree__empty-state")?.textContent ?? "", /读取|讀取|Reading/);
+    await act(async () => pending[0].reject(new Error("snapshot unavailable")));
+    await flush();
+    assert.doesNotMatch(container.textContent ?? "", /读取项目|讀取專案|Reading projects/,
+      "a failed first shell read must settle the loading state");
+    assert.match(container.textContent ?? "", /Add new project|添加新项目|新增專案/,
+      "the empty-state project action must remain available after a failed read");
+    assert.match(container.textContent ?? "", /Remote connection|远程连接|遠端連線/,
+      "the empty-state remote action must remain available after a failed read");
+  } finally {
+    await act(async () => failedRoot.unmount());
   }
 } finally {
   mock.timers.reset();

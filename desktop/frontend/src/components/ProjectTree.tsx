@@ -489,13 +489,14 @@ export function ProjectTree({
         // expanded folder for the duration of a catalog scan.
         return { ...project, children: projectTreeShellChildren(previous?.children, project.children) };
       })));
-      setShellStage("ready");
       await reloadRequestedProjects(projects);
     } catch (err) {
       // A shell snapshot is metadata-only. If it fails, the resident folder
       // identity can still drive the requested canonical topic reload.
       if (request === shellRequestRef.current) await reloadRequestedProjects(treeRef.current);
       if (throwOnSnapshotError) throw err;
+    } finally {
+      if (request === shellRequestRef.current) setShellStage("ready");
     }
   }, [applyRuntimeProjection, reloadProjectTopicLists]);
   refreshRef.current = refresh;
