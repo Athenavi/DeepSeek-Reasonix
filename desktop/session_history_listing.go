@@ -59,7 +59,7 @@ func (a *App) listSessionsFromDir(dir, active string) []SessionMeta {
 			Preview: node.Preview, Turns: node.Turns, TurnsState: node.TurnsState,
 			CreatedAt: node.CreatedAt, LastActivityAt: node.LastActivityAt, ModTime: node.LastActivityAt})
 	}
-	adopted := adoptedSourceRows(state, "")
+	adopted := adoptedSourceRows(state)
 	catalog := a.sessionCatalog.Load()
 	if catalog == nil {
 		return v3

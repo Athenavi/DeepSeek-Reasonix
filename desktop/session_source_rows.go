@@ -18,12 +18,10 @@ var sourceHeadRows sync.Map
 // A mapped DAG head must not return as an unidentified path placeholder while
 // its index is unavailable. This is a display filter, not an ownership alias:
 // independently identified siblings remain eligible for their own rows.
-func adoptedSourceRows(state workspacestate.State, workspaceID string) map[string]bool {
+// Adoption belongs to the source, not to the workspace a sidecar lists it in.
+func adoptedSourceRows(state workspacestate.State) map[string]bool {
 	adopted := map[string]bool{}
 	for _, mapping := range state.SourceMappings {
-		if workspaceID != "" && mapping.WorkspaceID != workspaceID {
-			continue
-		}
 		for _, key := range state.SourceKeys(mapping.SourceKey) {
 			adopted["source\x00local\x00"+key] = true
 		}

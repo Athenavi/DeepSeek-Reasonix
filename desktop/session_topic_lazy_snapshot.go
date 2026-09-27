@@ -142,17 +142,18 @@ func (a *App) lazyProjectTopicSnapshot(req ProjectTopicPageRequest, reader works
 func lazyTopicSourceExclusions(state workspacestate.State, workspaceID string) ([]string, bool) {
 	excluded := []string{}
 	for _, mapping := range state.SourceMappings {
-		if mapping.WorkspaceID != workspaceID {
-			continue
-		}
 		// Canonical directories have one source identity even if an older
 		// migration receipt retained their originating head ID.
 		if mapping.Format != "canonical" && !sourceMappingHasPathAlias(mapping) {
+			if mapping.WorkspaceID != workspaceID {
+				continue
+			}
 			// The catalog may not yet know about a new sibling, or the head
 			// index may be unavailable. Only the head-aware adapter can filter
 			// adopted identities without inventing a new path-only source.
 			return nil, false
 		}
+		// A sidecar can list a file outside the workspace that adopted it.
 		excluded = append(excluded, mapping.Path)
 	}
 	return excluded, true

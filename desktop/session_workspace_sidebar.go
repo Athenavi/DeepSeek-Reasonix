@@ -177,7 +177,7 @@ func (a *App) materializeProjectTopics(req ProjectTopicPageRequest, reader works
 	}
 	workspace.SessionIDs = admittedWorkspaceTopicMembers(req, state, workspace)
 	infos, _ := listWorkspaceSessionInfo(a.bootContext(), reader, workspace.SessionIDs)
-	adopted := adoptedSourceRows(state, workspaceID)
+	adopted := adoptedSourceRows(state)
 	adoptedTopics := state.AdoptedTopicIDs(workspaceID)
 	all := req
 	all.Cursor = ""
