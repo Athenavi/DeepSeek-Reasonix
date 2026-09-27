@@ -24,6 +24,7 @@ installBridgeApp({
       projects: [
         { key: "project:/repo", kind: "project", label: "Reasonix", root: "/repo" },
         { key: "project:/other", kind: "project", label: "Other", root: "/other" },
+        { key: "project_remote_box", kind: "project", label: "SSH Box", root: "remote-project:box:/srv/app", remote: { hostId: "box", workspace: "/srv/app" } },
       ],
       catalog: { state: "ready", revision: 1, indexed: 2, total: 2, repairPending: 0 },
       indexed: 2,
@@ -139,6 +140,7 @@ assert(document.querySelector('input[aria-label="Search workspaces"]'));
 const projectItems = [...document.querySelectorAll('.composer-workspace-menu--projects [role="menuitem"]')];
 assert(projectItems.some((item) => item.textContent?.includes("Reasonix")));
 assert(projectItems.some((item) => item.textContent?.includes("Other")));
+assert(!projectItems.some((item) => item.textContent?.includes("SSH Box")), "remote projects never appear among local folders to switch to");
 await click(projectItems.find((item) => item.textContent?.includes("Reasonix")) ?? null);
 assert.deepEqual(calls.switches, [], "selecting the current workspace only closes the menu");
 
