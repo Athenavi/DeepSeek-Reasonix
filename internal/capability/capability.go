@@ -293,9 +293,6 @@ func RenderTransientBlock(d RouteDecision) string {
 
 func routeEntry(text string, e Entry) (AutoUse, string, bool) {
 	if e.Kind == KindSkill {
-		if explicitSkill(text, e.Name) {
-			return AutoUseRequire, "the user explicitly referenced this skill", true
-		}
 		if e.AutoUse == AutoUseOff {
 			return "", "", false
 		}
@@ -310,17 +307,6 @@ func routeEntry(text string, e Entry) (AutoUse, string, bool) {
 		return AutoUsePrefer, "the user named this MCP tool", true
 	}
 	return "", "", false
-}
-
-func explicitSkill(text, name string) bool {
-	n := normalize(name)
-	return strings.Contains(text, "/"+n) ||
-		strings.Contains(text, "use "+n+" skill") ||
-		strings.Contains(text, "using "+n+" skill") ||
-		strings.Contains(text, "使用 "+n+" skill") ||
-		strings.Contains(text, "用 "+n+" skill") ||
-		strings.Contains(text, "使用"+n+"技能") ||
-		strings.Contains(text, "用"+n+"技能")
 }
 
 // namesMCPTool matches the identifier the host mints for the tool. A server
