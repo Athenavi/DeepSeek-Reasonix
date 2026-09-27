@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { loadCatalog, releaseForVersion, renderGitHubRelease, validateCatalog } from "./release-notes.mjs";
+import { loadCatalog, releaseForVersion, releaseRefs, renderGitHubRelease, validateCatalog } from "./release-notes.mjs";
 import { validateReleaseEvent } from "./release-event.mjs";
 
 test("the committed release catalog is valid and newest first", async () => {
@@ -23,9 +23,41 @@ test("GitHub rendering keeps product sections and source PR links", async () => 
   assert.match(markdown, /## 重点内容/);
   assert.match(markdown, /## 升级提醒/);
   assert.match(markdown, /## 风险提示/);
-  assert.match(markdown, /## 致谢/);
   assert.match(markdown, /\/pull\/6460/);
   assert.match(markdown, /reasonix\.io\/changelog\/v1\.17\.13/);
+});
+
+test("rendering credits authors and fixers and lists them once, in order", async () => {
+  const catalog = await loadCatalog();
+  const release = structuredClone(releaseForVersion(catalog, "1.39.1"));
+  release.contributors = ["late-comer"];
+  const refs = releaseRefs(release);
+  const special = {
+    10853: { kind: "pull", login: "github-actions[bot]", bot: true },
+    10858: { kind: "issue", fixes: [{ number: 20000, login: "fixer", bot: false }] },
+    10495: { kind: "issue", fixes: [] },
+  };
+  const credits = new Map(
+    refs.map((ref) => [ref, special[ref] || { kind: "pull", login: ref % 2 ? "KHG420" : "esengine", bot: false }]),
+  );
+  const zh = renderGitHubRelease(release, "zh", credits);
+  assert.match(zh, /\[#10763\]\([^)]+\/pull\/10763\) by @KHG420/);
+  assert.match(zh, /\[#10858\]\([^)]+\/pull\/10858\) fixed in #20000 by @fixer, /);
+  assert.match(zh, /\[#10495\]\([^)]+\/pull\/10495\), /);
+  assert.doesNotMatch(zh, /by @github-actions/);
+  assert.match(zh, /## 贡献者\n\n感谢本版本的贡献者：@KHG420、@fixer、@esengine\n$/);
+  const en = renderGitHubRelease(release, "en", credits);
+  assert.match(en, /## Contributors\n\nThanks to the contributors in this release: @KHG420, @fixer, @esengine\n$/);
+  assert.doesNotMatch(en, /late-comer/);
+});
+
+test("an unresolved ref renders as the plain link it always was", async () => {
+  const catalog = await loadCatalog();
+  const release = releaseForVersion(catalog, "1.39.0");
+  const markdown = renderGitHubRelease(release, "zh", new Map());
+  assert.doesNotMatch(markdown, / by @/);
+  assert.match(markdown, /\(\[#10731\]\(https:\/\/github\.com\/esengine\/DeepSeek-Reasonix\/pull\/10731\)\)/);
+  assert.doesNotMatch(markdown, /## 贡献者/);
 });
 
 test("targeted releases render Desktop and CLI sections from one shared item", async () => {

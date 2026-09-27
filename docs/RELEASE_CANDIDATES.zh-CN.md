@@ -6,6 +6,19 @@ Desktop 文件、执行最终安装包的原生验收并封存记录。`Publish 
 只接受该记录，验证来源与文件字节，经过一次 `release` 批准后创建三个标签并发布。
 `recover` 复用相同的封存文件，不重新构建或签名。
 
+渲染发布说明时会为贡献者署名：`refs` 中属于合并请求的编号后面加上
+`by @作者`；属于 issue 的编号，对 GitHub 记录为关闭它的每个已合并请求加上
+`fixed in #M by @作者`。结尾的「贡献者」列表按首次出现顺序列出这些真人作者，
+每人一次。直接推送修复的 issue 和机器人作者保持原样。查询需要 GitHub 令牌（`GH_TOKEN`，
+本地没有时用 `gh auth token`），以及 `issues: read` 和 `pull-requests: read` 权限。
+暂时性失败（5xx、限流、连接中断）会退避重试；重试后仍失败或鉴权失败时，渲染以
+`release_credits.*` 错误码失败，而不是发布缺少署名的说明。指向讨论或不存在的编号保持原样并给出警告。
+
+封存任务只渲染一次，写进候选包的 `evidence/release-notes.md`，记录为
+`notes.renderedPath` 并与 `notes.renderedSha256` 绑定。发布时校验候选包后直接发布这份
+内容，不再访问 GitHub，因此封存之后作者改名、issue 新关联了修复或接口故障都不会改变或
+阻塞发布内容。本改动之前封存的候选没有 `renderedPath`，仍按原方式从自身源码离线渲染。
+
 需要验收但不发布时，在受保护的 `main-v2` 上调度 `Prepare release candidate`，
 填写 `version` 和 `rehearsal=true`。可使用已有审核完成的版本进行隔离演练。
 它使用独立的 `release-candidate-rehearsal-*` 产物，记录

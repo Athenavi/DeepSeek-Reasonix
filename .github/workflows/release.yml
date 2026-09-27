@@ -212,6 +212,10 @@ jobs:
     needs: [resolve, cache-guard]
     if: ${{ always() && !cancelled() && needs.cache-guard.result == 'success' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: read # release-notes credits read PR and issue authors
+      pull-requests: read
     # The Stable caller has already passed the single GitHub release approval.
     # Official standalone recovery passes release-gate above. This job therefore
     # must not add a second GitHub environment approval.
@@ -274,6 +278,7 @@ jobs:
         if: ${{ !inputs.orchestrated }}
         env:
           RELEASE_TAG: ${{ needs.resolve.outputs.notes_version }}
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/release-notes.mjs render --version "$RELEASE_TAG" --output /tmp/release-notes.md
       - name: Revalidate approved release ref
         env:

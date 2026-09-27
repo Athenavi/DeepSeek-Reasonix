@@ -6,7 +6,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { artifactNamespace, candidateId, desktopPlatforms, npmPackages, sealCandidate, verifyCandidate } from "./release-candidate.mjs";
+import {
+  artifactNamespace,
+  candidateId,
+  desktopPlatforms,
+  npmPackages,
+  sealCandidate,
+  sealedNotesPath,
+  verifyCandidate,
+} from "./release-candidate.mjs";
 
 function fixture(t) {
   const root = mkdtempSync(path.join(tmpdir(), "reasonix-candidate-"));
@@ -50,13 +58,16 @@ function fixture(t) {
       sha256: createHash("sha256").update(platform).digest("hex"),
     }));
   }
+  writeFileSync(path.join(evidence, "release-notes.md"), sealedNotes);
   return root;
 }
+
+const sealedNotes = "notes by @alice\n";
 
 const metadata = {
   version: "1.2.3", sourceSHA: "a".repeat(40), buildControlSHA: "b".repeat(40),
   acceptanceControlSHA: "c".repeat(40), notesSourceSHA: "a".repeat(40),
-  catalogSha256: "d".repeat(64), renderedNotesSha256: "e".repeat(64),
+  catalogSha256: "d".repeat(64), renderedNotesSha256: createHash("sha256").update("notes by @alice\n").digest("hex"),
   repository: "esengine/DeepSeek-Reasonix", workflow: ".github/workflows/release-candidate.yml",
   runId: "123", runAttempt: "1", desktopPrefix: "desktop-123-1-preflight",
   payloadArtifactId: "456", payloadArtifactName: `release-candidate-payload-${candidateId("1.2.3", "a".repeat(40), "d".repeat(64))}`,
@@ -71,6 +82,30 @@ test("seals and verifies a complete immutable candidate", t => {
   const record = sealCandidate(root, metadata);
   assert.equal(record.candidateId, candidateId("1.2.3", "a".repeat(40), "d".repeat(64)));
   assert.doesNotThrow(() => verifyCandidate(root, record, new Date("2026-01-02T00:00:00Z")));
+});
+
+test("the rendered notes are sealed into the payload and bound to their hash", t => {
+  const root = fixture(t);
+  const record = sealCandidate(root, metadata);
+  assert.equal(record.notes.renderedPath, sealedNotesPath);
+  assert.equal(readFileSync(path.join(root, record.notes.renderedPath), "utf8"), sealedNotes);
+  assert.throws(() => sealCandidate(root, { ...metadata, renderedNotesSha256: "e".repeat(64) }), /do not match renderedSha256/);
+  writeFileSync(path.join(root, sealedNotesPath), "notes by @mallory\n");
+  assert.throws(() => verifyCandidate(root, record, new Date("2026-01-02T00:00:00Z")), /digest mismatch/);
+  rmSync(path.join(root, sealedNotesPath));
+  assert.throws(() => sealCandidate(root, metadata), /missing sealed release notes/);
+});
+
+test("a candidate sealed before notes were sealed still verifies", t => {
+  const root = fixture(t);
+  const record = sealCandidate(root, metadata);
+  rmSync(path.join(root, sealedNotesPath));
+  const legacy = structuredClone(record);
+  delete legacy.notes.renderedPath;
+  legacy.files = legacy.files.filter(file => file.path !== sealedNotesPath);
+  assert.doesNotThrow(() => verifyCandidate(root, legacy, new Date("2026-01-02T00:00:00Z")));
+  const forged = { ...legacy, notes: { ...legacy.notes, renderedPath: "evidence/other.md" } };
+  assert.throws(() => verifyCandidate(root, forged, new Date("2026-01-02T00:00:00Z")), /sealed release notes path/);
 });
 
 test("rehearsal bytes remain isolated from the publication identity", t => {

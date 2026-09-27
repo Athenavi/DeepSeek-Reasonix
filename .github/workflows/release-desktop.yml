@@ -1084,6 +1084,8 @@ jobs:
     permissions:
       contents: write
       actions: read
+      issues: read # release-notes credits read PR and issue authors
+      pull-requests: read
     # Approved orchestrators have already passed the matching GitHub environment.
     # Direct prereleases and manual Stable recovery pass release-gate above. The
     # Certum signing completes before either platform bundle reaches publication.
@@ -1200,6 +1202,8 @@ jobs:
       # GitHub release as usual.
       - name: Render reviewed release notes
         if: ${{ !inputs.orchestrated && needs.resolve.outputs.channel != 'preview' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/release-notes.mjs render --version "${{ needs.resolve.outputs.notes_version }}" --output /tmp/release-notes.md
 
       - name: Revalidate approved release ref

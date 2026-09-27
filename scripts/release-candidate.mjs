@@ -150,6 +150,16 @@ function requireAcceptanceReceipt(payloadRoot, files, metadata, item) {
   return { ...item, evidenceSha256: evidence.sha256, artifactSha256: receipt.sha256 };
 }
 
+// The notes are rendered once, at seal, because rendering reads GitHub: a later
+// render can differ (a renamed author, a newly linked fix) or fail outright.
+export const sealedNotesPath = "evidence/release-notes.md";
+
+function requireSealedNotes(files, renderedSha256) {
+  const notes = files.find(file => file.path === sealedNotesPath);
+  if (!notes) throw new Error(`candidate is missing sealed release notes: ${sealedNotesPath}`);
+  if (notes.sha256 !== renderedSha256) throw new Error("sealed release notes do not match renderedSha256");
+}
+
 export function sealCandidate(payloadRoot, metadata) {
   requireIdentity(metadata);
   const files = walk(payloadRoot);
@@ -162,6 +172,7 @@ export function sealCandidate(payloadRoot, metadata) {
     throw new Error("invalid candidate validity window");
   }
   const acceptance = metadata.acceptance.map(item => requireAcceptanceReceipt(payloadRoot, files, metadata, item));
+  requireSealedNotes(files, metadata.renderedNotesSha256);
   return {
     schema: 1,
     purpose: metadata.purpose ?? "release",
@@ -174,6 +185,7 @@ export function sealCandidate(payloadRoot, metadata) {
       sourceSHA: metadata.notesSourceSHA,
       catalogSha256: metadata.catalogSha256,
       renderedSha256: metadata.renderedNotesSha256,
+      renderedPath: sealedNotesPath,
     },
     source: {
       repository: metadata.repository,
@@ -224,6 +236,10 @@ export function verifyCandidate(payloadRoot, record, now = new Date(), purpose =
   const actual = walk(payloadRoot);
   requirePayloadLayout(payloadRoot, actual);
   if (JSON.stringify(actual) !== JSON.stringify(record.files)) throw new Error("candidate payload digest mismatch");
+  if (record.notes.renderedPath !== undefined) {
+    if (record.notes.renderedPath !== sealedNotesPath) throw new Error("invalid sealed release notes path");
+    requireSealedNotes(actual, record.notes.renderedSha256);
+  }
   requireDesktopIdentities(payloadRoot, {
     version: record.version,
     sourceSHA: record.sourceSHA,

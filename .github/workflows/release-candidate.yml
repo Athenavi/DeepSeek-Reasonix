@@ -194,6 +194,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      issues: read # release-notes credits read PR and issue authors
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -210,6 +212,7 @@ jobs:
         env:
           DOCS_BUILD_VERSION: v${{ needs.resolve.outputs.version }}
           DOCS_SOURCE_REVISION: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           node scripts/release-notes.mjs validate
           node scripts/release-notes.mjs render --version "$DOCS_BUILD_VERSION" --output /tmp/release-notes.md
@@ -259,6 +262,8 @@ jobs:
     permissions:
       actions: write
       contents: write
+      issues: read # release-notes credits read PR and issue authors
+      pull-requests: read
     uses: ./.github/workflows/release-desktop.yml
     with:
       channel: stable
@@ -285,6 +290,8 @@ jobs:
       attestations: write
       contents: read
       id-token: write
+      issues: read # release-notes credits read PR and issue authors
+      pull-requests: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -338,6 +345,16 @@ jobs:
           test -s payload/evidence/windows-amd64.json
           test -s payload/evidence/windows-arm64.json
           test -s payload/evidence/macos-universal-intel.json
+      # Rendered once and sealed: promotion publishes these bytes and never
+      # reads GitHub again, so a later rename or outage cannot change them.
+      - name: Render reviewed notes into the sealed payload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          worktree="$(mktemp -d "$RUNNER_TEMP/reasonix-notes.XXXXXX")"
+          git worktree add --detach "$worktree" "${{ github.sha }}"
+          node "$worktree/scripts/release-notes.mjs" render --version "v${{ needs.resolve.outputs.version }}" --output payload/evidence/release-notes.md
+          git worktree remove "$worktree"
       - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
           subject-path: payload/**/*
@@ -359,13 +376,6 @@ jobs:
           if-no-files-found: error
           overwrite: true
           retention-days: 90
-      - name: Render reviewed notes from the immutable product
-        run: |
-          git show "${{ github.sha }}:release-notes/releases.json" > /tmp/releases.json
-          worktree="$(mktemp -d "$RUNNER_TEMP/reasonix-notes.XXXXXX")"
-          git worktree add --detach "$worktree" "${{ github.sha }}"
-          node "$worktree/scripts/release-notes.mjs" render --version "v${{ needs.resolve.outputs.version }}" --output /tmp/release-notes.md
-          git worktree remove "$worktree"
       - name: Seal candidate record
         env:
           RELEASE_VERSION: ${{ needs.resolve.outputs.version }}
@@ -385,7 +395,7 @@ jobs:
           RELEASE_ACCEPTANCE_JSON: >-
             [{"kind":"windows-amd64","status":"passed","evidencePath":"evidence/windows-amd64.json"},{"kind":"windows-arm64","status":"passed","evidencePath":"evidence/windows-arm64.json"},{"kind":"macos-universal-intel","status":"passed","evidencePath":"evidence/macos-universal-intel.json"}]
         run: |
-          RELEASE_RENDERED_NOTES_SHA256="$(sha256sum /tmp/release-notes.md | awk '{print $1}')"
+          RELEASE_RENDERED_NOTES_SHA256="$(sha256sum payload/evidence/release-notes.md | awk '{print $1}')"
           RELEASE_CREATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           RELEASE_EXPIRES_AT="$(date -u -d '+30 days' +%Y-%m-%dT%H:%M:%SZ)"
           export RELEASE_RENDERED_NOTES_SHA256 RELEASE_CREATED_AT RELEASE_EXPIRES_AT

@@ -5,6 +5,7 @@ on:
     paths:
       - "release-notes/**"
       - "scripts/release-notes*.mjs"
+      - "scripts/release-credits*.mjs"
       - "scripts/release-event.mjs"
 
 permissions:
@@ -19,4 +20,4 @@ jobs:
         with:
           node-version: "22"
       - run: node scripts/release-notes.mjs validate
-      - run: node --test scripts/release-notes.test.mjs
+      - run: node --test scripts/release-notes.test.mjs scripts/release-credits.test.mjs
