@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -112,8 +113,73 @@ func seatbeltProfile(spec Spec) string {
 	for _, p := range explicitProtectedAllowDirs(spec) {
 		fmt.Fprintf(&b, "(allow file-write* (subpath %s))\n", sbplString(p))
 	}
+	// Last write rules: SBPL takes the final match, so no allowance re-opens them.
+	writeGitMetadataRules(&b, gitMetadataForSpec(spec))
 	return b.String()
 }
+
+// writeGitMetadataRules denies writes to protected Git metadata. A pin denies
+// only removing or renaming the entry and planting a symlink there, so the
+// entry's own mode and times stay writable. Worktree and submodule gitdirs
+// that exist get exact rules up to a limit; patterns cover the rest and any
+// created later, so the profile stays bounded however many a repository holds.
+func writeGitMetadataRules(b *strings.Builder, meta gitMetadata) {
+	paths := meta.Paths
+	var overWorktrees []string
+	for _, common := range meta.Commons {
+		g := gitGroupsOf(common, gitGroupMaxEntries)
+		paths = append(paths, g.Paths...)
+		if g.WorktreesOver {
+			overWorktrees = append(overWorktrees, common)
+		}
+	}
+	for _, p := range paths {
+		switch {
+		case p.Pin:
+			fmt.Fprintf(b, "(deny file-write-unlink (literal %s))\n", sbplString(p.Path))
+			fmt.Fprintf(b, "(deny file-write-create (require-all (literal %s) (vnode-type SYMLINK)))\n", sbplString(p.Path))
+		case p.Tree:
+			fmt.Fprintf(b, "(deny file-write* (subpath %s))\n", sbplString(p.Path))
+		default:
+			fmt.Fprintf(b, "(deny file-write* (literal %s))\n", sbplString(p.Path))
+		}
+	}
+	for _, common := range meta.Commons {
+		c := sbplRegexQuote(common)
+		modules := "^" + c + "/modules/(" + gitGroupSegment + "/)*"
+		patterns := []string{
+			"^" + c + "/worktrees/[^/]+/(config|config[.]worktree)$",
+			modules + "(config|config[.]worktree|commondir)$",
+			modules + "hooks(/.*)?$",
+		}
+		if slices.Contains(overWorktrees, common) {
+			patterns = append(patterns, "^"+c+"/worktrees/[^/]+/commondir$")
+		}
+		for _, re := range patterns {
+			fmt.Fprintf(b, "(deny file-write* (regex %s))\n", sbplString(re))
+		}
+		fmt.Fprintf(b, "(deny file-write-create (require-all (regex %s) (vnode-type SYMLINK)))\n", sbplString("^"+c+"/(modules|worktrees)/"))
+	}
+}
+
+// gitGroupSegment matches one path segment other than refs and logs, so the
+// submodule patterns do not catch a branch, tag or reflog named config or hooks.
+const gitGroupSegment = `([^/rl][^/]*|r|re|ref|r[^/e][^/]*|re[^/f][^/]*|ref[^/s][^/]*|refs[^/]+|l|lo|log|l[^/o][^/]*|lo[^/g][^/]*|log[^/s][^/]*|logs[^/]+)`
+
+// sbplRegexQuote escapes a path for a Seatbelt regex, whose metacharacters a
+// directory name may legally contain.
+func sbplRegexQuote(path string) string {
+	var b strings.Builder
+	for _, r := range path {
+		if strings.ContainsRune(`\.+*?()|[]{}^$`, r) {
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+func writableDirsForSpec(spec Spec) []string { return writeAllowDirsForSpec(spec) }
 
 func forbidWriteDirs(roots []string) []string {
 	return forbidReadDirs(roots)

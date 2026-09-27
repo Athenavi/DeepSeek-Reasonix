@@ -17,3 +17,7 @@ func CommandArgs(_ Spec, args []string) ([]string, bool) {
 
 // Available is always false on Windows.
 func Available() bool { return false }
+
+// writableDirsForSpec is empty: no Windows backend confines writes, so there
+// is no boundary for Git metadata protection to sit inside.
+func writableDirsForSpec(Spec) []string { return nil }
