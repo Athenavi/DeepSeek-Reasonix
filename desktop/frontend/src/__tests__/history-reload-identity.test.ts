@@ -24,7 +24,7 @@ const stub = installDesktopHostStub({
 
 try {
   const store = getTranscriptStore();
-  for (const protocol of [1, 2]) {
+  for (const protocol of [1, 2] as const) {
     revision = 1;
     const tabId = `history-reload-tab-${protocol}`;
     const sessionPath = `/fixture/history-reload-${protocol}.jsonl`;
@@ -44,7 +44,8 @@ try {
       historyRevision: 1,
       historyDigest: "generation-1",
       running: false,
-      meta: { sessionPath, sessionRevision: 1, sessionDigest: "generation-1" },
+      meta: { label: "fixture", ready: true, eventChannel: "fixture", cwd: "/fixture", sessionPath,
+        sessionRevision: 1, sessionDigest: "generation-1" },
     };
     const actions: HistoryWindowAction[] = [];
     const outcome = await loadHistoryWindow({
@@ -57,7 +58,7 @@ try {
       },
     });
     assert.equal(outcome, "loaded", `protocol ${protocol}: refreshed page should replace an evicted old window: ${JSON.stringify(actions)}`);
-    assert.equal(actions.at(-1)?.type, protocol === 2 ? "transcript_records" : "history_replace");
+    assert.equal(actions[actions.length - 1]?.type, protocol === 2 ? "transcript_records" : "history_replace");
     assert.equal(actions.find(action => action.type === "history_older_error"), undefined);
     assert.equal(state.historyRevision, 2);
     assert.equal(state.historyDigest, "generation-2");
