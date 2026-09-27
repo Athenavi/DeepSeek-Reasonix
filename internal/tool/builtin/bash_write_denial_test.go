@@ -1,6 +1,7 @@
 package builtin
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -72,7 +73,11 @@ func TestSandboxWriteHintNamesGitWorktreeMetadata(t *testing.T) {
 	objects := filepath.Join(main, ".git", "objects")
 	denial := "fatal: Unable to create '" + filepath.Join(gitDir, "index.lock") + "': Operation not permitted"
 	hint := appendSandboxWriteHint(denial, errors.New("exit status 128"), bashParams{Command: "git add ."}, sandbox.Spec{Mode: "enforce", WriteRoots: []string{worktree}}, "", subdir)
-	if !strings.Contains(hint, gitDir) || !strings.Contains(hint, objects) || strings.Contains(hint, `"`+filepath.Join(main, ".git")+`"`) || !strings.Contains(hint, "additional_write_dirs") {
+	wantDirs, err := json.Marshal([]string{gitDir, objects})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(hint, string(wantDirs)) || !strings.Contains(hint, "additional_write_dirs") {
 		t.Fatalf("missing actionable worktree metadata hint: %s", hint)
 	}
 	if got := gitWorktreeWriteDirs(subdir, "touch: /outside: Operation not permitted", []string{worktree}); len(got) != 0 {
