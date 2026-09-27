@@ -2,6 +2,509 @@
   "schemaVersion": 1,
   "releases": [
     {
+      "version": "1.39.2",
+      "date": "2026-09-27",
+      "channel": "stable",
+      "targetingVersion": 1,
+      "title": {
+        "en": "Reasonix 1.39.2",
+        "zh": "Reasonix 1.39.2"
+      },
+      "summary": {
+        "en": "Fixes for desktop and CLI: sessions that could not be opened or archived, live streaming after switching sessions, typed skill invocations, the setup API key name, and readable output on Chinese Windows.",
+        "zh": "桌面端与 CLI 修复：打不开或归档不掉的会话、切换会话后的实时流式显示、手动调用技能、设置向导的 API Key 变量名，以及中文 Windows 上的输出乱码。"
+      },
+      "surfaces": [
+        "desktop",
+        "cli"
+      ],
+      "guides": [],
+      "highlights": [
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Sessions that could not be opened or trashed work again",
+            "zh": "打不开、也删不掉的会话恢复正常"
+          },
+          "body": {
+            "en": "A session whose history recorded the same message twice failed to open and could not be moved to the Trash, showing only a generic error. It now opens (the first copy of the message wins; the file on disk is not rewritten), a damaged session can always be moved to the Trash with a clear message, and new writes can no longer record a duplicate.",
+            "zh": "历史里同一条消息被记录两次的会话会打不开，也无法移到废纸篓，只提示一个笼统的错误。现在这类会话可以正常打开（以第一条为准，磁盘上的文件不会被改写）；文件损坏的会话也总能移到废纸篓，并给出明确提示；新的写入也不会再产生重复消息。"
+          },
+          "refs": [
+            10893
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Old sessions you archive leave the sidebar",
+            "zh": "归档的旧会话会从侧栏消失"
+          },
+          "body": {
+            "en": "Archiving a recovered 1.38 conversation now archives every recovered copy at once instead of the next copy taking its place, and a legacy row listed under the wrong workspace (branch-badged rows, or rows titled with a raw file name) no longer stays stuck in the sidebar refusing pin, rename and open. Everything archived stays restorable from the archive list.",
+            "zh": "归档 1.38 留下的「已恢复」旧会话时，会一次归档它的所有恢复副本，不会再归档一条又冒出下一条；被列在错误工作区下的旧会话（带分支标记的、或以原始文件名为标题的）也不会再卡在侧栏、既删不掉又不能置顶/重命名/打开。归档的内容都可以在归档列表里恢复。"
+          },
+          "refs": [
+            10883,
+            11022
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Replies stream live again after switching sessions",
+            "zh": "切换会话后回复重新实时流式显示"
+          },
+          "body": {
+            "en": "A session opened from an older topic path, for example by switching to it in the sidebar, showed no thinking or answer until the turn ended. Output now streams as it arrives, as it does in the CLI.",
+            "zh": "从旧话题路径打开的会话（例如在侧栏切换过去）在整轮结束前看不到任何思考或回答。现在会像 CLI 一样边生成边显示。"
+          },
+          "refs": [
+            10973
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop"
+          ],
+          "title": {
+            "en": "Earlier history loads after the cache is cleared",
+            "zh": "缓存清理后仍能加载更早的历史"
+          },
+          "body": {
+            "en": "Scrolling up for older messages in a long session no longer fails, with retry stuck, after the session cache was evicted and the session had changed since the tab opened.",
+            "zh": "长会话里向上翻加载更早消息时，如果会话缓存已被清理且会话在打开后有过变化，不会再加载失败、重试也无效。"
+          },
+          "refs": [
+            10997
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Typed skill invocations reach the model the same way every time",
+            "zh": "手动调用技能时，模型收到的内容与工具调用一致"
+          },
+          "body": {
+            "en": "A message that is just /name (or a lone skill chip in the desktop composer) now sends the skill exactly as run_skill does, with your arguments labelled. Routing reads what you typed rather than the skill's body, so a skill that mentions another one no longer makes the model load both, and wording such as \"use X skill\" in the middle of a sentence no longer forces a skill.",
+            "zh": "只包含 /技能名 的消息（或桌面端输入框里单独的技能标签）现在与 run_skill 以同一种形式发给模型，你输入的参数也会单独标出。技能路由按你实际输入的内容判断，而不是技能正文：一个技能正文里提到另一个技能时，不会再让模型把两个都加载；句子中间出现「用 X 技能」之类的说法也不会再强制调用技能。"
+          },
+          "refs": [
+            11007,
+            11023
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "cli"
+          ],
+          "title": {
+            "en": "Setup keeps the API key variable name you type",
+            "zh": "reasonix setup 保留你输入的 API Key 变量名"
+          },
+          "body": {
+            "en": "The setup wizard asked for an API key variable name but always saved the key under a generated REASONIX_CONNECTION_…_KEY name. The name you type is now used. If another provider, setting or your environment already uses that variable, setup says what holds it and asks again; pressing Enter still lets Reasonix choose a private name.",
+            "zh": "设置向导会询问 API Key 变量名，但此前总是把密钥存到自动生成的 REASONIX_CONNECTION_…_KEY 里。现在会使用你输入的名字；如果该变量已被其他提供方、配置项或环境占用，向导会说明被谁占用并请你重新输入；直接回车仍由 Reasonix 自动选择一个私有名字。"
+          },
+          "refs": [
+            11005
+          ]
+        }
+      ],
+      "changes": {
+        "new": [],
+        "improved": [
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "The context panel's runtime keeps counting during long tool runs",
+              "zh": "上下文面板的运行时间在长时间工具执行中持续计时"
+            },
+            "body": {
+              "en": "Runtime in the context panel and the context ring no longer freezes between model requests, so long sessions show their real running time.",
+              "zh": "上下文面板和上下文环里的运行时间不再在两次模型请求之间停住，长会话显示的是真实运行时长。"
+            },
+            "refs": [
+              10925
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "History search finds text in tool output",
+              "zh": "历史搜索能找到工具输出里的内容"
+            },
+            "body": {
+              "en": "Content search in the history panel now matches tool results, such as a failed MCP server listing, and reads each session once instead of once per hit.",
+              "zh": "历史面板的内容搜索现在也会匹配工具结果（例如 MCP 服务器列表失败的输出），并且每个会话只读取一次。"
+            },
+            "refs": [
+              10938
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "The sidebar says it is reading projects on a slow start",
+              "zh": "启动较慢时侧栏会提示正在读取项目"
+            },
+            "body": {
+              "en": "Instead of briefly showing \"No projects yet\" before the project list arrives, the sidebar shows a loading state.",
+              "zh": "项目列表返回之前，侧栏显示加载状态，而不是先闪一下「还没有项目」。"
+            },
+            "refs": [
+              10979
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Symlinks inside the workspace appear in the file panel",
+              "zh": "工作区内的符号链接会显示在文件面板中"
+            },
+            "body": {
+              "en": "The file panel and the @ menu list a link whose target stays inside the workspace; links that dangle or point outside it are left out and cannot be previewed.",
+              "zh": "文件面板和 @ 菜单会列出目标仍在工作区内的符号链接；悬空或指向工作区外的链接不显示，也无法预览。"
+            },
+            "refs": [
+              10888
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Reopened sessions stay fast to read",
+              "zh": "重新打开的会话读取保持快速"
+            },
+            "body": {
+              "en": "After a session is reopened, new messages keep its on-disk index current, so later reads no longer rebuild it from the full log.",
+              "zh": "会话重新打开后，新消息会同步更新磁盘上的索引，之后读取不再从完整日志重建。"
+            },
+            "refs": [
+              10977
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Sandbox denials in a Git worktree say which folders to allow",
+              "zh": "Git worktree 中的沙箱拒绝会提示该放行哪些目录"
+            },
+            "body": {
+              "en": "When git add fails in a linked worktree because the sandbox blocks the main repository's Git metadata, bash now suggests the narrow folders to approve, never the whole .git directory.",
+              "zh": "在关联的 Git worktree 中，git add 因沙箱拦截主仓库的 Git 元数据而失败时，bash 会提示需要放行的最小目录，绝不会建议放行整个 .git 目录。"
+            },
+            "refs": [
+              11003
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "The environment note tells the tool shell from your login shell",
+              "zh": "环境说明区分工具 shell 与你的登录 shell"
+            },
+            "body": {
+              "en": "When your login shell is fish or zsh, the model is told that its bash tool still runs bash, so shell advice matches where commands actually run.",
+              "zh": "当你的登录 shell 是 fish 或 zsh 时，模型会知道它的 bash 工具仍然运行在 bash 中，给出的 shell 建议与实际执行环境一致。"
+            },
+            "refs": [
+              10902
+            ]
+          }
+        ],
+        "fixed": [
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "A remote Ask card shows once and can be answered",
+              "zh": "远程 Ask 卡片只显示一次且可以提交"
+            },
+            "body": {
+              "en": "In an SSH remote workspace, a question from the agent appeared twice and neither card could be submitted. It now appears once and submits.",
+              "zh": "在 SSH 远程工作区里，智能体的提问会出现两张卡片且都无法提交。现在只显示一张，并能正常提交。"
+            },
+            "refs": [
+              10914
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "SSH projects stay out of the composer's local folder menu",
+              "zh": "SSH 项目不再出现在输入框上方的本地文件夹菜单里"
+            },
+            "body": {
+              "en": "Pinned SSH projects were listed as local folders and failed when picked. They remain reachable from the sidebar's remote group.",
+              "zh": "已固定的 SSH 项目曾被当作本地文件夹列出，选中就报错。现在它们只在侧栏的远程分组中出现。"
+            },
+            "refs": [
+              10955
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "A waiting approval or question notifies once",
+              "zh": "等待中的审批或提问只通知一次"
+            },
+            "body": {
+              "en": "System notifications and bot-watched chats no longer repeat the same approval or question each time the desktop re-syncs a tab.",
+              "zh": "桌面端每次重新同步标签页时，系统通知和机器人监听的聊天不会再重复推送同一个审批或提问。"
+            },
+            "refs": [
+              10934,
+              10942
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Writes to the session's own temp folder no longer ask for scope",
+              "zh": "写入会话自己的临时目录不再请求扩大范围"
+            },
+            "body": {
+              "en": "write_file to the app-owned session temp directory stops prompting on every call; other directories still go through the normal approval.",
+              "zh": "write_file 写入应用自有的会话临时目录时不再每次都弹出扩大写入范围的请求；其他目录仍走正常审批。"
+            },
+            "refs": [
+              10890
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "A single ~ is no longer strikethrough",
+              "zh": "单个 ~ 不再被渲染成删除线"
+            },
+            "body": {
+              "en": "Ranges such as 500~1000 render as written; ~~text~~ still strikes through.",
+              "zh": "像 500~1000 这样的范围按原样显示；~~文字~~ 仍是删除线。"
+            },
+            "refs": [
+              10886
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "File edits keep untouched bytes in UTF-8 files with CJK text",
+              "zh": "编辑含中日韩文字的 UTF-8 文件不再改动未编辑的字节"
+            },
+            "body": {
+              "en": "edit_file and related tools could rewrite characters far from the edit when a file had a stray invalid byte. A file is now treated as GB18030 or GBK only when that reading round-trips exactly.",
+              "zh": "文件中有个别无效字节时，edit_file 等工具可能改写远离编辑处的字符。现在只有能原样往返时才把文件当作 GB18030 或 GBK 处理。"
+            },
+            "refs": [
+              10892
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Command and MCP output on Chinese Windows is readable",
+              "zh": "中文 Windows 上的命令输出和 MCP 报错可以正常阅读"
+            },
+            "body": {
+              "en": "Output from bash tool commands and MCP server startup errors written in the console code page is decoded instead of turning into mojibake, and output cut in the middle of a UTF-8 character no longer reads as garbled text.",
+              "zh": "bash 工具命令的输出和 MCP 服务器启动报错按控制台代码页正确解码，不再是乱码；在 UTF-8 字符中间被截断的输出也不会再整体显示成乱码。"
+            },
+            "refs": [
+              10918,
+              10912,
+              10948
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Tool calls through Responses relays run",
+              "zh": "经 Responses 中转的工具调用能正常执行"
+            },
+            "body": {
+              "en": "When a relay drops the per-call done events, the tool calls listed in the completed response are now run instead of the turn ending early.",
+              "zh": "中转服务丢掉单个工具调用的完成事件时，现在会按完成响应里列出的调用继续执行，而不是提前结束这一轮。"
+            },
+            "refs": [
+              10924
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "StepFun presets know their context window",
+              "zh": "StepFun 预设带上上下文窗口"
+            },
+            "body": {
+              "en": "StepFun models now show the context gauge and compact automatically at their 262144-token limit; existing StepFun entries without a window are updated.",
+              "zh": "StepFun 模型现在会显示上下文用量，并按 262144 token 的上限自动压缩；已安装但没有设置窗口的 StepFun 配置会自动补上。"
+            },
+            "refs": [
+              10930
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Subagents stay on the provider you picked",
+              "zh": "子代理留在你选择的提供方上"
+            },
+            "body": {
+              "en": "A subagent model named without a provider now runs on the parent session's provider when it serves that model, instead of the first provider that lists it.",
+              "zh": "只写模型名、不带提供方的子代理，现在会在父会话的提供方支持该模型时留在同一提供方，而不是跑到第一个列出它的提供方。"
+            },
+            "refs": [
+              10929
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "OpenCode Go minimax-m2.7 uses the route it is served on",
+              "zh": "OpenCode Go 的 minimax-m2.7 走正确的接口"
+            },
+            "body": {
+              "en": "minimax-m2.7 is offered only on the Anthropic route, where OpenCode Go serves it.",
+              "zh": "minimax-m2.7 只在 OpenCode Go 实际提供它的 Anthropic 接口上出现。"
+            },
+            "refs": [
+              10961
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "web_fetch works with fake-ip proxies",
+              "zh": "web_fetch 在 fake-ip 代理下可用"
+            },
+            "body": {
+              "en": "With Clash or mihomo in fake-ip mode, web_fetch no longer refuses every public site; it connects to an allowed address and still refuses hosts that resolve only to internal ones.",
+              "zh": "在 Clash 或 mihomo 的 fake-ip 模式下，web_fetch 不再拒绝所有公网站点；它会连接允许的地址，只解析到内网地址的主机仍会被拒绝。"
+            },
+            "refs": [
+              10909
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Projects under a cloud-drive folder load their config",
+              "zh": "云盘目录下的项目能正常加载配置"
+            },
+            "body": {
+              "en": "On Windows, a workspace inside a Box Drive or similar mount no longer fails every config load with a path error.",
+              "zh": "在 Windows 上，位于 Box Drive 等云盘挂载目录中的工作区不再每次加载配置都报路径错误。"
+            },
+            "refs": [
+              10904
+            ]
+          },
+          {
+            "targets": [
+              "cli"
+            ],
+            "title": {
+              "en": "Quoted text wraps within the terminal",
+              "zh": "引用文字在终端宽度内换行"
+            },
+            "body": {
+              "en": "Long blockquotes in the CLI chat, especially CJK text, no longer overflow the terminal and leave a stray rail on the next row.",
+              "zh": "CLI 对话里的长引用（尤其是中文）不再超出终端宽度、在下一行留下多余的竖线。"
+            },
+            "refs": [
+              10877
+            ]
+          }
+        ]
+      },
+      "upgrade": [],
+      "risks": [],
+      "contributors": [
+        "esengine",
+        "KHG420"
+      ],
+      "links": {
+        "github": "https://github.com/esengine/DeepSeek-Reasonix/releases/tag/desktop-v1.39.2",
+        "compare": "https://github.com/esengine/DeepSeek-Reasonix/compare/desktop-v1.39.1...desktop-v1.39.2",
+        "download": "https://reasonix.io/?download=desktop&channel=stable#start"
+      },
+      "releaseId": "1.39.2",
+      "baseVersion": "1.39.2",
+      "status": "reviewed",
+      "previousRelease": "1.39.1",
+      "builds": {
+        "cli": "v1.39.2",
+        "desktop": "v1.39.2",
+        "npm": "1.39.2"
+      }
+    },
+    {
       "version": "1.39.1",
       "date": "2026-09-26",
       "channel": "stable",
