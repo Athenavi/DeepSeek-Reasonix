@@ -313,7 +313,10 @@ export function useProjectTreeOrganization({
         const position = event.clientY < rect.top + rect.height / 2 ? "before" : "after";
         const folder = tree.find(folder => projectTreeOrganizationKey(folder) === key);
         const dragged = folder?.children?.find(row => projectSessionIdentity(row) === draggedID);
-        if (bindings.UpdateSessionOrganization && dragged) {
+        const targetGroup = (groupsRef.current[key] ?? []).find((group) => projectTreeGroupContainsNode(group, node));
+        if (dragged && targetGroup && !projectTreeGroupContainsNode(targetGroup, dragged)) {
+          mutateGroups(key, (groups) => moveNodeToGroup(groups, dragged, targetGroup.id), { kind: "set-group", target: projectNodeSelector(dragged), groupId: targetGroup.id });
+        } else if (bindings.UpdateSessionOrganization && dragged) {
           void mutateSessionOrganization(bindings, { scope: context.scope, workspaceRoot: context.root, hostId: splitOrganizationKey(key).hostId },
             { kind: "move", target: projectNodeSelector(dragged), anchor: projectNodeSelector(node), position })
             .then(saved => { setOrdersByKey(current => ({ ...current, [key]: saved.order })); return refresh({ reloadAllTopics: true }); })
@@ -326,7 +329,7 @@ export function useProjectTreeOrganization({
     };
     props.onDragEnd = clearTopicDrag;
     return { className, props };
-  }, [bindings, clearTopicDrag, dragTopicID, dropTopic, loadGroups, onTopicsChanged, refresh, showToast, tree]);
+  }, [bindings, clearTopicDrag, dragTopicID, dropTopic, loadGroups, mutateGroups, onTopicsChanged, refresh, showToast, tree]);
 
   const removeTopicFromGroups = useCallback((node: ProjectNode) => {
     const key = projectTreeOrganizationKey(node);
