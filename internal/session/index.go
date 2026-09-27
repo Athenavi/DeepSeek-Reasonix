@@ -68,11 +68,8 @@ func loadOrBuildSparseIndex(ctx context.Context, dir, cacheDir string) (sparseIn
 	if err != nil {
 		return sparseIndex{}, err
 	}
-	if data, readErr := os.ReadFile(sparseIndexPath(cacheDir)); readErr == nil {
-		var cached sparseIndex
-		if json.Unmarshal(data, &cached) == nil && cached.validFor(info, identity) {
-			return cached, nil
-		}
+	if cached, ok := readValidSparseIndex(cacheDir, info, identity); ok {
+		return cached, nil
 	}
 
 	rebuilt := sparseIndex{
@@ -108,6 +105,18 @@ func loadOrBuildSparseIndex(ctx context.Context, dir, cacheDir string) (sparseIn
 	}
 	writeSparseIndex(cacheDir, rebuilt)
 	return rebuilt, nil
+}
+
+func readValidSparseIndex(cacheDir string, info os.FileInfo, identity string) (sparseIndex, bool) {
+	data, err := os.ReadFile(sparseIndexPath(cacheDir))
+	if err != nil {
+		return sparseIndex{}, false
+	}
+	var cached sparseIndex
+	if json.Unmarshal(data, &cached) != nil || !cached.validFor(info, identity) {
+		return sparseIndex{}, false
+	}
+	return cached, true
 }
 
 func (idx sparseIndex) validFor(info os.FileInfo, identity string) bool {
@@ -186,6 +195,35 @@ func (s *Store) recordPersistedIndex(file *os.File, start int64, commits []Commi
 	s.index = index
 	s.indexMu.Unlock()
 	writeSparseIndex(s.dir, index)
+}
+
+// A reopened writer knows the durable sequence but not the older checkpoints.
+// Adopt an already validated cache before appending, so the new commits can
+// extend it without scanning history or leaving the disk index stale.
+func (s *Store) adoptPersistedIndex(file *os.File, start int64) {
+	s.indexMu.Lock()
+	partial, lastSequence := s.index.partial, s.index.LastSequence
+	s.indexMu.Unlock()
+	if !partial {
+		return
+	}
+	info, err := file.Stat()
+	if err != nil || info.Size() != start {
+		return
+	}
+	identity, err := sparseLogIdentity(file, info)
+	if err != nil {
+		return
+	}
+	cached, ok := readValidSparseIndex(s.dir, info, identity)
+	if !ok || cached.LastSequence != lastSequence {
+		return
+	}
+	s.indexMu.Lock()
+	if s.index.partial && s.index.LastSequence == lastSequence {
+		s.index = cached
+	}
+	s.indexMu.Unlock()
 }
 
 func (s *Store) rebuildWriterIndex(_ *os.File) error {
