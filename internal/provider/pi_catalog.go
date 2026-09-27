@@ -16,11 +16,10 @@ func PiCatalogModelInfo(kind, baseURL, model string) (ModelInfo, bool) {
 	if !ok {
 		return ModelInfo{}, false
 	}
-	for _, candidate := range piAI.GetModels("opencode-go") {
-		if candidate == nil || candidate.ID != strings.TrimSpace(model) || !piCatalogRouteMatches(route, candidate) {
-			continue
+	for _, candidate := range piCatalogOpenCodeGoModels(route) {
+		if candidate.ID == strings.TrimSpace(model) {
+			return modelInfoFromPi(candidate), true
 		}
-		return modelInfoFromPi(candidate), true
 	}
 	return ModelInfo{}, false
 }
@@ -36,6 +35,9 @@ func PiCatalogModelInfoForProvider(providerID, kind, baseURL, model string) (Mod
 	}
 	api := expectedCatalogAPI(kind)
 	configuredURL := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if route, ok := OfficialOpenCodeGoRoute(kind, configuredURL); ok && piRouteCorrectedAway(route, strings.TrimSpace(model)) {
+		return ModelInfo{}, false
+	}
 	for _, candidate := range piAI.GetModels(providerID) {
 		if candidate == nil || candidate.ID != strings.TrimSpace(model) || strings.ToLower(strings.TrimSpace(string(candidate.Api))) != api {
 			continue
@@ -140,6 +142,24 @@ func PiCatalogOpenCodeGoVisionModelIDs(route string) []string {
 	return ids
 }
 
+// piOpenCodeGoRouteCorrections pins models whose Pi route annotation disagrees
+// with both the opencode.ai/docs/go Endpoints table and models.dev.
+var piOpenCodeGoRouteCorrections = map[string]string{
+	"minimax-m2.7": OpenCodeGoRouteAnthropic,
+}
+
+// OpenCodeGoRouteCorrected reports a model whose route differs from the one
+// the embedded Pi catalog annotates.
+func OpenCodeGoRouteCorrected(model string) bool {
+	_, ok := piOpenCodeGoRouteCorrections[strings.TrimSpace(model)]
+	return ok
+}
+
+func piRouteCorrectedAway(route, id string) bool {
+	corrected, ok := piOpenCodeGoRouteCorrections[id]
+	return ok && corrected != route
+}
+
 func piCatalogOpenCodeGoModels(route string) []*piAI.Model {
 	var wantAPI, wantBaseURL string
 	switch route {
@@ -154,7 +174,7 @@ func piCatalogOpenCodeGoModels(route string) []*piAI.Model {
 	}
 	models := make([]*piAI.Model, 0)
 	for _, model := range piAI.GetModels("opencode-go") {
-		if model != nil && strings.EqualFold(string(model.Api), wantAPI) && strings.TrimRight(model.BaseURL, "/") == wantBaseURL {
+		if model != nil && strings.EqualFold(string(model.Api), wantAPI) && strings.TrimRight(model.BaseURL, "/") == wantBaseURL && !piRouteCorrectedAway(route, model.ID) {
 			models = append(models, model)
 		}
 	}
@@ -181,22 +201,5 @@ func modelInfoFromPi(model *piAI.Model) ModelInfo {
 		ContextWindow:   model.ContextWindow,
 		MaxOutputTokens: model.MaxTokens,
 		Reasoning:       model.Reasoning,
-	}
-}
-
-func piCatalogRouteMatches(route string, model *piAI.Model) bool {
-	if model == nil {
-		return false
-	}
-	api := strings.ToLower(strings.TrimSpace(string(model.Api)))
-	switch route {
-	case OpenCodeGoRouteChat:
-		return api == "openai-completions"
-	case OpenCodeGoRouteAnthropic:
-		return api == "anthropic-messages"
-	case OpenCodeGoRouteResponses:
-		return api == "openai-responses"
-	default:
-		return false
 	}
 }

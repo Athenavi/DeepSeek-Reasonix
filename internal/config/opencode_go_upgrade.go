@@ -118,14 +118,7 @@ func planOpenCodeGoUpgradeFiltered(c *Config, eligible func(ProviderEntry) bool)
 			}
 			continue
 		}
-		groups := map[string][]string{}
-		for _, model := range original.ModelList() {
-			route, known := provider.OpenCodeGoRecommendedRoute(model)
-			if !known {
-				route = current
-			}
-			groups[route] = append(groups[route], model)
-		}
+		groups := groupOpenCodeGoModelsByRoute(original, current)
 		if len(groups) == 0 {
 			continue
 		}
@@ -186,6 +179,18 @@ func planOpenCodeGoUpgradeFiltered(c *Config, eligible func(ProviderEntry) bool)
 		c.Bot.Connections[i].Model = rewrite(c.Bot.Connections[i].Model)
 	}
 	return j, additions
+}
+
+func groupOpenCodeGoModelsByRoute(original ProviderEntry, current string) map[string][]string {
+	groups := map[string][]string{}
+	for _, model := range original.ModelList() {
+		route, known := provider.OpenCodeGoRecommendedRoute(model)
+		if !known || openCodeGoKeepsCorrectedModel(original, model) {
+			route = current
+		}
+		groups[route] = append(groups[route], model)
+	}
+	return groups
 }
 
 // placeOpenCodeGoSiblings moves each split group directly after the connection
