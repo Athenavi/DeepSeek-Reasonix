@@ -4937,10 +4937,6 @@ func updateProjectsFileWithCollisionAssignment(mutator func(*desktopProjectFile)
 	return updateProjectsFileLockedWithCollisionAssignment(mutator, assignCollisions)
 }
 
-func updateProjectsFileLocked(mutator func(*desktopProjectFile) (bool, error)) error {
-	return updateProjectsFileLockedWithCollisionAssignment(mutator, true)
-}
-
 func updateProjectsFileLockedWithCollisionAssignment(mutator func(*desktopProjectFile) (bool, error), assignCollisions bool) error {
 	release, err := acquireDesktopProjectsFileLock()
 	if err != nil {

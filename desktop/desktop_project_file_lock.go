@@ -39,7 +39,7 @@ func updateProjectsFileCrossProcessLocked(mutator func(*desktopProjectFile) (boo
 	}
 	if assignCollisions {
 		if err := assignAddedProjectStateCollisions(previous, f.Projects); err != nil {
-			return fmt.Errorf("%w: %v", errProjectStateCollisionAssignment, err)
+			return fmt.Errorf("%w: %w", errProjectStateCollisionAssignment, err)
 		}
 	}
 	return saveProjectsFile(f)
