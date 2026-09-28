@@ -1,19 +1,33 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"reasonix/internal/config"
 	"reasonix/internal/control"
 	"reasonix/internal/serve"
+	"reasonix/internal/stats"
 )
 
 func TestAuthDisabledServeKeepsLaunchTokenOffTheTerminal(t *testing.T) {
+	// serve.New starts the process-wide usage catalog under REASONIX_HOME; it
+	// must be closed before the home is removed, or Windows refuses the delete.
+	closeUsage := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := stats.CloseUsageCatalogs(ctx); err != nil {
+			t.Fatalf("close usage catalog: %v", err)
+		}
+	}
+	closeUsage()
 	t.Setenv("REASONIX_HOME", t.TempDir())
+	t.Cleanup(closeUsage)
 	ctrl := newOwnedTestController(t, control.Options{SessionDir: t.TempDir()})
 	t.Cleanup(ctrl.Close)
 	srv := serve.New(ctrl, serve.NewBroadcaster(), config.ServeConfig{AuthMode: "none"})

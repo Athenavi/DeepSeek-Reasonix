@@ -52,7 +52,7 @@ func TestCommitDetailInPartialCloneReportsObjectNotLocal(t *testing.T) {
 		t.Fatalf("notLocalOr = %v, want ErrObjectNotLocal", got)
 	}
 	other := errors.New("other")
-	if got := notLocalOr(openWorkspaceRepo(clone), "no-such-rev", other); got != other {
+	if got := notLocalOr(openWorkspaceRepo(clone), "no-such-rev", other); !errors.Is(got, other) {
 		t.Fatalf("notLocalOr(no-such-rev) = %v, want the original error passed through", got)
 	}
 }

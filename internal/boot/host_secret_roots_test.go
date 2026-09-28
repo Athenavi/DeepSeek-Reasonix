@@ -32,15 +32,19 @@ func TestSandboxedShellCannotReadServeLaunchTokens(t *testing.T) {
 	if runtime.GOOS == "windows" || !sandbox.Available() {
 		t.Skip("OS sandbox unavailable")
 	}
-	t.Setenv("REASONIX_HOME", filepath.Join(isolateConfigHome(t), "reasonix-home"))
+	isolateConfigHome(t)
+	// Every file sits inside the write root: Linux masks /tmp with a tmpfs, so a
+	// file anywhere else under it would read as missing whether denied or not.
+	work := robustTempDir(t)
+	t.Setenv("REASONIX_HOME", filepath.Join(work, "reasonix-home"))
 	remoteDir := config.RemoteStateDir()
 	if err := os.MkdirAll(remoteDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	const secret = "launch-token-sentinel"
 	remoteToken := filepath.Join(remoteDir, "serve-demo.token")
-	flagToken := filepath.Join(t.TempDir(), "serve.token")
-	visible := filepath.Join(t.TempDir(), "visible.txt")
+	flagToken := filepath.Join(work, "serve.token")
+	visible := filepath.Join(work, "visible.txt")
 	for _, path := range []string{remoteToken, flagToken, visible} {
 		if err := os.WriteFile(path, []byte(secret), 0o600); err != nil {
 			t.Fatal(err)
@@ -48,7 +52,6 @@ func TestSandboxedShellCannotReadServeLaunchTokens(t *testing.T) {
 	}
 	config.RegisterHostSecretPath(flagToken)
 
-	work := t.TempDir()
 	spec := sandbox.Spec{Mode: "enforce", WriteRoots: []string{work}, ForbidReadRoots: RuntimeForbidReadRoots(config.Default(), work), Network: true}
 	read := func(path string) (string, error) {
 		argv, wrapped := sandbox.Command(spec, sandbox.Shell{Kind: sandbox.ShellBash, Path: "bash"}, "cat "+path)
