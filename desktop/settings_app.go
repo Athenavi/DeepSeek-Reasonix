@@ -30,6 +30,7 @@ import (
 	"reasonix/internal/netclient"
 	"reasonix/internal/provider"
 	"reasonix/internal/sandbox"
+	"reasonix/internal/tool"
 )
 
 // settings_app.go is the desktop Settings panel's command surface: it reads the
@@ -2942,6 +2943,18 @@ func (a *App) ClearProviderKey(apiKeyEnv string) error {
 // SetPermissionMode sets the writer-fallback mode (ask|allow|deny).
 func (a *App) SetPermissionMode(mode string) error {
 	return a.applyConfigChange(func(c *config.Config) error { return c.SetPermissionMode(mode) })
+}
+
+// AddPermissionRule appends a rule to the allow/ask/deny list.
+func (a *App) AddPermissionRule(list, rule string) error {
+	tools := tool.BuiltinContractEntries()
+	if ctrl, ok := a.activeCtrl().(interface{ AllToolContractEntries() []tool.ContractEntry }); ok {
+		tools = append(tools, ctrl.AllToolContractEntries()...)
+	}
+	if err := validateSavedPermissionRule(list, rule, tools); err != nil {
+		return err
+	}
+	return a.applyConfigChange(func(c *config.Config) error { return c.AddPermissionRule(list, rule) })
 }
 
 // RemovePermissionRule drops a rule from the allow/ask/deny list.
