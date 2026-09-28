@@ -25,7 +25,7 @@ var repositoryScopes = []string{"local", "worktree"}
 // resolve the same repository the invocation will.
 func driverOverrides(ctx context.Context, dir string, repoEnv, args []string) ([]string, error) {
 	sub := subcommandIndex(args)
-	if sub < 0 || args[sub] == "version" {
+	if sub < 0 || slices.Contains(noContentConversion, args[sub]) {
 		return nil, nil
 	}
 	query := []string{"config", "--name-only", "-z", "--get-regexp", `^(filter|merge)\.|^submodule\.recurse$`}
@@ -46,6 +46,14 @@ func driverOverrides(ctx context.Context, dir string, repoEnv, args []string) ([
 		return nil, fmt.Errorf("%w: %w", ErrRepositoryDrivers, err)
 	}
 	return overridesFor(out, true)
+}
+
+// noContentConversion are subcommands that never pass content through a
+// filter or merge driver and never honour submodule.recurse, so the listing
+// (a second git process per call) could only return overrides they ignore.
+var noContentConversion = []string{
+	"version", "rev-parse", "symbolic-ref", "check-ref-format", "merge-base", "rev-list",
+	"show-ref", "for-each-ref", "update-ref", "write-tree", "commit-tree",
 }
 
 func listConfig(ctx context.Context, dir string, repoEnv, globals, query []string) ([]byte, error) {

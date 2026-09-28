@@ -285,6 +285,9 @@ func TestUnaddressableDriverNameFailsClosed(t *testing.T) {
 	if !errors.Is(err, ErrRepositoryDrivers) {
 		t.Fatalf("status err = %v, want ErrRepositoryDrivers", err)
 	}
+	// rev-parse converts no content, so it runs without the listing and still
+	// starts no driver.
+	f.mustRun("rev-parse", "HEAD")
 	f.assertNotExecuted()
 }
 
