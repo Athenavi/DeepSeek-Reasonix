@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"strings"
 	"testing"
@@ -16,6 +17,22 @@ func TestAddPermissionRuleRejectsBareShellCommandBeforeSaving(t *testing.T) {
 	}
 	if _, err := os.Stat(config.UserConfigPath()); !os.IsNotExist(err) {
 		t.Fatalf("rejected rule wrote config: stat error = %v", err)
+	}
+	cfg := config.Default()
+	cfg.Permissions.Deny = []string{"rm"} // Existing entries must not be rewritten.
+	if err := cfg.SaveTo(config.UserConfigPath()); err != nil {
+		t.Fatalf("save existing config: %v", err)
+	}
+	before, err := os.ReadFile(config.UserConfigPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (&App{}).AddPermissionRule("deny", "git reset"); err == nil {
+		t.Fatal("bare command was accepted into existing config")
+	}
+	after, err := os.ReadFile(config.UserConfigPath())
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatalf("rejected rule changed existing config: read error = %v", err)
 	}
 }
 
