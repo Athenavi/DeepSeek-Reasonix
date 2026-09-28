@@ -31,7 +31,7 @@ export function useRuntimeNotifications(activeTabId: string | undefined) {
       pending.current = [];
     };
   }, [readPorts]);
-  const handleNotification = useCommittedCommand((event: AttentionChimeEvent & { err?: string }) => {
+  const handleNotification = useCommittedCommand((event: AttentionChimeEvent & { err?: string; outcome?: string }) => {
     if (event.kind === "ask_request" || event.kind === "approval_request" || event.kind === "turn_done") accept({ event });
   });
   const resetLegacyAttention = useCommittedCommand((resetTabId?: string) => accept({ resetTabId }));

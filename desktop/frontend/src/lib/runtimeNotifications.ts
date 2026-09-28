@@ -3,7 +3,11 @@ import { attentionChimeEventKey, clearAttentionChimeKeys, playAttentionChime, pl
 import type { Translator } from "./i18n";
 import type { ToastContextValue } from "./toast";
 
-export type NotificationOperation = { event: AttentionChimeEvent & { err?: string } } | { resetTabId?: string };
+export type NotificationOperation = { event: AttentionChimeEvent & { err?: string; outcome?: string } } | { resetTabId?: string };
+
+// Outcomes where the turn stopped to wait on the user; the host records them as
+// paused or awaiting_delivery (desktop/topic_status.go), never as a finish.
+const PAUSED_TURN_OUTCOMES = new Set(["final_readiness", "recovery_paused", "incomplete_read", "completion_uncertain"]);
 type NotificationPorts = { activeTabId: string | undefined; t: Translator; showToast: ToastContextValue["showToast"] };
 
 /** One owner deduplicates view events and authoritative background snapshots. */
@@ -72,7 +76,9 @@ export function createRuntimeNotifications(readPorts: () => NotificationPorts | 
         clearAttentionChimeKeys(seen, operation.resetTabId);
         clearAttentionChimeKeys(pendingSeen, operation.resetTabId);
       } else if (operation.event.kind === "turn_done") {
-        if (readPorts() && !operation.event.err) playSuccessChime();
+        if (!readPorts()) return;
+        if (PAUSED_TURN_OUTCOMES.has(operation.event.outcome ?? "")) playAttentionChime();
+        else if (!operation.event.err) playSuccessChime();
       } else handleAttention(operation.event);
     },
     start() { stop = runtimeStateStore.subscribe(handleSnapshot); handleSnapshot(); },
