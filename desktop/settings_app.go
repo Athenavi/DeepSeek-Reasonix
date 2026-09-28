@@ -2944,11 +2944,6 @@ func (a *App) SetPermissionMode(mode string) error {
 	return a.applyConfigChange(func(c *config.Config) error { return c.SetPermissionMode(mode) })
 }
 
-// AddPermissionRule appends a rule to the allow/ask/deny list.
-func (a *App) AddPermissionRule(list, rule string) error {
-	return a.applyConfigChange(func(c *config.Config) error { return c.AddPermissionRule(list, rule) })
-}
-
 // RemovePermissionRule drops a rule from the allow/ask/deny list.
 func (a *App) RemovePermissionRule(list, rule string) error {
 	return a.applyConfigChange(func(c *config.Config) error {
