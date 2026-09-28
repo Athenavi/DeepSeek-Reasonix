@@ -2951,7 +2951,15 @@ func (a *App) AddPermissionRule(list, rule string) error {
 	if ctrl, ok := a.activeCtrl().(interface{ AllToolContractEntries() []tool.ContractEntry }); ok {
 		tools = append(tools, ctrl.AllToolContractEntries()...)
 	}
-	if err := validateSavedPermissionRule(list, rule, tools); err != nil {
+	cfg, err := config.LoadForRootWithoutCredentialsReadOnly(a.activeWorkspaceRoot())
+	if err != nil {
+		return err
+	}
+	servers := make([]string, 0, len(cfg.Plugins))
+	for _, entry := range cfg.Plugins {
+		servers = append(servers, entry.Name)
+	}
+	if err := validateSavedPermissionRule(list, rule, tools, servers); err != nil {
 		return err
 	}
 	return a.applyConfigChange(func(c *config.Config) error { return c.AddPermissionRule(list, rule) })
