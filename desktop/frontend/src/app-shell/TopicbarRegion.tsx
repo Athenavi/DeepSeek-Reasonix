@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { PanelLeft } from "lucide-react";
-import logoSymbol from "../assets/logo-symbol.svg";
 import { Tooltip } from "../components/Tooltip";
 import { WorktreeBadge } from "../components/WorktreeBadge";
 
@@ -36,7 +35,7 @@ export function TopicbarRegion({ view, commands, children }: {
   const { sidebar, title, subtitle } = view;
   return <header className="topicbar">
     {view.brand && <div className="topicbar__brand">
-      <img src={logoSymbol} alt="Reasonix" className="topicbar__brand-logo" draggable={false} />
+      <span role="img" aria-label="Reasonix" className="topicbar__brand-logo" />
     </div>}
     {view.automationReturn && <button className="btn btn--small" type="button" onClick={event => {
       event.currentTarget.focus({ preventScroll: true });

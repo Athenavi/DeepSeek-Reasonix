@@ -35,7 +35,9 @@ try {
   assert.deepEqual([...document.querySelector("header")!.children].map(node => node.className),
     ["topicbar__brand", "btn btn--small", "tooltip-trigger", "topicbar__identity", "topicbar__spacer", "topicbar__actions"],
     "the Windows bar leads with the app mark");
-  assert.equal(document.querySelector(".topicbar__brand-logo")!.tagName, "IMG", "the leading mark is the app logo asset");
+  const logo = document.querySelector(".topicbar__brand-logo")!;
+  assert.equal(logo.getAttribute("role"), "img", "the leading mark is the app logo");
+  assert.equal(logo.getAttribute("aria-label"), "Reasonix");
   await paint();
   const action = document.querySelector(".topicbar__actions button");
   assert.equal(document.querySelectorAll(".topicbar__subtitle .worktree-badge").length, 1);
