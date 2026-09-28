@@ -26,6 +26,9 @@ func validateSavedPermissionRule(list, raw string, tools []tool.ContractEntry, s
 			return nil
 		}
 	}
+	if strings.HasPrefix(rule.Tool, "mcp__") && strings.ContainsAny(rule.Tool, "*?") {
+		return fmt.Errorf("permission rule %q uses an MCP tool-name wildcard; MCP permission rules require an exact tool name", raw)
+	}
 	if rule.Subject == "" && !strings.ContainsAny(rule.Tool, "()") {
 		// Allow uses an exact reusable command; ask/deny use a command prefix
 		// so arguments to the same command remain covered.

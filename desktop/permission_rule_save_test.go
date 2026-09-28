@@ -76,8 +76,8 @@ func TestAddPermissionRuleAcceptsConfiguredDisconnectedMCPServer(t *testing.T) {
 	if err := app.AddPermissionRule("deny", "mcp__other__create_issue"); err == nil {
 		t.Fatal("accepted an unconfigured MCP server")
 	}
-	if err := app.AddPermissionRule("deny", "mcp__github__*"); err == nil {
-		t.Fatal("accepted an ineffective MCP tool-name glob")
+	if err := app.AddPermissionRule("deny", "mcp__github__*"); err == nil || !strings.Contains(err.Error(), "exact tool name") {
+		t.Fatalf("MCP tool-name glob = %v, want exact-name guidance", err)
 	}
 	got, err := config.LoadForEditReadOnlyStrict(config.UserConfigPath())
 	if err != nil {
