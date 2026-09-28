@@ -26,7 +26,7 @@ require (
 	github.com/klauspost/compress v1.18.7
 	github.com/larksuite/oapi-sdk-go/v3 v3.11.0
 	github.com/mattn/go-runewidth v0.0.30
-	github.com/modelcontextprotocol/go-sdk v1.8.0-pre.2
+	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/pkg/sftp v1.13.11
 	github.com/rivo/uniseg v0.4.7
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
