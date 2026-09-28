@@ -29,9 +29,10 @@ type modelCredentialCommitJournal struct {
 	ResultRevision string   `json:"resultRevision,omitempty"`
 	Slots          []string `json:"slots"`
 	// SlotDigests: slot -> keyed digest of the staged value; removal needs the store to still hold it.
-	SlotDigests map[string]string `json:"slotDigests,omitempty"`
-	Phase       string            `json:"phase"`
-	UpdatedAt   string            `json:"updatedAt"`
+	SlotDigests map[string]string    `json:"slotDigests,omitempty"`
+	Rotations   []credentialRotation `json:"rotations,omitempty"`
+	Phase       string               `json:"phase"`
+	UpdatedAt   string               `json:"updatedAt"`
 	journalPath string
 }
 
@@ -298,6 +299,11 @@ func (c *Config) CompleteModelCredentialCommitLocked() error {
 			return err
 		}
 	}
+	if len(j.Rotations) > 0 {
+		if err := dropRotationBackups(j); err != nil {
+			return err
+		}
+	}
 	c.modelCredentialCommit = nil
 	c.stagedModelCredentials = nil
 	if path == "" {
@@ -318,6 +324,11 @@ func (c *Config) CleanupStagedModelCredentialsLocked(path string) {
 	}
 	if j := c.modelCredentialCommit; j != nil && (j.Phase == "config_committed" || fileContentRevision(path) != j.BeforeRevision) {
 		return // Publication or external edit: neither slots nor evidence are ours to remove.
+	}
+	if j := c.modelCredentialCommit; j != nil && len(j.Rotations) > 0 {
+		if restoreRotations(j) != nil || writeModelCredentialJournal(j) != nil {
+			return // Keep the journal so recovery can finish the restore.
+		}
 	}
 	if len(c.stagedModelCredentials) == 0 {
 		if c.modelCredentialCommit != nil && len(c.modelCredentialCommit.Slots) == 0 {
@@ -510,6 +521,9 @@ func RecoverModelCredentialCommitsLocked(configPath string) error {
 				if err := persistModelSettingsReceipt(&j); err != nil {
 					return err
 				}
+				if err := dropRotationBackups(&j); err != nil {
+					return err
+				}
 				if err := os.Remove(journalPath); err != nil && !os.IsNotExist(err) {
 					return err
 				}
@@ -525,6 +539,9 @@ func RecoverModelCredentialCommitsLocked(configPath string) error {
 			continue
 		}
 		if err := removeUnpublishedSlots(&j); err != nil {
+			return err
+		}
+		if err := restoreRotations(&j); err != nil {
 			return err
 		}
 		if err := os.Remove(journalPath); err != nil && !os.IsNotExist(err) {

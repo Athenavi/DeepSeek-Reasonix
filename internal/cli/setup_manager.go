@@ -922,7 +922,7 @@ func commitProviderSetupSession(s *providerSetupSession, configPath string) (boo
 		if typed := s.typedKeyEnv[name]; typed != "" && typed == entry.APIKeyEnv {
 			slot, err = fresh.StageNamedModelCredentialLocked(typed, name, value)
 		} else {
-			slot, err = fresh.StageModelCredentialLocked(value)
+			slot, err = fresh.RotateModelCredentialLocked([]string{name}, value)
 		}
 		if err != nil {
 			return false, err
