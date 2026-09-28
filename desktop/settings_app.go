@@ -30,6 +30,7 @@ import (
 	"reasonix/internal/netclient"
 	"reasonix/internal/provider"
 	"reasonix/internal/sandbox"
+	"reasonix/internal/tool"
 )
 
 // settings_app.go is the desktop Settings panel's command surface: it reads the
@@ -2946,6 +2947,21 @@ func (a *App) SetPermissionMode(mode string) error {
 
 // AddPermissionRule appends a rule to the allow/ask/deny list.
 func (a *App) AddPermissionRule(list, rule string) error {
+	tools := tool.BuiltinContractEntries()
+	if ctrl, ok := a.activeCtrl().(interface{ AllToolContractEntries() []tool.ContractEntry }); ok {
+		tools = append(tools, ctrl.AllToolContractEntries()...)
+	}
+	cfg, err := config.LoadForRootWithoutCredentialsReadOnly(a.activeWorkspaceRoot())
+	if err != nil {
+		return err
+	}
+	servers := make([]string, 0, len(cfg.Plugins))
+	for _, entry := range cfg.Plugins {
+		servers = append(servers, entry.Name)
+	}
+	if err := validateSavedPermissionRule(list, rule, tools, servers); err != nil {
+		return err
+	}
 	return a.applyConfigChange(func(c *config.Config) error { return c.AddPermissionRule(list, rule) })
 }
 
