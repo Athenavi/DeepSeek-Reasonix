@@ -129,8 +129,7 @@ func TestSummarizerReasoningOnlyIsSurfacedNotEmptied(t *testing.T) {
 
 // A reasoning-only reply that also opened a tool call is not a briefing: the
 // empty-output rejection must survive, and an opened call counts even when
-// the stream never completed it. At the ceiling that rejection now ends in the
-// truncation rescue instead of a digest built from chain-of-thought.
+// the stream never completed it. At the ceiling that rejection blocks the turn.
 func TestSummarizerReasoningWithToolCallStaysEmpty(t *testing.T) {
 	sess := foldableSessionOverForce(6)
 	a := agentOverForce(t, &fakeProvider{reasoningReply: "let me call a tool first", reasoningTool: true}, sess)
@@ -141,15 +140,13 @@ func TestSummarizerReasoningWithToolCallStaysEmpty(t *testing.T) {
 		}
 	})
 
-	if err := prepareContext(context.Background(), a, CompactionTriggerOverflow); err != nil {
-		t.Fatalf("prepare = %v, want the truncation rescue after the empty-output rejection", err)
+	if err := prepareContext(context.Background(), a, CompactionTriggerOverflow); !errors.Is(err, ErrCompactionRequired) {
+		t.Fatalf("prepare = %v, want a recoverable context failure", err)
 	}
 	if !strings.Contains(rejected, "summarizer returned empty output") {
 		t.Fatalf("failed receipt reason = %q, want the empty-output rejection for reasoning with a tool call", rejected)
 	}
-	if !truncatedRescue(a) {
-		t.Fatalf("receipt = %+v, want a truncation rescue and no digest built from tool-call reasoning", a.sess.compactionState.LastReceipt)
-	}
+	assertNoFailedSummaryRewrite(t, a)
 }
 
 // The reasoning clamp cuts on rune boundaries so a CJK briefing stays valid
@@ -171,35 +168,27 @@ func TestSummarizerReasoningClampKeepsValidUTF8(t *testing.T) {
 // truncation projection instead of any digest.
 func truncatedRescue(a *Agent) bool {
 	r := a.sess.compactionState.LastReceipt
-	return r != nil && r.Status == "applied" && r.Action == maintenanceActionTruncate &&
+	return r != nil && r.Status == "applied" && r.Action == "truncate" &&
 		latestDigest(a.sess.compactionState.Projection.Messages) == ""
 }
 
-// Overflow is where a failed summary used to turn into "context exceeds
-// provider limit and compaction failed". It now falls back to the truncation
-// rescue: no digest is fabricated, but the turn leaves with a smaller view.
-func TestOverflowSummarizerFailureFallsBackToTruncation(t *testing.T) {
+// Overflow recovery failure preserves the view and blocks the current attempt.
+func TestOverflowSummarizerFailurePreservesContext(t *testing.T) {
 	sess := foldableSessionOverForce(6)
 	a := agentOverForce(t, &fakeProvider{streamErr: errors.New("provider down")}, sess)
 	before := estimateMessagesTokens(provider.ModelMessages(sess.Messages))
 
-	if err := prepareContext(context.Background(), a, CompactionTriggerOverflow); err != nil {
-		t.Fatalf("prepare = %v, want the truncation rescue", err)
+	if err := prepareContext(context.Background(), a, CompactionTriggerOverflow); !errors.Is(err, ErrCompactionRequired) {
+		t.Fatalf("prepare = %v, want a recoverable context failure", err)
 	}
-	if !truncatedRescue(a) {
-		t.Fatalf("receipt = %+v, want an applied truncation without a digest", a.sess.compactionState.LastReceipt)
-	}
-	if after := projectionTokens(a); after == 0 || after >= before {
-		t.Fatalf("truncation left projection tokens=%d (source=%d)", after, before)
-	}
-	if after, hard := a.ContextUsedTokens(), a.hardInputCeiling(); after >= hard {
-		t.Fatalf("truncated view estimates %d tokens against a %d ceiling", after, hard)
+	assertNoFailedSummaryRewrite(t, a)
+	if after := estimateMessagesTokens(provider.ModelMessages(a.ModelHistorySnapshot())); after != before {
+		t.Fatalf("model history changed: %d -> %d", before, after)
 	}
 }
 
 // An oversized complete-prefix request fails admission and must not fabricate
-// a summary or privately shorten its input; only the explicit truncation
-// rescue may change the view.
+// a summary or privately shorten its input. The failed attempt preserves the view.
 func TestSummarizerFailureOnOversizedFoldDoesNotFabricateDigest(t *testing.T) {
 	sess := foldableSessionOverForce(120)
 	a := agentOverForceWindow(t, &fakeProvider{streamErr: errors.New("provider exploded")}, sess, 60000)
@@ -207,15 +196,13 @@ func TestSummarizerFailureOnOversizedFoldDoesNotFabricateDigest(t *testing.T) {
 		t.Fatalf("fixture fold is %d tokens against a %d budget; the shortening path is not exercised", tokens, budget)
 	}
 
-	if err := prepareContext(context.Background(), a, CompactionTriggerOverflow); err != nil {
-		t.Fatalf("prepare = %v, want the truncation rescue", err)
+	if err := prepareContext(context.Background(), a, CompactionTriggerOverflow); !errors.Is(err, ErrCompactionRequired) {
+		t.Fatalf("prepare = %v, want a recoverable context failure", err)
 	}
 	if degradedFold(a) || latestDigest(a.sess.compactionState.Projection.Messages) != "" {
 		t.Errorf("failed summary fabricated a digest: receipt=%+v", a.sess.compactionState.LastReceipt)
 	}
-	if !truncatedRescue(a) {
-		t.Fatalf("receipt = %+v, want an applied truncation", a.sess.compactionState.LastReceipt)
-	}
+	assertNoFailedSummaryRewrite(t, a)
 }
 
 // Below the hard ceiling the turn still goes out, so a failed summary must stay
@@ -241,7 +228,7 @@ func TestPressureBelowHardCeilingKeepsTheFailure(t *testing.T) {
 // The receipt recorded below the ceiling must not outlive the ceiling itself:
 // once growing usage crosses the hard ceiling the fold is the only way out, so
 // recovery has to run even with a standing failed receipt. If the summarizer is
-// still down, hard pressure takes the truncation rescue without a fake digest.
+// still down, hard pressure stops without installing a fallback projection.
 func TestFailedSummaryReceiptRetriesAtHardCeilingWithoutFallback(t *testing.T) {
 	sess := foldableSessionOverForce(6)
 	a := agentOverForce(t, &fakeProvider{streamErr: errors.New("provider down")}, sess)
@@ -268,14 +255,19 @@ func TestFailedSummaryReceiptRetriesAtHardCeilingWithoutFallback(t *testing.T) {
 		t.Fatalf("grown fixture estimates %d tokens against a %d ceiling; it is not past it", est, hard)
 	}
 
-	if err := prepareContext(context.Background(), a, CompactionTriggerPressure); err != nil {
-		t.Fatalf("over-ceiling prepare = %v, want the truncation rescue", err)
+	if err := prepareContext(context.Background(), a, CompactionTriggerPressure); !errors.Is(err, ErrCompactionRequired) {
+		t.Fatalf("over-ceiling prepare = %v, want a recoverable context failure", err)
 	}
 	if degradedFold(a) {
 		t.Fatal("hard-ceiling failure installed a mechanical digest")
 	}
-	if !truncatedRescue(a) {
-		t.Fatalf("receipt = %+v, want an applied truncation", a.sess.compactionState.LastReceipt)
+	assertNoFailedSummaryRewrite(t, a)
+}
+
+func assertNoFailedSummaryRewrite(t *testing.T, a *Agent) {
+	t.Helper()
+	if a.currentProjectionVersion() != 0 || truncatedRescue(a) || latestDigest(a.sess.compactionState.Projection.Messages) != "" {
+		t.Fatal("failed summary changed the model projection")
 	}
 }
 

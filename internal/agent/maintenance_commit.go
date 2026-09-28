@@ -89,14 +89,14 @@ func (a *Agent) installMaintenanceProjection(ctx context.Context, in maintenance
 		if accepted {
 			a.sess.checkpointState = "pending"
 			a.sess.compactionMu.Unlock()
-			return false, fmt.Errorf("persist %s projection: %w", in.action, err)
+			return false, &compactionPersistenceError{fmt.Errorf("persist %s projection: %w", in.action, err)}
 		}
 		a.sess.compactionState = previous
 		a.sess.compactionMu.Unlock()
 		if errors.Is(err, errCompressStaleContext) {
 			return false, err
 		}
-		return false, fmt.Errorf("persist %s projection: %w", in.action, err)
+		return false, &compactionPersistenceError{fmt.Errorf("persist %s projection: %w", in.action, err)}
 	}
 	a.sess.checkpointState = "applied"
 	a.sess.compactionMu.Unlock()
