@@ -28,7 +28,7 @@ func TestCompactionFinishPreservesUnrelatedErrors(t *testing.T) {
 		time.Sleep(compactionBudget)
 		synctest.Wait()
 		for _, original := range []error{nil, unrelated, wrapped, context.Canceled, fmt.Errorf("recovery guidance: %w", errSummaryBudget)} {
-			if got := finish(original); got != original {
+			if got := finish(original); got != original { //nolint:errorlint // Assert exact identity; even an additional wrapper violates this boundary.
 				t.Errorf("finish(%v) = %v; original error identity lost", original, got)
 			}
 		}
@@ -43,10 +43,10 @@ func TestCompactionFinishPreservesUnrelatedErrors(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	original := errors.New("unrelated error after stop")
-	if got := compactionError(ctx, original); got != original {
+	if got := compactionError(ctx, original); got != original { //nolint:errorlint // Assert exact identity, not merely an equivalent wrapped cause.
 		t.Fatalf("cancellation replaced unrelated error: %v", got)
 	}
-	if got := compactionError(t.Context(), context.DeadlineExceeded); got != context.DeadlineExceeded {
+	if got := compactionError(t.Context(), context.DeadlineExceeded); got != context.DeadlineExceeded { //nolint:errorlint // A foreign deadline must be returned unchanged.
 		t.Fatalf("foreign deadline reclassified: %v", got)
 	}
 }

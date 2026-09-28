@@ -94,7 +94,7 @@ func compactionError(ctx context.Context, err error) error {
 		return err
 	}
 	if errors.Is(err, context.DeadlineExceeded) && errors.Is(context.Cause(ctx), errSummaryBudget) && !errors.Is(err, errSummaryBudget) {
-		if err == context.DeadlineExceeded {
+		if err == context.DeadlineExceeded { //nolint:errorlint // Only the bare sentinel can be replaced without discarding an enclosing error.
 			return errSummaryBudget
 		}
 		// Keep any enclosing recovery/error identity, even when a work deadline
