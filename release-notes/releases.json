@@ -2,6 +2,172 @@
   "schemaVersion": 1,
   "releases": [
     {
+      "version": "1.39.4",
+      "date": "2026-09-28",
+      "channel": "stable",
+      "targetingVersion": 1,
+      "title": {
+        "en": "Reasonix 1.39.4",
+        "zh": "Reasonix 1.39.4"
+      },
+      "summary": {
+        "en": "Fixes for the CLI and desktop: /mcp retries no longer freeze the chat, review sub-agents run to completion, rotated keys keep their variable name, and remote tabs show their context.",
+        "zh": "CLI 与桌面端修复：/mcp 重试不再卡住对话、审查子代理不再被 8 轮上限打断、更换密钥保留原变量名、远程标签页显示上下文。"
+      },
+      "surfaces": [
+        "desktop",
+        "cli"
+      ],
+      "guides": [],
+      "highlights": [
+        {
+          "kind": "fixed",
+          "targets": [
+            "cli"
+          ],
+          "title": {
+            "en": "Retrying an MCP server in /mcp no longer freezes the chat",
+            "zh": "在 /mcp 里重试 MCP 服务不再卡住整个对话"
+          },
+          "body": {
+            "en": "Choosing Retry on a server that failed to connect ran the handshake on the UI loop, so an unresponsive server froze keys and redraw for up to its startup timeout. The connect now runs in the background.",
+            "zh": "对连接失败的服务选择「重试」时，握手在界面循环里同步执行，服务无响应时按键和重绘会卡住直到启动超时。现在连接在后台进行。"
+          },
+          "refs": [
+            11062
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Review sub-agents are no longer stopped after eight rounds",
+            "zh": "审查类子代理不再在 8 轮后被停下"
+          },
+          "body": {
+            "en": "Review, security-review and team-architect sub-agents paused after 8 tool-call rounds with a message to raise max_steps, which no setting reached. They now get the same step budget as other sub-agents.",
+            "zh": "review、security-review、team-architect 子代理在 8 轮工具调用后就会暂停，并提示调大 max_steps，但没有任何设置能调到。现在它们与其他子代理使用相同的步数预算。"
+          },
+          "refs": [
+            11093
+          ]
+        }
+      ],
+      "changes": {
+        "new": [],
+        "improved": [
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Permission rules that name no tool are flagged",
+              "zh": "提示匹配不到任何工具的权限规则"
+            },
+            "body": {
+              "en": "A rule written as a bare command, such as deny = [\"rm\"], parses but never matches a tool call. Such rules are now pointed out at startup with the Bash(...) form they should use; matching is unchanged.",
+              "zh": "写成裸命令的规则（例如 deny = [\"rm\"]）能被解析，但永远匹配不到任何工具调用。现在启动时会指出这类规则，并给出应写成的 Bash(...) 形式；匹配语义不变。"
+            },
+            "refs": [
+              10949
+            ]
+          }
+        ],
+        "fixed": [
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Saving a new key keeps the variable name you chose",
+              "zh": "保存新密钥时保留你设置的变量名"
+            },
+            "body": {
+              "en": "When a provider's key lives under a name only that provider reads, saving a new key now updates that variable in place instead of moving the provider to a private slot and leaving the old value behind. The previous value is kept until the save completes, so an interrupted save restores it.",
+              "zh": "当某个模型服务的密钥存放在只有它读取的变量名下时，保存新密钥现在会就地更新该变量，不再把服务挪到私有槽位、把旧值留在原处。保存完成前会保留旧值，中途中断会恢复。"
+            },
+            "refs": [
+              11122
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Remote SSH tabs show their context in the session overview",
+              "zh": "SSH 远程标签页的会话概览显示上下文"
+            },
+            "body": {
+              "en": "The right-hand overview of a remote tab showed empty context data even while the remote Serve reported usage. It now reads the selected remote session's context and drops responses that race a session switch.",
+              "zh": "远程标签页右侧概览在远端 Serve 已有用量时仍显示为空。现在会读取所选远程会话的上下文，并丢弃与切换会话竞争的过期响应。"
+            },
+            "refs": [
+              11092
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "A turn that stops for delivery checks rings the attention chime",
+              "zh": "因交付检查而停下的轮次会播放提醒音"
+            },
+            "body": {
+              "en": "A turn ending because delivery checks were incomplete played no sound. It now rings the attention chime, like other pauses that wait on you.",
+              "zh": "因交付检查未完成而结束的轮次之前没有任何提示音。现在会像其他等待你处理的暂停一样播放提醒音。"
+            },
+            "refs": [
+              11085
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Dropping a session on a group member adds it to that group",
+              "zh": "把会话拖到分组成员上会加入该分组"
+            },
+            "body": {
+              "en": "Dropping a session onto a member row of a session group only reordered it, so a session dragged in from outside stayed outside. It now joins the group.",
+              "zh": "把会话拖到会话分组的成员行上只会调整顺序，从组外拖进来的会话仍在组外。现在会加入该分组。"
+            },
+            "refs": [
+              11089
+            ]
+          }
+        ]
+      },
+      "upgrade": [],
+      "risks": [],
+      "contributors": [
+        "esengine",
+        "boscocp",
+        "KHG420"
+      ],
+      "links": {
+        "github": "https://github.com/esengine/DeepSeek-Reasonix/releases/tag/desktop-v1.39.4",
+        "compare": "https://github.com/esengine/DeepSeek-Reasonix/compare/desktop-v1.39.3...desktop-v1.39.4",
+        "download": "https://reasonix.io/?download=desktop&channel=stable#start"
+      },
+      "releaseId": "1.39.4",
+      "baseVersion": "1.39.4",
+      "status": "reviewed",
+      "previousRelease": "1.39.3",
+      "builds": {
+        "cli": "v1.39.4",
+        "desktop": "v1.39.4",
+        "npm": "1.39.4"
+      }
+    },
+    {
       "version": "1.39.3",
       "date": "2026-09-28",
       "channel": "stable",
