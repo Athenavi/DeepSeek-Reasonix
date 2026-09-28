@@ -6672,6 +6672,13 @@ type ChangedFileInfo struct {
 // ContextPanel returns the context usage, read files, and changed files for a
 // specific tab.
 func (a *App) ContextPanel(tabID string) ContextPanelInfo {
+	if a.isRemoteTab(tabID) {
+		used, window, ok := a.remoteContextSnapshot(tabID)
+		if ok {
+			return ContextPanelInfo{UsedTokens: used, WindowTokens: window, ReadFiles: []readFileRecord{}, ChangedFiles: []ChangedFileInfo{}}
+		}
+		return ContextPanelInfo{ReadFiles: []readFileRecord{}, ChangedFiles: []ChangedFileInfo{}}
+	}
 	read := a.captureContextRead(tabID)
 	ctrl, telemetry := read.ctrl, read.telemetry
 	if read.tab == nil {

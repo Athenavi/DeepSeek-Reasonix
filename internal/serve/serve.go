@@ -791,6 +791,12 @@ func (s *Server) history(w http.ResponseWriter, r *http.Request) {
 // context returns the prompt-vs-window gauge numbers. Supports ETag caching
 // so reconnecting clients avoid re-fetching unchanged context data.
 func (s *Server) context(w http.ResponseWriter, r *http.Request) {
+	s.bindMu.Lock()
+	defer s.bindMu.Unlock()
+	if err := s.expectedSessionErrorLocked(r); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
 	used, window := s.ctl().ContextSnapshot()
 	writeJSONCached(w, r, map[string]int{"used": used, "window": window})
 }

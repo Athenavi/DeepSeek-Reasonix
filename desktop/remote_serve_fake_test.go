@@ -53,6 +53,8 @@ type fakeServe struct {
 	eventsCloseEarly               bool // return immediately after the initial 200 frames
 	statusPayload                  string
 	statusAfterCancel              string
+	contextExpected                string
+	contextStarted, contextRelease chan struct{}
 }
 
 func (fs *fakeServe) eventsCount() int { fs.mu.Lock(); defer fs.mu.Unlock(); return fs.eventsConns }
@@ -305,6 +307,25 @@ func newFakeServe(t *testing.T, token string, sessions []serveSessionEntry) *fak
 		mux.HandleFunc("GET "+path, func(w http.ResponseWriter, r *http.Request) {
 			fs.record(r.Method, path, "")
 			responsePayload := payload
+			if path == "/context" {
+				fs.mu.Lock()
+				fs.contextExpected = r.Header.Get(expectedSessionPathHeader)
+				if id := r.Header.Get(expectedSessionIDHeader); id != "" {
+					fs.contextExpected = remoteSessionIDRoutePrefix + id
+				}
+				started, release := fs.contextStarted, fs.contextRelease
+				fs.mu.Unlock()
+				if started != nil {
+					started <- struct{}{}
+				}
+				if release != nil {
+					select {
+					case <-release:
+					case <-r.Context().Done():
+						return
+					}
+				}
+			}
 			if path == "/history" {
 				fs.mu.Lock()
 				fail := fs.failHistory
@@ -333,7 +354,7 @@ func newFakeServe(t *testing.T, token string, sessions []serveSessionEntry) *fak
 		})
 	}
 	snapshot("/history", `[{"role":"user","content":"hi"}]`)
-	snapshot("/context", `{"used":10}`)
+	snapshot("/context", `{"used":10,"window":128}`)
 	snapshot("/todos", `[]`)
 	snapshot("/checkpoints", `[{"turn":1}]`)
 	snapshot("/models", `{"current":"remote/chat","label":"chat","models":[{"ref":"remote/chat","provider":"remote","model":"chat","active":true}]}`)

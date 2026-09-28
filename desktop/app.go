@@ -6148,6 +6148,13 @@ func firstNonEmpty(values ...string) string {
 }
 
 func (a *App) ContextUsageForTab(tabID string) ContextInfo {
+	if a.isRemoteTab(tabID) {
+		used, window, ok := a.remoteContextSnapshot(tabID)
+		if ok {
+			return ContextInfo{Used: used, Window: window}
+		}
+		return ContextInfo{}
+	}
 	read := a.captureContextRead(tabID)
 	ctrl := read.ctrl
 	var info ContextInfo
