@@ -2369,7 +2369,9 @@ func (a *App) openTopicTabWithHead(scope, workspaceRoot, topicID, sessionPath, h
 	defer releaseAdmission()
 	if strings.TrimSpace(scope) == "project" {
 		saveWorkspace(actualRoot)
-		a.registerProjectRoot(actualRoot)
+		if err := a.registerProjectRoot(actualRoot); err != nil {
+			return TabMeta{}, err
+		}
 	}
 	targetKey := sessionRuntimeKey(sessionPath)
 
@@ -2665,7 +2667,9 @@ func (a *App) ensureBlankTab(scope, workspaceRoot string) (TabMeta, error) {
 	defer releaseAdmission()
 	if scope == "project" {
 		saveWorkspace(workspaceRoot)
-		a.registerProjectRoot(workspaceRoot)
+		if err := a.registerProjectRoot(workspaceRoot); err != nil {
+			return TabMeta{}, err
+		}
 	}
 	defaultModel, defaultToolApprovalMode := desktopNewSessionDefaults(scope, actualRoot)
 
@@ -4037,12 +4041,11 @@ func (a *App) applySessionBindingToTab(tab *WorkspaceTab, binding sessionBinding
 		if workspaceRoot == "" {
 			return
 		}
-		releaseAdmission, err := a.beginChangedProjectRuntimeAdmission(tab, scope, workspaceRoot)
+		releaseAdmission, err := a.beginRegisteredProjectRuntimeAdmission(tab, scope, workspaceRoot)
 		if err != nil {
 			return
 		}
 		defer releaseAdmission()
-		a.registerProjectRoot(workspaceRoot)
 	} else {
 		scope = "global"
 		workspaceRoot = globalTabWorkspaceRoot()

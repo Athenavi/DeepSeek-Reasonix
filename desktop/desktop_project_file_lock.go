@@ -25,12 +25,19 @@ func acquireDesktopProjectsFileLock() (func(), error) {
 // desktop-projects cross-process file lock.
 func updateProjectsFileCrossProcessLocked(mutator func(*desktopProjectFile) (bool, error)) error {
 	f := loadProjectsFile()
+	previous := make([]string, 0, len(f.Projects))
+	for _, project := range f.Projects {
+		previous = append(previous, project.Root)
+	}
 	changed, err := mutator(&f)
 	if err != nil {
 		return err
 	}
 	if !changed {
 		return nil
+	}
+	if err := assignAddedProjectStateCollisions(previous, f.Projects); err != nil {
+		return err
 	}
 	return saveProjectsFile(f)
 }

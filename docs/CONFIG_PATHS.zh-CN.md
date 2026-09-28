@@ -43,6 +43,14 @@ Legacy 迁移、OS home 约定目录扫描以及其他 fallback 路径都会跳�
 `<state root>` 默认等于 `<Reasonix home>`；只有设置 `REASONIX_STATE_HOME`
 时才会不同。
 
+Desktop 在将新项目写入 `desktop-projects.json` 时检测项目目录名冲突。已有项目及不冲突的
+项目继续使用原来的 `<state root>/projects/<workspace slug>/` 目录。只有新加入且发生
+冲突的项目使用 `<state root>/projects/@<项目绝对路径的 SHA-256>/`；其中的
+`.workspace-root` 文件记录目录归属。会话、Topic 和项目记忆路径都遵循该归属记录。
+读取项目列表不会创建或修改归属记录，也不会移动已有文件。如果两个项目在此修复之前就
+已经以同一个 slug 登记，其历史共享文件仍保留在原目录，因为旧目录无法证明每个文件的
+所属项目。
+
 Desktop Topic 的标题、标题来源、创建时间和自动标题状态以这些 SQLite 文件为权威存储。
 首次访问时，Desktop 会导入项目 `.reasonix/` 目录（或全局 Reasonix 目录）中的旧
 `desktop-topic-*.json`。检测到旧文件的 scope 会继续镜像旧格式以支持降级；全新 scope

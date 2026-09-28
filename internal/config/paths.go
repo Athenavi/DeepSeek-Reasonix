@@ -512,8 +512,9 @@ func StatsDir() string {
 }
 
 // ProjectSessionDir is the per-workspace session directory the desktop sidebar
-// lists: <state root>/projects/<slug>/sessions. Empty when either the state root
-// or workspaceRoot doesn't resolve.
+// lists. Existing projects use <state root>/projects/<slug>/sessions; newly
+// registered slug collisions use their assigned directory. Empty when either
+// the state root or workspaceRoot doesn't resolve.
 func ProjectSessionDir(workspaceRoot string) string {
 	base := MemoryUserDir()
 	root := strings.TrimSpace(workspaceRoot)
@@ -523,7 +524,7 @@ func ProjectSessionDir(workspaceRoot string) string {
 	if abs, err := filepath.Abs(root); err == nil {
 		root = abs
 	}
-	return filepath.Join(base, "projects", WorkspaceSlug(root), "sessions")
+	return filepath.Join(ProjectStateDir(base, root), "sessions")
 }
 
 // ProjectSessionStoreDir is the per-workspace execution-v2 session root.
@@ -536,7 +537,7 @@ func ProjectSessionStoreDir(workspaceRoot string) string {
 	if abs, err := filepath.Abs(root); err == nil {
 		root = abs
 	}
-	return filepath.Join(base, "projects", WorkspaceSlug(root), "sessions-v4")
+	return filepath.Join(ProjectStateDir(base, root), "sessions-v4")
 }
 
 // DesktopTopicStatePath returns the authoritative SQLite path for Desktop
@@ -554,7 +555,7 @@ func DesktopTopicStatePath(workspaceRoot string) string {
 	if abs, err := filepath.Abs(root); err == nil {
 		root = abs
 	}
-	return filepath.Join(base, "projects", WorkspaceSlug(root), "desktop", "topic-state-v1.sqlite")
+	return filepath.Join(ProjectStateDir(base, root), "desktop", "topic-state-v1.sqlite")
 }
 
 // WorkspaceSlug flattens an absolute workspace path into the directory name

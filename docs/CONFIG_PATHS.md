@@ -52,6 +52,17 @@ non-destructively when `<Reasonix home>/.env` is missing them.
 `<state root>` defaults to `<Reasonix home>`. It only differs when
 `REASONIX_STATE_HOME` is set.
 
+Desktop detects a project-directory name collision when it saves a newly added
+project in `desktop-projects.json`. Existing projects and projects without a
+collision keep their current `<state root>/projects/<workspace slug>/` directory.
+Only the newly added colliding project uses
+`<state root>/projects/@<SHA-256 of its absolute root>/`; its `.workspace-root`
+file records the assignment. Session, topic, and project-memory paths follow
+that assignment. Listing a project never creates or changes an assignment, and
+existing files are never moved. If two projects were already recorded with the
+same slug before this fix, their historical shared files remain in place: the
+old directory does not identify which project owns each file.
+
 Desktop topic titles, title sources, creation times, and automatic-title state
 are authoritative in these SQLite files. On first access, Desktop imports the
 legacy `desktop-topic-*.json` files from a project's `.reasonix/` directory (or

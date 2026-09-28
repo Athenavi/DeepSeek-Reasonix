@@ -281,7 +281,9 @@ func (a *App) openForkedSessionTabWithWorkspace(sourceTab *WorkspaceTab, locator
 		if err := prependTopicInProjectsFile(workspaceRoot, topicID, true); err != nil {
 			slog.Warn("desktop: persist isolated fork topic", "workspace", workspaceRoot, "topic", topicID, "err", err)
 		}
-		a.registerProjectRoot(workspaceRoot)
+		if err := a.registerProjectRoot(workspaceRoot); err != nil {
+			return forkedSessionTabOpen{}, err
+		}
 	}
 	if hook := forkTabBeforePublishHookForTest.Load(); hook != nil {
 		(*hook)()
