@@ -73,7 +73,7 @@ func TestRemoteRuntimeInboxReceiptSnapshotAndConsumptionOverHTTP(t *testing.T) {
 			}
 		}
 	})
-	server := httptest.NewServer(serve.New(ctrl, nil, config.ServeConfig{}).Handler())
+	server := httptest.NewServer(operatorServeHandler(serve.New(ctrl, nil, config.ServeConfig{})))
 	defer server.Close()
 	a, tab := remoteRuntimeTestApp(server.Client())
 	tab.base, tab.routing.currentPath, tab.session.path = server.URL, path, path

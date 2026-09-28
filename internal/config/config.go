@@ -1725,9 +1725,9 @@ func (s MCPConfigSource) UserAuthorized() bool {
 	}
 }
 
-// ProjectScoped reports whether an MCP entry belongs to one workspace. Project
-// scope remains useful for provenance, activation, and relative-path handling;
-// it no longer implies a separate launch-approval workflow.
+// ProjectScoped reports whether an MCP entry belongs to one workspace. Its
+// activation is keyed per workspace, and it stays disabled until the user
+// records a decision there.
 func (s MCPConfigSource) ProjectScoped() bool {
 	return s == MCPSourceProjectConfig || s == MCPSourceProjectMCPJSON
 }
@@ -1760,11 +1760,9 @@ func resolvedMCPTier(tier string) string {
 }
 
 // AutoStartPlugins returns enabled MCP entries for the catalog. Durable
-// enable/disable overrides in mcp-activation.json take precedence over the
-// legacy auto_start field. auto_start=false without an override still maps to
-// disabled; true/nil map to enabled. "Auto start" no longer means "spawn the
-// process at session boot" — enabled servers register cached tools and start
-// on first real tool call.
+// overrides in mcp-activation.json win over auto_start; without one a
+// project-declared server is disabled. Enabled servers register cached tools
+// and start on the first real tool call, not at session boot.
 func (c *Config) AutoStartPlugins() []PluginEntry {
 	return c.EnabledPlugins("", DefaultMCPActivationStore())
 }
@@ -1777,7 +1775,7 @@ func (c *Config) EnabledPlugins(workspace string, activation *MCPActivationStore
 	}
 	out := make([]PluginEntry, 0, len(c.Plugins))
 	for _, p := range c.Plugins {
-		enabled := p.ShouldAutoStart()
+		enabled := DeclaredDefaultOn(p)
 		if activation != nil {
 			if resolved, err := activation.IsEnabled(p, workspace); err == nil {
 				enabled = resolved

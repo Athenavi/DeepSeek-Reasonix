@@ -42,7 +42,7 @@ func TestSessionExportHTTPFixedCompleteSnapshot(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := control.New(control.Options{SessionService: service, SessionRuntime: runtime, ExclusiveSession: true, Sink: bc})
 	defer ctrl.Close()
-	server := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	server := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer server.Close()
 	response, err := http.Get(server.URL + "/session-export/snapshot")
 	if err != nil {
@@ -169,7 +169,7 @@ func TestSessionExportRemainsPinnedAfterForegroundSwitch(t *testing.T) {
 		t.Fatal("source runtime is unavailable")
 	}
 	appendSessionExportTestMessage(t, runtime, "SOURCE-A")
-	ts := httptest.NewServer(srv.Handler())
+	ts := httptest.NewServer(operatorHandler(srv))
 	defer ts.Close()
 	snapshot := captureSessionExportTestSnapshot(t, ts.URL, source, true)
 
@@ -214,7 +214,7 @@ func TestSessionExportRemainsPinnedAfterForegroundSwitch(t *testing.T) {
 
 func TestSessionExportRejectsPathLikeTargetIdentities(t *testing.T) {
 	srv, _, _, source := newExclusiveSessionServe(t)
-	ts := httptest.NewServer(srv.Handler())
+	ts := httptest.NewServer(operatorHandler(srv))
 	defer ts.Close()
 	snapshot := captureSessionExportTestSnapshot(t, ts.URL, source, false)
 
@@ -250,7 +250,7 @@ func TestSessionExportRemainsPinnedAfterTakeover(t *testing.T) {
 		t.Fatal("source runtime is unavailable")
 	}
 	appendSessionExportTestMessage(t, runtime, "BEFORE-TAKEOVER")
-	ts := httptest.NewServer(srv.Handler())
+	ts := httptest.NewServer(operatorHandler(srv))
 	defer ts.Close()
 	snapshot := captureSessionExportTestSnapshot(t, ts.URL, source, false)
 

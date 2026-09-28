@@ -3936,6 +3936,7 @@ command = "reasonix-missing-legacy-eager-mcp"
 tier = "eager"
 `)
 
+	enableProjectMCPForTest(t, dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	ctrl, err := Build(ctx, Options{})
@@ -3981,6 +3982,7 @@ command = "reasonix-missing-legacy-lazy-mcp"
 tier = "lazy"
 `)
 
+	enableProjectMCPForTest(t, dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	ctrl, err := Build(ctx, Options{})
@@ -4082,7 +4084,7 @@ func TestRuntimeForbidReadRootsAddsGlobalCredentialFileExceptOnWindows(t *testin
 	cfg := config.Default()
 	cfg.Sandbox.ForbidRead = []string{configured}
 	withoutCredentials := RuntimeForbidReadRoots(cfg, ".")
-	if !reflect.DeepEqual(withoutCredentials, []string{configured}) {
+	if want := appendUniquePaths([]string{configured}, config.HostSecretReadRoots()...); runtime.GOOS != "windows" && !reflect.DeepEqual(withoutCredentials, want) {
 		t.Fatalf("roots without global credentials = %v", withoutCredentials)
 	}
 	credentialPath := config.UserCredentialsPath()
@@ -4302,6 +4304,7 @@ tier = "eager"
 `)
 
 	var notices []event.Event
+	enableProjectMCPForTest(t, dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	ctrl, err := Build(ctx, Options{

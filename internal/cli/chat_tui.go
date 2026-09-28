@@ -29,6 +29,7 @@ import (
 	"reasonix/internal/config"
 	"reasonix/internal/control"
 	"reasonix/internal/event"
+	"reasonix/internal/gitcmd"
 	"reasonix/internal/hook"
 	"reasonix/internal/i18n"
 	"reasonix/internal/memory"
@@ -572,9 +573,16 @@ func runStatuslineCmd(cmd, stdinPayload string) string {
 }
 
 func runStatuslineCmdWithTimeout(cmd, stdinPayload string, timeout time.Duration) string {
-	res := hook.DefaultSpawner(context.Background(), hook.SpawnInput{
+	return runStatuslineCmdWith(hook.DefaultSpawner, cmd, stdinPayload, timeout)
+}
+
+// runStatuslineCmdWith spawns from the workspace, which the user does not
+// author, so a bare command name resolves through PATH alone.
+func runStatuslineCmdWith(spawn hook.Spawner, cmd, stdinPayload string, timeout time.Duration) string {
+	res := spawn(context.Background(), hook.SpawnInput{
 		Command: cmd,
 		Stdin:   stdinPayload + "\n",
+		Env:     map[string]string{hook.NoCwdCommandSearchEnv: "1"},
 		Timeout: timeout,
 	})
 	out := strings.TrimSpace(res.Stdout)
@@ -588,7 +596,16 @@ func (m chatTUI) refreshGitStatus() tea.Cmd {
 	if m.statuslineCmd != "" {
 		return nil
 	}
-	return fetchGitStatus()
+	return fetchGitStatus(sessionWorkspaceRepo(m.ctrl))
+}
+
+// sessionWorkspaceRepo is the git identity ctrl's session opened with; a
+// controller that carries none has no status line to read.
+func sessionWorkspaceRepo(ctrl control.SessionAPI) gitcmd.Repo {
+	if c, ok := ctrl.(interface{ WorkspaceRepo() gitcmd.Repo }); ok {
+		return c.WorkspaceRepo()
+	}
+	return gitcmd.Repo{}
 }
 
 // modelSwitchMsg carries the result of an async /model switch. A nil err means

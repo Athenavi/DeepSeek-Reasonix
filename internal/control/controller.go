@@ -42,6 +42,7 @@ import (
 	"reasonix/internal/extension"
 	"reasonix/internal/extension/dispatch"
 	"reasonix/internal/extension/uihub"
+	"reasonix/internal/gitcmd"
 	goaldomain "reasonix/internal/goal"
 	"reasonix/internal/guardian"
 	"reasonix/internal/hook"
@@ -287,6 +288,8 @@ type Controller struct {
 	// command discovery, and the guard root for checkpoint restore writes. It is
 	// surfaced to frontends via WorkspaceRoot().
 	workspaceRoot string
+	// workspaceRepo is workspaceRoot's git identity, resolved before any turn ran.
+	workspaceRepo gitcmd.Repo
 
 	// externalFolderRefs maps session-generated @ tokens to user-dropped
 	// directories outside workspaceRoot. It is intentionally per-controller:
@@ -673,6 +676,7 @@ type Options struct {
 	// WorkspaceRoot is the project root checkpoint restores are confined to ("" =
 	// no confinement). Frontends pass the cwd they launched the session in.
 	WorkspaceRoot          string
+	WorkspaceRepo          gitcmd.Repo // WorkspaceRoot's identity, resolved when the session opened
 	ExternalFolderToolRefs externalFolderToolRefs
 	// ResponseLanguage controls final-answer language preference. Empty/auto
 	// means no transient injection because the stable language policy follows the
@@ -862,6 +866,7 @@ func New(opts Options) *Controller {
 		capabilityRuntime:      opts.CapabilityRuntime,
 		ablation:               opts.Ablation,
 		workspaceRoot:          opts.WorkspaceRoot,
+		workspaceRepo:          opts.WorkspaceRepo,
 		externalFolderToolRefs: opts.ExternalFolderToolRefs,
 		providerResolver:       opts.ProviderResolver,
 		runtimeGeneration:      opts.RuntimeGeneration,
@@ -4628,7 +4633,7 @@ func (c *Controller) syncCapabilityRuntimeFromConfig(name string, enabledOverrid
 		if strings.TrimSpace(entry.Name) != name {
 			continue
 		}
-		enabled := entry.ShouldAutoStart()
+		enabled := config.DeclaredDefaultOn(entry)
 		if enabledOverride != nil {
 			enabled = *enabledOverride
 		} else if resolved, resolveErr := config.DefaultMCPActivationStore().IsEnabled(entry, c.workspaceRoot); resolveErr == nil {
@@ -4735,9 +4740,14 @@ func (c *Controller) DisconnectedMCPNames() []string {
 	return names
 }
 
+// ConnectConfiguredMCPServer starts a configured server at the user's request;
+// for a project-declared one that request is the approval, and is recorded.
 func (c *Controller) ConnectConfiguredMCPServer(name string) (int, error) {
 	p, err := c.configuredMCPServer(name)
 	if err != nil {
+		return 0, err
+	}
+	if err := config.RecordExplicitStart(p, c.workspaceRoot); err != nil {
 		return 0, err
 	}
 	return c.connectMCPServer(p)
@@ -4789,10 +4799,7 @@ func (c *Controller) RemoveMCPServer(name string) (disconnected bool, err error)
 	// cached/on-demand surface without starting a process; otherwise ensure the
 	// removed name stays absent.
 	if removedState.fallbackFound {
-		enabled := removedState.fallback.ShouldAutoStart()
-		if resolved, resolveErr := config.DefaultMCPActivationStore().IsEnabled(removedState.fallback, c.workspaceRoot); resolveErr == nil {
-			enabled = resolved
-		}
+		enabled := config.MCPServerEnabled(removedState.fallback, c.workspaceRoot)
 		if enabled {
 			_, _ = c.RegisterMCPServerOnDemand(removedState.fallback)
 		} else {
@@ -4848,6 +4855,11 @@ func (c *Controller) ModelSelectionIdentity() string { return c.selection.identi
 // (the directory that file-writers and @-references are scoped to).
 // Empty means no scoping is in effect.
 func (c *Controller) WorkspaceRoot() string { return c.workspaceRoot }
+
+// WorkspaceRepo is the workspace's git identity as the session resolved it when
+// it opened. Host git reads the workspace through it rather than rediscovering
+// the repository from files the session's own commands may have written.
+func (c *Controller) WorkspaceRepo() gitcmd.Repo { return c.workspaceRepo }
 
 func (c *Controller) imageInputEnabled() bool {
 	if c.frozenImageInput != nil {

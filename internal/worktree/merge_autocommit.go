@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"reasonix/internal/fileutil"
+	"reasonix/internal/gitcmd"
 )
 
 var gitNoOptionalLocks = []string{"GIT_OPTIONAL_LOCKS=0"}
@@ -23,15 +24,15 @@ func autoCommitDirtyWorktree(ctx context.Context, inspection MergeInspection) (s
 	if err := verifyWorktreeMergeIdentity(ctx, inspection); err != nil {
 		return "", false, fmt.Errorf("worktree changed before auto-commit: %w", err)
 	}
-	indexPath, originalIndex, err := snapshotRealIndex(ctx, inspection.WorktreeRoot)
+	indexPath, originalIndex, err := snapshotRealIndex(ctx, inspection.worktree)
 	if err != nil {
 		return "", false, err
 	}
-	realEntries, stderr, err := runGitEnv(ctx, inspection.WorktreeRoot, gitNoOptionalLocks, "ls-files", "--stage", "-z")
+	realEntries, stderr, err := runGitEnv(ctx, inspection.worktree, gitNoOptionalLocks, "ls-files", "--stage", "-z")
 	if err != nil {
 		return "", false, fmt.Errorf("snapshot real index entries: %w%s", err, stderrSuffix(stderr))
 	}
-	stagedIndexChanges, err := hasStagedIndexChanges(ctx, inspection.WorktreeRoot, inspection.WorktreeHead)
+	stagedIndexChanges, err := hasStagedIndexChanges(ctx, inspection.worktree, inspection.WorktreeHead)
 	if err != nil {
 		return "", false, err
 	}
@@ -42,14 +43,14 @@ func autoCommitDirtyWorktree(ctx context.Context, inspection MergeInspection) (s
 	}
 	defer os.Remove(tempIndex)
 	tempEnv := []string{"GIT_OPTIONAL_LOCKS=0", "GIT_INDEX_FILE=" + tempIndex}
-	if _, stderr, err := runGitEnv(ctx, inspection.WorktreeRoot, tempEnv, "read-tree", inspection.WorktreeHead); err != nil {
+	if _, stderr, err := runGitEnv(ctx, inspection.worktree, tempEnv, "read-tree", inspection.WorktreeHead); err != nil {
 		return "", false, fmt.Errorf("seed temporary index: %w%s", err, stderrSuffix(stderr))
 	}
 	if err := secureTemporaryIndex(tempIndex); err != nil {
 		return "", false, err
 	}
-	if _, stderr, err := runGitEnv(ctx, inspection.WorktreeRoot, tempEnv, "add", "-A"); err != nil {
-		return "", false, fmt.Errorf("stage confirmed changes in temporary index: %w%s", err, stderrSuffix(stderr))
+	if err := inspection.worktree.StageAll(ctx, tempEnv...); err != nil {
+		return "", false, fmt.Errorf("stage confirmed changes in temporary index: %w", err)
 	}
 	if err := secureTemporaryIndex(tempIndex); err != nil {
 		return "", false, err
@@ -62,7 +63,7 @@ func autoCommitDirtyWorktree(ctx context.Context, inspection MergeInspection) (s
 	if stagedIndexChanges && realEntries != tempEntries {
 		return "", false, errors.New("worktree_index_split: staged or index-only content is not fully represented by the working tree; commit, stash, or unstage it manually")
 	}
-	headTree, stderr, err := gitValue(ctx, inspection.WorktreeRoot, "rev-parse", "--verify", inspection.WorktreeHead+"^{tree}")
+	headTree, stderr, err := gitValue(ctx, inspection.worktree, "rev-parse", "--verify", inspection.WorktreeHead+"^{tree}")
 	if err != nil {
 		return "", false, fmt.Errorf("read confirmed worktree tree: %w%s", err, stderrSuffix(stderr))
 	}
@@ -70,14 +71,14 @@ func autoCommitDirtyWorktree(ctx context.Context, inspection MergeInspection) (s
 		return "", false, errors.New("confirmed worktree snapshot no longer contains committable changes; inspect again")
 	}
 
-	committedHead, stderr, err := gitValue(ctx, inspection.WorktreeRoot,
+	committedHead, stderr, err := gitValue(ctx, inspection.worktree,
 		"-c", "user.name=Reasonix", "-c", "user.email=reasonix@local",
 		"commit-tree", stagedTree, "-p", inspection.WorktreeHead, "-m", "worktree: save changes before merge back")
 	if err != nil {
 		return "", false, fmt.Errorf("create exact worktree commit: %w%s", err, stderrSuffix(stderr))
 	}
 	noteMergeStep("after_worktree_commit")
-	if err := verifyCommitObject(ctx, inspection.WorktreeRoot, committedHead, inspection.WorktreeHead, stagedTree); err != nil {
+	if err := verifyCommitObject(ctx, inspection.worktree, committedHead, inspection.WorktreeHead, stagedTree); err != nil {
 		return "", false, fmt.Errorf("auto-commit object identity changed: %w", err)
 	}
 	if err := verifyWorktreeMergeIdentity(ctx, inspection); err != nil {
@@ -89,8 +90,8 @@ func autoCommitDirtyWorktree(ctx context.Context, inspection MergeInspection) (s
 	}
 	branchRef := "refs/heads/" + inspection.WorktreeBranch
 	input := fmt.Sprintf("update %s %s %s\n", branchRef, committedHead, inspection.WorktreeHead)
-	if _, stderr, err := runGitInput(ctx, inspection.WorktreeRoot, input, "update-ref", "--stdin"); err != nil {
-		installed, verifyErr := refEquals(ctx, inspection.WorktreeRoot, branchRef, committedHead)
+	if _, stderr, err := runGitInput(ctx, inspection.worktree, input, "update-ref", "--stdin"); err != nil {
+		installed, verifyErr := refEquals(ctx, inspection.worktree, branchRef, committedHead)
 		if verifyErr != nil || installed {
 			return "", true, fmt.Errorf("auto-commit ref transaction is uncertain; recovery is required: %w%s", err, stderrSuffix(stderr))
 		}
@@ -100,7 +101,7 @@ func autoCommitDirtyWorktree(ctx context.Context, inspection MergeInspection) (s
 	if err := verifyWorktreeCheckout(ctx, inspection, committedHead); err != nil {
 		return "", true, fmt.Errorf("auto-commit ref was installed but checkout identity changed; recovery is required: %w", err)
 	}
-	if err := verifyTemporaryIndexAgainstWorktree(ctx, inspection.WorktreeRoot, tempEnv, stagedTree); err != nil {
+	if err := verifyTemporaryIndexAgainstWorktree(ctx, inspection.worktree, tempEnv, stagedTree); err != nil {
 		return "", true, fmt.Errorf("auto-commit ref was installed but worktree contents changed; recovery is required: %w", err)
 	}
 	noteMergeStep("before_worktree_index_sync")
@@ -137,13 +138,13 @@ func secureTemporaryIndex(path string) error {
 	return nil
 }
 
-func snapshotRealIndex(ctx context.Context, root string) (string, []byte, error) {
+func snapshotRealIndex(ctx context.Context, root gitcmd.Repo) (string, []byte, error) {
 	indexPath, stderr, err := gitValue(ctx, root, "rev-parse", "--git-path", "index")
 	if err != nil {
 		return "", nil, fmt.Errorf("resolve real index path: %w%s", err, stderrSuffix(stderr))
 	}
 	if !filepath.IsAbs(indexPath) {
-		indexPath = filepath.Join(root, indexPath)
+		indexPath = filepath.Join(root.Dir, indexPath)
 	}
 	body, err := os.ReadFile(indexPath)
 	if err != nil {
@@ -156,21 +157,21 @@ func verifyTemporaryIndex(ctx context.Context, inspection MergeInspection, env [
 	if err := verifyWorktreeMergeIdentity(ctx, inspection); err != nil {
 		return "", "", err
 	}
-	tree, stderr, err := gitValueEnv(ctx, inspection.WorktreeRoot, env, "write-tree")
+	tree, stderr, err := gitValueEnv(ctx, inspection.worktree, env, "write-tree")
 	if err != nil {
 		return "", "", fmt.Errorf("record temporary index tree: %w%s", err, stderrSuffix(stderr))
 	}
-	if err := verifyTemporaryIndexAgainstWorktree(ctx, inspection.WorktreeRoot, env, tree); err != nil {
+	if err := verifyTemporaryIndexAgainstWorktree(ctx, inspection.worktree, env, tree); err != nil {
 		return "", "", err
 	}
-	entries, stderr, err := runGitEnv(ctx, inspection.WorktreeRoot, env, "ls-files", "--stage", "-z")
+	entries, stderr, err := runGitEnv(ctx, inspection.worktree, env, "ls-files", "--stage", "-z")
 	if err != nil {
 		return "", "", fmt.Errorf("snapshot temporary index entries: %w%s", err, stderrSuffix(stderr))
 	}
 	return tree, entries, nil
 }
 
-func verifyTemporaryIndexAgainstWorktree(ctx context.Context, root string, env []string, expectedTree string) error {
+func verifyTemporaryIndexAgainstWorktree(ctx context.Context, root gitcmd.Repo, env []string, expectedTree string) error {
 	if _, stderr, err := runGitEnv(ctx, root, env, "diff", "--quiet", "--"); err != nil {
 		if exitCode(err) == 1 {
 			return errors.New("working tree differs from the temporary index")
@@ -243,7 +244,7 @@ func installIndexFileCAS(indexPath, preparedPath string, expected []byte) (err e
 	return nil
 }
 
-func verifyCommitObject(ctx context.Context, root, commit, expectedParent, expectedTree string) error {
+func verifyCommitObject(ctx context.Context, root gitcmd.Repo, commit, expectedParent, expectedTree string) error {
 	line, stderr, err := gitValue(ctx, root, "rev-list", "--parents", "-n", "1", commit)
 	if err != nil {
 		return fmt.Errorf("read auto-commit parents: %w%s", err, stderrSuffix(stderr))
@@ -263,19 +264,19 @@ func verifyCommitObject(ctx context.Context, root, commit, expectedParent, expec
 }
 
 func verifyWorktreeCheckout(ctx context.Context, inspection MergeInspection, expectedHead string) error {
-	branch, stderr, err := gitValue(ctx, inspection.WorktreeRoot, "symbolic-ref", "--quiet", "--short", "HEAD")
+	branch, stderr, err := gitValue(ctx, inspection.worktree, "symbolic-ref", "--quiet", "--short", "HEAD")
 	if err != nil || branch != inspection.WorktreeBranch {
 		return fmt.Errorf("worktree branch is %q, expected %q%s", branch, inspection.WorktreeBranch, stderrSuffix(stderr))
 	}
-	branchHead, stderr, err := gitValue(ctx, inspection.WorktreeRoot, "rev-parse", "--verify", "refs/heads/"+inspection.WorktreeBranch)
+	branchHead, stderr, err := gitValue(ctx, inspection.worktree, "rev-parse", "--verify", "refs/heads/"+inspection.WorktreeBranch)
 	if err != nil || branchHead != expectedHead {
 		return fmt.Errorf("worktree branch HEAD is %s, expected %s%s", branchHead, expectedHead, stderrSuffix(stderr))
 	}
-	head, stderr, err := gitValue(ctx, inspection.WorktreeRoot, "rev-parse", "--verify", "HEAD")
+	head, stderr, err := gitValue(ctx, inspection.worktree, "rev-parse", "--verify", "HEAD")
 	if err != nil || head != expectedHead {
 		return fmt.Errorf("worktree HEAD is %s, expected %s%s", head, expectedHead, stderrSuffix(stderr))
 	}
-	operation, err := gitOperation(ctx, inspection.WorktreeRoot)
+	operation, err := gitOperation(ctx, inspection.worktree)
 	if err != nil {
 		return err
 	}
@@ -289,10 +290,10 @@ func verifyAutoCommitSuccess(ctx context.Context, inspection MergeInspection, co
 	if err := verifyWorktreeCheckout(ctx, inspection, committedHead); err != nil {
 		return err
 	}
-	if err := verifyCommitObject(ctx, inspection.WorktreeRoot, committedHead, inspection.WorktreeHead, expectedTree); err != nil {
+	if err := verifyCommitObject(ctx, inspection.worktree, committedHead, inspection.WorktreeHead, expectedTree); err != nil {
 		return err
 	}
-	status, stderr, err := runGitEnv(ctx, inspection.WorktreeRoot, gitNoOptionalLocks, "status", "--porcelain=v1", "--untracked-files=all")
+	status, stderr, err := runGitEnv(ctx, inspection.worktree, gitNoOptionalLocks, "status", "--porcelain=v1", "--untracked-files=all")
 	if err != nil {
 		return fmt.Errorf("verify auto-commit status: %w%s", err, stderrSuffix(stderr))
 	}
@@ -302,12 +303,12 @@ func verifyAutoCommitSuccess(ctx context.Context, inspection MergeInspection, co
 	return nil
 }
 
-func gitValueEnv(ctx context.Context, root string, env []string, args ...string) (string, string, error) {
+func gitValueEnv(ctx context.Context, root gitcmd.Repo, env []string, args ...string) (string, string, error) {
 	out, stderr, err := runGitEnv(ctx, root, env, args...)
 	return strings.TrimSpace(out), stderr, err
 }
 
-func hasStagedIndexChanges(ctx context.Context, root, head string) (bool, error) {
+func hasStagedIndexChanges(ctx context.Context, root gitcmd.Repo, head string) (bool, error) {
 	_, stderr, err := runGitEnv(ctx, root, gitNoOptionalLocks, "diff", "--cached", "--quiet", head, "--")
 	if err == nil {
 		return false, nil
@@ -318,7 +319,7 @@ func hasStagedIndexChanges(ctx context.Context, root, head string) (bool, error)
 	return false, fmt.Errorf("inspect staged index changes: %w%s", err, stderrSuffix(stderr))
 }
 
-func refEquals(ctx context.Context, root, ref, expected string) (bool, error) {
+func refEquals(ctx context.Context, root gitcmd.Repo, ref, expected string) (bool, error) {
 	value, stderr, err := gitValue(ctx, root, "rev-parse", "--verify", ref)
 	if err != nil {
 		return false, fmt.Errorf("read ref %s: %w%s", ref, err, stderrSuffix(stderr))

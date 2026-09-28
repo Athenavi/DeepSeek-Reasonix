@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,11 +11,15 @@ import (
 	"strings"
 
 	"reasonix/internal/fileutil"
+	"reasonix/internal/gitcmd"
 )
 
 const (
 	mergeMetadataVersion = 1
 	mergeMetadataName    = "metadata.json"
+	// mergeIdentityName holds the pinned identities beside metadata.json, whose
+	// shape older builds decode strictly and so must not change.
+	mergeIdentityName = "metadata.repo.json"
 )
 
 type mergeMetadata struct {
@@ -24,6 +29,16 @@ type mergeMetadata struct {
 	CreatedHead    string `json:"createdHead"`
 	WorktreeRoot   string `json:"worktreeRoot"`
 	WorktreeBranch string `json:"worktreeBranch"`
+	// The identities pinned at creation, kept in mergeIdentityName; without
+	// that file they are resolved from the roots (see source and worktreeAt).
+	SourceRepo   gitcmd.Repo `json:"-"`
+	WorktreeRepo gitcmd.Repo `json:"-"`
+}
+
+// mergeIdentity is the content of mergeIdentityName.
+type mergeIdentity struct {
+	SourceRepo   gitcmd.Repo `json:"sourceRepo"`
+	WorktreeRepo gitcmd.Repo `json:"worktreeRepo"`
 }
 
 func writeMergeMetadata(result Result, targetBranch string) error {
@@ -34,6 +49,8 @@ func writeMergeMetadata(result Result, targetBranch string) error {
 		CreatedHead:    strings.TrimSpace(result.Head),
 		WorktreeRoot:   filepath.Clean(result.WorktreeRoot),
 		WorktreeBranch: strings.TrimSpace(result.Branch),
+		SourceRepo:     result.SourceRepo,
+		WorktreeRepo:   result.WorktreeRepo,
 	}
 	body, err := json.MarshalIndent(metadata, "", "  ")
 	if err != nil {
@@ -43,7 +60,89 @@ func writeMergeMetadata(result Result, targetBranch string) error {
 	if err := fileutil.AtomicCreateFile(metadataPath(result.WorktreeRoot), body, 0o600); err != nil {
 		return fmt.Errorf("publish worktree metadata: %w", err)
 	}
+	identity, err := json.MarshalIndent(mergeIdentity{SourceRepo: result.SourceRepo, WorktreeRepo: result.WorktreeRepo}, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode worktree identity: %w", err)
+	}
+	if err := fileutil.AtomicCreateFile(identityPath(metadataPath(result.WorktreeRoot)), append(identity, '\n'), 0o600); err != nil {
+		return fmt.Errorf("publish worktree identity: %w", err)
+	}
 	return nil
+}
+
+func identityPath(metadataFile string) string {
+	return filepath.Join(filepath.Dir(metadataFile), mergeIdentityName)
+}
+
+// removeMergeMetadata removes metadataFile and the identity beside it.
+func removeMergeMetadata(metadataFile string) error {
+	if err := os.Remove(identityPath(metadataFile)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := os.Remove(metadataFile); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+// readMergeIdentity fills the pinned identities from the file beside
+// metadataFile; a missing file leaves them unresolved.
+func readMergeIdentity(metadataFile string, metadata *mergeMetadata) error {
+	path := identityPath(metadataFile)
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect worktree identity: %w", err)
+	}
+	if !info.Mode().IsRegular() || (runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0) {
+		return errors.New("worktree identity is not a private regular file")
+	}
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read worktree identity: %w", err)
+	}
+	var identity mergeIdentity
+	decoder := json.NewDecoder(strings.NewReader(string(body)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&identity); err != nil {
+		return fmt.Errorf("decode worktree identity: %w", err)
+	}
+	metadata.SourceRepo, metadata.WorktreeRepo = identity.SourceRepo, identity.WorktreeRepo
+	return nil
+}
+
+// source is the source checkout's pinned identity, checked against the
+// recorded source root.
+func (m mergeMetadata) source(ctx context.Context) (gitcmd.Repo, error) {
+	repo := m.SourceRepo
+	if !repo.Valid() {
+		var err error
+		if repo, err = gitcmd.Open(ctx, m.SourceRoot); err != nil {
+			return repo, err
+		}
+	}
+	repo = repo.Top()
+	if err := repo.Verify(); err != nil {
+		return repo, fmt.Errorf("source checkout identity changed: %w", err)
+	}
+	if err := sameDirectory(repo.WorkTree, m.SourceRoot); err != nil {
+		return repo, fmt.Errorf("source checkout identity changed: %w", err)
+	}
+	return repo, nil
+}
+
+// worktreeAt is the worktree's pinned identity with its checkout at root,
+// where a cleanup move may have put it; git keeps its administrative dir.
+func (m mergeMetadata) worktreeAt(ctx context.Context, root string) (gitcmd.Repo, error) {
+	if !m.WorktreeRepo.Valid() {
+		repo, err := gitcmd.Open(ctx, root)
+		return repo.Top(), err
+	}
+	repo := m.WorktreeRepo
+	repo.Dir, repo.WorkTree = root, root
+	return repo, repo.Verify()
 }
 
 func metadataPath(worktreeRoot string) string {
@@ -179,6 +278,9 @@ func decodeMergeMetadata(path string) (mergeMetadata, error) {
 	}
 	if !strings.HasPrefix(metadata.WorktreeBranch, "reasonix/delivery-") {
 		return mergeMetadata{}, errors.New("worktree metadata names an unmanaged branch")
+	}
+	if err := readMergeIdentity(path, &metadata); err != nil {
+		return mergeMetadata{}, err
 	}
 	return metadata, nil
 }

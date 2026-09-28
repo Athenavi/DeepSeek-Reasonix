@@ -110,6 +110,7 @@ func TestRemoteModelSourceRefreshesAutonomousHTTPRunAndRetiresOldRoute(t *testin
 	request := httptest.NewRequest(http.MethodPost, "/submit", strings.NewReader(`{"input":"autonomous next run"}`)).WithContext(ctx)
 	request.Host = "127.0.0.1"
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+srv.AuthToken())
 	response := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(response, request)
 	if response.Code != http.StatusAccepted {

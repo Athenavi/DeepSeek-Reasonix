@@ -53,7 +53,7 @@ func TestResumeRefusedWhenSessionLeaseHeld(t *testing.T) {
 		t.Fatalf("seed lease on active: %v", err)
 	}
 	server.SetSessionLeases(leases)
-	srv := httptest.NewServer(server.Handler())
+	srv := httptest.NewServer(operatorHandler(server))
 	defer srv.Close()
 
 	body, err := json.Marshal(map[string]string{"path": held})
@@ -101,7 +101,7 @@ func TestResumeMovesSessionLease(t *testing.T) {
 		t.Fatalf("seed lease on active: %v", err)
 	}
 	server.SetSessionLeases(leases)
-	srv := httptest.NewServer(server.Handler())
+	srv := httptest.NewServer(operatorHandler(server))
 	defer srv.Close()
 
 	body, err := json.Marshal(map[string]string{"path": next})
@@ -205,7 +205,7 @@ func TestConcurrentResumesKeepControllerAndLeaseAligned(t *testing.T) {
 		t.Fatalf("seed lease on active: %v", err)
 	}
 	server.SetSessionLeases(leases)
-	srv := httptest.NewServer(server.Handler())
+	srv := httptest.NewServer(operatorHandler(server))
 	defer srv.Close()
 	client := &http.Client{Timeout: 10 * time.Second}
 
@@ -275,7 +275,7 @@ func TestConcurrentResumeAndForkKeepAlignment(t *testing.T) {
 		t.Fatalf("seed lease on active: %v", err)
 	}
 	server.SetSessionLeases(leases)
-	srv := httptest.NewServer(server.Handler())
+	srv := httptest.NewServer(operatorHandler(server))
 	defer srv.Close()
 	client := &http.Client{Timeout: 10 * time.Second}
 
@@ -352,7 +352,7 @@ func TestInterleavedResumesForcedThroughBindWindow(t *testing.T) {
 		t.Fatalf("seed lease on active: %v", err)
 	}
 	server.SetSessionLeases(leases)
-	srv := httptest.NewServer(server.Handler())
+	srv := httptest.NewServer(operatorHandler(server))
 	defer srv.Close()
 	client := &http.Client{Timeout: 10 * time.Second}
 

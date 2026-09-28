@@ -1165,9 +1165,9 @@ func TestAutoStartPlugins(t *testing.T) {
 	off := false
 	on := true
 	c.Plugins = []PluginEntry{
-		{Name: "implicit", Command: "implicit-bin"},
-		{Name: "disabled", Command: "disabled-bin", AutoStart: &off},
-		{Name: "enabled", Command: "enabled-bin", AutoStart: &on},
+		{Name: "implicit", Command: "implicit-bin", Source: MCPSourceUserConfig},
+		{Name: "disabled", Command: "disabled-bin", AutoStart: &off, Source: MCPSourceUserConfig},
+		{Name: "enabled", Command: "enabled-bin", AutoStart: &on, Source: MCPSourceUserConfig},
 	}
 	got := c.AutoStartPlugins()
 	if len(got) != 2 || got[0].Name != "implicit" || got[1].Name != "enabled" {

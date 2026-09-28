@@ -337,6 +337,14 @@ func (b bash) prepareLaunch(ctx context.Context, sh sandbox.Shell, command strin
 		}
 		return sandbox.Prepared{}, nil, fmt.Errorf("%s", sandbox.UnavailableMessage())
 	}
+	if prepared.Wrapped {
+		if err := sandbox.CheckGitMetadata(spec); err != nil {
+			if lease != nil {
+				lease.Release()
+			}
+			return sandbox.Prepared{}, nil, err
+		}
+	}
 	return prepared, lease, nil
 }
 

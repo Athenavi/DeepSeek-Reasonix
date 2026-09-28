@@ -93,7 +93,7 @@ func getForkTargets(t *testing.T, baseURL string, refs ...session.SessionRef) fo
 
 func TestForkTargetsRouteEncodesEmptyTargetSetAsArray(t *testing.T) {
 	srv, _, _, ref := newExclusiveSessionServe(t)
-	server := httptest.NewServer(srv.Handler())
+	server := httptest.NewServer(operatorHandler(srv))
 	defer server.Close()
 
 	req, _ := http.NewRequest(http.MethodGet, server.URL+"/fork-targets", nil)
@@ -124,7 +124,7 @@ func TestForkTargetsRouteEncodesEmptyTargetSetAsArray(t *testing.T) {
 func TestForkRoutesRequireAndEnforceSessionFence(t *testing.T) {
 	srv, _, service, ref := newExclusiveSessionServe(t)
 	appendForkTurn(t, service, ref, "turn-1", false)
-	server := httptest.NewServer(srv.Handler())
+	server := httptest.NewServer(operatorHandler(srv))
 	defer server.Close()
 
 	get, _ := http.NewRequest(http.MethodGet, server.URL+"/fork-targets", nil)
@@ -153,7 +153,7 @@ func TestForkRoutesRequireAndEnforceSessionFence(t *testing.T) {
 
 func TestForkRoutesReportLegacySessionWithoutTurnRecords(t *testing.T) {
 	srv := newBrokerTestServer(t, boot.Options{})
-	server := httptest.NewServer(srv.Handler())
+	server := httptest.NewServer(operatorHandler(srv))
 	defer server.Close()
 
 	payload := getForkTargets(t, server.URL)
@@ -171,7 +171,7 @@ func TestForkTargetsRouteListsCompletedAndOpenTurns(t *testing.T) {
 	srv, _, service, ref := newExclusiveSessionServe(t)
 	appendForkTurn(t, service, ref, "turn-1", false)
 	appendForkTurn(t, service, ref, "turn-2", true)
-	server := httptest.NewServer(srv.Handler())
+	server := httptest.NewServer(operatorHandler(srv))
 	defer server.Close()
 
 	payload := getForkTargets(t, server.URL, ref)
@@ -189,7 +189,7 @@ func TestForkTargetsRouteListsCompletedAndOpenTurns(t *testing.T) {
 
 func TestForkSessionRouteRejectsMissingOrEmptyTurnID(t *testing.T) {
 	srv, _, _, ref := newExclusiveSessionServe(t)
-	server := httptest.NewServer(srv.Handler())
+	server := httptest.NewServer(operatorHandler(srv))
 	defer server.Close()
 
 	for _, body := range []string{`{}`, `{"turnId":""}`, `{"turnId":"   "}`, `{`, `{"turnId":"t1","name":`} {
@@ -205,7 +205,7 @@ func TestForkSessionRouteCreatesChildWithoutSwitchingParent(t *testing.T) {
 	srv, ctrl, service, ref := newExclusiveSessionServe(t)
 	appendForkTurn(t, service, ref, "turn-1", false)
 	parentPath := ctrl.SessionPath()
-	server := httptest.NewServer(srv.Handler())
+	server := httptest.NewServer(operatorHandler(srv))
 	defer server.Close()
 	target := getForkTargets(t, server.URL, ref).Targets[0]
 
@@ -261,7 +261,7 @@ func TestForkSessionRouteReportsUnavailableTurnReason(t *testing.T) {
 	srv, _, service, ref := newExclusiveSessionServe(t)
 	appendForkTurn(t, service, ref, "turn-1", false)
 	appendForkTurn(t, service, ref, "turn-2", true)
-	server := httptest.NewServer(srv.Handler())
+	server := httptest.NewServer(operatorHandler(srv))
 	defer server.Close()
 	targets := getForkTargets(t, server.URL, ref)
 

@@ -6909,39 +6909,6 @@ func (r *appendingDesktopRunner) Run(_ context.Context, input string) error {
 	return nil
 }
 
-func TestCapabilitiesShowsDefaultMCPAsAutomaticIdleNotDisabled(t *testing.T) {
-	isolateDesktopUserDirs(t)
-	dir := robustTempDir(t)
-	t.Chdir(dir)
-	if err := os.WriteFile(filepath.Join(dir, "reasonix.toml"), []byte(`
-[[plugins]]
-name = "playwright"
-command = "npx"
-args = ["-y", "@playwright/mcp"]
-`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	app := NewApp()
-	app.setTestCtrl(control.New(control.Options{Host: plugin.NewHost()}), "")
-	defer func() {
-		if c := app.activeCtrl(); c != nil {
-			c.Close()
-		}
-	}()
-
-	view := app.Capabilities()
-	for _, s := range view.Servers {
-		if s.Name == "playwright" {
-			if s.Status != "deferred" || s.StartIntent != "automatic" || s.RuntimeState != "idle" {
-				t.Fatalf("default MCP view = %+v, want deferred automatic idle", s)
-			}
-			return
-		}
-	}
-	t.Fatalf("playwright MCP missing from Capabilities: %+v", view.Servers)
-}
-
 func TestCapabilitiesIncludesInstalledPlugins(t *testing.T) {
 	isolateDesktopUserDirs(t)
 	reasonixHome := config.ReasonixHomeDir()
@@ -7006,6 +6973,7 @@ url = %q
 `, srv.URL), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	enableProjectMCPForTest(t, dir)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -8434,6 +8402,7 @@ command = "reasonix-missing-mcp-binary"
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	enableProjectMCPForWorkspace(t, dir, "")
 
 	app := NewApp()
 	app.setTestCtrl(control.New(control.Options{Host: plugin.NewHost()}), "")
@@ -8961,6 +8930,7 @@ tier = "lazy"
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	enableProjectMCPForWorkspace(t, dir, "")
 
 	app := NewApp()
 	app.setTestCtrl(control.New(control.Options{Host: plugin.NewHost()}), "")
@@ -9022,6 +8992,7 @@ tier = "lazy"
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	enableProjectMCPForWorkspace(t, dir, "")
 
 	host := plugin.NewHost()
 	host.RecordFailure(plugin.Spec{Name: "figma", Type: "http", URL: "https://mcp.figma.com/mcp"}, errors.New("connect: 401 unauthorized"))
@@ -9056,6 +9027,7 @@ tier = "lazy"
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	enableProjectMCPForWorkspace(t, dir, "")
 
 	host := plugin.NewHost()
 	host.RecordFailure(plugin.Spec{Name: "figma", Type: "http", URL: "https://mcp.figma.com/mcp"}, errors.New("connect: 401 unauthorized"))
@@ -9230,6 +9202,7 @@ tier = "background"
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	enableProjectMCPForWorkspace(t, dir, "")
 
 	app := NewApp()
 	app.setTestCtrl(control.New(control.Options{Host: plugin.NewHost()}), "")
@@ -9280,6 +9253,7 @@ name = "codegraph"
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	enableProjectMCPForWorkspace(t, dir, "")
 
 	reg := tool.NewRegistry()
 	reg.Add(desktopFakeTool{name: "mcp__codegraph__connect"})
@@ -9338,6 +9312,7 @@ tier = "lazy"
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	enableProjectMCPForWorkspace(t, dir, "")
 
 	app := NewApp()
 	app.setTestCtrl(control.New(control.Options{Host: plugin.NewHost()}), "")
@@ -9431,6 +9406,7 @@ tier = "eager"
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	enableProjectMCPForWorkspace(t, dir, "")
 
 	app := NewApp()
 	app.setTestCtrl(control.New(control.Options{Host: plugin.NewHost()}), "")

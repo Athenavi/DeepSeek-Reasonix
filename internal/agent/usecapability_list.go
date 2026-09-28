@@ -136,7 +136,7 @@ func (t *UseCapabilityTool) listServers() (string, error) {
 		connected := server.enabled && resolved.ServerAuthorized() && t.host != nil && t.host.HasClientForSpec(resolved)
 		status := "configured"
 		if !server.enabled {
-			status = "disabled"
+			status = server.decision.Code()
 		} else if connected {
 			status = "ready"
 		} else if t.host != nil {

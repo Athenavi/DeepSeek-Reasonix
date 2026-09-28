@@ -7,13 +7,15 @@ import (
 	"testing"
 
 	"reasonix/internal/config"
+	"reasonix/internal/gitcmd"
 	"reasonix/internal/worktree"
 )
 
 func TestDeliveryWorktreeAvailabilityDelegatesWithoutRequiringGit(t *testing.T) {
 	original := inspectDeliveryWorktree
 	t.Cleanup(func() { inspectDeliveryWorktree = original })
-	inspectDeliveryWorktree = func(_ context.Context, root string) worktree.Availability {
+	inspectDeliveryWorktree = func(_ context.Context, repo gitcmd.Repo) worktree.Availability {
+		root := filepath.Base(repo.Dir)
 		return worktree.Availability{Available: false, Reason: "Git is not installed", RepoRoot: root}
 	}
 	got := NewApp().DeliveryWorktreeAvailability("project")
@@ -35,7 +37,8 @@ func TestCreateDeliveryWorktreeRegistersAndOpensManagedProject(t *testing.T) {
 
 	original := createDeliveryWorktree
 	t.Cleanup(func() { createDeliveryWorktree = original })
-	createDeliveryWorktree = func(_ context.Context, source, gotManaged string) (worktree.Result, error) {
+	createDeliveryWorktree = func(_ context.Context, sourceRepo gitcmd.Repo, gotManaged string) (worktree.Result, error) {
+		source := filepath.Base(sourceRepo.Dir)
 		if source != "source-project" {
 			t.Fatalf("source = %q", source)
 		}

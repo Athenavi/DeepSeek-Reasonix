@@ -131,7 +131,10 @@ func (a *App) ClearMCPServerAuthentication(name string) error {
 			return err
 		}
 	}
-	if _, _, _, err := config.ClearPluginAuthenticationInSourceForRoot(root, name); err != nil {
+	if err := config.KeepMCPDecisionAcross(root, name, func() (config.PluginEntry, error) {
+		updated, _, _, err := config.ClearPluginAuthenticationInSourceForRoot(root, name)
+		return updated, err
+	}); err != nil {
 		return err
 	}
 	disconnectMCPServerControllers(name, ctrl, controllers)

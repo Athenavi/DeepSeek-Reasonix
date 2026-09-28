@@ -792,7 +792,7 @@ func runServeWithOptions(args []string, opts serveRunOptions) int {
 	if opts.command == "web" {
 		sessionID = fs.String("session-id", "", "bind a fresh Web session identity (used by /web handoff)")
 	}
-	authHelp := "auth mode: none, token, or password (default: config/none)"
+	authHelp := "auth mode: none, token, or password (default: config/none; none still requires the launch token for changes)"
 	if opts.command == "web" {
 		authHelp = "auth mode: none, token, or password (default: generated token)"
 	}
@@ -867,6 +867,7 @@ func runServeWithOptions(args []string, opts serveRunOptions) int {
 			return 1
 		}
 		serveCfg.Token = tok
+		config.RegisterHostSecretPath(*tokenFile)
 	}
 	if *behindProxy {
 		serveCfg.BehindProxy = true

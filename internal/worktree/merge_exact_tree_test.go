@@ -16,13 +16,13 @@ func TestMergeBackUsesExactPreparedTreeWithoutHooks(t *testing.T) {
 	}
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	gitCommitFile(t, created.WorktreeRoot, "feature.txt", "feature\n", "feature")
 	inspection := inspectMergeTest(t, created.WorkspaceRoot, managed)
-	expectedTree, conflicts, _, err := mergeTree(context.Background(), repo, inspection.TargetHead, inspection.WorktreeHead)
+	expectedTree, conflicts, _, err := mergeTree(context.Background(), opened(t, repo), inspection.TargetHead, inspection.WorktreeHead)
 	if err != nil || conflicts {
 		t.Fatalf("expected merge tree = %q, conflicts=%v, err=%v", expectedTree, conflicts, err)
 	}
@@ -55,7 +55,7 @@ func TestMergeBackDoesNotRequireUserGitIdentity(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestMergeBackFailsClosedWhenSourceMutationFenceIsBusy(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestMergeBackRejectsSameHeadSourceBranchSwitchBeforeCAS(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestMergeBackFencesSourceHeadDuringRefTransaction(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestMergeBackFencesSourceHeadDuringRefTransaction(t *testing.T) {
 		}
 		attempted = true
 		gitTest(t, repo, "update-ref", "refs/heads/same-head-external", inspection.TargetHead)
-		if _, _, switchErr := runGit(context.Background(), repo, "symbolic-ref", "HEAD", "refs/heads/same-head-external"); switchErr == nil {
+		if _, _, switchErr := runGit(context.Background(), opened(t, repo), "symbolic-ref", "HEAD", "refs/heads/same-head-external"); switchErr == nil {
 			t.Fatal("source HEAD changed while the mutation fence was held")
 		}
 	}
@@ -176,7 +176,7 @@ func TestMergeBackRejectsIndexMutationBeforeRefUpdate(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +210,7 @@ func TestMergeBackRefCompareAndSwapPreservesExternalAdvance(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func TestMergeBackPreservesChangedMergeHeadAfterRefUpdate(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestMergeBackRejectsWorktreeAdvanceBeforePrepare(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +307,7 @@ func TestMergeBackRejectsWorktreeContentDriftBeforePrepare(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,7 +339,7 @@ func TestMergeBackRejectsWorktreeBranchSwitchBeforePrepare(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,7 +368,7 @@ func TestMergeBackRefTransactionRejectsWorktreeAdvanceAtomically(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +390,7 @@ func TestMergeBackRefTransactionRejectsWorktreeAdvanceAtomically(t *testing.T) {
 	if got := gitTest(t, repo, "rev-parse", "HEAD"); got != inspection.TargetHead {
 		t.Fatalf("target transaction partially updated ref to %s", got)
 	}
-	if operation, operationErr := gitOperation(context.Background(), repo); operationErr != nil || operation != "" {
+	if operation, operationErr := gitOperation(context.Background(), opened(t, repo)); operationErr != nil || operation != "" {
 		t.Fatalf("source merge state was not aborted: operation=%q, err=%v", operation, operationErr)
 	}
 	if got := gitTest(t, created.WorktreeRoot, "rev-parse", "HEAD"); got != externalHead {
@@ -402,7 +402,7 @@ func TestMergeBackReportsRecoveryWhenWorktreeAdvancesAfterRefTransaction(t *test
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}

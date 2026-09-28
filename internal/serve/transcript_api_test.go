@@ -36,7 +36,7 @@ func TestTranscriptHTTPBindsSessionAndImmutableContent(t *testing.T) {
 	executor := agent.New(nil, nil, session, agent.Options{}, bc)
 	ctrl := control.New(control.Options{Executor: executor, SessionDir: dir, SessionPath: path, Sink: bc})
 	defer ctrl.Close()
-	server := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	server := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer server.Close()
 	response, err := http.Get(server.URL + "/transcript/snapshot?session=" + url.QueryEscape(path))
 	if err != nil {
@@ -102,7 +102,7 @@ func TestTranscriptOutlineHTTPPaginatesAndAdvertisesCapability(t *testing.T) {
 	ctrl := control.New(control.Options{Executor: agent.New(nil, nil, session, agent.Options{}, bc), SessionDir: dir, SessionPath: path, Sink: bc})
 	defer ctrl.Close()
 	srv := New(ctrl, bc, config.ServeConfig{})
-	server := httptest.NewServer(srv.Handler())
+	server := httptest.NewServer(operatorHandler(srv))
 	defer server.Close()
 
 	if !slices.Contains(srv.capabilities(), servecontract.TranscriptOutlineV1) {
@@ -156,7 +156,7 @@ func TestTranscriptOutlineHTTPPaginatesAndAdvertisesCapability(t *testing.T) {
 
 	// A controller without the optional capability declines the route so a
 	// client can fall back to its loaded-turn rail.
-	plain := httptest.NewServer(New(outlineLessController{ctrl}, bc, config.ServeConfig{}).Handler())
+	plain := httptest.NewServer(operatorHandler(New(outlineLessController{ctrl}, bc, config.ServeConfig{})))
 	defer plain.Close()
 	unsupported, err := http.Get(plain.URL + "/transcript/outline?session=" + url.QueryEscape(path))
 	if err != nil {
@@ -193,7 +193,7 @@ func TestCanonicalSessionHistoryHTTPUsesAuthorizedContentRanges(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := control.New(control.Options{SessionService: service, SessionRuntime: runtime, ExclusiveSession: true, Sink: bc})
 	defer ctrl.Close()
-	server := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	server := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer server.Close()
 	openResponse, err := http.Get(server.URL + "/session/open?sessionId=canonical")
 	if err != nil {
@@ -544,7 +544,7 @@ func newWindowTestServer(t *testing.T) (*httptest.Server, *control.Controller) {
 	bc := NewBroadcaster()
 	ctrl := control.New(control.Options{SessionService: service, SessionRuntime: runtime, ExclusiveSession: true, Sink: bc})
 	t.Cleanup(ctrl.Close)
-	server := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	server := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	t.Cleanup(server.Close)
 	return server, ctrl
 }
@@ -634,7 +634,7 @@ func TestCanonicalSessionHistoryHTTPAnswersColdIdentity(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := control.New(control.Options{SessionService: service, SessionRuntime: foreground, ExclusiveSession: true, Sink: bc})
 	defer ctrl.Close()
-	server := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	server := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer server.Close()
 
 	var page canonical.MessageHistoryPage

@@ -94,7 +94,7 @@ func TestRuntimeStateHTTPIncludesDetachedAndKeepsSnapshotImmutable(t *testing.T)
 	server := New(foreground, nil, config.ServeConfig{})
 	detachedPath := agent.CanonicalSessionPath(detached.SessionPath())
 	server.detached[detachedPath] = &detachedSession{path: detachedPath, ctrl: detached}
-	httpServer := httptest.NewServer(server.Handler())
+	httpServer := httptest.NewServer(operatorHandler(server))
 	defer httpServer.Close()
 	// This endpoint reads managed runtimes, so removing a transcript cannot
 	// make it disappear or cause a catalog/history scan to fail.
@@ -141,7 +141,7 @@ func TestRuntimeStateHTTPStatusUsesRequestedDetachedController(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("detached runner did not start")
 	}
-	httpServer := httptest.NewServer(server.Handler())
+	httpServer := httptest.NewServer(operatorHandler(server))
 	defer httpServer.Close()
 	var status struct {
 		SessionPath  string                     `json:"sessionPath"`
@@ -247,7 +247,7 @@ func TestRuntimeStateSSEFiltersSessionsAndPreservesHostOnlyPayload(t *testing.T)
 	foreground := runtimeStateServeController(t, dir, "foreground", nil)
 	broadcaster := NewBroadcaster()
 	server := New(foreground, broadcaster, config.ServeConfig{})
-	httpServer := httptest.NewServer(server.Handler())
+	httpServer := httptest.NewServer(operatorHandler(server))
 	defer httpServer.Close()
 	client := &http.Client{Timeout: 5 * time.Second}
 	currentResponse, err := client.Get(httpServer.URL + "/events")
@@ -294,7 +294,7 @@ func TestRuntimeStateInboxReceiptRetainsRichFollowupAndSessionFence(t *testing.T
 		t.Fatal("foreground runner did not start")
 	}
 	server := New(ctrl, nil, config.ServeConfig{})
-	httpServer := httptest.NewServer(server.Handler())
+	httpServer := httptest.NewServer(operatorHandler(server))
 	defer httpServer.Close()
 	request := map[string]any{
 		"input": "run fixture-skill", "display": "rich display", "intent": "followup", "idempotencyKey": "stable-key",

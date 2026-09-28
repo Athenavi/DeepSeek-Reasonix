@@ -461,6 +461,7 @@ func collectMCP(cfg *config.Config, root, home, reasonixHome string, disp func(s
 	if cfg == nil {
 		return rep, issues
 	}
+	enabled := enabledMCPNames(cfg, root, reasonixHome)
 	// Stable order by name.
 	entries := append([]config.PluginEntry(nil), cfg.Plugins...)
 	sort.SliceStable(entries, func(i, j int) bool {
@@ -471,12 +472,9 @@ func collectMCP(cfg *config.Config, root, home, reasonixHome string, disp func(s
 			Name:        p.Name,
 			Effective:   true,
 			Transport:   transportOf(p.Type),
-			StartIntent: "automatic",
+			StartIntent: startIntent(enabled[p.Name]),
 			EnvKeys:     sortedKeys(p.Env),
 			HeaderKeys:  sortedKeys(p.Headers),
-		}
-		if !p.ShouldAutoStart() {
-			info.StartIntent = "off"
 		}
 		if owner, ok := cfg.PluginPackageOwner(p.Name); ok {
 			info.PackageOwner = owner

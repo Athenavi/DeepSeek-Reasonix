@@ -40,6 +40,7 @@ import (
 	"reasonix/internal/extension/providerext"
 	"reasonix/internal/extension/sidecar"
 	"reasonix/internal/extension/uihub"
+	"reasonix/internal/gitcmd"
 	"reasonix/internal/guardian"
 	"reasonix/internal/history"
 	"reasonix/internal/hook"
@@ -234,6 +235,7 @@ type Options struct {
 	WorkspaceOnly          bool
 	PinnedContextLoader    control.PinnedContextLoader
 	SessionTemp            *sessiontemp.Manager // session-private temp manager; Rebuild reuses old's
+	WorkspaceRepo          gitcmd.Repo          // git identity the session opened with; Rebuild reuses old's
 	PersistentShell        *persistentshell.Manager
 	RuntimeReload
 	// deferPublish keeps a replacement generation private until migration and
@@ -256,7 +258,8 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 	if stderr == nil {
 		stderr = os.Stderr
 	}
-	root := resolveWorkspaceRoot(opts.WorkspaceRoot)
+	root := ResolveWorkspaceRoot(opts.WorkspaceRoot)
+	repo := workspaceRepo(ctx, opts.WorkspaceRepo, root)
 	additionalDirs, err := normalizeAdditionalDirs(root, opts.AdditionalDirs)
 	if err != nil {
 		return nil, err
@@ -787,6 +790,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 		OAuthHTTPClient:       balanceClient,
 	}
 	autoStartEntries := cfg.EnabledPlugins(root, config.DefaultMCPActivationStore())
+	emitProjectMCPDecisionNotice(sink, cfg, root)
 	enabledMCPNames := make(map[string]bool, len(autoStartEntries))
 	for _, enabled := range autoStartEntries {
 		if name := strings.TrimSpace(enabled.Name); name != "" {
@@ -1886,6 +1890,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 		},
 		CapabilityRuntime:      capRuntime,
 		WorkspaceRoot:          root,
+		WorkspaceRepo:          repo,
 		ExternalFolderToolRefs: readPathResolver,
 		ResponseLanguage:       cfg.ResponseLanguage(),
 		ReasoningLanguage:      config.ReasoningLanguageForEntry(entry, cfg.ReasoningLanguage()),
@@ -2289,7 +2294,9 @@ func currentWorkspacePromptLine(root string) string {
 	return "Current workspace: " + strconv.Quote(root)
 }
 
-func resolveWorkspaceRoot(explicit string) string {
+// ResolveWorkspaceRoot is the workspace a session in the current directory uses:
+// explicit, else the nearest git root, else the working directory.
+func ResolveWorkspaceRoot(explicit string) string {
 	if explicit != "" {
 		return explicit
 	}
@@ -2395,6 +2402,7 @@ func runtimeForbidReadRootsForGOOS(cfg *config.Config, root, goos string) []stri
 	if goos == "windows" {
 		return append([]string(nil), base...)
 	}
+	base = appendUniquePaths(base, config.HostSecretReadRoots()...)
 	credentialPath := strings.TrimSpace(config.UserCredentialsPath())
 	if credentialPath == "" {
 		return append([]string(nil), base...)

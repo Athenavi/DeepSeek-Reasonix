@@ -17,7 +17,7 @@ func TestProtocolRecoveryHTTPRejectsMissingAndStaleTokens(t *testing.T) {
 	got := make(chan string, 1)
 	ctrl := control.New(control.Options{Runner: fakeRunner{got: got}, Sink: bc})
 	defer ctrl.Close()
-	srv := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer srv.Close()
 	for _, tc := range []struct {
 		body   string

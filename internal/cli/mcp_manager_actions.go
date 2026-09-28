@@ -158,7 +158,7 @@ func (m chatTUI) applyMCPMode(tier string) (tea.Model, tea.Cmd) {
 		m.notice(fmt.Sprintf("mcp mode: no configured MCP server named %q", v.Name))
 		return m, nil
 	}
-	if _, err := config.UpsertPluginInSourceForRoot(workspace, selected); err != nil {
+	if _, err := config.UpsertPluginKeepingDecision(workspace, selected); err != nil {
 		m.notice("mcp mode: " + err.Error())
 		return m, nil
 	}
@@ -284,7 +284,12 @@ func (m chatTUI) clearMCPAuthentication(v mcpServerView) (tea.Model, tea.Cmd) {
 		m.notice("clear authentication: " + err.Error())
 		return m, nil
 	}
-	_, changed, _, err := config.ClearPluginAuthenticationInSourceForRoot(workspace, v.Name)
+	var changed bool
+	err := config.KeepMCPDecisionAcross(workspace, v.Name, func() (config.PluginEntry, error) {
+		updated, didChange, _, cerr := config.ClearPluginAuthenticationInSourceForRoot(workspace, v.Name)
+		changed = didChange
+		return updated, cerr
+	})
 	if err != nil {
 		m.notice("clear authentication: " + err.Error())
 		return m, nil

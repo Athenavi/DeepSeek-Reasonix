@@ -405,6 +405,7 @@ args = ["serve"]
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	enableProjectMCPForTest(t, root)
 	draft, err := a.seedPreviousDraftForTarget("project", root)
 	if err != nil {
 		t.Fatal(err)

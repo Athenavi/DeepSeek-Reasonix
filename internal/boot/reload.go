@@ -113,6 +113,9 @@ func rebuildWithPrevious(ctx context.Context, old *control.Controller, previous 
 	if opts.PersistentShell == nil {
 		opts.PersistentShell = old.PersistentShell()
 	}
+	if opts.WorkspaceRepo.Dir == "" {
+		opts.WorkspaceRepo = old.WorkspaceRepo()
+	}
 
 	home := config.ReasonixHomeDir()
 	// fromGraph must be the PREVIOUS generation's graph when available.

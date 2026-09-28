@@ -29,7 +29,7 @@ func (c *exactPromptController) ResolvePromptExact(identity control.PromptIdenti
 func TestServeExactPromptChecksSessionBeforeController(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := &exactPromptController{SessionAPI: control.New(control.Options{Sink: bc}), sessionID: "session-a"}
-	srv := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer srv.Close()
 	post := func(sessionID string) int {
 		resp, err := http.Post(srv.URL+"/resolve-prompt", "application/json", strings.NewReader(

@@ -8,6 +8,7 @@ import (
 
 	"reasonix/internal/agent"
 	"reasonix/internal/config"
+	"reasonix/internal/gitcmd"
 	"reasonix/internal/worktree"
 )
 
@@ -28,10 +29,12 @@ func TestForkWorktreeForTabCreatesIsolatedWorkspace(t *testing.T) {
 		rollbackDeliveryWorktree = origRollback
 	})
 
-	inspectDeliveryWorktree = func(_ context.Context, root string) worktree.Availability {
+	inspectDeliveryWorktree = func(_ context.Context, repo gitcmd.Repo) worktree.Availability {
+		root := repo.Dir
 		return worktree.Availability{Available: true, RepoRoot: root, Branch: "main"}
 	}
-	createDeliveryWorktree = func(_ context.Context, source, gotManaged string) (worktree.Result, error) {
+	createDeliveryWorktree = func(_ context.Context, sourceRepo gitcmd.Repo, gotManaged string) (worktree.Result, error) {
+		source := sourceRepo.Dir
 		return worktree.Result{
 			WorkspaceRoot: isolatedRoot,
 			WorktreeRoot:  filepath.Dir(isolatedRoot),
@@ -90,11 +93,12 @@ func TestForkWorktreeForTabRefusesDirtySourceWithoutMutation(t *testing.T) {
 		inspectDeliveryWorktree = origInspect
 		createDeliveryWorktree = origCreate
 	})
-	inspectDeliveryWorktree = func(_ context.Context, root string) worktree.Availability {
+	inspectDeliveryWorktree = func(_ context.Context, repo gitcmd.Repo) worktree.Availability {
+		root := repo.Dir
 		return worktree.Availability{Available: true, RepoRoot: root, SourceDirty: true}
 	}
 	createCalls := 0
-	createDeliveryWorktree = func(context.Context, string, string) (worktree.Result, error) {
+	createDeliveryWorktree = func(context.Context, gitcmd.Repo, string) (worktree.Result, error) {
 		createCalls++
 		return worktree.Result{}, nil
 	}
@@ -125,10 +129,10 @@ func TestForkWorktreeForTabFallsBackToSharedFork(t *testing.T) {
 		inspectDeliveryWorktree = origInspect
 		createDeliveryWorktree = origCreate
 	})
-	inspectDeliveryWorktree = func(context.Context, string) worktree.Availability {
+	inspectDeliveryWorktree = func(context.Context, gitcmd.Repo) worktree.Availability {
 		return worktree.Availability{Reason: "not a repository"}
 	}
-	createDeliveryWorktree = func(context.Context, string, string) (worktree.Result, error) {
+	createDeliveryWorktree = func(context.Context, gitcmd.Repo, string) (worktree.Result, error) {
 		t.Fatal("fallback must not create a worktree")
 		return worktree.Result{}, nil
 	}
@@ -164,7 +168,8 @@ func TestForkWorktreeForTabRollsBackUnusedCreation(t *testing.T) {
 		createDeliveryWorktree = origCreate
 		rollbackDeliveryWorktree = origRollback
 	})
-	inspectDeliveryWorktree = func(_ context.Context, root string) worktree.Availability {
+	inspectDeliveryWorktree = func(_ context.Context, repo gitcmd.Repo) worktree.Availability {
+		root := repo.Dir
 		return worktree.Availability{Available: true, RepoRoot: root}
 	}
 	created := worktree.Result{
@@ -174,7 +179,7 @@ func TestForkWorktreeForTabRollsBackUnusedCreation(t *testing.T) {
 		Branch:        "reasonix/delivery-test",
 		Head:          "deadbeef",
 	}
-	createDeliveryWorktree = func(context.Context, string, string) (worktree.Result, error) {
+	createDeliveryWorktree = func(context.Context, gitcmd.Repo, string) (worktree.Result, error) {
 		return created, nil
 	}
 	rollbackCalls := 0
@@ -211,7 +216,8 @@ func TestForkWorktreeForTabPreservesReferencedWorkspaceWhenSourceCloses(t *testi
 		rollbackDeliveryWorktree = origRollback
 		forkTabBeforePublishHookForTest.Store(nil)
 	})
-	inspectDeliveryWorktree = func(_ context.Context, root string) worktree.Availability {
+	inspectDeliveryWorktree = func(_ context.Context, repo gitcmd.Repo) worktree.Availability {
+		root := repo.Dir
 		return worktree.Availability{Available: true, RepoRoot: root}
 	}
 	worktreeRoot := filepath.Join(t.TempDir(), "worktree")
@@ -226,7 +232,7 @@ func TestForkWorktreeForTabPreservesReferencedWorkspaceWhenSourceCloses(t *testi
 		Branch:        "reasonix/delivery-preserved",
 		Head:          "deadbeef",
 	}
-	createDeliveryWorktree = func(context.Context, string, string) (worktree.Result, error) {
+	createDeliveryWorktree = func(context.Context, gitcmd.Repo, string) (worktree.Result, error) {
 		return created, nil
 	}
 	rollbackCalls := 0
