@@ -23,7 +23,7 @@ var errCompressStaleContext = errors.New("compress: conversation changed while c
 // anchor against the current model-visible view and installs a projection only;
 // the canonical transcript and checkpoint lineage remain untouched.
 func (a *Agent) CompressContext(ctx context.Context, req tool.CompressRequest) (result tool.CompressResult, resultErr error) {
-	ctx, finish := a.beginCompactionRun(ctx, CompactionTriggerTool)
+	ctx, finish := a.beginCompactionRun(ctx)
 	defer func() { resultErr = finish(resultErr) }()
 	direction := strings.TrimSpace(req.Direction)
 	anchor := strings.TrimSpace(req.Anchor)
@@ -186,9 +186,8 @@ func (a *Agent) compressVisibleRange(
 	preview string,
 	instructions string,
 ) (resultOut tool.CompressResult, resultErr error) {
-	ctx, finish := a.beginCompactionRun(ctx, trigger)
+	ctx, finish := a.beginCompactionRun(ctx)
 	defer func() { resultErr = finish(resultErr) }()
-	compactionPhase(ctx, "preparing")
 	if err := a.sess.compactionRunMu.acquire(ctx); err != nil {
 		return tool.CompressResult{}, err
 	}
@@ -201,9 +200,6 @@ func (a *Agent) compressVisibleRange(
 	}
 	plan, ok := a.planVisibleCompression(snap, direction, anchorIndex, preview)
 	if !ok {
-		if hard := a.hardInputCeiling(); hard > 0 && plan.result.SourceTokens >= hard {
-			return plan.result, fmt.Errorf("%w: %w: %s", ErrCompactionRequired, errCheckpointRejected, plan.result.Reason)
-		}
 		return plan.result, nil
 	}
 	result := plan.result
@@ -221,7 +217,7 @@ func (a *Agent) compressVisibleRange(
 	if reason != "" {
 		a.emitCompactionAborted(trigger)
 		result.Reason = reason
-		return result, fmt.Errorf("%w: %s", errCheckpointRejected, reason)
+		return result, nil
 	}
 
 	res, err := a.foldToSummaryMode(ctx, prepared.fold, prepared.instructions, prepared.inputMode)
@@ -257,12 +253,12 @@ func (a *Agent) compressVisibleRange(
 			result.Reason = "pinned-context-too-large: checkpoint prevents compaction from reducing context"
 			a.emitCompactionTelemetry(tele)
 			a.emitCompactionAborted(trigger)
-			return result, fmt.Errorf("%w: %s", errCheckpointRejected, result.Reason)
+			return result, nil
 		}
 		result.Reason = "compressed context would not be smaller"
 		a.emitCompactionTelemetry(tele)
 		a.emitCompactionAborted(trigger)
-		return result, fmt.Errorf("%w: %s", errCheckpointRejected, result.Reason)
+		return result, nil
 	}
 
 	inputHash := providerVisibleFingerprint(modelInputMessages(snap.visible))
@@ -460,13 +456,7 @@ func (a *Agent) foldSummaryWithChunkedFallback(ctx context.Context, trigger stri
 	if err == nil || !chunkedFallbackApplies(err, inputMode) {
 		return res, tele, err
 	}
-	chunked, chunkedErr := a.chunkedFoldSummary(ctx, fold, instructions, func(done, total int) {
-		if r := currentCompactionRun(ctx); r != nil {
-			r.mu.Lock()
-			r.state.CompletedParts, r.state.TotalParts, r.dirty = done, total, true
-			r.mu.Unlock()
-		}
-	})
+	chunked, chunkedErr := a.chunkedFoldSummary(ctx, fold, instructions, nil)
 	chunked.Usage = mergeSamplingUsage(res.Usage, chunked.Usage)
 	chunked.Spans += res.Spans
 	if chunked.FoldTokens <= 0 {

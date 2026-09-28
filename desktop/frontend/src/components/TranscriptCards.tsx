@@ -2,7 +2,6 @@
 // decision receipts, and compaction cards.
 
 import { useState } from "react";
-import { CompactionProgress } from "./CompactionProgress";
 import { ErrorMessage } from "./ErrorMessage";
 import { CheckCheck, ChevronRight, CirclePlay, ClipboardCheck, FileSearch, Info, TriangleAlert } from "lucide-react";
 import { useT } from "../lib/i18n";
@@ -127,7 +126,7 @@ export function NoticeCard({ item, onAction, onAccept, onOpenVerification, actio
   );
 }
 
-export function CompactionCard({ item, tabId }: { item: CompactionItem; tabId?: string }) {
+export function CompactionCard({ item }: { item: CompactionItem }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const status = item.operationId ? sessionOperationStatus(item.status, item.activity) : item.status;
@@ -146,7 +145,7 @@ export function CompactionCard({ item, tabId }: { item: CompactionItem; tabId?: 
   if (item.pending || status === "noop" || status === "cancelled" || status === "interrupted" || status === "unavailable") {
     return <div className={`compaction${item.pending ? " compaction--pending" : ""}`} data-entrance={item.id} data-transcript-layout-variant="static" role="status">
       <ProcessCompactIcon className={item.pending ? "compaction__spinner" : undefined} size={item.pending ? 14 : 12} />
-      {item.contextCompaction && status !== "noop" && (!item.pending || item.contextCompaction.status === "running") ? <CompactionProgress key={item.contextCompaction.runId} progress={item.contextCompaction} tabId={tabId} /> : <span>{stateLabel}{status === "running" || (!status && item.pending) ? <span className="compaction__hint">{t("compaction.workingHint")}</span> : null}</span>}
+      <span>{stateLabel}{status === "running" || (!status && item.pending) ? <span className="compaction__hint">{t("compaction.workingHint")}</span> : null}</span>
     </div>;
   }
   const tokenMeta = item.inputTokens != null && item.resultTokens != null
@@ -160,7 +159,6 @@ export function CompactionCard({ item, tabId }: { item: CompactionItem; tabId?: 
         <ChevronRight className={open ? "compaction__chevron--open" : ""} size={12} />
       </button>
       {open && <pre className="compaction__body">{item.detail || item.summary}</pre>}
-      {item.contextCompaction && <CompactionProgress key={item.contextCompaction.runId} progress={item.contextCompaction} tabId={tabId} />}
     </div>
   );
 }

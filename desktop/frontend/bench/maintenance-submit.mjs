@@ -104,27 +104,6 @@ try {
   assert.equal(await page.locator(".composer-run-strip__state").count(), 0, "editing a normal submission into /compact cannot relabel the in-flight request");
   await page.evaluate(() => window.maintenanceProbe.rejectAdmission());
   await page.getByRole("button", { name: "Send (Enter)", exact: true }).waitFor();
-  const beforeRetry = await page.evaluate(() => window.maintenanceProbe.stats());
-  await input.fill("Draft retained during preparation");
-  await page.evaluate(() => window.maintenanceProbe.progress("waiting_response"));
-  await page.getByText("Still waiting for model output", { exact: false }).waitFor();
-  await page.getByRole("button", { name: "Switch session" }).click();
-  assert.equal(await page.getByText("Still waiting for model output", { exact: false }).count(), 0);
-  await page.getByRole("button", { name: "Switch session" }).click();
-  await page.evaluate(() => window.maintenanceProbe.progress("generating"));
-  assert.equal(await page.getByText("Still waiting for model output", { exact: false }).count(), 0);
-  await page.evaluate(() => window.maintenanceProbe.progress("saving"));
-  await page.getByText("Saving compaction result…", { exact: false }).waitFor();
-  await page.evaluate(() => window.maintenanceProbe.progress("waiting_response", "failed"));
-  await page.getByText("Context preparation exceeded 5 minutes", { exact: false }).waitFor();
-  const retry = page.getByRole("button", { name: "Retry preparation", exact: true });
-  await retry.click();
-  assert.equal(await retry.isDisabled(), true);
-  assert.deepEqual(await page.evaluate(() => window.maintenanceProbe.retryStats()), { ...beforeRetry, retries: 1 });
-  await page.evaluate(() => window.maintenanceProbe.finishRetry());
-  await page.getByText("Context prepared. You can continue the conversation.", { exact: true }).waitFor();
-  assert.equal(await input.inputValue(), "Draft retained during preparation");
-  await page.screenshot({ path: path.join(evidence, "compaction-timeout-retry.png") });
   assert.deepEqual(errors, []);
   console.log(`PASS submission edits, session isolation, admission failure, duplicate compaction and durable summary restore; evidence: ${evidence}`);
 } catch (error) {

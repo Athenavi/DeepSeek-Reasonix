@@ -33,7 +33,6 @@ func (a *Agent) commitSummaryProjection(ctx context.Context, commit summaryProje
 		return CompactionState{}, err
 	}
 	state := a.summaryProjectionState(commit)
-	compactionPhase(ctx, "saving")
 	a.sess.compactionMu.Lock()
 	// This is the shared commit boundary for ordinary, positional, and fallback
 	// summary projection installs. Cancellation that wins before this point

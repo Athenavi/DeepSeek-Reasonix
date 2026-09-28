@@ -8,11 +8,7 @@ import (
 )
 
 func maintenanceHistoryRow(op *event.SessionOperationInfo) HistoryMessage {
-	trigger := op.Trigger
-	if trigger == "" {
-		trigger = "manual"
-	}
-	return HistoryMessage{Role: "compaction", Pending: op.Status == "running" || op.Status == "cancelling" || op.Status == "finalizing", Trigger: trigger, ContextCompaction: op.ContextCompaction,
+	return HistoryMessage{Role: "compaction", Pending: op.Status == "running" || op.Status == "cancelling" || op.Status == "finalizing", Trigger: "manual",
 		OperationID: op.OperationID, OperationRevision: op.OperationRevision, RuntimeEpoch: op.RuntimeEpoch,
 		OperationKind: op.Kind, OperationStatus: op.Status, OperationActivity: op.Activity,
 		ErrorCode: op.ErrorCode, Detail: op.Detail, Applied: op.Applied,

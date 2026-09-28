@@ -91,7 +91,6 @@ func TestRemoteTabCommandsForwardedToServe(t *testing.T) {
 		{"steer", func() error { return a.SteerRemoteTab(meta.ID, "keep it narrow") }, `POST /inbox/items {"input":"keep it narrow","intent":"steer"}`},
 		{"plan-on", func() error { return a.SetRemoteTabPlanMode(meta.ID, true) }, `POST /plan {"on":true}`},
 		{"compact", func() error { return a.CompactRemoteTab(meta.ID, "preserve tests") }, `POST /compact {"instructions":"preserve tests"}`},
-		{"compact-retry", func() error { return a.RetryContextCompactionForTab(meta.ID, "failed-run", "epoch") }, `POST /compact {"retryRunId":"failed-run","runtimeEpoch":"epoch"}`},
 		{"fork", func() error { return a.ForkRemoteTab(meta.ID, 2, "try-auth") }, `POST /fork {"name":"try-auth","turn":2}`},
 		{"summarize", func() error { return a.SummarizeRemoteTab(meta.ID, 4, "upto") }, `POST /summarize {"mode":"upto","turn":4}`},
 		{"forget", func() error { return a.ForgetRemoteTab(meta.ID, "api-key") }, `POST /forget {"name":"api-key"}`},

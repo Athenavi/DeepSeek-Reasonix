@@ -57,10 +57,6 @@ func (c *Controller) RuntimeStateSnapshot() event.RuntimeStateSnapshot {
 
 func cloneRuntimeState(in event.RuntimeStateSnapshot) event.RuntimeStateSnapshot {
 	out := in
-	if in.ContextCompaction != nil {
-		value := *in.ContextCompaction
-		out.ContextCompaction = &value
-	}
 	out.Todos = append([]event.Todo{}, in.Todos...)
 	out.Interactions = append([]event.PendingInteraction{}, in.Interactions...)
 	if in.Recovery != nil {
@@ -143,7 +139,6 @@ func (c *Controller) refreshRuntimeStateAttempt(e event.Event, attempt int) {
 		activity = ""
 	}
 	next := base
-	applyCompactionRuntimeState(&next, e)
 	next.SchemaVersion = 1
 	goalView, goalErr := c.goalLifecycleView()
 	next.Goal = goalView
@@ -197,7 +192,10 @@ func (c *Controller) refreshRuntimeStateAttempt(e event.Event, attempt int) {
 	// hint. Derive it only from the authoritative phase/request projection so a
 	// worker crossing into the finishing window cannot make an accepted cancel
 	// briefly look unavailable.
-	applyRuntimeCancellation(&next, maintenance)
+	next.Cancellable = next.Phase == "executing" || next.Phase == "cancelling" || next.PendingPrompt
+	if maintenance != nil && (maintenance.Activity == "finalizing" || maintenance.Activity == "recovery_required") {
+		next.Cancellable = false
+	}
 	next.BackgroundJobs = 0
 	if c.jobs != nil {
 		next.BackgroundJobs = len(c.jobs.RunningForSession(c.parentSessionID()))
@@ -348,7 +346,6 @@ func setRuntimePhase(next *event.RuntimeStateSnapshot, exclusiveSession bool, v3
 func applyRuntimeSessionState(next *event.RuntimeStateSnapshot, v3Snapshot session.Snapshot, hasV3Snapshot bool) {
 	if hasV3Snapshot {
 		snapshot := v3Snapshot
-		restoreCompactionRuntimeState(next, snapshot.Projection.ContextCompaction)
 		next.CommittedSeq = snapshot.EventSequence
 		next.DurableSeq = snapshot.DurableSequence
 		next.Persistence = string(snapshot.PersistenceStatus)

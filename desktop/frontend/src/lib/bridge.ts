@@ -447,7 +447,6 @@ export interface AppBindings extends AttachmentBindings, SessionExportBindings, 
   ClearGoalForTab(tabID: string): Promise<void>;
   Compact(): Promise<void>;
   CompactForTab(tabID: string): Promise<void>;
-  RetryContextCompactionForTab(tabID: string, runId: string, runtimeEpoch: string): Promise<void>;
   NewSession(): Promise<void>;
   NewSessionForTab(tabID: string): Promise<void>;
   ClearSession(): Promise<SessionClearResult>;
@@ -3339,7 +3338,6 @@ function makeMockApp(): MockAppBindings {
         async ClearGoalForTab(tabID) { await this.SetGoalForTab(tabID, ""); },
         async Compact() {},
         async CompactForTab() {},
-        async RetryContextCompactionForTab() {},
         async NewSession() {},
         async NewSessionForTab() {},
         async ClearSession() { return { sessionPath: "", sessionGeneration: 0 }; },

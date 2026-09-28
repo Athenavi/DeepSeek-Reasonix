@@ -73,7 +73,7 @@ func (a *Agent) recoverContextLimit(ctx context.Context, frozen samplingRequest,
 		return samplingRequest{req: next}, true, contextRecoveryLearnedRetry
 	}
 	if physical <= 0 && budget.retries == 0 {
-		work, finish := a.beginCompactionRun(ctx, CompactionTriggerOverflow)
+		work, finish := a.beginCompactionRun(ctx)
 		defer func() { budget.failure = finish(budget.failure) }()
 		ctx = work
 		startProjectionVersion := a.currentProjectionVersion()

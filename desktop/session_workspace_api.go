@@ -724,10 +724,6 @@ func (a *App) openSessionWithNavigation(ref session.SessionRef, navigationSequen
 		return HistoryPage{}, err
 	}
 	a.selectLocalSurfaceAfterOpen(navigationSequence)
-	// A retained maintenance owner may emit no further model progress while
-	// waiting. Publish its new surface binding now so Stop does not depend on
-	// the periodic runtime refresh after navigating back to the session.
-	a.emitRuntimeStateChanged()
 	// runtime:rebuilt intentionally has no reload semantics. SessionRef opening
 	// is navigation, so publish ready only after the exact target commits and
 	// let every frontend owner re-read its metadata and history.

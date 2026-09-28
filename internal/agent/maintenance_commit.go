@@ -66,7 +66,6 @@ func (a *Agent) installMaintenanceProjection(ctx context.Context, in maintenance
 	next.LastReceipt = receipt
 	next.UpdatedAt = now
 
-	compactionPhase(ctx, "saving")
 	a.sess.compactionMu.Lock()
 	// Cancellation and the projection compare-and-swap share this lock boundary.
 	// Once the state is installed, persistence finishes atomically with respect

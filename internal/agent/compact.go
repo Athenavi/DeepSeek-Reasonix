@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	"reasonix/internal/ablation"
@@ -90,9 +89,8 @@ func (a *Agent) compactToProjection(ctx context.Context, trigger, instructions s
 }
 
 func (a *Agent) compactToProjectionWithChunked(ctx context.Context, trigger, instructions string, req foldRequest) (outcome CompactionOutcome, err error) {
-	ctx, finish := a.beginCompactionRun(ctx, trigger)
+	ctx, finish := a.beginCompactionRun(ctx)
 	defer func() { err = finish(err) }()
-	compactionPhase(ctx, "preparing")
 	if err := a.sess.compactionRunMu.acquire(ctx); err != nil {
 		return CompactionNoop, err
 	}
@@ -201,7 +199,7 @@ func (a *Agent) SummarizeUpTo(ctx context.Context, toIdx int) error {
 }
 
 func (a *Agent) summarizeAtProjectionBoundary(ctx context.Context, canonicalIndex int, direction string) (resultErr error) {
-	ctx, finish := a.beginCompactionRun(ctx, CompactionTriggerManual)
+	ctx, finish := a.beginCompactionRun(ctx)
 	defer func() { resultErr = finish(resultErr) }()
 	if err := ctx.Err(); err != nil {
 		return err
@@ -475,31 +473,22 @@ func (a *Agent) runSummaryRequest(ctx context.Context, req provider.Request) (su
 	if err := ctx.Err(); err != nil {
 		return "", usage, err
 	}
-	compactionPhase(ctx, "waiting_response")
-	ctx, finishObservation := observeSummaryRequest(ctx)
-	defer finishObservation()
 	ch, err := provider.StreamAuxiliary(ctx, a.svc.prov, req)
 	if err != nil {
 		return "", usage, err
 	}
-	defer drainSummaryStream(ctx, cancel, ch)
+	defer func() {
+		cancel()
+		for range ch {
+		}
+	}()
 
 	// Cancel on timeout; join the buffer worker before releasing execution ownership.
 	var b strings.Builder
 	var reasoning strings.Builder
 	toolCalls := 0
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	var progress <-chan struct{}
-	if run := currentCompactionRun(ctx); run != nil {
-		progress = run.wake
-	}
 	for {
 		select {
-		case <-progress:
-			publishCompactionOutput(ctx)
-		case <-ticker.C:
-			publishCompactionOutput(ctx)
 		case <-ctx.Done():
 			return "", usage, ctx.Err()
 		case chunk, ok := <-ch:

@@ -1,5 +1,4 @@
 import type { Action, Item, State } from "./useController";
-import { reduceContextCompactionProgress } from "./contextCompactionProgress";
 import type { WireEvent } from "./types";
 import { acceptSessionRuntimeSnapshot, type RuntimeState } from "./runtimeStateStore";
 import { interruptOrphanedSessionOperationItems, sessionOperationItem, upsertSessionOperationItem } from "./sessionMaintenanceOperation";
@@ -14,7 +13,6 @@ function lastPendingCompaction(items: readonly Item[], manual = false): number {
 
 export function reduceCompactionEvent(s: State, e: WireEvent): State {
   switch (e.kind) {
-    case "context_compaction_progress": return reduceContextCompactionProgress(s, e.contextCompaction);
     case "session_operation": {
       const op = e.sessionOperation;
       if (!op?.operationId) return s;
@@ -68,15 +66,12 @@ export function reconcileMaintenanceState(next: State, a: Action): State {
     "history_replace", "history_rebase", "history_prepend", "history_append", "history_items_patch",
     "transcript_snapshot", "transcript_v2_snapshot", "transcript_page", "transcript_records"].includes(a.type);
   if (historyOrRuntimeSynchronized && next.runtimeStateSnapshot) {
-    const snapshot = next.runtimeStateSnapshot;
-    next = reduceContextCompactionProgress(next, snapshot.contextCompaction);
-    const maintenance = snapshot.maintenance;
+    const maintenance = next.runtimeStateSnapshot.maintenance;
     const items = interruptOrphanedSessionOperationItems(
       next.items,
       maintenance?.operationId,
-      maintenance?.runtimeEpoch || snapshot.runtimeEpoch,
-      snapshot.revision,
-      snapshot.contextCompaction?.status === "running" ? snapshot.contextCompaction.runId : undefined,
+      maintenance?.runtimeEpoch || next.runtimeStateSnapshot.runtimeEpoch,
+      next.runtimeStateSnapshot.revision,
     );
     if (items !== next.items) next = { ...next, items };
   }

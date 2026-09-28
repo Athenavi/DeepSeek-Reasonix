@@ -40,19 +40,6 @@ func WithRequestObserver(ctx context.Context, observe func(RequestObservation)) 
 	return context.WithValue(ctx, requestObserverKey{}, observe)
 }
 
-// WithAdditionalRequestObserver retains the caller's diagnostic observer.
-func WithAdditionalRequestObserver(ctx context.Context, observe func(RequestObservation)) context.Context {
-	prior, _ := ctx.Value(requestObserverKey{}).(func(RequestObservation))
-	return WithRequestObserver(ctx, func(value RequestObservation) {
-		if prior != nil {
-			prior(value)
-		}
-		if observe != nil {
-			observe(value)
-		}
-	})
-}
-
 type requestObservationState struct {
 	mu      sync.Mutex
 	value   RequestObservation

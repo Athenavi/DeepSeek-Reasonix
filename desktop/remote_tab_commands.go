@@ -317,7 +317,7 @@ func (a *App) remoteTabPost(tabID, path string, body map[string]any) error {
 		if !a.remoteTabAdmissionCurrent(tabID, admittedGen) {
 			continue
 		}
-		ctx, cancel := remoteMaintenanceCommandContext(a, path)
+		ctx, cancel := commandContext(a)
 		var payload []byte
 		if body != nil {
 			payload, _ = json.Marshal(body)

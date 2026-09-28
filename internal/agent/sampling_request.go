@@ -100,7 +100,7 @@ func (a *Agent) streamProviderRequest(ctx context.Context, req provider.Request)
 // Output budgets are resolved only here and never change the compact_ratio
 // trigger. Physical overflow may attempt at most one recovery summary.
 func (a *Agent) prepareSamplingRequest(ctx context.Context) (result samplingRequest, requestErr error) {
-	work, finish := a.beginCompactionRun(ctx, CompactionTriggerPressure)
+	work, finish := a.beginCompactionRun(ctx)
 	defer func() { requestErr = finish(requestErr) }()
 	// Keep the ordinary request context alive after a safe pressure timeout,
 	// while every nested maintenance attempt shares the bounded work context.

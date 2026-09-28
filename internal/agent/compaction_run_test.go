@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"reflect"
-	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -89,15 +88,7 @@ func TestCompactionBudgetIncludesContinuousOutputAndSilentStreams(t *testing.T) 
 					p := &slowSummaryProvider{output: output}
 					sess := foldableSessionOverForce(6)
 					before := sess.Snapshot()
-					var mu sync.Mutex
-					var states []event.ContextCompactionState
-					a := New(p, nil, sess, Options{ContextWindow: 5000, CompactRatio: .5}, event.FuncSink(func(e event.Event) {
-						if e.ContextCompaction != nil {
-							mu.Lock()
-							states = append(states, *e.ContextCompaction)
-							mu.Unlock()
-						}
-					}))
+					a := New(p, nil, sess, Options{ContextWindow: 5000, CompactRatio: .5}, event.Discard)
 					parent := context.Background()
 					start := time.Now()
 					_, err := a.contextManager().Prepare(parent, ContextPreparePolicy{Trigger: trigger})
@@ -119,12 +110,6 @@ func TestCompactionBudgetIncludesContinuousOutputAndSilentStreams(t *testing.T) 
 					}
 					if !reflect.DeepEqual(before, sess.Snapshot()) || a.currentProjectionVersion() != 0 {
 						t.Fatal("timeout changed history")
-					}
-					mu.Lock()
-					last := states[len(states)-1]
-					mu.Unlock()
-					if last.Status != "failed" || last.ErrorCode != "summary_budget_exceeded" || (last.LastOutputAt != 0) != output {
-						t.Fatalf("terminal = %+v", last)
 					}
 				})
 			})
@@ -160,9 +145,9 @@ func TestCompactionBudgetCancelsQueuedOperationBeforeGateRelease(t *testing.T) {
 func TestNestedCompactionRunKeepsOriginalBudget(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		a := New(nil, nil, NewSession("sys"), Options{}, event.Discard)
-		ctx, finish := a.beginCompactionRun(context.Background(), CompactionTriggerManual)
+		ctx, finish := a.beginCompactionRun(context.Background())
 		time.Sleep(4 * time.Minute)
-		nested, end := a.beginCompactionRun(ctx, CompactionTriggerManual)
+		nested, end := a.beginCompactionRun(ctx)
 		deadline, _ := nested.Deadline()
 		if time.Until(deadline) != time.Minute || currentCompactionRun(ctx) != currentCompactionRun(nested) {
 			t.Fatal("nested operation reset its budget")

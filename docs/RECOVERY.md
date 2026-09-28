@@ -34,9 +34,9 @@ not the user's message number. Keep the complete error for diagnosis.
 - Context preparation has one five-minute generation budget, including queued
   and chunked work. Heartbeats do not extend it. A failed summary keeps the last
   committed context; it no longer triggers additional lossy truncation. If that
-  context cannot be sent safely, the current attempt stops. **Retry preparation**
-  only retries preparation; continue the task yourself after it succeeds.
-  Original chat history stays available. See [context preparation recovery](CONTEXT_COMPACTION_RECOVERY.md).
+  context cannot be sent safely, the current attempt stops with a recoverable
+  error. Retry with `/compact`, shorten the latest message, or select a model
+  with a larger context window. Original chat history stays available.
 - On save failures, keep the conversation open, export a backup if available,
   and check disk space and write permissions. Model requests and tool execution
   remain paused until the required save has been confirmed.

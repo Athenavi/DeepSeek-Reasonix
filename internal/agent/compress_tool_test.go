@@ -211,7 +211,7 @@ func TestCompressionVisibleMessagesSplitsLegacyStrictSummary(t *testing.T) {
 	}
 }
 
-func TestCompressContextNoSavingsIsTypedFailure(t *testing.T) {
+func TestCompressContextNoSavingsIsNoop(t *testing.T) {
 	sess := &Session{Messages: []provider.Message{
 		{Role: provider.RoleSystem, Content: "sys"},
 		{Role: provider.RoleUser, Content: "tiny"},
@@ -220,9 +220,8 @@ func TestCompressContextNoSavingsIsTypedFailure(t *testing.T) {
 	a := New(&fakeProvider{reply: strings.Repeat("long summary ", 30)}, tool.NewRegistry(), sess, Options{}, event.Discard)
 
 	got, err := a.CompressContext(context.Background(), tool.CompressRequest{Direction: "before", Anchor: "keep boundary"})
-	var failure *SummaryError
-	if !errors.As(err, &failure) || failure.Code != "summary_no_reduction" {
-		t.Fatalf("CompressContext failure: %v", err)
+	if err != nil {
+		t.Fatalf("CompressContext: %v", err)
 	}
 	if got.Status != "noop" || !strings.Contains(got.Reason, "not be smaller") {
 		t.Fatalf("result = %+v", got)
@@ -232,21 +231,6 @@ func TestCompressContextNoSavingsIsTypedFailure(t *testing.T) {
 	}
 	if reasons := sess.DrainContentRewriteReasons(); len(reasons) != 0 {
 		t.Fatalf("noop reported cache rewrite reasons: %v", reasons)
-	}
-}
-
-func TestCompressContextEmptyRangeAtHardLimitBlocksWithoutMutation(t *testing.T) {
-	sess := NewSession(strings.Repeat("fixed prefix ", 2000))
-	sess.Add(provider.Message{Role: provider.RoleUser, Content: "only retained boundary"})
-	before := sess.Snapshot()
-	a := New(&fakeProvider{reply: "unused"}, nil, sess, Options{ContextWindow: 1000}, event.Discard)
-	_, err := a.CompressContext(t.Context(), tool.CompressRequest{Direction: "before", Anchor: "only retained boundary"})
-	var failure *SummaryError
-	if !errors.Is(err, ErrCompactionRequired) || !errors.As(err, &failure) || failure.Code != "summary_no_reduction" {
-		t.Fatalf("empty range failure = %v", err)
-	}
-	if a.currentProjectionVersion() != 0 || !reflect.DeepEqual(before, sess.Snapshot()) {
-		t.Fatal("empty range failure changed context or canonical history")
 	}
 }
 

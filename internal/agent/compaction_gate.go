@@ -19,12 +19,6 @@ func (g *compactionGate) acquire(ctx context.Context) error {
 	select {
 	case g.token <- struct{}{}:
 		return g.acquired(ctx)
-	default:
-		compactionPhase(ctx, "preparing")
-	}
-	select {
-	case g.token <- struct{}{}:
-		return g.acquired(ctx)
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -35,7 +29,6 @@ func (g *compactionGate) acquired(ctx context.Context) error {
 		g.Unlock()
 		return err
 	}
-	captureCompactionBaseline(ctx)
 	return nil
 }
 

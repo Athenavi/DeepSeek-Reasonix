@@ -1,9 +1,7 @@
 package main
 
 import (
-	"context"
 	"testing"
-	"time"
 
 	"reasonix/internal/session"
 )
@@ -74,33 +72,6 @@ func TestOpenSessionActivatesVisibleTabAlreadyRunningTheSession(t *testing.T) {
 	app.mu.RUnlock()
 	if activeID != tab.ID || count != 1 || tab.Ctrl != ctrl {
 		t.Fatalf("owner tab not activated in place: active=%q tabs=%d sameCtrl=%v", activeID, count, tab.Ctrl == ctrl)
-	}
-}
-
-func TestOpenSessionPublishesRuntimeBindingWithoutNewModelOutput(t *testing.T) {
-	app, tab, _, _, _ := canonicalWorkspaceOpenFixture(t)
-	published := make(chan RuntimeStateProjection, 8)
-	app.runtimeEvents.emit = func(_ context.Context, name string, payload ...any) {
-		if name == "runtime-state:changed" && len(payload) == 1 {
-			select {
-			case published <- payload[0].(RuntimeStateProjection):
-			default:
-			}
-		}
-	}
-	app.mu.Lock()
-	app.activeTabID = ""
-	app.mu.Unlock()
-	if _, err := app.OpenSession(session.SessionRef{HostID: localDesktopHostID, SessionID: tab.SessionID}); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case snapshot := <-published:
-		if len(snapshot.Sessions) != 1 || !snapshot.Sessions[0].Open || snapshot.Sessions[0].TabID != tab.ID || snapshot.Sessions[0].SessionID != tab.SessionID {
-			t.Fatalf("navigation published the wrong binding: %+v", snapshot.Sessions)
-		}
-	case <-time.After(3 * time.Second):
-		t.Fatal("navigation did not publish the runtime; Stop would wait for periodic refresh")
 	}
 }
 

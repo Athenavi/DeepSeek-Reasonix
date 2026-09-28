@@ -342,7 +342,7 @@ export type Item = { turnId?: string } & (
   | { kind: "phase"; id: string; text: string }
   | { kind: "notice"; id: string; local?: boolean; level: "info" | "warn"; text: string; detail?: string; code?: string; title?: string; variant?: "delivery" | "completion"; action?: "continue_delivery" | "open_changes" | "recover_context"; recoveryId?: string; completionSummary?: WireCompletionSummary; decisionReceipt?: WireDecisionReceipt; missing?: string[]; inboxItemId?: string }
   | {
-      kind: "compaction"; contextCompaction?: import("./contextCompactionProgress").ContextCompactionState;
+      kind: "compaction";
       id: string;
       pending: boolean;
       trigger: string;
@@ -1658,7 +1658,7 @@ function applyEvent(s: State, e: WireEvent, preserveToolPayloads = false): State
     }
     case "phase":
       return { ...s, seq: s.seq + 1, items: [...s.items, { kind: "phase", id: `p${s.seq}`, text: e.text ?? "" }] };
-    case "session_operation": case "context_compaction_progress":
+    case "session_operation":
     case "compaction_started":
     case "compaction_done":
       return reduceCompactionEvent(s, e);

@@ -94,13 +94,6 @@ func TestContextMaintenanceProjectionSurvivesSessionSwitch(t *testing.T) {
 			if got := provider.ModelMessages(exec.ModelHistorySnapshot()); !reflect.DeepEqual(got, wantModel) {
 				t.Fatal("model projection changed after switching away and reopening")
 			}
-			if strings.Contains(mode, "failure") {
-				state := controller.RuntimeStateSnapshot()
-				progress := state.ContextCompaction
-				if progress == nil || progress.Status != "failed" || !progress.Retryable || progress.RuntimeEpoch != state.RuntimeEpoch {
-					t.Fatalf("failed receipt not rebound on reopen: %+v", progress)
-				}
-			}
 		})
 	}
 }

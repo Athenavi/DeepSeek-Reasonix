@@ -9,8 +9,6 @@ import { runtimeStateStore, type RuntimeState } from "../src/lib/runtimeStateSto
 import { orderedLocalSubmissions } from "../src/lib/localSubmissionState";
 import { sessionOperationHistoryMessage } from "../src/lib/sessionMaintenanceOperation";
 import { submitTurn } from "../src/lib/turnSubmit";
-import { getTranscriptStore } from "../src/lib/transcriptStore";
-import type { ContextCompactionState } from "../src/lib/contextCompactionProgress";
 import type { AppBindings } from "../src/lib/bridge";
 import { installDesktopHostStub } from "../src/__tests__/desktopHostStub";
 import "../src/styles.css";
@@ -29,8 +27,6 @@ let submissions = 0;
 let starts = 0;
 let lastInput = "";
 let revision = 0;
-let retries = 0;
-let retryRelease: (() => void) | undefined;
 let admission: Promise<void> | undefined;
 let releaseAdmission: (() => void) | undefined;
 let rejectAdmission: ((reason: Error) => void) | undefined;
@@ -40,11 +36,6 @@ installDesktopHostStub({
   CaptureInboxTarget: (tabId: string, sessionPath: string) => ({ tabId, sessionPath, generation: 1, selection: 0, remote: false }),
   Commands: () => [], Models: () => [], ModelsForTab: () => [],
   TranscriptOutlineForTab: () => ({ turns: [], hasMore: false }),
-  RetryContextCompactionForTab: async (tab: string, runId: string, epoch: string) => {
-    if (tab !== "A" || runId !== "auto-A" || epoch !== "epoch-A") throw new Error("wrong retry target");
-    retries++;
-    await new Promise<void>(resolve => { retryRelease = resolve; });
-  },
 });
 const bridge = { StartTurnForTab: async (tab: string, input: string) => {
   lastInput = input;
@@ -64,7 +55,6 @@ async function send(display: string, input = display, tab = active) {
   paint();
 }
 function paint() {
-  for (const [tab, state] of states) getTranscriptStore().setState(tab, state);
   runtimeStateStore.commit({ epoch: "fixture", revision: ++revision, topics: [], sessions: [...states.entries()].map(([tabId, state]) => ({
     tabId, scope: "global", workspaceRoot: "", topicId: "", sessionPath: `fixture-${tabId}`, sessionGeneration: 1,
     open: true, remote: false, freshness: "synced", state: state.runtimeStateSnapshot ?? runtime(0),
@@ -84,18 +74,6 @@ function paint() {
   </ToastProvider></LocaleProvider>));
 }
 Object.assign(window, { maintenanceProbe: {
-  retryStats: () => ({ retries, starts, submissions }),
-  finishRetry: () => retryRelease?.(),
-  progress: (phase: string, status = "running") => {
-    const progress: ContextCompactionState = { runId: "auto-A", trigger: "pressure", runtimeEpoch: "epoch-A",
-      phase, status, revision: ++revision, startedAt: Date.now() - 65000, observedAt: Date.now(), deadlineAt: Date.now() + 235000,
-      lastOutputAt: phase === "generating" ? Date.now() : undefined,
-      errorCode: status === "failed" ? "summary_budget_exceeded" : undefined, retryable: status === "failed" };
-    states.set("A", reducer(states.get("A")!, { type: "runtime_snapshot", snapshot: {
-      ...runtime(revision), phase: status === "running" ? "executing" : "idle", running: status === "running", contextCompaction: progress,
-    } }));
-    paint();
-  },
   holdAdmission: () => { admission = new Promise<void>((resolve, reject) => { releaseAdmission = resolve; rejectAdmission = reject; }); },
   releaseAdmission: () => { releaseAdmission?.(); admission = undefined; },
   rejectAdmission: () => { rejectAdmission?.(new Error("fixture admission failure")); admission = undefined; },

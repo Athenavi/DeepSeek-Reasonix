@@ -45,37 +45,36 @@ type MaintenanceState struct {
 // RuntimeStateSnapshot is a host-only, replaceable observation. It is never a
 // transcript or durable turn record. Running retains the legacy admission gate.
 type RuntimeStateSnapshot struct {
-	SchemaVersion     int                     `json:"schemaVersion"`
-	HostID            string                  `json:"hostId,omitempty"`
-	SessionID         string                  `json:"sessionId,omitempty"`
-	SessionCodec      string                  `json:"sessionCodec,omitempty"`
-	ProjectionEpoch   string                  `json:"projectionEpoch"`
-	RuntimeEpoch      string                  `json:"runtimeEpoch"`
-	ActivityRevision  uint64                  `json:"activityRevision"`
-	Revision          uint64                  `json:"revision"`
-	Phase             string                  `json:"phase"`
-	Running           bool                    `json:"running"`
-	TurnID            string                  `json:"turnId"`
-	TurnStatus        TurnStatus              `json:"turnStatus"`
-	TurnEventSeq      uint64                  `json:"turnEventSeq"`
-	CommittedSeq      uint64                  `json:"committedEventSeq"`
-	DurableSeq        uint64                  `json:"durableEventSeq"`
-	Persistence       string                  `json:"persistenceStatus"`
-	PersistenceErr    string                  `json:"persistenceError,omitempty"`
-	HeadID            string                  `json:"headId"`
-	PendingPrompt     bool                    `json:"pendingPrompt"`
-	Interactions      []PendingInteraction    `json:"pendingInteractions"`
-	Todos             []Todo                  `json:"todos"`
-	TodoWritten       bool                    `json:"todoWritten"`
-	CancelRequested   bool                    `json:"cancelRequested"`
-	Cancellable       bool                    `json:"cancellable"`
-	BackgroundJobs    int                     `json:"backgroundJobs"`
-	Activity          string                  `json:"activity"`
-	Recovery          *RecoveryStatus         `json:"recovery,omitempty"`
-	Goal              *goaldomain.View        `json:"goal,omitempty"`
-	GoalError         string                  `json:"goalError,omitempty"`
-	Maintenance       *MaintenanceState       `json:"maintenance,omitempty"`
-	ContextCompaction *ContextCompactionState `json:"contextCompaction,omitempty"`
+	SchemaVersion    int                  `json:"schemaVersion"`
+	HostID           string               `json:"hostId,omitempty"`
+	SessionID        string               `json:"sessionId,omitempty"`
+	SessionCodec     string               `json:"sessionCodec,omitempty"`
+	ProjectionEpoch  string               `json:"projectionEpoch"`
+	RuntimeEpoch     string               `json:"runtimeEpoch"`
+	ActivityRevision uint64               `json:"activityRevision"`
+	Revision         uint64               `json:"revision"`
+	Phase            string               `json:"phase"`
+	Running          bool                 `json:"running"`
+	TurnID           string               `json:"turnId"`
+	TurnStatus       TurnStatus           `json:"turnStatus"`
+	TurnEventSeq     uint64               `json:"turnEventSeq"`
+	CommittedSeq     uint64               `json:"committedEventSeq"`
+	DurableSeq       uint64               `json:"durableEventSeq"`
+	Persistence      string               `json:"persistenceStatus"`
+	PersistenceErr   string               `json:"persistenceError,omitempty"`
+	HeadID           string               `json:"headId"`
+	PendingPrompt    bool                 `json:"pendingPrompt"`
+	Interactions     []PendingInteraction `json:"pendingInteractions"`
+	Todos            []Todo               `json:"todos"`
+	TodoWritten      bool                 `json:"todoWritten"`
+	CancelRequested  bool                 `json:"cancelRequested"`
+	Cancellable      bool                 `json:"cancellable"`
+	BackgroundJobs   int                  `json:"backgroundJobs"`
+	Activity         string               `json:"activity"`
+	Recovery         *RecoveryStatus      `json:"recovery,omitempty"`
+	Goal             *goaldomain.View     `json:"goal,omitempty"`
+	GoalError        string               `json:"goalError,omitempty"`
+	Maintenance      *MaintenanceState    `json:"maintenance,omitempty"`
 }
 
 func (s RuntimeStateSnapshot) ActiveWork() bool {

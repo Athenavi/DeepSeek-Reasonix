@@ -85,11 +85,8 @@ func (m ContextManager) Prepare(ctx context.Context, policy ContextPreparePolicy
 	if m.agent == nil {
 		return PreparedContext{}, nil
 	}
-	ctx, finish := m.agent.beginCompactionRun(ctx, policy.Trigger)
+	ctx, finish := m.agent.beginCompactionRun(ctx)
 	defer func() { err = finish(err) }()
-	if policy.Force || policy.Trigger == CompactionTriggerManual {
-		compactionPhase(ctx, "preparing")
-	}
 	if err := m.agent.sess.compactionRunMu.acquire(ctx); err != nil {
 		return PreparedContext{}, err
 	}
@@ -158,7 +155,6 @@ func (m ContextManager) prepareOnce(ctx context.Context, policy ContextPreparePo
 	if est < fold && !forceFold {
 		return prepared, nil
 	}
-	compactionPhase(ctx, "preparing")
 
 	// A manual compact over the hard ceiling is a rescue, not a convenience:
 	// prune first so the never-folded recent tail can shrink too.
@@ -253,7 +249,7 @@ func (m ContextManager) foldContext(ctx context.Context, prepared PreparedContex
 	a.sess.compaction.stuckInputHash = blockedInputHash
 	a.sess.compaction.consecutive += maxSummaries
 	if policy.Trigger == CompactionTriggerOverflow || hard > 0 && result.InputTokens >= hard {
-		return PreparedContext{}, fmt.Errorf("%w: %w", ErrCompactionRequired, compactionFailure(ctx, fmt.Errorf("%w: %s", errCheckpointRejected, reason)))
+		return PreparedContext{}, fmt.Errorf("%w: %w", ErrCompactionRequired, compactionError(ctx, fmt.Errorf("%w: %s", errCheckpointRejected, reason)))
 	}
 	slog.Info("agent: context maintenance paused below hard ceiling", "reason", reason)
 	return result, nil
@@ -277,7 +273,7 @@ func (m ContextManager) summaryFailed(ctx context.Context, policy ContextPrepare
 	if ctxErr := ctx.Err(); ctxErr != nil && !errors.Is(context.Cause(ctx), errSummaryBudget) {
 		return PreparedContext{}, ctxErr
 	}
-	err = compactionFailure(ctx, err)
+	err = compactionError(ctx, err)
 	if errors.Is(err, errCompressStaleContext) && policy.Trigger != CompactionTriggerManual {
 		reason := "context changed during summary; automatic retry blocked for this generation"
 		a.recordContextMaintenanceBlocked(inputHash, policy.Trigger, "summary", reason)
@@ -300,7 +296,7 @@ func (m ContextManager) summaryNoop(ctx context.Context, policy ContextPreparePo
 	switch {
 	case policy.Trigger == CompactionTriggerOverflow || hard > 0 && latest.InputTokens >= hard:
 		m.agent.recordContextMaintenanceBlocked(inputHash, policy.Trigger, "summary", reason)
-		return PreparedContext{}, fmt.Errorf("%w: %w", ErrCompactionRequired, compactionFailure(ctx, fmt.Errorf("%w: %s", errCheckpointRejected, reason)))
+		return PreparedContext{}, fmt.Errorf("%w: %w", ErrCompactionRequired, compactionError(ctx, fmt.Errorf("%w: %s", errCheckpointRejected, reason)))
 	case policy.Force:
 		// A requested compaction with no eligible history is a successful no-op.
 		// It must not poison the retry ledger or masquerade as a hard-limit failure.

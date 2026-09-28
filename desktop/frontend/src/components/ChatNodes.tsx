@@ -127,7 +127,7 @@ const ChatNodeSeat = memo(function ChatNodeSeat({ source, nodeKey, loader, scrol
     case "tool": body = <ChatTool node={node} loader={loader} actions={actions} scroll={scroll} />; break;
     case "phase": body = <ContextInjectionRow title={t("chat.activity")} summary={node.item.text} beforeToggle={scroll.beforeChange}>{node.item.text}</ContextInjectionRow>; break;
     case "notice": body = <ChatNotice node={node} actions={actions} scroll={scroll} />; break;
-    case "compaction": body = <ChatCompaction node={node} loader={loader} tabId={tabId} />; break;
+    case "compaction": body = <ChatCompaction node={node} loader={loader} />; break;
     case "extension": body = node.item.card.actions?.length ? <ExtensionCard item={node.item} tabId={tabId} /> :
       <ChatDisclosure label={node.item.card.title || node.item.pluginId}><ExtensionCard item={node.item} tabId={tabId} /></ChatDisclosure>; break;
     case "tail": body = <ChatTurnTail node={node} source={source} actions={actions} loader={loader} tabId={tabId} hostId={hostId} />; break;
@@ -155,7 +155,7 @@ function ChatNotice({ node, actions, scroll }: { node: Extract<ChatNode, { kind:
   </ContextInjectionRow>;
 }
 
-function ChatCompaction({ node, loader, tabId }: { node: Extract<ChatNode, { kind: "compaction" }>; loader: ChatContentLoader; tabId?: string }) {
+function ChatCompaction({ node, loader }: { node: Extract<ChatNode, { kind: "compaction" }>; loader: ChatContentLoader }) {
   const [loadFailed, setLoadFailed] = useState(false);
   const needsContent = loader.needsFullContent(node.item, "summary");
   useEffect(() => {
@@ -164,7 +164,7 @@ function ChatCompaction({ node, loader, tabId }: { node: Extract<ChatNode, { kin
     void loader.load(node.item, "summary").catch(() => { if (alive) setLoadFailed(true); });
     return () => { alive = false; };
   }, [loader, node.item, needsContent, loadFailed]);
-  return <CompactionCard tabId={tabId} item={loadFailed && node.item.status === "loading"
+  return <CompactionCard item={loadFailed && node.item.status === "loading"
     ? { ...node.item, pending: false, status: "unavailable", errorCode: "record_incomplete" }
     : node.item} />;
 }

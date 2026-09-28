@@ -3,7 +3,6 @@ import type { PendingInteraction, RecoveryStatus, Todo } from "../generated/desk
 import { sameSessionIdentity, type SessionIdentity } from "./sessionIdentity";
 
 export interface RuntimeState {
-	contextCompaction?: import("./contextCompactionProgress").ContextCompactionState | null;
   schemaVersion: number;
   hostId?: string;
   sessionId?: string;

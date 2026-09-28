@@ -10,18 +10,6 @@ const projection = (revision: number, changes: Partial<RuntimeState> = {}): Runt
     open: true, remote: false, freshness: "synced", state: { ...state, revision, ...changes } }] });
 
 {
-  const store = createRuntimeStateStore();
-  for (const [index, phase] of (["executing", "cancelling", "recovery_required"] as const).entries()) {
-    const frame = projection(index + 1, { phase, cancellable: phase === "executing" });
-    frame.sessions[0].sessionGeneration = 0;
-    assert.equal(acceptRuntimeState(store, frame), "accepted", `maintenance phase ${phase} is valid`);
-    const selected = selectRuntimeSession(store.getSnapshot(), "a", { sessionPath: "/fixture/session", sessionGeneration: 0 });
-    assert.equal(selected?.state.running, true, "initial generation must show the maintenance owner");
-    assert.equal(selectRuntime(selected).cancellable, phase === "executing");
-  }
-}
-
-{
   const versioned = (projectionEpoch: string, revision: number, todos: RuntimeState["todos"]): RuntimeState => ({
     ...state, projectionEpoch, revision, todos,
   });
