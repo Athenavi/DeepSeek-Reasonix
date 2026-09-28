@@ -42,16 +42,20 @@ func (a *App) archiveHistoricalSource(selector SessionSelector) (SessionMutation
 		return SessionMutationResult{}, sessionOperationErrorForTarget(err, id, operationID)
 	}
 	archivedPaths := []string{source.path}
-	for _, sibling := range recoveredLegacySiblings(source) {
-		siblingID, siblingSource, err := a.historicalSourceForSelector(SessionSelector{Source: &SessionSourceRef{HostID: localDesktopHostID, Path: sibling}})
+	siblings := legacyHeadVersions(source)
+	for _, path := range recoveredLegacySiblings(source) {
+		siblings = append(siblings, SessionSourceRef{HostID: localDesktopHostID, Path: path})
+	}
+	for _, sibling := range siblings {
+		siblingID, siblingSource, err := a.historicalSourceForSelector(SessionSelector{Source: &sibling})
 		if err != nil {
-			slog.Warn("desktop: recovered sibling archive skipped", "source_key", id, "err", err)
+			slog.Warn("desktop: sibling archive skipped", "source_key", id, "err", err)
 			continue
 		}
 		siblingResult, err := a.archiveHistoricalSourceWithOperation(ctx, siblingID, siblingSource,
 			"archive-source-"+strings.TrimPrefix(newTabID(), "tab_"))
 		if err != nil {
-			slog.Warn("desktop: recovered sibling archive failed", "source_key", siblingID, "err", err)
+			slog.Warn("desktop: sibling archive failed", "source_key", siblingID, "err", err)
 			continue
 		}
 		result.IdentityAliases = append(result.IdentityAliases, siblingResult.IdentityAliases...)
@@ -104,6 +108,46 @@ func recoveredLegacySiblings(source historicalSource) []string {
 		}
 	}
 	return siblings
+}
+
+// legacyHeadVersions lists the other live heads of a legacy transcript that are
+// versions of the selected head's conversation: each rewind keeps the head it
+// left as a version, and the sidebar lists every version as its own row with
+// the same title. Named forks start a conversation of their own and stay.
+func legacyHeadVersions(source historicalSource) []SessionSourceRef {
+	if source.format != "legacy" || source.head == "" {
+		return nil
+	}
+	heads, err := agent.ListSessionHeads(source.path)
+	if err != nil {
+		return nil
+	}
+	byID := make(map[string]agent.SessionHead, len(heads))
+	for _, head := range heads {
+		byID[head.ID] = head
+	}
+	origin := func(id string) string {
+		for range heads {
+			head, ok := byID[id]
+			if !ok || head.Kind != agent.HeadKindRewind || head.ParentHead == "" {
+				break
+			}
+			id = head.ParentHead
+		}
+		return id
+	}
+	if _, ok := byID[source.head]; !ok {
+		return nil
+	}
+	want := origin(source.head)
+	var versions []SessionSourceRef
+	for _, head := range heads {
+		if head.ID == source.head || head.Retired || head.Kind == agent.HeadKindConcurrent || origin(head.ID) != want {
+			continue
+		}
+		versions = append(versions, SessionSourceRef{HostID: localDesktopHostID, Path: source.path, HeadID: head.ID})
+	}
+	return versions
 }
 
 func (a *App) archiveHistoricalSourceWithOperation(ctx context.Context, id string, source historicalSource, operationID string) (SessionMutationResult, error) {
