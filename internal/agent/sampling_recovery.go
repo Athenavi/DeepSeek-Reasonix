@@ -41,7 +41,7 @@ func (a *Agent) streamWithSamplingRecovery(parent context.Context, turn int) (te
 	defer cancel()
 	state := samplingRecoveryState{}
 	defer func() {
-		if limit.Wall > 0 && errors.Is(terminal.err, context.DeadlineExceeded) && parent.Err() == nil {
+		if limit.Wall > 0 && errors.Is(ctx.Err(), context.DeadlineExceeded) && errors.Is(terminal.err, context.DeadlineExceeded) && parent.Err() == nil {
 			terminal.err = &taskBudgetPause{axis: "time", detail: "recovery reached the task deadline"}
 		}
 		if terminal.err == nil && state.replay.retries > 0 {
@@ -96,6 +96,9 @@ func (a *Agent) streamWithSamplingRecovery(parent context.Context, turn int) (te
 			continue
 		}
 		sink.Flush()
+		if state.context.failure != nil {
+			result.err = state.context.failure
+		}
 		if !state.protocol {
 			if err := a.offerProtocolRecovery(state.frozen, result.err); err != nil {
 				result.err = err
@@ -181,7 +184,7 @@ func (a *Agent) trySamplingRepair(ctx context.Context, s *samplingRecoveryState,
 		s.frozen = next
 		return true
 	}
-	if s.protocol {
+	if s.protocol || s.context.failure != nil {
 		return false
 	}
 	next, ok := a.tryRecoverReasoningReplay400(sink, s.frozen, id, attempt, result.err, &s.replay)

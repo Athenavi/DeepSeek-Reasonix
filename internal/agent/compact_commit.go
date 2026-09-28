@@ -33,6 +33,7 @@ func (a *Agent) commitSummaryProjection(ctx context.Context, commit summaryProje
 		return CompactionState{}, err
 	}
 	state := a.summaryProjectionState(commit)
+	compactionPhase(ctx, "saving")
 	a.sess.compactionMu.Lock()
 	// This is the shared commit boundary for ordinary, positional, and fallback
 	// summary projection installs. Cancellation that wins before this point
@@ -59,14 +60,14 @@ func (a *Agent) commitSummaryProjection(ctx context.Context, commit summaryProje
 		if accepted {
 			a.sess.checkpointState = "pending"
 			a.sess.compactionMu.Unlock()
-			return CompactionState{}, fmt.Errorf("persist projection: %w", err)
+			return CompactionState{}, &compactionPersistenceError{fmt.Errorf("persist projection: %w", err)}
 		}
 		a.sess.compactionState = prev
 		a.sess.compactionMu.Unlock()
 		if errors.Is(err, errCompressStaleContext) {
 			return CompactionState{}, err
 		}
-		return CompactionState{}, fmt.Errorf("persist projection: %w", err)
+		return CompactionState{}, &compactionPersistenceError{fmt.Errorf("persist projection: %w", err)}
 	}
 	a.sess.checkpointState = "applied"
 	if commit.activeTurn != 0 && commit.trigger != CompactionTriggerManual {

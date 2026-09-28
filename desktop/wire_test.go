@@ -8,6 +8,16 @@ import (
 	"reasonix/internal/event"
 )
 
+func TestTabMetaPreservesInitialGenerationForMaintenanceControls(t *testing.T) {
+	data, err := json.Marshal(TabMeta{ID: "tab", SessionID: "session"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"sessionGeneration":0`) {
+		t.Fatalf("initial binding became unknown to the runtime selector: %s", data)
+	}
+}
+
 func TestWireEventTabPreservesSharedRetryingFields(t *testing.T) {
 	w := toWireTab(event.Event{Kind: event.Retrying, RetryAttempt: 3, RetryMax: 10}, "tab-1")
 	b, err := json.Marshal(w)

@@ -76,6 +76,7 @@ func (c *Controller) runModelTurn(ctx context.Context, input string) error {
 		return nil
 	}
 	turnID := c.RuntimeStatus().TurnID
+	ctx = agent.WithCompactionCancellationGrace(ctx, c.cancellationGrace())
 	ctx = provider.WithRequestObserver(ctx, func(observation provider.RequestObservation) {
 		c.recordProviderRequest(turnID, observation)
 	})

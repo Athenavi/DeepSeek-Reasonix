@@ -14152,6 +14152,36 @@
     },
     {
       "cancellation": "before-dispatch",
+      "domain": "desktop/compaction_retry.go",
+      "name": "RetryContextCompactionForTab",
+      "owner": "App.RetryContextCompactionForTab",
+      "params": [
+        {
+          "kind": "string"
+        },
+        {
+          "kind": "string"
+        },
+        {
+          "kind": "string"
+        }
+      ],
+      "returnsError": true,
+      "scope": {
+        "inputs": [
+          "tabID",
+          "runID",
+          "runtimeEpoch"
+        ],
+        "kind": "owner-inputs",
+        "resolver": "App.RetryContextCompactionForTab"
+      },
+      "sources": [
+        "desktop/compaction_retry.go"
+      ]
+    },
+    {
+      "cancellation": "before-dispatch",
       "domain": "desktop/inbox_app.go",
       "name": "RetryInboxItem",
       "owner": "App.RetryInboxItem",
@@ -23976,6 +24006,128 @@
         }
       ]
     },
+    "event.ContextCompactionState": {
+      "fields": [
+        {
+          "name": "runId",
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "parentOperationId",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "turnId",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "runtimeEpoch",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "revision",
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "trigger",
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "phase",
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "status",
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "startedAt",
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "deadlineAt",
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "observedAt",
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "lastOutputAt",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "requests",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "completedParts",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "totalParts",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "errorCode",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "applied",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "retryable",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        }
+      ]
+    },
     "event.FinalReadiness": {
       "fields": [
         {
@@ -24413,6 +24565,17 @@
             },
             "kind": "nullable"
           }
+        },
+        {
+          "name": "contextCompaction",
+          "optional": true,
+          "type": {
+            "elem": {
+              "kind": "object",
+              "ref": "event.ContextCompactionState"
+            },
+            "kind": "nullable"
+          }
         }
       ]
     },
@@ -24507,6 +24670,24 @@
         },
         {
           "name": "archive",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "contextCompaction",
+          "optional": true,
+          "type": {
+            "elem": {
+              "kind": "object",
+              "ref": "event.ContextCompactionState"
+            },
+            "kind": "nullable"
+          }
+        },
+        {
+          "name": "trigger",
           "optional": true,
           "type": {
             "kind": "string"
@@ -25382,6 +25563,17 @@
             "elem": {
               "kind": "object",
               "ref": "event.SessionOperationInfo"
+            },
+            "kind": "nullable"
+          }
+        },
+        {
+          "name": "contextCompaction",
+          "optional": true,
+          "type": {
+            "elem": {
+              "kind": "object",
+              "ref": "event.ContextCompactionState"
             },
             "kind": "nullable"
           }
@@ -42173,7 +42365,6 @@
         },
         {
           "name": "sessionGeneration",
-          "optional": true,
           "type": {
             "kind": "integer"
           }
@@ -47717,6 +47908,17 @@
           "optional": true,
           "type": {
             "kind": "string"
+          }
+        },
+        {
+          "name": "contextCompaction",
+          "optional": true,
+          "type": {
+            "elem": {
+              "kind": "object",
+              "ref": "event.ContextCompactionState"
+            },
+            "kind": "nullable"
           }
         },
         {

@@ -1,6 +1,7 @@
 import type { HistoryMessage, WireSessionOperation } from "./types";
 import type { Item } from "./useController";
 import type { StructuredInvocationSubmit } from "./invocationDisplay";
+import { parseContextCompactionState } from "./contextCompactionState";
 
 export type CompactionItem = Extract<Item, { kind: "compaction" }>;
 
@@ -66,6 +67,8 @@ export function parseSessionOperation(value: unknown): WireSessionOperation | un
     archive: typeof raw.archive === "string" ? raw.archive : undefined,
     operationRevision: count(raw.operationRevision),
     runtimeEpoch: text(raw.runtimeEpoch),
+    trigger: text(raw.trigger),
+    contextCompaction: parseContextCompactionState(raw.contextCompaction),
   };
 }
 
@@ -102,6 +105,8 @@ export function sessionOperationFromHistory(message: HistoryMessage): WireSessio
     archive: message.archive,
     operationRevision: message.operationRevision,
     runtimeEpoch: message.runtimeEpoch,
+    trigger: message.trigger,
+    contextCompaction: message.contextCompaction,
   };
 }
 
@@ -112,7 +117,8 @@ export function sessionOperationHistoryMessage(messageId: string, operation: Wir
     messageId,
     content: "",
     pending: operationPending(status),
-    trigger: "manual",
+    trigger: operation.trigger || "manual",
+    contextCompaction: operation.contextCompaction,
     messages: operation.messages,
     summary: operation.summary,
     archive: operation.archive,
@@ -134,10 +140,11 @@ export function sessionOperationItem(operation: WireSessionOperation, historyEnt
   const status = sessionOperationStatus(operation.status, operation.activity);
   return {
     ...operation,
+    contextCompaction: parseContextCompactionState(operation.contextCompaction),
     kind: "compaction",
     id: `maintenance:${operation.operationId}`,
     pending: operationPending(status),
-    trigger: "manual",
+    trigger: operation.trigger || "manual",
     messages: operation.messages ?? 0,
     summary: operation.summary ?? "",
     archive: operation.archive ?? "",
@@ -163,6 +170,7 @@ function fillMissing(prior: CompactionItem, incoming: CompactionItem): Compactio
     operationRevision: prior.operationRevision ?? incoming.operationRevision,
     runtimeEpoch: prior.runtimeEpoch ?? incoming.runtimeEpoch,
     historyEntryId: prior.historyEntryId ?? incoming.historyEntryId,
+    contextCompaction: prior.contextCompaction ?? incoming.contextCompaction,
   };
 }
 
@@ -239,6 +247,7 @@ export function interruptOrphanedSessionOperationItems(
   activeOperationId?: string,
   activeRuntimeEpoch?: string,
   runtimeRevision?: number,
+  activeCompactionRunId?: string,
 ): Item[] {
   let changed = false;
   const next = items.map((item) => {
@@ -247,11 +256,12 @@ export function interruptOrphanedSessionOperationItems(
     // A changed epoch is independently authoritative even if revisions reset.
     if ((!item.runtimeEpoch || item.runtimeEpoch === activeRuntimeEpoch) && runtimeRevision !== undefined
       && item.observedRuntimeRevision !== undefined && runtimeRevision <= item.observedRuntimeRevision) return item;
-    const identityMatches = item.operationId === activeOperationId
+    const identityMatches = (item.operationId === activeOperationId || item.operationId === activeCompactionRunId)
       && !(item.runtimeEpoch && activeRuntimeEpoch && item.runtimeEpoch !== activeRuntimeEpoch);
     if (identityMatches) return item;
     changed = true;
-    return { ...item, pending: false, status: "interrupted", activity: "interrupted", interruptionInferred: true };
+    return { ...item, pending: false, status: "interrupted", activity: "interrupted", interruptionInferred: true,
+      contextCompaction: undefined };
   });
   return changed ? next : items;
 }

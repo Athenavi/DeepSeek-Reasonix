@@ -7511,6 +7511,22 @@
       ]
     }
   },
+  "RetryContextCompactionForTab": {
+    "domain": "desktop/compaction_retry.go",
+    "owner": "App.RetryContextCompactionForTab",
+    "sources": [
+      "desktop/compaction_retry.go"
+    ],
+    "scope": {
+      "kind": "owner-inputs",
+      "resolver": "App.RetryContextCompactionForTab",
+      "inputs": [
+        "tabID",
+        "runID",
+        "runtimeEpoch"
+      ]
+    }
+  },
   "RetryInboxItem": {
     "domain": "desktop/inbox_app.go",
     "owner": "App.RetryInboxItem",

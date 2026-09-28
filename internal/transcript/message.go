@@ -53,6 +53,7 @@ type Message struct {
 	OperationKind     string                           `json:"operationKind,omitempty"`
 	OperationStatus   string                           `json:"operationStatus,omitempty"`
 	OperationActivity string                           `json:"operationActivity,omitempty"`
+	ContextCompaction *event.ContextCompactionState    `json:"contextCompaction,omitempty"`
 	ErrorCode         string                           `json:"errorCode,omitempty"`
 	Applied           bool                             `json:"applied,omitempty"`
 	InputTokens       int                              `json:"inputTokens,omitempty"`

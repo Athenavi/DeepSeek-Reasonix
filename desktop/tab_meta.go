@@ -33,7 +33,7 @@ type TabMeta struct {
 	Session                        *session.SessionRef `json:"session,omitempty"`
 	SessionRevision                int64               `json:"sessionRevision,omitempty"`
 	SessionDigest                  string              `json:"sessionDigest,omitempty"`
-	SessionGeneration              uint64              `json:"sessionGeneration,omitempty"`
+	SessionGeneration              uint64              `json:"sessionGeneration"`
 	ReadOnly                       bool                `json:"readOnly,omitempty"`
 	// TakenOver marks a local or remote tab spectating a session whose writer is
 	// on the other side of a cooperative handoff.

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"reasonix/internal/event"
@@ -11,15 +12,13 @@ import (
 func TestPressureCompactionDoesNotCallChunkedFold(t *testing.T) {
 	prov := &extractStubProvider{failFirst: 64, reply: "digest"}
 	a := agentOverForce(t, prov, foldableSessionOverForce(12))
-	if err := prepareContext(context.Background(), a, CompactionTriggerPressure); err != nil {
-		t.Fatalf("prepare = %v, want the truncation rescue instead of a chunked projection", err)
+	if err := prepareContext(context.Background(), a, CompactionTriggerPressure); !errors.Is(err, ErrCompactionRequired) {
+		t.Fatalf("prepare = %v, want a recoverable context failure", err)
 	}
 	if degradedFold(a) {
 		t.Fatal("pressure compaction must not install a fabricated summary")
 	}
-	if !truncatedRescue(a) {
-		t.Fatalf("receipt = %+v, want the truncation rescue, not a chunked digest", a.sess.compactionState.LastReceipt)
-	}
+	assertNoFailedSummaryRewrite(t, a)
 	if prov.calls > 2 {
 		t.Fatalf("provider calls = %d, want at most one summary plus one retry, not chunked/tree-reduce", prov.calls)
 	}

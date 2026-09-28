@@ -142,7 +142,7 @@ func turnEventSynchronousBarrier(kind event.Kind) bool {
 	switch kind {
 	case event.ToolDispatch, event.ToolStarted, event.ToolResult, event.AskRequest, event.ApprovalRequest,
 		event.MCPInteractionRequest, event.PromptAnswered, event.TurnStatusChanged,
-		event.TurnStarted, event.TurnDone, event.SessionOperation:
+		event.TurnStarted, event.TurnDone, event.SessionOperation, event.ContextCompactionProgress:
 		return true
 	default:
 		return false
@@ -210,6 +210,9 @@ func (s *turnEventSink) publishInner(e event.Event) {
 func (s *turnEventSink) persistAndPublish(e event.Event) error {
 	if s == nil || s.c == nil {
 		return nil
+	}
+	if e.Kind == event.ContextCompactionProgress {
+		return s.publishCompactionProgress(e)
 	}
 	if e.Kind == event.SessionOperation {
 		if err := s.c.persistMaintenanceOperation(e); err != nil {

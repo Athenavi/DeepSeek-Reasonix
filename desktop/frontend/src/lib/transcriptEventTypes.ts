@@ -15,6 +15,8 @@ export interface WireCompaction {
   archive?: string; // done: archive path, if any
 }
 export interface WireSessionOperation {
+	contextCompaction?: import("./contextCompactionProgress").ContextCompactionState;
+	trigger?: string;
   operationId: string;
   kind: string;
   activity: string;

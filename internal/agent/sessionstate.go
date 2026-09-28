@@ -36,7 +36,7 @@ type sessionRuntime struct {
 	compactionMu sync.Mutex
 	// compactionRunMu singleflights the expensive summary transaction without
 	// holding the session lock during network I/O.
-	compactionRunMu sync.Mutex
+	compactionRunMu compactionGate
 	compaction      compactionProgress
 	compactionState CompactionState
 	cacheState      string // legacy resume telemetry; never provider-visible

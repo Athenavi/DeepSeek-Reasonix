@@ -61,6 +61,7 @@ export type EventKind =
   | "completion_summary"
   | "read_status"
   | "session_operation"
+  | "context_compaction_progress"
   | "provider_unreachable";
 export type StreamAttemptAction = "begin" | "discard" | "commit";
 export type TurnStatus = "queued" | "in_progress" | "waiting_user" | "cancelling" | "completed" | "interrupted" | "failed" | "protocol_failed" | "recovery_required";
@@ -439,6 +440,7 @@ export interface WireEvent extends RecoveryEventFields {
   mcpInteraction?: WireMCPInteraction;
   compaction?: WireCompaction;
   sessionOperation?: WireSessionOperation;
+	contextCompaction?: import("./contextCompactionProgress").ContextCompactionState;
   maintenance?: WireContextMaintenance;
   guardian?: WireGuardian;
   decisionReceipt?: WireDecisionReceipt;
@@ -847,6 +849,7 @@ export interface HistoryMessage extends TranscriptTurnMetadata {
   operationKind?: string;
   operationStatus?: string;
   operationActivity?: string;
+	contextCompaction?: import("./contextCompactionProgress").ContextCompactionState;
   operationRevision?: number;
   runtimeEpoch?: string;
   errorCode?: string;

@@ -3,7 +3,7 @@
 
 export const DESKTOP_PROTOCOL_VERSION = 11;
 
-export const DESKTOP_CONTRACT_DIGEST = "sha256:857039e0868d57e1e367b080f009abd2d21baa856ae5d57e55fc8c3b1cef5734";
+export const DESKTOP_CONTRACT_DIGEST = "sha256:9acb55b593abc580c69f87d32f39ee45c019f15cbc5b5b51803ae893b63ac5de";
 
 export const DESKTOP_COMMANDS = [
   "AIRenameSession",
@@ -528,6 +528,7 @@ export const DESKTOP_COMMANDS = [
   "ResumeSessionPageForTab",
   "ResumeTranscriptSessionForTab",
   "RetryAuthenticationForTab",
+  "RetryContextCompactionForTab",
   "RetryInboxItem",
   "RetryLegacyEmptySessionCleanup",
   "RetryManualSessionCreation",
@@ -1287,6 +1288,27 @@ export interface TranscriptReplayRequest {
   after: number;
 }
 
+export interface ContextCompactionState {
+  runId: string;
+  parentOperationId?: string;
+  turnId?: string;
+  runtimeEpoch?: string;
+  revision: number;
+  trigger: string;
+  phase: string;
+  status: string;
+  startedAt: number;
+  deadlineAt: number;
+  observedAt: number;
+  lastOutputAt?: number;
+  requests?: number;
+  completedParts?: number;
+  totalParts?: number;
+  errorCode?: string;
+  applied?: boolean;
+  retryable?: boolean;
+}
+
 export interface event_FinalReadiness {
   attempts?: number;
   missing?: string[];
@@ -1361,6 +1383,7 @@ export interface RuntimeStateSnapshot {
   goal?: goal_View | null;
   goalError?: string;
   maintenance?: MaintenanceState | null;
+  contextCompaction?: ContextCompactionState | null;
 }
 
 export interface SessionOperationInfo {
@@ -1378,6 +1401,8 @@ export interface SessionOperationInfo {
   messages?: number;
   summary?: string;
   archive?: string;
+  contextCompaction?: ContextCompactionState | null;
+  trigger?: string;
 }
 
 export interface Todo {
@@ -1526,6 +1551,7 @@ export interface Event {
   compaction?: Compaction | null;
   maintenance?: ContextMaintenance | null;
   sessionOperation?: SessionOperationInfo | null;
+  contextCompaction?: ContextCompactionState | null;
   guardian?: Guardian | null;
   decisionReceipt?: eventwire_DecisionReceipt | null;
   extension?: ExtensionSurface | null;
@@ -4652,7 +4678,7 @@ export interface TabMeta {
   session?: SessionRef | null;
   sessionRevision?: number;
   sessionDigest?: string;
-  sessionGeneration?: number;
+  sessionGeneration: number;
   readOnly?: boolean;
   takenOver?: boolean;
   projectColor?: string;
@@ -5715,6 +5741,7 @@ export interface Message {
   operationKind?: string;
   operationStatus?: string;
   operationActivity?: string;
+  contextCompaction?: ContextCompactionState | null;
   errorCode?: string;
   applied?: boolean;
   inputTokens?: number;
@@ -6457,6 +6484,7 @@ export interface GeneratedDesktopCommands {
   ResumeSessionPageForTab(arg0: string, arg1: string, arg2: number): Promise<HistoryPage>;
   ResumeTranscriptSessionForTab(arg0: string, arg1: string): Promise<HistorySwitchPhases>;
   RetryAuthenticationForTab(arg0: string): Promise<AuthenticationState>;
+  RetryContextCompactionForTab(arg0: string, arg1: string, arg2: string): Promise<void>;
   RetryInboxItem(arg0: string, arg1: string): Promise<void>;
   RetryLegacyEmptySessionCleanup(): Promise<LegacyEmptySessionCleanupStatus>;
   RetryManualSessionCreation(arg0: string): Promise<ManualSessionCreationView>;

@@ -11,6 +11,7 @@ import (
 
 type contextRecoveryBudget struct {
 	retries int
+	failure error
 }
 
 func (a *Agent) recoverContextLimit(ctx context.Context, frozen samplingRequest, err error, budget *contextRecoveryBudget) (samplingRequest, bool, string) {
@@ -72,24 +73,31 @@ func (a *Agent) recoverContextLimit(ctx context.Context, frozen samplingRequest,
 		return samplingRequest{req: next}, true, contextRecoveryLearnedRetry
 	}
 	if physical <= 0 && budget.retries == 0 {
+		work, finish := a.beginCompactionRun(ctx, CompactionTriggerOverflow)
+		defer func() { budget.failure = finish(budget.failure) }()
+		ctx = work
 		startProjectionVersion := a.currentProjectionVersion()
 		if _, perr := a.contextManager().Prepare(ctx, ContextPreparePolicy{
 			Trigger: CompactionTriggerOverflow,
 			Force:   true,
 		}); perr != nil {
+			budget.failure = perr
 			a.setLastRecovery(contextRecoveryFailed)
 			return samplingRequest{}, false, contextRecoveryFailed
 		}
 		if a.currentProjectionVersion() <= startProjectionVersion {
+			budget.failure = fmt.Errorf("%w: %w", ErrCompactionRequired, summaryError(errCheckpointRejected))
 			a.setLastRecovery(contextRecoveryFailed)
 			return samplingRequest{}, false, contextRecoveryFailed
 		}
 		rebuilt, rerr := a.buildSamplingRequest(ctx, CompactionTriggerPressure)
 		if rerr != nil {
+			budget.failure = rerr
 			a.setLastRecovery(contextRecoveryFailed)
 			return samplingRequest{}, false, contextRecoveryFailed
 		}
 		if aerr := a.applyAdmissionToRequest(&rebuilt.req); aerr != nil {
+			budget.failure = aerr
 			a.setLastRecovery(contextRecoveryFailed)
 			return samplingRequest{}, false, contextRecoveryFailed
 		}

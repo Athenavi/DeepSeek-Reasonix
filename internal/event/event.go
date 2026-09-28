@@ -147,8 +147,8 @@ const (
 	// lifecycle. One stable operation id is upserted from running through its
 	// terminal state without inventing a user turn.
 	SessionOperation
-	// KindCount is a sentinel one past the last real Kind. New event kinds must
-	// be inserted above it so completeness tests cover them automatically.
+	ContextCompactionProgress
+	// KindCount bounds completeness tests; append new kinds above it.
 	KindCount
 )
 
@@ -478,12 +478,13 @@ type Event struct {
 	Readiness          *FinalReadiness          // TurnDone: structured final-readiness recovery state
 	ProtocolRecovery   *provider.ProtocolRecoveryAction
 	Diagnostic         *provider.FailureDiagnostic
-	RecoveryCheckpoint bool                  // local durable recovery checkpoint, not a notice
-	Receipt            *CompletionReceipt    // TurnDone: what the host verified, and what it could not
-	CheckpointTurn     *int                  // TurnDone: authoritative checkpoint for this turn's visible user message
-	Compaction         Compaction            // Compaction
-	Maintenance        *ContextMaintenance   // ContextMaintenanceEvent
-	SessionOperation   *SessionOperationInfo // SessionOperation
+	RecoveryCheckpoint bool                    // local durable recovery checkpoint, not a notice
+	Receipt            *CompletionReceipt      // TurnDone: what the host verified, and what it could not
+	CheckpointTurn     *int                    // TurnDone: authoritative checkpoint for this turn's visible user message
+	Compaction         Compaction              // Compaction
+	Maintenance        *ContextMaintenance     // ContextMaintenanceEvent
+	SessionOperation   *SessionOperationInfo   // SessionOperation
+	ContextCompaction  *ContextCompactionState // ContextCompactionProgress
 	Guardian           GuardianResult
 	DecisionReceipt    *provider.DecisionReceipt // Notice: durable user decision receipt
 	WriteIntent        bool                      // local write-ahead checkpoint, not a user notice

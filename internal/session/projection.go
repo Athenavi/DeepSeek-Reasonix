@@ -14,10 +14,11 @@ import (
 )
 
 type Projection struct {
-	Submissions      SubmissionIndex
-	TranscriptInputs []transcriptInput
-	HiddenTurns      map[string]bool
-	RetractedInputs  map[string]string
+	ContextCompaction *event.ContextCompactionState `json:"contextCompaction,omitempty"`
+	Submissions       SubmissionIndex
+	TranscriptInputs  []transcriptInput
+	HiddenTurns       map[string]bool
+	RetractedInputs   map[string]string
 	// RejectedToolResults retains local execution evidence independently of the
 	// wire projection. Result message IDs scope evidence even when call IDs repeat.
 	RejectedToolResults  map[string]rejectedToolResult `json:"rejectedToolResults,omitempty"`
@@ -584,6 +585,7 @@ func projectDiagnostic(projection *Projection, commit Commit, ev Event) error {
 	if len(ev.Payload) > 0 && !json.Valid(ev.Payload) {
 		return damagedPayload(ev, nil)
 	}
+	projectCompactionReceipt(projection, ev.Payload)
 	return nil
 }
 
@@ -630,6 +632,10 @@ func projectionMessageIndex(messages []provider.Message, id string) int {
 }
 
 func cloneProjection(projection Projection) Projection {
+	if projection.ContextCompaction != nil {
+		value := *projection.ContextCompaction
+		projection.ContextCompaction = &value
+	}
 	projection.TranscriptInputs = append([]transcriptInput(nil), projection.TranscriptInputs...)
 	projection.HiddenTurns = maps.Clone(projection.HiddenTurns)
 	projection.RetractedInputs = maps.Clone(projection.RetractedInputs)

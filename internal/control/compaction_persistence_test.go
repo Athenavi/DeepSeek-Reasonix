@@ -38,7 +38,7 @@ func compactionPersistenceHistory(tools bool) *agent.Session {
 }
 
 func TestContextMaintenanceProjectionSurvivesSessionSwitch(t *testing.T) {
-	for _, mode := range []string{"summary", "prune", "truncate", "auto-summary", "auto-prune", "auto-truncate"} {
+	for _, mode := range []string{"summary", "prune", "failure", "auto-summary", "auto-prune", "auto-failure"} {
 		t.Run(mode, func(t *testing.T) {
 			service, err := session.NewService("desktop", session.NewFilesystemPersistence(filepath.Join(t.TempDir(), "sessions-v5")))
 			if err != nil {
@@ -50,7 +50,7 @@ func TestContextMaintenanceProjectionSurvivesSessionSwitch(t *testing.T) {
 				t.Fatal(err)
 			}
 			providerMock := testutil.NewMock("maintenance", testutil.Turn{Text: "durable summary"}, testutil.Turn{Text: "final answer"}, testutil.Turn{Text: "final answer"})
-			if strings.Contains(mode, "truncate") {
+			if strings.Contains(mode, "failure") {
 				providerMock = testutil.NewMock("maintenance", testutil.Turn{StreamError: errors.New("summary unavailable")}, testutil.Turn{Text: "final answer"})
 			}
 			exec := agent.New(providerMock, tool.NewRegistry(), compactionPersistenceHistory(strings.Contains(mode, "prune")), agent.Options{ContextWindow: 10_000, CompactRatio: .8}, event.Discard)
@@ -64,7 +64,11 @@ func TestContextMaintenanceProjectionSurvivesSessionSwitch(t *testing.T) {
 			} else {
 				err = controller.Compact(t.Context(), "")
 			}
-			if err != nil {
+			if strings.Contains(mode, "failure") {
+				if !errors.Is(err, agent.ErrCompactionRequired) {
+					t.Fatalf("failed summary = %v, want blocked turn", err)
+				}
+			} else if err != nil {
 				t.Fatal(err)
 			}
 
@@ -89,6 +93,13 @@ func TestContextMaintenanceProjectionSurvivesSessionSwitch(t *testing.T) {
 			}
 			if got := provider.ModelMessages(exec.ModelHistorySnapshot()); !reflect.DeepEqual(got, wantModel) {
 				t.Fatal("model projection changed after switching away and reopening")
+			}
+			if strings.Contains(mode, "failure") {
+				state := controller.RuntimeStateSnapshot()
+				progress := state.ContextCompaction
+				if progress == nil || progress.Status != "failed" || !progress.Retryable || progress.RuntimeEpoch != state.RuntimeEpoch {
+					t.Fatalf("failed receipt not rebound on reopen: %+v", progress)
+				}
 			}
 		})
 	}

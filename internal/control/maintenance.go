@@ -39,6 +39,7 @@ type maintenanceIdentity struct {
 	runtimeEpoch      string
 	sessionPath       string
 	projectionVersion uint64
+	retryOnly         bool
 }
 
 // Result fields are frozen together at each serialized publication boundary.
@@ -61,13 +62,20 @@ func (c *Controller) beginMaintenance(parent context.Context, kind string) (*con
 	if err := c.ensureWriteAuthorityReady(); err != nil {
 		return nil, nil, err
 	}
-	runtimeEpoch := c.RuntimeStateSnapshot().RuntimeEpoch
-	c.mu.Lock()
+	runtimeState := c.RuntimeStateSnapshot()
+	runtimeEpoch := runtimeState.RuntimeEpoch
+	path := c.SessionPath()
+	if err := c.lockCompactionAdmission(parent); err != nil {
+		return nil, nil, err
+	}
 	verb := strings.ReplaceAll(kind, "_", " ")
 	if strings.HasPrefix(kind, "summarize_") {
 		verb = "summarize"
 	}
 	switch {
+	case c.sessionPath != path:
+		c.mu.Unlock()
+		return nil, nil, errors.New("context compaction session changed")
 	case c.closed:
 		c.mu.Unlock()
 		return nil, nil, errors.New("controller is closed")
@@ -98,11 +106,13 @@ func (c *Controller) beginMaintenance(parent context.Context, kind string) (*con
 	}
 	work, cancel := context.WithCancel(extension.ContextWithRuntimeOwner(c.withAuthentication(parent), c.runtimeOwner))
 	before := c.ContextMaintenanceSnapshot()
+	_, retryOnly := parent.Value(compactionRetryKey{}).(compactionRetryTarget)
 	op := &controllerMaintenance{
 		maintenanceIdentity: maintenanceIdentity{
 			id: "maintenance-" + newRuntimeStateEpoch(), kind: kind,
 			runtimeEpoch: runtimeEpoch, sessionPath: c.sessionPath,
 			projectionVersion: before.ProjectionVersion,
+			retryOnly:         retryOnly,
 		},
 		maintenanceResult: maintenanceResult{status: "running", inputTokens: before.ProjectedTokens},
 		activity:          "running", cancel: cancel, done: make(chan struct{}),
@@ -115,7 +125,7 @@ func (c *Controller) beginMaintenance(parent context.Context, kind string) (*con
 		return nil, nil, fmt.Errorf("persist maintenance start: %w", err)
 	}
 	c.refreshRuntimeState(event.Event{})
-	return op, work, nil
+	return op, agent.WithCompactionParent(c.withCompactionTransportObservation(work), op.id), nil
 }
 
 // startCompactAsync is used by /compact so registration happens before the
@@ -145,6 +155,9 @@ func (c *Controller) executeMaintenance(op *controllerMaintenance, ctx context.C
 	c.authentication.recordFailure(err, c.ModelRef())
 	after := c.ContextMaintenanceSnapshot()
 	applied := after.ProjectionVersion > op.projectionVersion
+	if progress := c.RuntimeStateSnapshot().ContextCompaction; progress != nil && progress.ParentOperationID == op.id && progress.Status == "recovery_required" {
+		return c.retainMaintenanceRecovery(op, "save_failed", err, after, applied)
+	}
 
 	// Once the worker returns, expose the non-cancellable persistence boundary.
 	if emitErr := c.emitMaintenanceOperation(op, "finalizing", "", "", after, applied); emitErr != nil {
@@ -163,6 +176,10 @@ func (c *Controller) executeMaintenance(op *controllerMaintenance, ctx context.C
 		}
 	} else if err != nil {
 		status, code, detail = "failed", "summary_failed", err.Error()
+		var summary *agent.SummaryError
+		if errors.As(err, &summary) {
+			code = summary.Code
+		}
 	} else if !applied {
 		status, code = "noop", "no_history"
 	}
@@ -241,6 +258,8 @@ func (c *Controller) emitMaintenanceOperation(op *controllerMaintenance, status,
 	if summary != "" {
 		info.Summary = summary
 	}
+	// Read the cached snapshot without triggering a sampler under Controller.mu.
+	// Progress is attached below, after releasing the controller lock.
 	if snapshot.LastReceipt != nil && info.Applied {
 		info.Messages, info.Archive = snapshot.LastReceipt.CoveredCount, snapshot.LastReceipt.Archive
 	}
@@ -249,6 +268,12 @@ func (c *Controller) emitMaintenanceOperation(op *controllerMaintenance, status,
 		c.applyMaintenanceInfoLocked(op, info)
 	}
 	c.mu.Unlock()
+	c.runtimeState.mu.Lock()
+	if progress := c.runtimeState.snapshot.ContextCompaction; progress != nil && progress.ParentOperationID == op.id {
+		value := *progress
+		info.ContextCompaction = &value
+	}
+	c.runtimeState.mu.Unlock()
 	err := event.EmitChecked(c.sink, event.Event{Kind: event.SessionOperation, SessionOperation: info})
 	if err == nil && terminal {
 		c.mu.Lock()
@@ -401,7 +426,7 @@ func (c *Controller) finishMaintenanceOperation(op *controllerMaintenance) {
 	c.maintenance = nil
 	close(op.done)
 	closed := c.closed
-	if !closed && !c.recoveryRequiredLocked() && c.authentication.admissionError() == nil {
+	if !closed && !op.retryOnly && !c.recoveryRequiredLocked() && c.authentication.admissionError() == nil {
 		if candidate, ok := c.popNextPendingLocked(); ok {
 			next = candidate
 			runCtx, cancel, started = c.startTurnLocked(context.Background(), next)
@@ -432,7 +457,7 @@ func (c *Controller) finishMaintenanceOperation(op *controllerMaintenance) {
 	c.mu.Lock()
 	recovery := c.recoveryRequiredLocked()
 	c.mu.Unlock()
-	if !recovery && c.authentication.admissionError() == nil {
+	if !op.retryOnly && !recovery && c.authentication.admissionError() == nil {
 		c.maybeDispatchInbox()
 		c.kickGoalDriver()
 	}

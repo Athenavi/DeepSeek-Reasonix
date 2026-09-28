@@ -38,6 +38,7 @@ func StreamAuxiliary(ctx context.Context, p Provider, req Request) (<-chan Chunk
 					if !ok {
 						break loop
 					}
+					observeAuxiliaryOutput(ctx, c)
 					if c.Type == ChunkError {
 						err = c.Err
 						if err == nil {

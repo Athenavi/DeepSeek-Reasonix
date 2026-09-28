@@ -3,7 +3,7 @@ import type { RuntimeProjection, RuntimeState, createRuntimeStateStore } from ".
 function validState(state: RuntimeState) {
   if (!state || state.schemaVersion !== 1) return Boolean(state);
   return Boolean(state.runtimeEpoch) && Number.isSafeInteger(state.revision) && state.revision > 0
-    && ["idle", "executing", "finishing", "closed"].includes(state.phase)
+    && ["idle", "executing", "finishing", "cancelling", "recovery_required", "closed"].includes(state.phase)
     && [state.running, state.pendingPrompt, state.cancelRequested, state.cancellable].every(value => typeof value === "boolean")
     && Number.isSafeInteger(state.backgroundJobs) && state.backgroundJobs >= 0;
 }

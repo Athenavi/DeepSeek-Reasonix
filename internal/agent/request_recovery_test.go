@@ -2,7 +2,6 @@ package agent
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"reasonix/internal/event"
@@ -72,26 +71,5 @@ func TestRequestExtensionRecoveryHonorsRequiredAndExplicitBlocks(t *testing.T) {
 				}
 			})
 		}
-	}
-}
-
-func TestTruncationRecoversOversizedProtectedToolResult(t *testing.T) {
-	a := New(&mockProvider{name: "fixture"}, tool.NewRegistry(), NewSession("sys"), Options{}, event.Discard)
-	messages := []provider.Message{
-		{Role: provider.RoleSystem, Content: "sys"},
-		{Role: provider.RoleUser, Content: "keep the latest request"},
-		{Role: provider.RoleAssistant, ToolCalls: []provider.ToolCall{{ID: "large", Name: "read", Arguments: `{}`}}},
-		{Role: provider.RoleTool, ToolCallID: "large", Name: "read", Content: strings.Repeat("large observation ", 10000)},
-	}
-	target := 5000
-	got, affected := a.truncateView(messages, target)
-	if affected == 0 || a.estimatedVisibleRequestTokens(got) >= target {
-		t.Fatal("protected oversized result still blocks the request")
-	}
-	if got[1].Content != messages[1].Content || len(messages[3].Content) <= 2048 || !strings.Contains(got[3].Content, "omitted") {
-		t.Fatal("latest user request or canonical tool result changed")
-	}
-	if err := provider.ValidateModelTranscript(got); err != nil {
-		t.Fatal(err)
 	}
 }

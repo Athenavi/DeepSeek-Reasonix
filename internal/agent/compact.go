@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"reasonix/internal/ablation"
@@ -88,8 +89,13 @@ func (a *Agent) compactToProjection(ctx context.Context, trigger, instructions s
 	return a.compactToProjectionWithChunked(ctx, trigger, instructions, foldRequest{force: force, mustFree: mustFree})
 }
 
-func (a *Agent) compactToProjectionWithChunked(ctx context.Context, trigger, instructions string, req foldRequest) (CompactionOutcome, error) {
-	a.sess.compactionRunMu.Lock()
+func (a *Agent) compactToProjectionWithChunked(ctx context.Context, trigger, instructions string, req foldRequest) (outcome CompactionOutcome, err error) {
+	ctx, finish := a.beginCompactionRun(ctx, trigger)
+	defer func() { err = finish(err) }()
+	compactionPhase(ctx, "preparing")
+	if err := a.sess.compactionRunMu.acquire(ctx); err != nil {
+		return CompactionNoop, err
+	}
 	defer a.sess.compactionRunMu.Unlock()
 	return a.compactToProjectionLocked(ctx, trigger, instructions, req)
 }
@@ -194,7 +200,9 @@ func (a *Agent) SummarizeUpTo(ctx context.Context, toIdx int) error {
 	return a.summarizeAtProjectionBoundary(ctx, toIdx, "before")
 }
 
-func (a *Agent) summarizeAtProjectionBoundary(ctx context.Context, canonicalIndex int, direction string) error {
+func (a *Agent) summarizeAtProjectionBoundary(ctx context.Context, canonicalIndex int, direction string) (resultErr error) {
+	ctx, finish := a.beginCompactionRun(ctx, CompactionTriggerManual)
+	defer func() { resultErr = finish(resultErr) }()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -434,6 +442,10 @@ func (a *Agent) summarize(ctx context.Context, region []provider.Message, instru
 // runSummaryRequest admits, sends, and drains one summary request.
 // Named returns so defer can attach RequestCount and still return usage.
 func (a *Agent) runSummaryRequest(ctx context.Context, req provider.Request) (summary string, usage *provider.Usage, err error) {
+	if err := ctx.Err(); err != nil {
+		return "", nil, err
+	}
+	defer func(operationCtx context.Context) { err = compactionError(operationCtx, err) }(ctx)
 	req.Messages, err = a.resolveRequestImages(ctx, req.Messages)
 	if err != nil {
 		return "", nil, err
@@ -460,17 +472,34 @@ func (a *Agent) runSummaryRequest(ctx context.Context, req provider.Request) (su
 	if a.svc.prov == nil {
 		return "", usage, fmt.Errorf("summary unavailable")
 	}
+	if err := ctx.Err(); err != nil {
+		return "", usage, err
+	}
+	compactionPhase(ctx, "waiting_response")
+	ctx, finishObservation := observeSummaryRequest(ctx)
+	defer finishObservation()
 	ch, err := provider.StreamAuxiliary(ctx, a.svc.prov, req)
 	if err != nil {
 		return "", usage, err
 	}
+	defer drainSummaryStream(ctx, cancel, ch)
 
-	// Unblock on timeout if the stream stalls while open.
+	// Cancel on timeout; join the buffer worker before releasing execution ownership.
 	var b strings.Builder
 	var reasoning strings.Builder
 	toolCalls := 0
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	var progress <-chan struct{}
+	if run := currentCompactionRun(ctx); run != nil {
+		progress = run.wake
+	}
 	for {
 		select {
+		case <-progress:
+			publishCompactionOutput(ctx)
+		case <-ticker.C:
+			publishCompactionOutput(ctx)
 		case <-ctx.Done():
 			return "", usage, ctx.Err()
 		case chunk, ok := <-ch:
@@ -485,7 +514,7 @@ func (a *Agent) runSummaryRequest(ctx context.Context, req provider.Request) (su
 					// reasoning is private chain-of-thought, not digest material.
 					r := strings.TrimSpace(reasoning.String())
 					if r == "" || toolCalls > 0 {
-						return "", usage, fmt.Errorf("summarizer returned empty output")
+						return "", usage, errSummaryEmpty
 					}
 					return truncateUTF8Bytes(r, summaryReasoningMaxBytes), usage, nil
 				}
