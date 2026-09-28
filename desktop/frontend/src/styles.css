@@ -22277,7 +22277,9 @@ body > .mermaid-diagram--fullscreen {
   display: block;
   width: 22px;
   height: 22px;
-  object-fit: contain;
+  background: var(--accent);
+  -webkit-mask: url("./assets/logo-symbol.svg") no-repeat center / contain;
+  mask: url("./assets/logo-symbol.svg") no-repeat center / contain;
 }
 .app--windows-frameless .sidebar__head,
 .app--windows-frameless .sidebar__brand,
