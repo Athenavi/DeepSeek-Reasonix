@@ -4820,7 +4820,7 @@ func migrateLegacyWorkspacesIntoProjects() {
 	if len(legacy) == 0 {
 		return
 	}
-	_ = updateProjectsFile(func(f *desktopProjectFile) (bool, error) {
+	_ = updateProjectsFilePreservingLegacyState(func(f *desktopProjectFile) (bool, error) {
 		seen := make(map[string]bool, len(f.Projects)+len(legacy))
 		for _, p := range f.Projects {
 			seen[p.Root] = true

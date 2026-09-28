@@ -64,7 +64,9 @@ func (a *App) surfaceForCanonicalSession(ref session.SessionRef, workspace works
 	defer releaseAdmission()
 	if scope == "project" {
 		saveWorkspace(workspaceRoot)
-		a.registerProjectRoot(workspaceRoot)
+		if err := a.registerProjectRoot(workspaceRoot); err != nil {
+			return nil, nil, false, err
+		}
 	}
 	model, toolApprovalMode := desktopNewSessionDefaults(scope, actualRoot)
 	tab := &WorkspaceTab{

@@ -38,6 +38,7 @@ func TestSessionDataGuardDeniesSessionStores(t *testing.T) {
 		projectSession,
 		filepath.Join(root, "sessions", "sub", "new.jsonl"),                     // not-yet-existing file under the store
 		filepath.Join(root, "projects", "any-slug", "sessions", "x.jsonl.meta"), // CAS ledger sidecar
+		filepath.Join(root, "projects", "@assigned", ".workspace-root"),         // project state ownership
 	} {
 		if err := g.Check(target); err == nil {
 			t.Errorf("Check(%q) = nil, want session-data denial", target)
