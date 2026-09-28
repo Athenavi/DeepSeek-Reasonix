@@ -90,6 +90,24 @@ type mcpActionItem struct {
 	label string
 }
 
+// mcpConnectCause is which request started a background connect; it decides
+// the notice the result posts.
+type mcpConnectCause int
+
+const (
+	mcpConnectRetry mcpConnectCause = iota
+	mcpConnectMode
+	mcpConnectAuth
+)
+
+type mcpConnectDoneMsg struct {
+	server string
+	cause  mcpConnectCause
+	entry  *config.PluginEntry // the saved entry when cause is mcpConnectMode
+	tools  int
+	err    error
+}
+
 type mcpExternalDoneMsg struct {
 	label  string
 	target string
