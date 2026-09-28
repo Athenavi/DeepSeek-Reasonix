@@ -30,7 +30,7 @@ func summaryError(err error) error {
 	if errors.As(err, &typed) || errors.As(err, &persistence) || errors.Is(err, context.Canceled) {
 		return err
 	}
-	code := "summary_provider_error"
+	var code string
 	switch {
 	case errors.Is(err, errSummaryEmpty):
 		code = "summary_empty"
@@ -40,8 +40,22 @@ func summaryError(err error) error {
 		code = "summary_no_reduction"
 	case errors.Is(err, errCompressStaleContext):
 		code = "summary_context_changed"
+	default:
+		return err
 	}
 	return &SummaryError{Code: code, Cause: err}
+}
+
+// Only the summary request owner may classify an otherwise untyped provider
+// failure. Entry-point validation, extensions, and persistence keep their errors.
+func summaryRequestError(ctx context.Context, err error) error {
+	err = summaryError(compactionError(ctx, err))
+	var typed *SummaryError
+	var persistence *compactionPersistenceError
+	if err == nil || errors.As(err, &typed) || errors.As(err, &persistence) || errors.Is(err, context.Canceled) {
+		return err
+	}
+	return &SummaryError{Code: "summary_provider_error", Cause: err}
 }
 
 type compactionRunKey struct{}
@@ -79,16 +93,16 @@ func compactionError(ctx context.Context, err error) error {
 	if errors.As(err, &persistence) {
 		return err
 	}
-	if errors.Is(ctx.Err(), context.Canceled) {
-		return ctx.Err()
-	}
-	if errors.Is(context.Cause(ctx), errSummaryBudget) {
-		if errors.Is(err, ErrCompactionRequired) {
-			return fmt.Errorf("%w: %w", ErrCompactionRequired, errSummaryBudget)
+	if errors.Is(err, context.DeadlineExceeded) && errors.Is(context.Cause(ctx), errSummaryBudget) && !errors.Is(err, errSummaryBudget) {
+		if err == context.DeadlineExceeded {
+			return errSummaryBudget
 		}
-		return errSummaryBudget
+		// Keep any enclosing recovery/error identity, even when a work deadline
+		// needs its budget classification added. An expired run alone is not
+		// evidence that a later request-preparation error came from compaction.
+		return fmt.Errorf("%w: %w", err, errSummaryBudget)
 	}
-	return summaryError(err)
+	return err
 }
 
 type compactionPersistenceError struct{ error }

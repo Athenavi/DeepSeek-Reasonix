@@ -48,7 +48,7 @@ func (a *Agent) commitSummaryProjection(ctx context.Context, commit summaryProje
 		a.sess.compactionState.Projection.ProjectionVersion != commit.projectionVersion ||
 		a.sess.compactionState.Generation != commit.generation {
 		a.sess.compactionMu.Unlock()
-		return CompactionState{}, errCompressStaleContext
+		return CompactionState{}, summaryError(errCompressStaleContext)
 	}
 	prev := a.sess.compactionState
 	a.sess.compactionState = state

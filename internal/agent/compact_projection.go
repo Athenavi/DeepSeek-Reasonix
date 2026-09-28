@@ -196,7 +196,7 @@ func (a *Agent) compressVisibleRange(
 		return tool.CompressResult{}, err
 	}
 	if !a.explicitCompressionSnapshotCurrent(snap) {
-		return tool.CompressResult{}, errCompressStaleContext
+		return tool.CompressResult{}, summaryError(errCompressStaleContext)
 	}
 	plan, ok := a.planVisibleCompression(snap, direction, anchorIndex, preview)
 	if !ok {

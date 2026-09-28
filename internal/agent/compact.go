@@ -443,7 +443,7 @@ func (a *Agent) runSummaryRequest(ctx context.Context, req provider.Request) (su
 	if err := ctx.Err(); err != nil {
 		return "", nil, err
 	}
-	defer func(operationCtx context.Context) { err = compactionError(operationCtx, err) }(ctx)
+	defer func(operationCtx context.Context) { err = summaryRequestError(operationCtx, err) }(ctx)
 	req.Messages, err = a.resolveRequestImages(ctx, req.Messages)
 	if err != nil {
 		return "", nil, err

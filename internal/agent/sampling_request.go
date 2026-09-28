@@ -101,11 +101,11 @@ func (a *Agent) streamProviderRequest(ctx context.Context, req provider.Request)
 // trigger. Physical overflow may attempt at most one recovery summary.
 func (a *Agent) prepareSamplingRequest(ctx context.Context) (result samplingRequest, requestErr error) {
 	work, finish := a.beginCompactionRun(ctx)
-	defer func() { requestErr = finish(requestErr) }()
 	// Keep the ordinary request context alive after a safe pressure timeout,
 	// while every nested maintenance attempt shares the bounded work context.
 	ctx = context.WithValue(ctx, compactionRunKey{}, currentCompactionRun(work))
 	defer func() {
+		requestErr = finish(requestErr)
 		if errors.Is(requestErr, ErrCompactionRequired) {
 			requestErr = fmt.Errorf("%s: %w", i18n.M.ContextLimitRecovery, requestErr)
 		}

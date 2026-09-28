@@ -2,6 +2,9 @@ package agent
 
 import (
 	"encoding/json"
+	"errors"
+	"reflect"
+	"strings"
 	"testing"
 
 	"reasonix/internal/event"
@@ -11,6 +14,46 @@ import (
 	"reasonix/internal/provider"
 	"reasonix/internal/tool"
 )
+
+func TestSummaryRecoversOversizedProtectedToolResult(t *testing.T) {
+	p := &mockProvider{name: "fixture", chunks: []provider.Chunk{
+		{Type: provider.ChunkText, Text: "Read completed; keep the latest request and use the observation to continue."},
+		{Type: provider.ChunkDone},
+	}}
+	s := NewSession("sys")
+	s.Add(provider.Message{Role: provider.RoleUser, Content: "keep the latest request"})
+	s.Add(provider.Message{Role: provider.RoleAssistant, ToolCalls: []provider.ToolCall{{ID: "large", Name: "read", Arguments: `{}`}}})
+	s.Add(provider.Message{Role: provider.RoleTool, ToolCallID: "large", Name: "read", Content: strings.Repeat("large observation ", 10000)})
+	before := s.Snapshot()
+	// The recent tool result is too large for the desired replay, but fits the
+	// summarizer's input window. Recover by summarizing it, never truncating it.
+	a := New(p, tool.NewRegistry(), s, Options{ContextWindow: 64000}, event.Discard)
+	if err := a.CompactNow(t.Context(), ""); err != nil {
+		t.Fatal(err)
+	}
+	if len(p.requests) != 1 {
+		t.Fatalf("summary requests=%d, want 1", len(p.requests))
+	}
+	observed := false
+	for _, msg := range p.requests[0].Messages {
+		if msg.Role == provider.RoleTool && msg.ToolCallID == "large" && msg.Content == before[3].Content {
+			observed = true
+		}
+	}
+	if !observed || !reflect.DeepEqual(before, s.Snapshot()) {
+		t.Fatal("summary lost the protected tool result or changed canonical history")
+	}
+	prepared := a.contextManager().currentPrepared()
+	if prepared.ProjectionVersion == 0 || prepared.InputTokens >= 5000 || latestDigest(prepared.Messages) == "" {
+		t.Fatalf("summary did not recover a compact replay: version=%d tokens=%d", prepared.ProjectionVersion, prepared.InputTokens)
+	}
+	if err := provider.ValidateModelTranscript(provider.ModelMessages(prepared.Messages)); err != nil {
+		t.Fatalf("invalid recovered transcript: %v", err)
+	}
+	if truncatedRescue(a) {
+		t.Fatal("summary recovery used truncation")
+	}
+}
 
 func TestRecoveredHistoryReachesModelWithoutExecutingTools(t *testing.T) {
 	mp := &mockProvider{name: "fixture", chunks: []provider.Chunk{{Type: provider.ChunkDone}}}
@@ -59,10 +102,11 @@ func TestRequestExtensionRecoveryHonorsRequiredAndExplicitBlocks(t *testing.T) {
 				warnings := 0
 				d := newExtDispatcher(client, mode == "required", func(string) { warnings++ }, point)
 				a := New(&mockProvider{name: "fixture"}, tool.NewRegistry(), NewSession("system"), Options{Extensions: d}, event.Discard)
-				got, err := a.buildSamplingRequest(t.Context(), CompactionTriggerPressure)
+				got, err := a.prepareSamplingRequest(t.Context())
 				if mode != "optional" {
-					if err == nil {
-						t.Fatal("required extension or explicit block bypassed")
+					var summary *SummaryError
+					if err == nil || errors.As(err, &summary) {
+						t.Fatalf("required extension or explicit block bypassed or reclassified: %v", err)
 					}
 					return
 				}

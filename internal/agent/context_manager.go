@@ -249,7 +249,7 @@ func (m ContextManager) foldContext(ctx context.Context, prepared PreparedContex
 	a.sess.compaction.stuckInputHash = blockedInputHash
 	a.sess.compaction.consecutive += maxSummaries
 	if policy.Trigger == CompactionTriggerOverflow || hard > 0 && result.InputTokens >= hard {
-		return PreparedContext{}, fmt.Errorf("%w: %w", ErrCompactionRequired, compactionError(ctx, fmt.Errorf("%w: %s", errCheckpointRejected, reason)))
+		return PreparedContext{}, fmt.Errorf("%w: %w", ErrCompactionRequired, summaryError(fmt.Errorf("%w: %s", errCheckpointRejected, reason)))
 	}
 	slog.Info("agent: context maintenance paused below hard ceiling", "reason", reason)
 	return result, nil
@@ -273,7 +273,7 @@ func (m ContextManager) summaryFailed(ctx context.Context, policy ContextPrepare
 	if ctxErr := ctx.Err(); ctxErr != nil && !errors.Is(context.Cause(ctx), errSummaryBudget) {
 		return PreparedContext{}, ctxErr
 	}
-	err = compactionError(ctx, err)
+	err = summaryError(compactionError(ctx, err))
 	if errors.Is(err, errCompressStaleContext) && policy.Trigger != CompactionTriggerManual {
 		reason := "context changed during summary; automatic retry blocked for this generation"
 		a.recordContextMaintenanceBlocked(inputHash, policy.Trigger, "summary", reason)
@@ -296,7 +296,7 @@ func (m ContextManager) summaryNoop(ctx context.Context, policy ContextPreparePo
 	switch {
 	case policy.Trigger == CompactionTriggerOverflow || hard > 0 && latest.InputTokens >= hard:
 		m.agent.recordContextMaintenanceBlocked(inputHash, policy.Trigger, "summary", reason)
-		return PreparedContext{}, fmt.Errorf("%w: %w", ErrCompactionRequired, compactionError(ctx, fmt.Errorf("%w: %s", errCheckpointRejected, reason)))
+		return PreparedContext{}, fmt.Errorf("%w: %w", ErrCompactionRequired, summaryError(fmt.Errorf("%w: %s", errCheckpointRejected, reason)))
 	case policy.Force:
 		// A requested compaction with no eligible history is a successful no-op.
 		// It must not poison the retry ledger or masquerade as a hard-limit failure.
