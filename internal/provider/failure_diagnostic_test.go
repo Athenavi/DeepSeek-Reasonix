@@ -59,6 +59,7 @@ func TestFailureDiagnosticDetailUsesOnlySafeOperatorFields(t *testing.T) {
 		Protocol:            "openai",
 		RequestPath:         "/anthropic/v1/chat/completions",
 		TraceID:             "trace-secret",
+		TransportCode:       "PROTOCOL_ERROR",
 	}
 	if got, want := FailureDiagnosticDetail(diagnostic), "Connection ID: deepseek-anthropic\nRequest path: /anthropic/v1/chat/completions"; got != want {
 		t.Fatalf("FailureDiagnosticDetail() = %q, want %q", got, want)
@@ -71,7 +72,7 @@ func TestInterruptedTurnRecoveryOptionalFieldsRemainBackwardCompatible(t *testin
 		InterruptedTools []string `json:"interrupted_tools,omitempty"`
 	}
 	current := InterruptedTurnRecovery{
-		TerminalStatus: "failed", FailureDiagnostic: &FailureDiagnostic{Kind: "request", Status: 404},
+		TerminalStatus: "failed", FailureDiagnostic: &FailureDiagnostic{Kind: "transport_protocol", TransportCode: "PROTOCOL_ERROR"},
 		Pending: true, InterruptedTools: []string{"bash"},
 	}
 	raw, err := json.Marshal(current)

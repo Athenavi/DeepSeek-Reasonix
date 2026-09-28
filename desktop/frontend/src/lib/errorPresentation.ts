@@ -1,4 +1,5 @@
 import { t, getLocale, type DictKey, type Translator, type Locale } from "./i18n";
+import type { WireEvent } from "./types";
 
 export interface ErrorPresentation { summary: string; detail: string }
 
@@ -24,6 +25,7 @@ const codeKeys: Record<string, DictKey> = {
   invalid_api_key: "error.auth", insufficient_quota: "error.quota", rate_limit_exceeded: "error.rateLimit",
   stream_interrupted: "error.interrupted", empty_response: "error.empty", stale_generation: "error.conflict",
   provider_connection: "error.connection", cancelled: "error.cancelled",
+  transport_protocol: "error.transportProtocol",
 };
 
 // Narrow legacy matches bridge errors from older services and OS libraries.
@@ -61,8 +63,11 @@ function statusKey(status: number): DictKey | undefined {
   if (status === 400 || status === 422) return "error.invalidInput";
 }
 
-export function presentError(error: unknown, translate: Translator = t, locale: Locale = getLocale()): ErrorPresentation {
+export function presentError(error: unknown, translate: Translator = t, locale: Locale = getLocale(), diagnostic?: WireEvent["diagnostic"]): ErrorPresentation {
   const detail = errorDetail(error).trim();
+  if (diagnostic?.kind === "transport_protocol") {
+    return { summary: translate("error.transportProtocol"), detail: [detail, diagnostic.transportCode ? `HTTP/2: ${diagnostic.transportCode}` : ""].filter(Boolean).join("\n") };
+  }
   const structured = error && typeof error === "object" ? error as { code?: unknown; status?: unknown } : undefined;
   const code = typeof structured?.code === "string" ? structured.code : detail;
   const explicitStatus = typeof structured?.status === "number" ? structured.status : 0;
