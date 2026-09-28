@@ -32,7 +32,7 @@ assert.equal(rebound.items[0].kind === "compaction" && rebound.items[0].contextC
 assert.equal(parseContextCompactionState({ ...start, startedAt: "invalid" }), undefined);
 assert.equal(parseContextCompactionState({ ...start, status: "future-unknown" }), undefined);
 const orphan = reducer(apply(initialState, start), { type: "runtime_snapshot", snapshot: {
-  schemaVersion: 1, projectionEpoch: "next", runtimeEpoch: "next", revision: 1, phase: "idle", running: false,
+  schemaVersion: 1, projectionEpoch: "next", runtimeEpoch: "next", revision: 1, activityRevision: 0, phase: "idle", running: false,
   turnId: "", turnStatus: "", turnEventSeq: 0, pendingPrompt: false, cancellable: false, cancelRequested: false, backgroundJobs: 0, activity: "",
 } });
 assert.equal(orphan.items[0].kind === "compaction" && orphan.items[0].status, "interrupted");
