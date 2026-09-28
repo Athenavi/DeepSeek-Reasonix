@@ -477,7 +477,7 @@ func setConnectionsCredentialConfig(c *config.Config, names []string, key string
 		}
 		entries = append(entries, *p)
 	}
-	env, err := c.StageModelCredentialLocked(key)
+	env, err := c.RotateModelCredentialLocked(names, key)
 	if err != nil {
 		return err
 	}

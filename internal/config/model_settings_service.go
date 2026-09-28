@@ -66,8 +66,9 @@ func (c *Config) ProviderEditPath(root, name string) (string, error) {
 	return UserConfigPath(), nil
 }
 
-// CommitConnectionCredential writes a fresh private slot before publishing the
-// config reference. It never overwrites a legacy/shared credential variable.
+// CommitConnectionCredential writes the key before publishing the config
+// reference: in place when its providers alone in the user config read their
+// stored variable, otherwise to a fresh private slot.
 func CommitConnectionCredential(req ConnectionCredentialRequest) (ConnectionCredentialResult, error) {
 	var result ConnectionCredentialResult
 	path := strings.TrimSpace(req.ConfigPath)
@@ -118,7 +119,7 @@ func CommitConnectionCredential(req ConnectionCredentialRequest) (ConnectionCred
 	}
 	defer cfg.CleanupStagedModelCredentialsLocked(path)
 	baseline := cfg.ModelSettingsBaseline()
-	slot, err := cfg.StageModelCredentialLocked(req.Key)
+	slot, err := cfg.RotateModelCredentialLocked(req.ProviderNames, req.Key)
 	if err != nil {
 		return result, err
 	}

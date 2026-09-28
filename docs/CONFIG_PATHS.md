@@ -175,9 +175,16 @@ what holds the name and asks again; Enter falls back to a
 private slot. If the name is claimed between the prompt and saving, the save is
 refused and nothing is written.
 
-Saving a new key later for a provider that uses a typed name moves that
-provider to a private slot; the old value stays under the typed name. Rotating
-in place is tracked in #11010.
+Saving a new key later for a provider in the user config rewrites its
+variable in place when that provider (or the set of providers the key is saved
+for) is the only reader of it in the user config, both before and after the
+edit, and the global `.env` already holds its value. A project that reads the
+same name sees the new key, as it saw the old one. Providers declared in a
+project `reasonix.toml` always get a private slot. The previous value is kept in the global `.env` under
+a temporary variable until the config is published: a save that fails or is
+interrupted puts it back, unless something else has written the variable since.
+When another provider or setting also reads the variable, the new key goes to a
+private slot as before and the shared variable is left unchanged.
 
 Existing configs are not rewritten on upgrade. If an old custom provider already
 uses `CUSTOM_API_KEY`, it will keep working with that key. If several old custom
