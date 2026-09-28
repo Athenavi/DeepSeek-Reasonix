@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -23,7 +24,7 @@ func acquireDesktopProjectsFileLock() (func(), error) {
 
 // updateProjectsFileCrossProcessLocked requires desktopProjectsFileMu and the
 // desktop-projects cross-process file lock.
-func updateProjectsFileCrossProcessLocked(mutator func(*desktopProjectFile) (bool, error)) error {
+func updateProjectsFileCrossProcessLocked(mutator func(*desktopProjectFile) (bool, error), assignCollisions bool) error {
 	f := loadProjectsFile()
 	previous := make([]string, 0, len(f.Projects))
 	for _, project := range f.Projects {
@@ -36,8 +37,10 @@ func updateProjectsFileCrossProcessLocked(mutator func(*desktopProjectFile) (boo
 	if !changed {
 		return nil
 	}
-	if err := assignAddedProjectStateCollisions(previous, f.Projects); err != nil {
-		return err
+	if assignCollisions {
+		if err := assignAddedProjectStateCollisions(previous, f.Projects); err != nil {
+			return fmt.Errorf("%w: %v", errProjectStateCollisionAssignment, err)
+		}
 	}
 	return saveProjectsFile(f)
 }

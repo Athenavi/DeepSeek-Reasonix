@@ -46,6 +46,15 @@ func TestNewCollidingProjectGetsOwnStateWithoutMovingExistingProject(t *testing.
 	if got, err := os.ReadFile(oldSession); err != nil || string(got) != "existing session\n" {
 		t.Fatalf("existing session changed: %q, %v", got, err)
 	}
+	if err := removeProject(first); err != nil {
+		t.Fatal(err)
+	}
+	if err := addProject(first, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := config.ProjectSessionDir(first); got != firstDir {
+		t.Fatalf("re-added original project moved to %q, want %q", got, firstDir)
+	}
 	if _, err := os.Stat(filepath.Join(secondDir, "existing.jsonl")); !os.IsNotExist(err) {
 		t.Fatalf("new project sees existing session: %v", err)
 	}
@@ -102,6 +111,61 @@ func TestNewCollidingProjectGetsOwnStateWithoutMovingExistingProject(t *testing.
 		if !found {
 			t.Fatalf("project %q did not list its session %q: %+v", tc.root, tc.want, page.Items)
 		}
+	}
+}
+
+func TestLegacyProjectImportsKeepExistingCollisionState(t *testing.T) {
+	for _, source := range []string{"workspace-list", "sidebar-recovery"} {
+		t.Run(source, func(t *testing.T) {
+			t.Setenv("REASONIX_HOME", t.TempDir())
+			root := t.TempDir()
+			first := filepath.Join(root, "front-end", "app")
+			second := filepath.Join(root, "front", "end-app")
+			for _, path := range []string{first, second} {
+				if err := os.MkdirAll(path, 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := addProject(first, ""); err != nil {
+				t.Fatal(err)
+			}
+			legacyDir := config.ProjectSessionDir(second)
+			if err := os.MkdirAll(legacyDir, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			oldSession := filepath.Join(legacyDir, "legacy.jsonl")
+			if err := os.WriteFile(oldSession, []byte("legacy session\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			switch source {
+			case "workspace-list":
+				rememberWorkspace(second)
+				migrateLegacyWorkspacesIntoProjects()
+			case "sidebar-recovery":
+				if _, err := recoverLegacyProjectSidebarRoots(desktopTabsFile{Tabs: []desktopTabEntry{{Scope: "project", WorkspaceRoot: second}}}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got := config.ProjectSessionDir(second); got != legacyDir {
+				t.Fatalf("imported project moved to %q, want %q", got, legacyDir)
+			}
+			if got, err := os.ReadFile(oldSession); err != nil || string(got) != "legacy session\n" {
+				t.Fatalf("imported session changed: %q, %v", got, err)
+			}
+		})
+	}
+}
+
+func TestProjectRegistrationKeepsOpeningOnProjectListLockFailure(t *testing.T) {
+	t.Setenv("REASONIX_HOME", t.TempDir())
+	root := t.TempDir()
+	lockPath := filepath.Join(desktopConfigDir(), desktopProjectsFile+".lock")
+	if err := os.MkdirAll(lockPath, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	app := NewApp()
+	if err := app.registerProjectRoot(root); err != nil {
+		t.Fatalf("project list lock failure blocked opening: %v", err)
 	}
 }
 

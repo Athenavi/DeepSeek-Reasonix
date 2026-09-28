@@ -4832,7 +4832,7 @@ func recoverLegacyProjectSidebarRoots(tabs desktopTabsFile) (bool, error) {
 	}
 
 	changed := false
-	err := updateProjectsFile(func(f *desktopProjectFile) (bool, error) {
+	err := updateProjectsFilePreservingLegacyState(func(f *desktopProjectFile) (bool, error) {
 		seen := map[string]bool{}
 		for _, project := range f.Projects {
 			root := normalizeProjectRoot(project.Root)
@@ -4924,18 +4924,30 @@ func saveProjectsFile(f desktopProjectFile) error {
 }
 
 func updateProjectsFile(mutator func(*desktopProjectFile) (bool, error)) error {
+	return updateProjectsFileWithCollisionAssignment(mutator, true)
+}
+
+func updateProjectsFilePreservingLegacyState(mutator func(*desktopProjectFile) (bool, error)) error {
+	return updateProjectsFileWithCollisionAssignment(mutator, false)
+}
+
+func updateProjectsFileWithCollisionAssignment(mutator func(*desktopProjectFile) (bool, error), assignCollisions bool) error {
 	desktopProjectsFileMu.Lock()
 	defer desktopProjectsFileMu.Unlock()
-	return updateProjectsFileLocked(mutator)
+	return updateProjectsFileLockedWithCollisionAssignment(mutator, assignCollisions)
 }
 
 func updateProjectsFileLocked(mutator func(*desktopProjectFile) (bool, error)) error {
+	return updateProjectsFileLockedWithCollisionAssignment(mutator, true)
+}
+
+func updateProjectsFileLockedWithCollisionAssignment(mutator func(*desktopProjectFile) (bool, error), assignCollisions bool) error {
 	release, err := acquireDesktopProjectsFileLock()
 	if err != nil {
 		return err
 	}
 	defer release()
-	return updateProjectsFileCrossProcessLocked(mutator)
+	return updateProjectsFileCrossProcessLocked(mutator, assignCollisions)
 }
 
 func prependTopicInProjectsFile(workspaceRoot, topicID string, ensureProject bool) error {
@@ -5065,7 +5077,7 @@ func removeTopicFromProjectsFileCrossProcessLocked(topicID string) error {
 			}
 		}
 		return changed, nil
-	})
+	}, true)
 }
 
 func normalizeProjectRoot(root string) string {
