@@ -31178,6 +31178,13 @@
           }
         },
         {
+          "name": "errorDetail",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
           "name": "session",
           "optional": true,
           "type": {
@@ -40790,6 +40797,13 @@
         },
         {
           "name": "errorCode",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "errorDetail",
           "optional": true,
           "type": {
             "kind": "string"
