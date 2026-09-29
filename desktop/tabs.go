@@ -2487,6 +2487,22 @@ func (a *App) openTopicSessionWithNavigation(scope, workspaceRoot, topicID, sess
 	if a.desktopSessions.navigationSeq.Load() != navigation {
 		return TabMeta{}, errSessionNavigationSuperseded
 	}
+	if strings.HasPrefix(sessionPath, "bot-session:") {
+		if !strings.HasPrefix(sessionPath, embeddedBotSessionPrefix) {
+			return TabMeta{}, fmt.Errorf("invalid bot session identity")
+		}
+		path, err := a.embeddedBotSessionPath(scope, workspaceRoot, sessionPath)
+		if err != nil {
+			return TabMeta{}, err
+		}
+		meta, err := a.openTopicTabWithActivation(scope, workspaceRoot, topicID, path, true, navigation)
+		if err != nil {
+			return TabMeta{}, err
+		}
+		a.setTabReadOnly(meta.ID, true)
+		meta.ReadOnly = true
+		return meta, nil
+	}
 	validatedSource := false
 	headID := ""
 	if source, err := parseSessionSourceRoute(sessionPath); err != nil {
