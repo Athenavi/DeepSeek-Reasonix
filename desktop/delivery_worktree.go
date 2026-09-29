@@ -46,7 +46,11 @@ type DeliveryWorktreeOpenResult = IsolatedWorktreeOpenResult
 // optional Git isolation path. A false result never disables writing itself;
 // the cross-platform workspace writer lease remains the no-Git fallback.
 func (a *App) IsolatedWorktreeAvailability(workspaceRoot string) worktree.Availability {
-	return inspectDeliveryWorktree(a.bootContext(), workspaceRoot)
+	repo, err := a.workspaceRepoForRoot(workspaceRoot)
+	if err != nil {
+		return worktree.Availability{Reason: err.Error()}
+	}
+	return inspectDeliveryWorktree(a.bootContext(), repo)
 }
 
 // CreateIsolatedWorktree creates a durable branch-backed worktree and opens it
@@ -61,7 +65,11 @@ func (a *App) CreateIsolatedWorktree(workspaceRoot string) (IsolatedWorktreeOpen
 			return worktree.Result{}, err
 		}
 		defer releaseAdmission()
-		return createDeliveryWorktree(a.bootContext(), workspaceRoot, config.DeliveryWorktreeDir())
+		repo, err := a.workspaceRepoForRoot(workspaceRoot)
+		if err != nil {
+			return worktree.Result{}, err
+		}
+		return createDeliveryWorktree(a.bootContext(), repo, config.DeliveryWorktreeDir())
 	}()
 	if err != nil {
 		return IsolatedWorktreeOpenResult{}, err

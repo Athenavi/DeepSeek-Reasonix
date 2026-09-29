@@ -43,6 +43,18 @@ Legacy 迁移、OS home 约定目录扫描以及其他 fallback 路径都会跳�
 `<state root>` 默认等于 `<Reasonix home>`；只有设置 `REASONIX_STATE_HOME`
 时才会不同。
 
+Desktop 在将新项目写入 `desktop-projects.json` 时检测项目目录名冲突。只有另一个已登记
+项目仍实际指向同一个旧目录时，才给新项目分配目录。已有项目和从旧工作区记录导入的
+项目都继续使用原来的 `<state root>/projects/<workspace slug>/` 目录；原项目在冲突
+项目分配到别处后移除并重新加入，也仍使用该旧目录。只有满足上述冲突条件的新项目使用
+`<state root>/projects/@<项目绝对路径的 SHA-256>/`；其中的
+`.workspace-root` 文件记录目录归属。会话、Topic 和项目记忆路径都遵循该归属记录。
+读取项目列表不会创建或修改归属记录，也不会移动已有文件。如果两个项目在此修复之前就
+已经以同一个 slug 登记，其历史共享文件仍保留在原目录，因为旧目录无法证明每个文件的
+所属项目。
+Studio 目前只解析 `<state root>/projects/<workspace slug>/`，不会读取 `.workspace-root`；
+因此新分配目录的项目状态暂时不会与 Studio 共享，直到 Studio 支持此归属记录。
+
 Desktop Topic 的标题、标题来源、创建时间和自动标题状态以这些 SQLite 文件为权威存储。
 首次访问时，Desktop 会导入项目 `.reasonix/` 目录（或全局 Reasonix 目录）中的旧
 `desktop-topic-*.json`。检测到旧文件的 scope 会继续镜像旧格式以支持降级；全新 scope
@@ -139,8 +151,12 @@ CLI 的自定义 provider 向导会先根据 base URL 生成 provider 名称，�
 会说明是什么占用了它，并请你重新输入；直接回车则改用独立槽位。如果在提示之后、保存之前这个名字被占用，保存会被拒绝，
 不写入任何内容。
 
-之后再为使用手动变量名的 provider 保存新 key 时，该 provider 会切换到独立槽位，旧值仍留在
-手动输入的变量名下。原地轮换见 #11010。
+之后再为用户配置里的 provider 保存新 key 时，如果这个 provider（或本次一起保存 key 的那组
+provider）在用户配置里是该变量唯一的读取方（编辑前后都是），且全局 `.env` 里已有它的值，
+Reasonix 会原地改写这个变量；读取同名变量的项目会像之前读到旧 key 一样读到新 key。项目
+`reasonix.toml` 里声明的 provider 始终改用独立槽位。配置发布之前，旧值以一个临时变量名保存在全局 `.env` 里：
+保存失败或中断时会写回旧值，除非这期间有别的写入方改过这个变量。如果还有其他 provider
+或设置读取这个变量，新 key 仍写入独立槽位，共享变量保持不变。
 
 升级时不会自动改写已有配置。旧配置中已经使用 `CUSTOM_API_KEY` 的自定义 provider 会继续
 读取这个 key。若多个旧自定义 provider 已经意外共用了 `CUSTOM_API_KEY`，重新保存每个

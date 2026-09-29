@@ -251,7 +251,7 @@ func (s *Server) capabilities() []string {
 		if _, ok := s.ctl().(*control.Controller); ok {
 			caps = append(caps, servecontract.SubmissionIdentityV1, servecontract.InboxMutationsV1)
 		}
-		caps = append(caps, capabilitySessionIdentityV1, capabilitySessionOwnershipV1, capabilitySessionContentV1, capabilitySessionReadV2, capabilityHistoryWindowV1, capabilityGoalLifecycleV2, capabilityForkTargetsV1, servecontract.TranscriptV2, servecontract.SessionExportV1, servecontract.HistoryOutlineV1)
+		caps = append(caps, capabilitySessionIdentityV1, capabilitySessionOwnershipV1, capabilitySessionContentV1, capabilitySessionReadV2, capabilityHistoryWindowV1, capabilityGoalLifecycleV2, capabilityForkTargetsV1, servecontract.SessionExportV1, servecontract.HistoryOutlineV1)
 	}
 	if _, ok := s.ctl().(interface {
 		SubmitExtensionFormExact(context.Context, string, string, uint64, string, map[string]any) error
@@ -264,9 +264,11 @@ func (s *Server) capabilities() []string {
 	if s.buildOptions.BrowserExecutor != nil {
 		caps = append(caps, capabilityBrowser)
 	}
-	// Announce the outline from the same capability the route enforces, so a
-	// controller without the projection never advertises a route that answers
-	// 501.
+	// Follow and the outline are announced from the same interfaces their routes
+	// enforce: a path-backed foreground follows through the legacy projection.
+	if _, ok := s.ctl().(control.TranscriptFollowAPI); ok {
+		caps = append(caps, servecontract.TranscriptV2)
+	}
 	if _, ok := s.ctl().(control.TranscriptOutlineAPI); ok {
 		caps = append(caps, capabilityTranscriptOutline)
 	}

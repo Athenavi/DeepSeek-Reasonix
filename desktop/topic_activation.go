@@ -480,7 +480,9 @@ func (a *App) refreshTabMetaExtras(tab *WorkspaceTab) {
 
 	gitBranch := ""
 	if root != "" {
-		gitBranch = workspaceGitBranch(root)
+		if repo, err := workspaceRepo(root, ctrl); err == nil {
+			gitBranch = workspaceGitBranch(repo)
+		}
 	}
 	imageInputEnabled := false
 	visionFallbackEnabled := false

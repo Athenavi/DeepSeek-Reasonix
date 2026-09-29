@@ -9,7 +9,6 @@ import (
 	"reasonix/internal/evidence"
 )
 
-const defaultReviewMaxSteps = 8
 const defaultReviewOutputTokens = 2048
 
 func composeChildTaskPrompt(spec ProfileExecSpec) string {
@@ -55,9 +54,6 @@ func applyReviewBudget(spec *ProfileExecSpec) {
 	}
 	switch strings.TrimSpace(spec.Worker.Profile) {
 	case "review", "security-review", "security_review", "team-architect":
-		if spec.Sched.MaxSteps <= 0 {
-			spec.Sched.MaxSteps = defaultReviewMaxSteps
-		}
 		if spec.Sched.MaxOutputTokens <= 0 {
 			spec.Sched.MaxOutputTokens = defaultReviewOutputTokens
 		}
@@ -70,17 +66,17 @@ func applyReviewBudget(spec *ProfileExecSpec) {
 // PrepareReviewSubagentContext applies the same bounded review contract used
 // by task/profile delegation to built-in skill runners. The returned boolean
 // is false for non-review profiles so their existing budgets remain unchanged.
-func PrepareReviewSubagentContext(ctx context.Context, profile, objective string) (prompt string, maxSteps, maxOutputTokens int, ok bool) {
+func PrepareReviewSubagentContext(ctx context.Context, profile, objective string) (prompt string, maxOutputTokens int, ok bool) {
 	spec := ProfileExecSpec{
 		Task:   TaskSpec{Objective: objective},
 		Worker: WorkerSpec{Profile: profile},
 	}
 	applyReviewBudget(&spec)
-	if spec.Sched.MaxSteps == 0 && spec.Sched.MaxOutputTokens == 0 {
-		return objective, 0, 0, false
+	if spec.Sched.MaxOutputTokens == 0 {
+		return objective, 0, false
 	}
 	fillChildFacts(ctx, &spec)
-	return composeChildTaskPrompt(spec), spec.Sched.MaxSteps, spec.Sched.MaxOutputTokens, true
+	return composeChildTaskPrompt(spec), spec.Sched.MaxOutputTokens, true
 }
 
 type childOutputBudgetKey struct{}

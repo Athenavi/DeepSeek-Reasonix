@@ -22,7 +22,9 @@ var errCompressStaleContext = errors.New("compress: conversation changed while c
 // CompressContext implements the context-bound compress tool. It resolves the
 // anchor against the current model-visible view and installs a projection only;
 // the canonical transcript and checkpoint lineage remain untouched.
-func (a *Agent) CompressContext(ctx context.Context, req tool.CompressRequest) (tool.CompressResult, error) {
+func (a *Agent) CompressContext(ctx context.Context, req tool.CompressRequest) (result tool.CompressResult, resultErr error) {
+	ctx, finish := a.beginCompactionRun(ctx)
+	defer func() { resultErr = finish(resultErr) }()
 	direction := strings.TrimSpace(req.Direction)
 	anchor := strings.TrimSpace(req.Anchor)
 	focus := strings.TrimSpace(req.Focus)
@@ -183,14 +185,18 @@ func (a *Agent) compressVisibleRange(
 	anchorIndex int,
 	preview string,
 	instructions string,
-) (tool.CompressResult, error) {
-	a.sess.compactionRunMu.Lock()
+) (resultOut tool.CompressResult, resultErr error) {
+	ctx, finish := a.beginCompactionRun(ctx)
+	defer func() { resultErr = finish(resultErr) }()
+	if err := a.sess.compactionRunMu.acquire(ctx); err != nil {
+		return tool.CompressResult{}, err
+	}
 	defer a.sess.compactionRunMu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return tool.CompressResult{}, err
 	}
 	if !a.explicitCompressionSnapshotCurrent(snap) {
-		return tool.CompressResult{}, errCompressStaleContext
+		return tool.CompressResult{}, summaryError(errCompressStaleContext)
 	}
 	plan, ok := a.planVisibleCompression(snap, direction, anchorIndex, preview)
 	if !ok {

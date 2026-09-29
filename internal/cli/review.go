@@ -12,6 +12,7 @@ import (
 	"reasonix/internal/boot"
 	"reasonix/internal/config"
 	"reasonix/internal/event"
+	"reasonix/internal/gitcmd"
 	"reasonix/internal/hook"
 	"reasonix/internal/sandbox"
 	"reasonix/internal/secrets"
@@ -178,20 +179,25 @@ func reviewToolConfig() *config.Config {
 func getReviewDiff(base, commit string) (string, error) {
 	cwd, _ := os.Getwd()
 	ctx := context.Background()
+	// Resolved before the review agent runs, and only once.
+	repo, err := gitcmd.Open(ctx, cwd)
+	if err != nil {
+		return "", err
+	}
 	switch {
 	case commit != "":
-		return runGit(ctx, cwd, "diff", commit+"^.."+commit)
+		return runGit(ctx, repo, "diff", commit+"^.."+commit)
 	case base != "":
-		return runGit(ctx, cwd, "diff", base+"...HEAD")
+		return runGit(ctx, repo, "diff", base+"...HEAD")
 	default:
 		// Working tree changes: staged + unstaged.
-		out, err := runGit(ctx, cwd, "diff", "HEAD")
+		out, err := runGit(ctx, repo, "diff", "HEAD")
 		if err != nil {
 			return "", err
 		}
 		if out == "" {
 			// No working-tree changes; check for staged-only.
-			out, err = runGit(ctx, cwd, "diff", "--cached")
+			out, err = runGit(ctx, repo, "diff", "--cached")
 		}
 		return out, err
 	}

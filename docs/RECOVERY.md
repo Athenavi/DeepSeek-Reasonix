@@ -31,10 +31,12 @@ not the user's message number. Keep the complete error for diagnosis.
   replacement if needed. A failed image in the current turn must be reattached.
 - Invalid requests from optional extensions are skipped. Required extensions
   and explicit blocking decisions still pause the operation with guidance.
-- If summarization fails and recent tool results exceed the window, the
-  request copy is abbreviated; the original stays in session history. If the
-  request still cannot fit, shorten the latest message or select a model with
-  a larger context window.
+- Context preparation has one five-minute generation budget, including queued
+  and chunked work. Heartbeats do not extend it. A failed summary keeps the last
+  committed context; it no longer triggers additional lossy truncation. If that
+  context cannot be sent safely, the current attempt stops with a recoverable
+  error. Retry with `/compact`, shorten the latest message, or select a model
+  with a larger context window. Original chat history stays available.
 - On save failures, keep the conversation open, export a backup if available,
   and check disk space and write permissions. Model requests and tool execution
   remain paused until the required save has been confirmed.

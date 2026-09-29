@@ -6,6 +6,7 @@
 export const en = {
   "error.unknown": "An error occurred. Open details to view the reported cause.",
   "error.connection": "Could not connect. Check the network, proxy and service address.",
+  "error.transportProtocol": "The HTTP/2 connection failed with a protocol error. Check the service or proxy compatibility; expand the details for error information.",
   "error.dns": "The server address could not be resolved. Check the address and DNS settings.",
   "error.interrupted": "The connection was interrupted. Check the network or service before trying again.",
   "error.timeout": "The request timed out. Check the service and connection before trying again.",
@@ -3021,6 +3022,8 @@ export const en = {
   "settings.hooksPathUnavailable": "No project settings file is available",
   "settings.hooksGlobalHint": "Saved globally. Restart Reasonix to load new hooks.",
   "settings.hooksProjectHint": "Saved in this workspace. Restart Reasonix to load new hooks.",
+  "settings.hooksAwaitingApproval": "These hooks came with this workspace and stay off until you approve them as they are now. Any later change needs approval again.",
+  "settings.hooksApprove": "Approve",
   "settings.hooksJsonTitle": "JSON config",
   "settings.hooksJsonHint": "Edit the {\"hooks\": ...} block from settings.json directly. Arrays with event fields are also accepted; saving validates and formats the JSON.",
   "settings.hooksJsonCopy": "Copy JSON",

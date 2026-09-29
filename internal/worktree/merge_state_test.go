@@ -12,14 +12,14 @@ func TestWorktreeStateTokenBindsFileContentAndIndex(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	path := filepath.Join(repo, "README.md")
-	original, err := worktreeStateToken(context.Background(), repo)
+	original, err := worktreeStateToken(context.Background(), opened(t, repo))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, []byte("changed\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	changed, err := worktreeStateToken(context.Background(), repo)
+	changed, err := worktreeStateToken(context.Background(), opened(t, repo))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestWorktreeStateTokenBindsFileContentAndIndex(t *testing.T) {
 		t.Fatal("filesystem content change did not change the state token")
 	}
 	gitTest(t, repo, "add", "README.md")
-	staged, err := worktreeStateToken(context.Background(), repo)
+	staged, err := worktreeStateToken(context.Background(), opened(t, repo))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestWorktreeStateTokenBindsSymlinkTargetAndMode(t *testing.T) {
 	if err := os.Symlink("first", link); err != nil {
 		t.Fatal(err)
 	}
-	first, err := worktreeStateToken(context.Background(), repo)
+	first, err := worktreeStateToken(context.Background(), opened(t, repo))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestWorktreeStateTokenBindsSymlinkTargetAndMode(t *testing.T) {
 	if err := os.Symlink("second", link); err != nil {
 		t.Fatal(err)
 	}
-	second, err := worktreeStateToken(context.Background(), repo)
+	second, err := worktreeStateToken(context.Background(), opened(t, repo))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,14 +70,14 @@ func TestWorktreeStateTokenBindsSymlinkTargetAndMode(t *testing.T) {
 	if err := os.WriteFile(file, []byte("mode\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	plain, err := worktreeStateToken(context.Background(), repo)
+	plain, err := worktreeStateToken(context.Background(), opened(t, repo))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chmod(file, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	executable, err := worktreeStateToken(context.Background(), repo)
+	executable, err := worktreeStateToken(context.Background(), opened(t, repo))
 	if err != nil {
 		t.Fatal(err)
 	}

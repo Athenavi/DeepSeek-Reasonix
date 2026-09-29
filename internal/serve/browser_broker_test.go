@@ -14,6 +14,7 @@ import (
 	"reasonix/internal/browser"
 	"reasonix/internal/config"
 	"reasonix/internal/control"
+	"reasonix/internal/servecontract"
 	"reasonix/internal/session"
 )
 
@@ -146,7 +147,7 @@ func newBrokerTestServer(t *testing.T, opts boot.Options) *Server {
 }
 
 func TestServerCapabilitiesFollowBroker(t *testing.T) {
-	if caps := newBrokerTestServer(t, boot.Options{}).capabilities(); !slices.Equal(caps, []string{capabilityPermissionPresets, capabilityPresentFiles, capabilityExecutionV2, capabilitySessionHistory, capabilityMaintenanceV1, modelApplicationCapability, capabilityExtensionFormInstanceV1, capabilityInteractionTargetV1, capabilityTranscriptOutline}) {
+	if caps := newBrokerTestServer(t, boot.Options{}).capabilities(); !slices.Equal(caps, []string{capabilityPermissionPresets, capabilityPresentFiles, capabilityExecutionV2, capabilitySessionHistory, capabilityMaintenanceV1, modelApplicationCapability, capabilityExtensionFormInstanceV1, capabilityInteractionTargetV1, servecontract.TranscriptV2, capabilityTranscriptOutline}) {
 		t.Fatalf("capabilities without broker = %v", caps)
 	}
 	broker, err := NewBrowserBroker("http://127.0.0.1:9999", "tok")
@@ -155,7 +156,7 @@ func TestServerCapabilitiesFollowBroker(t *testing.T) {
 	}
 	srv := newBrokerTestServer(t, boot.Options{BrowserExecutor: broker})
 	caps := srv.capabilities()
-	if !slices.Equal(caps, []string{capabilityPermissionPresets, capabilityPresentFiles, capabilityExecutionV2, capabilitySessionHistory, capabilityMaintenanceV1, modelApplicationCapability, capabilityExtensionFormInstanceV1, capabilityInteractionTargetV1, capabilityBrowser, capabilityTranscriptOutline}) {
+	if !slices.Equal(caps, []string{capabilityPermissionPresets, capabilityPresentFiles, capabilityExecutionV2, capabilitySessionHistory, capabilityMaintenanceV1, modelApplicationCapability, capabilityExtensionFormInstanceV1, capabilityInteractionTargetV1, capabilityBrowser, servecontract.TranscriptV2, capabilityTranscriptOutline}) {
 		t.Fatalf("capabilities with broker = %v", caps)
 	}
 }
@@ -239,11 +240,11 @@ func TestHandshakeAdvertisesBrowserCapability(t *testing.T) {
 			t.Fatalf("handshake status = %d, want 204", resp.StatusCode)
 		}
 		got := resp.Header.Get(capabilitiesHeader)
-		if withBroker && got != capabilityPermissionPresets+","+capabilityPresentFiles+","+capabilityExecutionV2+","+capabilitySessionHistory+","+capabilityMaintenanceV1+","+modelApplicationCapability+","+capabilityExtensionFormInstanceV1+","+capabilityInteractionTargetV1+","+capabilityBrowser+","+capabilityTranscriptOutline {
-			t.Fatalf("capabilities header = %q, want permission, present-files, browser and outline capabilities", got)
+		if withBroker && got != capabilityPermissionPresets+","+capabilityPresentFiles+","+capabilityExecutionV2+","+capabilitySessionHistory+","+capabilityMaintenanceV1+","+modelApplicationCapability+","+capabilityExtensionFormInstanceV1+","+capabilityInteractionTargetV1+","+capabilityBrowser+","+servecontract.TranscriptV2+","+capabilityTranscriptOutline {
+			t.Fatalf("capabilities header = %q, want permission, present-files, browser, transcript and outline capabilities", got)
 		}
-		if !withBroker && got != capabilityPermissionPresets+","+capabilityPresentFiles+","+capabilityExecutionV2+","+capabilitySessionHistory+","+capabilityMaintenanceV1+","+modelApplicationCapability+","+capabilityExtensionFormInstanceV1+","+capabilityInteractionTargetV1+","+capabilityTranscriptOutline {
-			t.Fatalf("capabilities header = %q, want permission, present-files and outline capabilities", got)
+		if !withBroker && got != capabilityPermissionPresets+","+capabilityPresentFiles+","+capabilityExecutionV2+","+capabilitySessionHistory+","+capabilityMaintenanceV1+","+modelApplicationCapability+","+capabilityExtensionFormInstanceV1+","+capabilityInteractionTargetV1+","+servecontract.TranscriptV2+","+capabilityTranscriptOutline {
+			t.Fatalf("capabilities header = %q, want permission, present-files, transcript and outline capabilities", got)
 		}
 	}
 }

@@ -27,7 +27,7 @@ import (
 // current project or every project, while Type only classifies its contents.
 // List() and Index() merge both directories so every session sees the full set.
 type Store struct {
-	Dir       string // ...reasonix/projects/<slug>/memory
+	Dir       string // ...reasonix/projects/<project directory>/memory
 	GlobalDir string // ...reasonix/memory/global (shared across projects)
 }
 
@@ -111,7 +111,7 @@ func StoreFor(userDir, cwd string) Store {
 		return Store{}
 	}
 	return Store{
-		Dir:       filepath.Join(userDir, "projects", config.WorkspaceSlug(absOf(cwd)), "memory"),
+		Dir:       filepath.Join(config.ProjectStateDir(userDir, absOf(cwd)), "memory"),
 		GlobalDir: filepath.Join(userDir, "memory", "global"),
 	}
 }

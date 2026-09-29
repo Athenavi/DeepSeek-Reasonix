@@ -207,7 +207,7 @@ func TestForegroundMutationRejectsStaleSessionPath(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(expectedSessionPathHeader, stalePath)
 	rec := httptest.NewRecorder()
-	s.Handler().ServeHTTP(rec, req)
+	operatorHandler(s).ServeHTTP(rec, req)
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("stale cancel status = %d, want %d", rec.Code, http.StatusConflict)
 	}
@@ -220,7 +220,7 @@ func TestForegroundMutationRejectsStaleSessionPath(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(expectedSessionPathHeader, currentPath)
 	rec = httptest.NewRecorder()
-	s.Handler().ServeHTTP(rec, req)
+	operatorHandler(s).ServeHTTP(rec, req)
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("current cancel status = %d, want %d", rec.Code, http.StatusNoContent)
 	}

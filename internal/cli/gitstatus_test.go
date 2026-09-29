@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
+
+	"reasonix/internal/gitcmd"
 )
 
 func TestParseGitNumstat(t *testing.T) {
@@ -108,7 +110,7 @@ func TestLoadGitStatus(t *testing.T) {
 	}
 
 	// This checks Git semantics, not subprocess speed on a shared CI runner.
-	status, err := loadGitStatus(t.Context(), filepath.Join(root, "subdir"))
+	status, err := loadGitStatus(t.Context(), openedRepo(t, filepath.Join(root, "subdir")))
 	if err != nil {
 		t.Fatalf("loadGitStatus: %v", err)
 	}
@@ -128,7 +130,7 @@ func TestLoadGitStatusRejectsCanceledSnapshot(t *testing.T) {
 		t.Run(cancelAt, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
-			run := func(ctx context.Context, _ string, args ...string) (string, error) {
+			run := func(ctx context.Context, _ gitcmd.Repo, args ...string) (string, error) {
 				if args[0] == cancelAt {
 					cancel()
 				}
@@ -149,12 +151,23 @@ func TestLoadGitStatusRejectsCanceledSnapshot(t *testing.T) {
 					return "", nil
 				}
 			}
-			status, err := loadGitStatusWithRunner(ctx, "", run)
+			repo := gitcmd.Repo{Dir: "repo", GitDir: "repo", CommonDir: "repo", WorkTree: "repo"}
+			status, err := loadGitStatusWithRunner(ctx, repo, run)
 			if !errors.Is(err, context.Canceled) || status != (gitStatus{}) {
 				t.Fatalf("canceled query returned status=%+v err=%v", status, err)
 			}
 		})
 	}
+}
+
+// openedRepo is dir's identity as a session opening it resolves it.
+func openedRepo(t *testing.T, dir string) gitcmd.Repo {
+	t.Helper()
+	repo, err := gitcmd.Open(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("Open(%s): %v", dir, err)
+	}
+	return repo
 }
 
 func TestRunGitDisablesOptionalLocks(t *testing.T) {
@@ -172,7 +185,8 @@ func TestRunGitDisablesOptionalLocks(t *testing.T) {
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
-	out, err := runGit(context.Background(), "", "status")
+	dir := t.TempDir()
+	out, err := runGit(context.Background(), gitcmd.Repo{Dir: dir, GitDir: dir, CommonDir: dir, WorkTree: dir}, "status")
 	if err != nil {
 		t.Fatalf("runGit: %v", err)
 	}

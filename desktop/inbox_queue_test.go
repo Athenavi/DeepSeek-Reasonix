@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
@@ -26,7 +27,7 @@ func TestRemoteInboxQueueCapabilitiesAndIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	server := httptest.NewServer(serve.New(ctrl, nil, config.ServeConfig{}).Handler())
+	server := httptest.NewServer(operatorServeHandler(serve.New(ctrl, nil, config.ServeConfig{})))
 	defer server.Close()
 	a, tab := remoteRuntimeTestApp(server.Client())
 	tab.base, tab.routing.currentPath, tab.session.path = server.URL, path, path
@@ -104,4 +105,14 @@ func TestTargetGuidanceQueuesEndedTurnAndRejectsReplacementSession(t *testing.T)
 	if _, err := a.EnqueueInboxSteerForTurn("tab", "ended-turn", "unsafe", "unsafe", "unsafe"); err == nil {
 		t.Fatal("legacy request bypassed the session fence")
 	}
+}
+
+// operatorServeHandler stands in for the remote client, which holds the
+// launch token a serve requires for mutations.
+func operatorServeHandler(s *serve.Server) http.Handler {
+	h := s.Handler()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Set("Authorization", "Bearer "+s.AuthToken())
+		h.ServeHTTP(w, r)
+	})
 }

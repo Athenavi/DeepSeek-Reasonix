@@ -92,6 +92,7 @@ type Config struct {
 	// rewrite the original file; the UI may surface them for doctor repair.
 	loadWarnings      []string
 	openCodeGoJournal *openCodeGoJournal
+	projectScope      projectScopeReport
 }
 
 // KeepProjectSkillKey marks a skill field as an intentional project override.
@@ -962,17 +963,19 @@ type NetworkProxyConfig struct {
 	Password string `toml:"password"`
 }
 
-// NetworkProxySpec returns the expanded proxy settings used by netclient.
+// NetworkProxySpec returns the expanded proxy settings used by netclient. The
+// settings are the user's, so ${VAR} expands from the process environment and
+// never from a workspace .env.
 func (c *Config) NetworkProxySpec() netclient.ProxySpec {
 	return netclient.ProxySpec{
 		Mode:        c.Network.ProxyMode,
-		URL:         c.expandVars(c.Network.ProxyURL),
-		NoProxy:     c.expandVars(c.Network.NoProxy),
+		URL:         ExpandVars(c.Network.ProxyURL),
+		NoProxy:     ExpandVars(c.Network.NoProxy),
 		Type:        c.Network.Proxy.Type,
-		Server:      c.expandVars(c.Network.Proxy.Server),
+		Server:      ExpandVars(c.Network.Proxy.Server),
 		Port:        c.Network.Proxy.Port,
-		Username:    c.expandVars(c.Network.Proxy.Username),
-		Password:    c.expandVars(c.Network.Proxy.Password),
+		Username:    ExpandVars(c.Network.Proxy.Username),
+		Password:    ExpandVars(c.Network.Proxy.Password),
 		DirectHosts: c.directProxyHosts(),
 	}
 }
@@ -1148,7 +1151,7 @@ func (c *Config) WriteRoots() []string {
 // config doesn't explicitly set a workspace_root. Desktop tabs pass their
 // project root here so tool confinement is correct without changing cwd.
 func (c *Config) WriteRootsForRoot(fallbackRoot string) []string {
-	root := c.expandVars(c.Sandbox.WorkspaceRoot)
+	root := c.expandSandboxPath(c.Sandbox.WorkspaceRoot)
 	if root == "" {
 		root = fallbackRoot
 		if root == "" || root == "." {
@@ -1161,7 +1164,7 @@ func (c *Config) WriteRootsForRoot(fallbackRoot string) []string {
 	}
 	roots := []string{root}
 	for _, d := range c.Sandbox.AllowWrite {
-		if d = c.expandVars(d); d != "" {
+		if d = c.expandSandboxPath(d); d != "" {
 			roots = append(roots, d)
 		}
 	}
@@ -1175,7 +1178,7 @@ func (c *Config) WriteRootsForRoot(fallbackRoot string) []string {
 func (c *Config) AllowWriteRoots() []string {
 	var roots []string
 	for _, d := range c.Sandbox.AllowWrite {
-		if d = c.expandVars(d); d != "" {
+		if d = c.expandSandboxPath(d); d != "" {
 			roots = append(roots, d)
 		}
 	}
@@ -1203,7 +1206,7 @@ func (c *Config) ForbidReadRootsForRoot(fallbackRoot string) []string {
 	}
 	roots := make([]string, 0, len(c.Sandbox.ForbidRead))
 	for _, d := range c.Sandbox.ForbidRead {
-		if d = c.expandVars(d); d != "" {
+		if d = c.expandSandboxPath(d); d != "" {
 			if !filepath.IsAbs(d) {
 				d = filepath.Join(root, d)
 			}
@@ -1725,9 +1728,9 @@ func (s MCPConfigSource) UserAuthorized() bool {
 	}
 }
 
-// ProjectScoped reports whether an MCP entry belongs to one workspace. Project
-// scope remains useful for provenance, activation, and relative-path handling;
-// it no longer implies a separate launch-approval workflow.
+// ProjectScoped reports whether an MCP entry belongs to one workspace. Its
+// activation is keyed per workspace, and it stays disabled until the user
+// records a decision there.
 func (s MCPConfigSource) ProjectScoped() bool {
 	return s == MCPSourceProjectConfig || s == MCPSourceProjectMCPJSON
 }
@@ -1760,11 +1763,9 @@ func resolvedMCPTier(tier string) string {
 }
 
 // AutoStartPlugins returns enabled MCP entries for the catalog. Durable
-// enable/disable overrides in mcp-activation.json take precedence over the
-// legacy auto_start field. auto_start=false without an override still maps to
-// disabled; true/nil map to enabled. "Auto start" no longer means "spawn the
-// process at session boot" — enabled servers register cached tools and start
-// on first real tool call.
+// overrides in mcp-activation.json win over auto_start; without one a
+// project-declared server is disabled. Enabled servers register cached tools
+// and start on the first real tool call, not at session boot.
 func (c *Config) AutoStartPlugins() []PluginEntry {
 	return c.EnabledPlugins("", DefaultMCPActivationStore())
 }
@@ -1777,7 +1778,7 @@ func (c *Config) EnabledPlugins(workspace string, activation *MCPActivationStore
 	}
 	out := make([]PluginEntry, 0, len(c.Plugins))
 	for _, p := range c.Plugins {
-		enabled := p.ShouldAutoStart()
+		enabled := DeclaredDefaultOn(p)
 		if activation != nil {
 			if resolved, err := activation.IsEnabled(p, workspace); err == nil {
 				enabled = resolved

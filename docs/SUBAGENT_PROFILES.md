@@ -51,7 +51,8 @@ This is a real isolated subagent run, not prompt text inserted into the parent
 agent. The parent conversation retains the task and the child's final answer,
 not the child's full working context. Review and security-review children also
 receive a compact parent facts pack (confirmed decisions, evidence summary, file
-anchors) and default to 8 steps plus a 2048 output-token cap.
+anchors) and a 2048 output-token cap per response; their step budget is the
+same as any other sub-agent's (an explicit `max_steps` wins).
 
 The parent model can also select a profile at call time without listing profile
 names in the tool schema (prompt-cache stability):

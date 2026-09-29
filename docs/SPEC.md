@@ -1134,7 +1134,10 @@ cursor behavior.
 `[serve]` controls the HTTP browser frontend used by `reasonix serve`. The
 default `auth_mode = "none"` is intended for the loopback default
 `127.0.0.1:8787`; deployments reachable from another machine must use `token` or
-`password`. Password mode requires either a startup `--password` or a stored
+`password`. In `none` mode every state-changing request still needs the launch
+token, which Serve writes to a 0600 file under `<Reasonix home>/remote/` rather
+than to the terminal, and otherwise refuses with `launch_token_required`.
+`[serve]` is read from the user config only. Password mode requires either a startup `--password` or a stored
 bcrypt `password_hash`. `behind_proxy` must stay false unless the server is
 behind a trusted proxy that owns the `X-Forwarded-For` and `X-Forwarded-Proto`
 headers.

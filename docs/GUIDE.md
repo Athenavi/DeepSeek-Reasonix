@@ -246,8 +246,30 @@ the terminal; stop it with Ctrl-C.
 An explicit `reasonix web --auth none` disables the default token and should be
 used only when the listener is intentionally trusted. `reasonix serve` keeps its
 backward-compatible, config-driven `auth_mode = "none"` default on
-`127.0.0.1:8787`. If you bind Serve outside loopback, expose it through a tunnel,
-or put it behind a reverse proxy, enable authentication before sharing the URL:
+`127.0.0.1:8787`.
+
+Without authentication (`auth_mode = "none"`, the `serve` default) reads stay
+open on the listener, but every state-changing request, approvals included,
+needs the launch token:
+
+- Serve writes the token to a 0600 file under `<Reasonix home>/remote/` and
+  prints only its path next to an `approvals:` link; append
+  `#token=<file contents>` to open it in a browser. A managed launch with
+  `--token-file` names that file instead. Token mode prints its `share:` link
+  the same way.
+- Send it as `Authorization: Bearer <token>`, or open the link once so the page
+  sets its cookie. Without it the request answers 403 `launch_token_required`.
+- Prefer `--token-file` over `--token`: argv is visible to other processes,
+  sandboxed ones included. A plaintext `[serve].token` in the global
+  config is readable from inside the sandbox; keep the secret in a file.
+- On macOS and Linux the OS sandbox denies the remote state directory and any
+  `--token-file`. Windows has no bash sandbox, so there nothing keeps an agent
+  command from reading the file.
+- `[serve]` is read from the user config only; a project `reasonix.toml`
+  cannot set it.
+
+If you bind Serve outside loopback, expose it through a tunnel, or put it behind
+a reverse proxy, enable authentication before sharing the URL:
 
 ```bash
 reasonix serve --auth token
@@ -722,6 +744,77 @@ global credential `.env` to the runtime read-deny boundary. Windows does not:
 it has no OS-level shell sandbox, and denying the current user would also deny
 the host settings process. Project `.env` files keep their existing
 workspace-scoped behavior.
+
+**Git metadata is host-protected.** Inside the bash sandbox, the Git
+configuration and hooks of the workspace repository stay read-only, because the
+host's own git reads them.
+
+The repository is the one git itself discovers from each writable root. A
+`.git` file is followed to the gitdir it names the way git resolves it,
+relative to the file with symlinks followed, so the protection lands on what
+git will read. Protected:
+
+- `.git` itself, the gitdir, the common dir and every symlink on the way to
+  them: none can be removed, renamed or replaced by a symlink.
+- `config`, `config.worktree`, `commondir` and `hooks/` of the gitdir and of
+  the common dir.
+- `config`, `config.worktree` and `commondir` of each existing `worktrees/*`
+  entry, and `config` and `config.worktree` of entries created later.
+- `config`, `config.worktree`, `commondir` and `hooks/` of each submodule
+  gitdir under `modules/`, existing or created later.
+
+Everything else under `.git` (objects, refs, index, logs, lock files) stays
+writable, so add, commit, branch, checkout, merge, rebase, stash, tag and
+worktree creation keep working. These operations change:
+
+| Operation | In the sandbox |
+| --- | --- |
+| `git config` without `--global`, `git remote add` / `set-url`, `git branch -m`, `git submodule init`, `git submodule update --init`, `git sparse-checkout init`, `git maintenance register`, `git init` in an existing repository | Fails |
+| Installing a hook into `.git/hooks` | Fails |
+| `git worktree remove` / `prune` of a linked worktree that existed before the command | Fails; one added in the same command can be removed |
+| Cloning a new submodule (`git submodule add`, `git submodule update` for one not yet cloned) | Fails on macOS; on Linux the clone lands but its config entry does not |
+| `git branch --set-upstream-to`, `git checkout --track`, `git push -u` | Reports the refused write but exits 0; no upstream is recorded |
+
+To add or initialise submodules, run it outside the sandbox (in a terminal, or through an approved danger-full-access retry); updating submodules that are
+already cloned works inside it.
+
+When a command's output names one of these paths, the bash result says so with
+`sandbox.git_metadata_protected`, also when git exited 0. `additional_write_dirs` cannot grant it.
+
+A protected file that already has another hard link refuses every confined
+command with `sandbox.git_metadata_linked`, because a write through the other
+name would reach it; the user removes that link outside the sandbox.
+
+Limits:
+
+- On Linux, bubblewrap can only mount over paths that exist and cannot pin a
+  symlink. Creating an absent `commondir`, `config.worktree` or hooks
+  directory, or swapping a symlink on the `gitdir:` path, is not stopped there.
+- Closing that on Linux is the host's side: its own git has to pin its git and
+  common directories instead of rediscovering them.
+- Existing worktree and submodule gitdirs get exact rules, up to 128 each on
+  macOS and 512 on Linux.
+- On macOS, patterns cover the rest and gitdirs created later. They skip
+  `refs/` and `logs/`, so a branch or tag named `config` or `hooks` stays
+  writable, but a new submodule named `hooks` is protected whole.
+- On macOS with more than 128 worktrees, `git worktree add` fails; past 128
+  submodules each command starts about 0.1 s slower.
+- On Linux, past 512 gitdirs the whole `worktrees/` or `modules/` directory is
+  mounted read-only, and a command can cause that by planting `HEAD` files.
+  A command can likewise plant a submodule gitdir with a hard-linked config,
+  after which every confined command is refused until the user removes it.
+- A repository created by a sandboxed command is protected from the next
+  command on.
+- A `.git` made unrecognisable to git (for example a corrupted `HEAD`) sends
+  git's discovery further up.
+- A repository nested in the workspace that is not a submodule gitdir under
+  `modules/` is not protected, including one a command creates and records as
+  a gitlink.
+- The host can run such a repository's configuration through its gitlink
+  unless the host's own git excludes it.
+- Hooks that `core.hooksPath` points outside `.git`, and files `include.path`
+  names, are ordinary workspace files.
+- Windows has no shell sandbox, so none of this is enforced there.
 
 **Session-private temporary directory.** Within one logical chat session, Bash
 commands share a private temporary directory so consecutive calls can exchange

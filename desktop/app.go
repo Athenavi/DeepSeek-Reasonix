@@ -4820,7 +4820,7 @@ func migrateLegacyWorkspacesIntoProjects() {
 	if len(legacy) == 0 {
 		return
 	}
-	_ = updateProjectsFile(func(f *desktopProjectFile) (bool, error) {
+	_ = updateProjectsFilePreservingLegacyState(func(f *desktopProjectFile) (bool, error) {
 		seen := make(map[string]bool, len(f.Projects)+len(legacy))
 		for _, p := range f.Projects {
 			seen[p.Root] = true
@@ -6148,6 +6148,13 @@ func firstNonEmpty(values ...string) string {
 }
 
 func (a *App) ContextUsageForTab(tabID string) ContextInfo {
+	if a.isRemoteTab(tabID) {
+		used, window, ok := a.remoteContextSnapshot(tabID)
+		if ok {
+			return ContextInfo{Used: used, Window: window}
+		}
+		return ContextInfo{}
+	}
 	read := a.captureContextRead(tabID)
 	ctrl := read.ctrl
 	var info ContextInfo
@@ -7449,11 +7456,7 @@ func (a *App) mcpServersView() []ServerView {
 }
 
 func mcpEntryEnabled(p config.PluginEntry, workspace string) bool {
-	enabled, err := config.DefaultMCPActivationStore().IsEnabled(p, workspace)
-	if err != nil {
-		return p.ShouldAutoStart()
-	}
-	return enabled
+	return config.MCPServerEnabled(p, workspace)
 }
 
 func mcpRuntimeState(status string) string {
@@ -8517,6 +8520,9 @@ func (a *App) ReconnectMCPServer(name string) error {
 	if !found {
 		return fmt.Errorf("no configured MCP server named %q", name)
 	}
+	if err := config.RecordExplicitStart(entry, root); err != nil {
+		return err
+	}
 	controllers := a.mcpControllersSharingHost(host, name, ctrl)
 	for i := range controllers {
 		if controllers[i].ctrl == ctrl {
@@ -8673,6 +8679,9 @@ func (a *App) SetMCPServerTier(name, tier string) error {
 	}
 	a.bumpExtensionGeneration()
 	if tab != nil && ctrl != nil && !mcpConnected(ctrl, name) {
+		if err := config.RecordExplicitStart(updated, root); err != nil {
+			return err
+		}
 		if _, err := ctrl.ConnectMCPServer(updated); err != nil {
 			recordMCPFailure(ctrl, updated, err)
 			return nil
@@ -8707,7 +8716,7 @@ func (a *App) saveDesktopMCPServer(root string, entry config.PluginEntry) error 
 	if err := ensureMCPServerDirectlyWritable(root, entry.Name); err != nil {
 		return err
 	}
-	_, err := config.UpsertPluginInSourceForRoot(root, entry)
+	_, err := config.UpsertPluginKeepingDecision(root, entry)
 	return err
 }
 
@@ -9869,10 +9878,6 @@ func previewMediaKind(path string) (kind string, mime string) {
 		return "html", mime
 	}
 	return "", ""
-}
-
-func (a *App) activeWorkspaceBase() (string, error) {
-	return workspaceBaseFromRoot(a.activeWorkspaceRoot())
 }
 
 func (a *App) workspaceTargetForTab(tabID string) (string, control.SessionAPI, bool) {

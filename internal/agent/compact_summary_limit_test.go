@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -194,7 +195,7 @@ func TestUnnumberedSummaryOverflowSkipsReplanToTranscript(t *testing.T) {
 // A provider that rejects every summary form must not trap /compact in a loop
 // of identical requests: replay re-plans, then the transcript form, then the
 // fragment path, and at the ceiling the truncation rescue finally lands.
-func TestManualCompactOverCeilingRescuesWithoutRepeatingRequests(t *testing.T) {
+func TestManualCompactOverCeilingFailsWithoutRepeatingRequests(t *testing.T) {
 	prov := &denseTokenizerProvider{window: 20_000, alwaysOverflow: true}
 	sess := longASCIISession(30)
 	a := New(prov, tool.NewRegistry(), sess, Options{ContextWindow: 20_000, CompactRatio: 0.8}, event.Discard)
@@ -202,15 +203,10 @@ func TestManualCompactOverCeilingRescuesWithoutRepeatingRequests(t *testing.T) {
 		t.Fatalf("fixture estimates %d tokens against a %d ceiling; it is not over it", est, hard)
 	}
 
-	if err := a.CompactNow(context.Background(), ""); err != nil {
-		t.Fatalf("CompactNow = %v, want the truncation rescue", err)
+	if err := a.CompactNow(context.Background(), ""); !errors.Is(err, ErrCompactionRequired) {
+		t.Fatalf("CompactNow = %v, want a recoverable context failure", err)
 	}
-	if !truncatedRescue(a) {
-		t.Fatalf("receipt = %+v, want an applied truncation without a digest", a.sess.compactionState.LastReceipt)
-	}
-	if after, hard := a.ContextUsedTokens(), a.hardInputCeiling(); after >= hard {
-		t.Fatalf("rescued view estimates %d tokens against a %d ceiling", after, hard)
-	}
+	assertNoFailedSummaryRewrite(t, a)
 	summaries := prov.summaryRequests()
 	if len(summaries) < 3 {
 		t.Fatalf("summary requests = %d, want replay re-plans and the transcript form before the rescue", len(summaries))
@@ -309,75 +305,6 @@ func TestActiveTurnFoldBoundaryKeepsNewestRounds(t *testing.T) {
 	}
 	if got := activeTurnFoldBoundary(msgs, 1, 7); got != 4 {
 		t.Fatalf("boundary = %d, want 4 when the fold end cuts the newest rounds off", got)
-	}
-}
-
-func toolLoopSession(rounds int) *Session {
-	sess := NewSession("sys")
-	sess.Add(provider.Message{Role: provider.RoleUser, Content: "read everything"})
-	body := strings.Repeat("tool output line\n", 120)
-	for i := range rounds {
-		id := fmt.Sprintf("c%d", i)
-		sess.Add(provider.Message{Role: provider.RoleAssistant, ToolCalls: []provider.ToolCall{{ID: id, Name: "read_file", Arguments: "{}"}}})
-		sess.Add(provider.Message{Role: provider.RoleTool, ToolCallID: id, Name: "read_file", Content: body})
-	}
-	sess.Add(provider.Message{Role: provider.RoleUser, Content: "now summarize"})
-	sess.Add(provider.Message{Role: provider.RoleAssistant, Content: "tail"})
-	return sess
-}
-
-func TestTruncateViewElidesOldestToolResultsBeforeDropping(t *testing.T) {
-	sess := toolLoopSession(10)
-	a := New(&denseTokenizerProvider{window: 1 << 20}, tool.NewRegistry(), sess, Options{ContextWindow: 10_000, CompactRatio: 0.5}, event.Discard)
-	visible := sess.Snapshot()
-	total := a.estimatedVisibleRequestTokens(visible)
-	if total < 3000 {
-		t.Fatalf("fixture estimates only %d tokens", total)
-	}
-
-	projected, affected := a.truncateView(visible, total*2/3)
-	if affected == 0 || len(projected) != len(visible) {
-		t.Fatalf("elision changed %d messages and %d->%d length; want in-place elision only", affected, len(visible), len(projected))
-	}
-	if !strings.HasPrefix(projected[3].Content, elidedToolResultPrefix) {
-		t.Fatalf("oldest tool result was not elided: %q", projected[3].Content[:40])
-	}
-	newest := len(visible) - 3
-	if strings.HasPrefix(projected[newest].Content, elidedToolResultPrefix) {
-		t.Fatal("the protected tail's tool result must stay verbatim")
-	}
-	if after := a.estimatedVisibleRequestTokens(projected); after >= total*2/3 {
-		t.Fatalf("elision left %d tokens, want under the %d target", after, total*2/3)
-	}
-
-}
-
-// Text-only history gives elision nothing to cut, so the drop stage must
-// remove the oldest replay units behind a marker while an earlier digest and
-// the protected tail survive.
-func TestTruncateViewDropsOldestUnitsWhenElisionCannotReach(t *testing.T) {
-	sess := longASCIISession(6)
-	a := New(&denseTokenizerProvider{window: 1 << 20}, tool.NewRegistry(), sess, Options{ContextWindow: 10_000, CompactRatio: 0.5}, event.Discard)
-	visible := sess.Snapshot()
-	digest := formatSummaryMessage("- earlier digest")
-	withDigest := append([]provider.Message{visible[0], visible[1], digest}, visible[2:]...)
-	total := a.estimatedVisibleRequestTokens(withDigest)
-
-	dropped, affected := a.truncateView(withDigest, total/3)
-	if affected == 0 || len(dropped) >= len(withDigest) {
-		t.Fatalf("drop stage changed %d messages and %d->%d length; want oldest units removed", affected, len(withDigest), len(dropped))
-	}
-	if !strings.Contains(dropped[1].Content, "truncated to fit the context window") {
-		t.Fatalf("drop stage left no marker: %q", dropped[1].Content)
-	}
-	if latestDigest(dropped) == "" {
-		t.Fatal("an earlier compaction digest must survive truncation")
-	}
-	if last := dropped[len(dropped)-1]; last.Content != visible[len(visible)-1].Content {
-		t.Fatal("the protected tail must stay verbatim")
-	}
-	if after := a.estimatedVisibleRequestTokens(dropped); after >= total/3 {
-		t.Fatalf("drop stage left %d tokens, want under the %d target", after, total/3)
 	}
 }
 

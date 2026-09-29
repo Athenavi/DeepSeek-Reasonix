@@ -105,7 +105,7 @@ func TestDeleteSessionDeletesCanonicalIdentity(t *testing.T) {
 	}
 	t.Cleanup(ctrl.Close)
 	t.Cleanup(func() { _ = service.CloseAll(context.Background()) })
-	srv := httptest.NewServer(newLifecycleTestServer(t, ctrl, NewBroadcaster(), config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(newLifecycleTestServer(t, ctrl, NewBroadcaster(), config.ServeConfig{})))
 	defer srv.Close()
 	post := func(body string) int {
 		resp, err := http.Post(srv.URL+"/delete-session", "application/json", strings.NewReader(body))
@@ -548,7 +548,7 @@ func newMigratedDeleteFixture(t *testing.T, canonicalIDs ...string) *migratedDel
 	t.Cleanup(ctrl.Close)
 	t.Cleanup(func() { _ = service.CloseAll(context.Background()) })
 	srv := newLifecycleTestServer(t, ctrl, NewBroadcaster(), config.ServeConfig{})
-	ts := httptest.NewServer(srv.Handler())
+	ts := httptest.NewServer(operatorHandler(srv))
 	t.Cleanup(ts.Close)
 	return &migratedDeleteFixture{t: t, srv: srv, url: ts.URL, legacyDir: legacyDir, v4Root: v4Root, service: service}
 }

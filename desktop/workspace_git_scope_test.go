@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"reasonix/internal/gitcmd"
 )
 
 func gitScopeRepo(t *testing.T) string {
@@ -17,7 +19,7 @@ func gitScopeRepo(t *testing.T) string {
 		{"-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "init"},
 		{"branch", "shared"},
 	} {
-		if out, err := workspaceGit(append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
+		if out, err := gitcmd.Command(context.Background(), root, args...).CombinedOutput(); err != nil {
 			t.Fatalf("git fixture: %v: %s", err, out)
 		}
 	}
@@ -34,7 +36,7 @@ func TestWorkspaceGitBranchScope(t *testing.T) {
 	if err != nil || !slices.Contains(list, "shared") {
 		t.Fatalf("branches: %v, %v", list, err)
 	}
-	base, err := a.gitWorkspaceBaseForTab("a", rootA)
+	base, err := a.gitWorkspaceRepoForTab("a", rootA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,13 +47,13 @@ func TestWorkspaceGitBranchScope(t *testing.T) {
 	if err := workspaceCheckoutBranch(base, "shared", false); err != nil {
 		t.Fatal(err)
 	}
-	if workspaceGitBranch(rootA) != "shared" || workspaceGitBranch(rootB) != "main" {
+	if workspaceGitBranch(openWorkspaceRepo(rootA)) != "shared" || workspaceGitBranch(openWorkspaceRepo(rootB)) != "main" {
 		t.Fatal("checkout changed the replacement workspace")
 	}
 	if err := a.GitCreateBranchForTab("b", rootB, "new-branch"); err != nil {
 		t.Fatal(err)
 	}
-	if workspaceGitBranch(rootA) != "shared" || workspaceGitBranch(rootB) != "new-branch" {
+	if workspaceGitBranch(openWorkspaceRepo(rootA)) != "shared" || workspaceGitBranch(openWorkspaceRepo(rootB)) != "new-branch" {
 		t.Fatal("create crossed project boundaries")
 	}
 	if err := a.GitCheckoutForTab("a", rootB, "--detach"); err == nil {
@@ -117,7 +119,7 @@ func TestWorkspaceTallyBudgetAndFileKinds(t *testing.T) {
 	for i := range paths {
 		paths[i] = "large"
 	}
-	added, _, partial := workspaceGitDiffTally(context.Background(), base, paths)
+	added, _, partial := workspaceGitDiffTally(context.Background(), openWorkspaceRepo(base), paths)
 	if added != workspaceDiffTallyReadLimit/2 || !partial {
 		t.Fatalf("aggregate budget: %d, %v", added, partial)
 	}

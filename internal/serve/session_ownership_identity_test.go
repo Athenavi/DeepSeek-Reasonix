@@ -95,7 +95,7 @@ func TestIdentityHandoffReleasesWriterAndOwnershipTracks(t *testing.T) {
 	_, ctrl, service, current := newExclusiveSessionServe(t)
 	root := identityRoot(t, service, current)
 	lifecycle := newIdentityLifecycleServe(t, ctrl, current)
-	ts := httptest.NewServer(lifecycle.Handler())
+	ts := httptest.NewServer(operatorHandler(lifecycle))
 	defer ts.Close()
 	route := "session-id:" + current.SessionID
 
@@ -157,7 +157,7 @@ func TestIdentityHandoffReleasesWriterAndOwnershipTracks(t *testing.T) {
 func TestIdentityResumeMountsSpectatorWhenWriterHeld(t *testing.T) {
 	_, ctrl, service, current := newExclusiveSessionServe(t)
 	root := identityRoot(t, service, current)
-	ts := httptest.NewServer(newLifecycleTestServer(t, ctrl, NewBroadcaster(), config.ServeConfig{}).Handler())
+	ts := httptest.NewServer(operatorHandler(newLifecycleTestServer(t, ctrl, NewBroadcaster(), config.ServeConfig{})))
 	defer ts.Close()
 	route := "session-id:" + current.SessionID
 
@@ -208,7 +208,7 @@ func TestIdentityAdoptRegistersWriterAfterServeRestart(t *testing.T) {
 	_, ctrl, service, current := newExclusiveSessionServe(t)
 	root := identityRoot(t, service, current)
 	lifecycle := newLifecycleTestServer(t, ctrl, NewBroadcaster(), config.ServeConfig{})
-	ts := httptest.NewServer(lifecycle.Handler())
+	ts := httptest.NewServer(operatorHandler(lifecycle))
 	defer ts.Close()
 	defer retireExclusiveForeground(t, ctrl, service)
 	route := "session-id:" + current.SessionID
@@ -245,7 +245,7 @@ func TestIdentityReclaimReattachesForeground(t *testing.T) {
 	_, ctrl, service, current := newExclusiveSessionServe(t)
 	root := identityRoot(t, service, current)
 	lifecycle := newIdentityLifecycleServe(t, ctrl, current)
-	ts := httptest.NewServer(lifecycle.Handler())
+	ts := httptest.NewServer(operatorHandler(lifecycle))
 	defer ts.Close()
 	route := "session-id:" + current.SessionID
 
@@ -298,7 +298,7 @@ func TestIdentityReclaimReattachesForeground(t *testing.T) {
 // the serve cannot release.
 func TestIdentityHandoffRefusesForeignHolder(t *testing.T) {
 	_, ctrl, service, _ := newExclusiveSessionServe(t)
-	ts := httptest.NewServer(newLifecycleTestServer(t, ctrl, NewBroadcaster(), config.ServeConfig{}).Handler())
+	ts := httptest.NewServer(operatorHandler(newLifecycleTestServer(t, ctrl, NewBroadcaster(), config.ServeConfig{})))
 	defer ts.Close()
 	resp, raw := serveBody(t, http.MethodPost, ts.URL+"/handoff", `{"sessionPath":"session-id:does-not-exist","targetWriterId":"taker","force":true}`)
 	if resp.StatusCode != http.StatusBadRequest {
@@ -348,7 +348,7 @@ func TestIdentityMirrorEndAcceptsLiveWriter(t *testing.T) {
 	_, ctrl, service, current := newExclusiveSessionServe(t)
 	root := identityRoot(t, service, current)
 	lifecycle := newIdentityLifecycleServe(t, ctrl, current)
-	ts := httptest.NewServer(lifecycle.Handler())
+	ts := httptest.NewServer(operatorHandler(lifecycle))
 	defer ts.Close()
 	route := "session-id:" + current.SessionID
 	grant := handoffIdentityForTest(t, ts.URL, route)
@@ -382,7 +382,7 @@ func TestIdentityMirrorEndReclaimsOnceWriterReleases(t *testing.T) {
 	_, ctrl, service, current := newExclusiveSessionServe(t)
 	root := identityRoot(t, service, current)
 	lifecycle := newIdentityLifecycleServe(t, ctrl, current)
-	ts := httptest.NewServer(lifecycle.Handler())
+	ts := httptest.NewServer(operatorHandler(lifecycle))
 	defer ts.Close()
 	route := "session-id:" + current.SessionID
 	grant := handoffIdentityForTest(t, ts.URL, route)
@@ -424,7 +424,7 @@ func TestIdentityMirrorEndReclaimsOnceWriterReleases(t *testing.T) {
 func TestHistoryIdentityRouteDetectsRuntimeChangeDuringRead(t *testing.T) {
 	_, ctrl, service, current := newExclusiveSessionServe(t)
 	lifecycle := newIdentityLifecycleServe(t, ctrl, current)
-	ts := httptest.NewServer(lifecycle.Handler())
+	ts := httptest.NewServer(operatorHandler(lifecycle))
 	defer ts.Close()
 	defer retireExclusiveForeground(t, ctrl, service)
 	route := "session-id:" + current.SessionID
@@ -458,7 +458,7 @@ func TestHistoryIdentityRouteDetectsRuntimeChangeDuringRead(t *testing.T) {
 func TestIdentityStatusAnswersFreeWriterWithRouteMatch(t *testing.T) {
 	_, ctrl, service, current := newExclusiveSessionServe(t)
 	lifecycle := newIdentityLifecycleServe(t, ctrl, current)
-	ts := httptest.NewServer(lifecycle.Handler())
+	ts := httptest.NewServer(operatorHandler(lifecycle))
 	defer ts.Close()
 	route := "session-id:" + current.SessionID
 
@@ -511,7 +511,7 @@ func countSessions(t *testing.T, url string) int {
 func TestIdentityHandoffDoesNotPersistReplacementSession(t *testing.T) {
 	_, ctrl, service, current := newExclusiveSessionServe(t)
 	lifecycle := newIdentityLifecycleServe(t, ctrl, current)
-	ts := httptest.NewServer(lifecycle.Handler())
+	ts := httptest.NewServer(operatorHandler(lifecycle))
 	defer ts.Close()
 	defer retireExclusiveForeground(t, ctrl, service)
 	route := "session-id:" + current.SessionID
@@ -557,7 +557,7 @@ func TestIdentityHandoffRefusesTurnAdmittedAfterQuietProbe(t *testing.T) {
 	})
 	root := identityRoot(t, service, current)
 	lifecycle := newIdentityLifecycleServe(t, ctrl, current)
-	ts := httptest.NewServer(lifecycle.Handler())
+	ts := httptest.NewServer(operatorHandler(lifecycle))
 	defer ts.Close()
 	defer retireExclusiveForeground(t, ctrl, service)
 	route := "session-id:" + current.SessionID
@@ -598,7 +598,7 @@ func TestIdentityHandoffRefusesTurnAdmittedAfterQuietProbe(t *testing.T) {
 func TestIdentityHandoffRefusesFinalizingRuntimeAndRecovers(t *testing.T) {
 	_, ctrl, service, current := newExclusiveSessionServe(t)
 	lifecycle := newIdentityLifecycleServe(t, ctrl, current)
-	ts := httptest.NewServer(lifecycle.Handler())
+	ts := httptest.NewServer(operatorHandler(lifecycle))
 	defer ts.Close()
 	defer retireExclusiveForeground(t, ctrl, service)
 	route := "session-id:" + current.SessionID
@@ -663,7 +663,7 @@ func TestIdentityOwnershipCoversDetachedHolder(t *testing.T) {
 	_, ctrl, service, current := newExclusiveSessionServe(t)
 	root := identityRoot(t, service, current)
 	lifecycle := newIdentityLifecycleServe(t, ctrl, current)
-	ts := httptest.NewServer(lifecycle.Handler())
+	ts := httptest.NewServer(operatorHandler(lifecycle))
 	defer ts.Close()
 	defer retireExclusiveForeground(t, ctrl, service)
 

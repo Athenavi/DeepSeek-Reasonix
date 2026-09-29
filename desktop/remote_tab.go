@@ -442,10 +442,17 @@ func (a *App) clearRemotePendingEvent(tabID, kind, callID string) {
 
 // serveGet fetches a JSON member of the tab snapshot, returning the raw
 // payload for verbatim passthrough.
-func serveGet(ctx context.Context, client *http.Client, url string) (json.RawMessage, error) {
+func serveGet(ctx context.Context, client *http.Client, url string, expectedPath ...string) (json.RawMessage, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
+	}
+	if len(expectedPath) != 0 && strings.TrimSpace(expectedPath[0]) != "" {
+		if sessionID, ok := strings.CutPrefix(expectedPath[0], remoteSessionIDRoutePrefix); ok {
+			req.Header.Set(expectedSessionIDHeader, sessionID)
+		} else {
+			req.Header.Set(expectedSessionPathHeader, expectedPath[0])
+		}
 	}
 	resp, err := client.Do(req)
 	if err != nil {

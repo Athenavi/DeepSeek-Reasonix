@@ -40,6 +40,7 @@ import (
 	"reasonix/internal/extension/providerext"
 	"reasonix/internal/extension/sidecar"
 	"reasonix/internal/extension/uihub"
+	"reasonix/internal/gitcmd"
 	"reasonix/internal/guardian"
 	"reasonix/internal/history"
 	"reasonix/internal/hook"
@@ -234,6 +235,7 @@ type Options struct {
 	WorkspaceOnly          bool
 	PinnedContextLoader    control.PinnedContextLoader
 	SessionTemp            *sessiontemp.Manager // session-private temp manager; Rebuild reuses old's
+	WorkspaceRepo          gitcmd.Repo          // git identity the session opened with; Rebuild reuses old's
 	PersistentShell        *persistentshell.Manager
 	RuntimeReload
 	// deferPublish keeps a replacement generation private until migration and
@@ -256,7 +258,8 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 	if stderr == nil {
 		stderr = os.Stderr
 	}
-	root := resolveWorkspaceRoot(opts.WorkspaceRoot)
+	root := ResolveWorkspaceRoot(opts.WorkspaceRoot)
+	repo := workspaceRepo(ctx, opts.WorkspaceRepo, root)
 	additionalDirs, err := normalizeAdditionalDirs(root, opts.AdditionalDirs)
 	if err != nil {
 		return nil, err
@@ -787,6 +790,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 		OAuthHTTPClient:       balanceClient,
 	}
 	autoStartEntries := cfg.EnabledPlugins(root, config.DefaultMCPActivationStore())
+	emitProjectMCPDecisionNotice(sink, cfg, root)
 	enabledMCPNames := make(map[string]bool, len(autoStartEntries))
 	for _, enabled := range autoStartEntries {
 		if name := strings.TrimSpace(enabled.Name); name != "" {
@@ -979,7 +983,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 		return addTools(reg, lsp.Tools(lspMgr))
 	}
 	if cfg.LSP.Enabled {
-		lspMgr = lsp.NewManager(root, LSPSpecs(cfg.LSP))
+		lspMgr = lsp.NewManager(root, verifiedLSPSpecs(cfg))
 		addLSPTools()
 		prev := cleanup
 		cleanup = func() { prev(); lspMgr.Close() }
@@ -1005,6 +1009,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 	// inherit this same gate.
 	policy := permission.New(cfg.Permissions.Mode, cfg.Permissions.Allow, cfg.Permissions.Ask, cfg.Permissions.Deny).
 		WithSessionAllow(opts.PermissionAllow)
+	emitUnmatchableRuleNotice(sink, cfg.Permissions.Allow, cfg.Permissions.Ask, cfg.Permissions.Deny)
 	headlessGate := control.NewSharedHeadlessGate(policy, opts.HeadlessApprovalMode)
 
 	var resolvedHooks []hook.ResolvedHook
@@ -1886,6 +1891,7 @@ func build(ctx context.Context, opts Options) (*BuildResult, error) {
 		},
 		CapabilityRuntime:      capRuntime,
 		WorkspaceRoot:          root,
+		WorkspaceRepo:          repo,
 		ExternalFolderToolRefs: readPathResolver,
 		ResponseLanguage:       cfg.ResponseLanguage(),
 		ReasoningLanguage:      config.ReasoningLanguageForEntry(entry, cfg.ReasoningLanguage()),
@@ -2089,39 +2095,28 @@ func effectivePlannerModel(cfg *config.Config, opts Options) string {
 	return strings.TrimSpace(cfg.Agent.PlannerModel)
 }
 
+// rememberPermissionRule files a workspace's "always" under the user's home:
+// the checkout's reasonix.toml cannot grant allow rules, since a clone could
+// have written them.
 func rememberPermissionRule(workspaceRoot, rule string) control.RememberResult {
-	path := rememberPermissionConfigPath(workspaceRoot)
-	result := control.RememberResult{Rule: strings.TrimSpace(rule), Path: path}
-	unlock, err := config.LockConfigFileEdits(path)
-	if err != nil {
-		slog.Warn("lock config for permission rule", "path", path, "err", err)
-		result.Err = err
-		return result
+	store := config.NewProjectGrantStore(config.ReasonixHomeDir())
+	result := control.RememberResult{Rule: strings.TrimSpace(rule), Path: store.Path()}
+	root := strings.TrimSpace(workspaceRoot)
+	if root == "" {
+		root, _ = os.Getwd()
 	}
-	defer unlock()
-
-	edit, err := config.LoadForEditReadOnlyStrict(path)
-	if err != nil {
-		slog.Warn("load config for permission rule", "path", path, "err", err)
-		result.Err = err
-		return result
+	result.Err = store.Update(root, func(g config.ProjectGrant) (config.ProjectGrant, error) {
+		if coveredBy := coveredPermissionRule(g.Allow, result.Rule); coveredBy != "" {
+			result.CoveredBy = coveredBy
+			return g, nil
+		}
+		g.Allow = append(pruneCoveredPermissionRules(g.Allow, result.Rule), result.Rule)
+		return g, nil
+	})
+	if result.Err != nil {
+		slog.Warn("persist permission rule", "rule", rule, "err", result.Err)
 	}
-	if coveredBy := coveredPermissionRule(edit.Permissions.Allow, result.Rule); coveredBy != "" {
-		result.CoveredBy = coveredBy
-		return result
-	}
-	edit.Permissions.Allow = pruneCoveredPermissionRules(edit.Permissions.Allow, result.Rule)
-	if err := edit.AddPermissionRule("allow", rule); err != nil {
-		slog.Warn("persist permission rule", "rule", rule, "err", err)
-		result.Err = err
-		return result
-	}
-	if err := config.WritePermissionsAllow(path, edit.Permissions.Allow); err != nil {
-		slog.Warn("save config after permission rule", "err", err)
-		result.Err = err
-		return result
-	}
-	result.Saved = true
+	result.Saved = result.Err == nil && result.CoveredBy == ""
 	return result
 }
 
@@ -2289,7 +2284,9 @@ func currentWorkspacePromptLine(root string) string {
 	return "Current workspace: " + strconv.Quote(root)
 }
 
-func resolveWorkspaceRoot(explicit string) string {
+// ResolveWorkspaceRoot is the workspace a session in the current directory uses:
+// explicit, else the nearest git root, else the working directory.
+func ResolveWorkspaceRoot(explicit string) string {
 	if explicit != "" {
 		return explicit
 	}
@@ -2395,6 +2392,7 @@ func runtimeForbidReadRootsForGOOS(cfg *config.Config, root, goos string) []stri
 	if goos == "windows" {
 		return append([]string(nil), base...)
 	}
+	base = appendUniquePaths(base, config.HostSecretReadRoots()...)
 	credentialPath := strings.TrimSpace(config.UserCredentialsPath())
 	if credentialPath == "" {
 		return append([]string(nil), base...)

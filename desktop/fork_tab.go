@@ -66,7 +66,8 @@ func (a *App) forkForTabWithOptions(tabID string, turn int, isolateWorkspace boo
 		if scope != "project" || strings.TrimSpace(srcRoot) == "" {
 			result.FallbackToShared = true
 		} else {
-			avail := inspectDeliveryWorktree(a.bootContext(), srcRoot)
+			srcRepo, _ := workspaceRepo(srcRoot, ctrl)
+			avail := inspectDeliveryWorktree(a.bootContext(), srcRepo)
 			if !avail.Available {
 				result.FallbackToShared = true
 			} else if avail.SourceDirty {
@@ -80,7 +81,7 @@ func (a *App) forkForTabWithOptions(tabID string, turn int, isolateWorkspace boo
 						return worktree.Result{}, err
 					}
 					defer releaseAdmission()
-					return createDeliveryWorktree(a.bootContext(), srcRoot, config.DeliveryWorktreeDir())
+					return createDeliveryWorktree(a.bootContext(), srcRepo, config.DeliveryWorktreeDir())
 				}()
 				if createErr != nil {
 					return ForkWorktreeResultView{}, fmt.Errorf("create isolated fork worktree: %w", createErr)
@@ -280,7 +281,9 @@ func (a *App) openForkedSessionTabWithWorkspace(sourceTab *WorkspaceTab, locator
 		if err := prependTopicInProjectsFile(workspaceRoot, topicID, true); err != nil {
 			slog.Warn("desktop: persist isolated fork topic", "workspace", workspaceRoot, "topic", topicID, "err", err)
 		}
-		a.registerProjectRoot(workspaceRoot)
+		if err := a.registerProjectRoot(workspaceRoot); err != nil {
+			return forkedSessionTabOpen{}, err
+		}
 	}
 	if hook := forkTabBeforePublishHookForTest.Load(); hook != nil {
 		(*hook)()

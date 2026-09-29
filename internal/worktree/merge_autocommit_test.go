@@ -14,7 +14,7 @@ func TestMergeBackRejectsSplitIndexWithoutLosingEitherVersion(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestMergeBackRejectsSplitIndexWithoutLosingEitherVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	inspection := inspectMergeTest(t, created.WorktreeRoot, managed)
-	_, indexBefore, err := snapshotRealIndex(context.Background(), created.WorktreeRoot)
+	_, indexBefore, err := snapshotRealIndex(context.Background(), opened(t, created.WorktreeRoot))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestMergeBackRejectsSplitIndexWithoutLosingEitherVersion(t *testing.T) {
 	if got := gitTest(t, created.WorktreeRoot, "rev-parse", "HEAD"); got != inspection.WorktreeHead {
 		t.Fatalf("split index advanced HEAD to %s", got)
 	}
-	_, indexAfter, err := snapshotRealIndex(context.Background(), created.WorktreeRoot)
+	_, indexAfter, err := snapshotRealIndex(context.Background(), opened(t, created.WorktreeRoot))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestMergeBackAutoCommitUsesExactTreeWithoutHooks(t *testing.T) {
 	}
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestMergeBackAutoCommitRejectsSameHeadBranchSwitchBeforeCAS(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestMergeBackAutoCommitPreservesIndexMutationAfterRefCAS(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}

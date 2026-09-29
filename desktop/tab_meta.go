@@ -2,6 +2,7 @@ package main
 
 import (
 	"reasonix/internal/control"
+	"reasonix/internal/gitcmd"
 	goaldomain "reasonix/internal/goal"
 	"reasonix/internal/session"
 )
@@ -75,6 +76,8 @@ type TabMeta struct {
 	ModelSettingsPending bool                         `json:"modelSettingsPending,omitempty"`
 	Active               bool                         `json:"active"`
 	Cwd                  string                       `json:"cwd"`
+	// repo is the tab session's git identity for WorkspaceRoot; never serialized.
+	repo gitcmd.Repo
 }
 
 // setAuthenticationMeta only exposes pending settings belonging to this runtime.

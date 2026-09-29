@@ -38,7 +38,7 @@ func TestNewSessionAfterResumeKeepsWritePath(t *testing.T) {
 	if err := server.SetSessionLeases(leases); err != nil {
 		t.Fatal(err)
 	}
-	srv := httptest.NewServer(server.Handler())
+	srv := httptest.NewServer(operatorHandler(server))
 	defer srv.Close()
 
 	resumeBody, _ := json.Marshal(map[string]string{"path": bPath})

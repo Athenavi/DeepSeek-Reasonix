@@ -52,6 +52,23 @@ non-destructively when `<Reasonix home>/.env` is missing them.
 `<state root>` defaults to `<Reasonix home>`. It only differs when
 `REASONIX_STATE_HOME` is set.
 
+Desktop detects a project-directory name collision when it saves a newly added
+project in `desktop-projects.json`. A new assignment is made only when another
+recorded project still resolves to the same legacy directory. Existing projects
+and projects imported from older workspace records keep their current
+`<state root>/projects/<workspace slug>/` directory. Re-adding the original
+project after its colliding peer was assigned elsewhere also keeps that legacy
+directory. Only a newly added project that meets the collision rule uses
+`<state root>/projects/@<SHA-256 of its absolute root>/`; its `.workspace-root`
+file records the assignment. Session, topic, and project-memory paths follow
+that assignment. Listing a project never creates or changes an assignment, and
+existing files are never moved. If two projects were already recorded with the
+same slug before this fix, their historical shared files remain in place: the
+old directory does not identify which project owns each file.
+Studio currently resolves only `<state root>/projects/<workspace slug>/` and does
+not read `.workspace-root`; a newly assigned project's state is therefore not
+shared with Studio until Studio supports these assignments.
+
 Desktop topic titles, title sources, creation times, and automatic-title state
 are authoritative in these SQLite files. On first access, Desktop imports the
 legacy `desktop-topic-*.json` files from a project's `.reasonix/` directory (or
@@ -175,9 +192,16 @@ what holds the name and asks again; Enter falls back to a
 private slot. If the name is claimed between the prompt and saving, the save is
 refused and nothing is written.
 
-Saving a new key later for a provider that uses a typed name moves that
-provider to a private slot; the old value stays under the typed name. Rotating
-in place is tracked in #11010.
+Saving a new key later for a provider in the user config rewrites its
+variable in place when that provider (or the set of providers the key is saved
+for) is the only reader of it in the user config, both before and after the
+edit, and the global `.env` already holds its value. A project that reads the
+same name sees the new key, as it saw the old one. Providers declared in a
+project `reasonix.toml` always get a private slot. The previous value is kept in the global `.env` under
+a temporary variable until the config is published: a save that fails or is
+interrupted puts it back, unless something else has written the variable since.
+When another provider or setting also reads the variable, the new key goes to a
+private slot as before and the shared variable is left unchanged.
 
 Existing configs are not rewritten on upgrade. If an old custom provider already
 uses `CUSTOM_API_KEY`, it will keep working with that key. If several old custom

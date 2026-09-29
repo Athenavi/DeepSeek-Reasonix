@@ -46,6 +46,7 @@ type mcpRuntimeServer struct {
 	entry      config.PluginEntry
 	spec       plugin.Spec
 	enabled    bool
+	decision   config.MCPDecision // why a disabled server is off
 	cached     []plugin.CachedTool
 	cacheKeyOK bool
 }
@@ -107,7 +108,7 @@ func (r *MCPCapabilityRuntime) ConfigureServers(entries []config.PluginEntry, sp
 	for _, entry := range entries {
 		name := strings.TrimSpace(entry.Name)
 		if name != "" {
-			byName[name] = runtimePluginEntry(entry)
+			byName[name] = entry
 		}
 	}
 	next := make(map[string]mcpRuntimeServer, len(specs))
@@ -125,11 +126,16 @@ func (r *MCPCapabilityRuntime) ConfigureServers(entries []config.PluginEntry, sp
 		if enabled != nil {
 			isEnabled = enabled[name]
 		}
+		decision := config.MCPDecisionOn
+		if ok {
+			decision = serverDecision(entry, spec, isEnabled)
+		}
 		cached, keyOK := cachedToolsForSpec(spec, r.hostProfile())
 		next[name] = mcpRuntimeServer{
-			entry:      entry,
+			entry:      runtimePluginEntry(entry),
 			spec:       spec,
 			enabled:    isEnabled,
+			decision:   decision,
 			cached:     cached,
 			cacheKeyOK: keyOK,
 		}
@@ -155,6 +161,7 @@ func (r *MCPCapabilityRuntime) UpsertServer(entry config.PluginEntry, raw plugin
 	if name == "" {
 		return
 	}
+	decision := serverDecision(entry, spec, enabled)
 	entry = runtimePluginEntry(entry)
 	if strings.TrimSpace(entry.Name) == "" {
 		entry.Name = name
@@ -165,6 +172,7 @@ func (r *MCPCapabilityRuntime) UpsertServer(entry config.PluginEntry, raw plugin
 		entry:      entry,
 		spec:       spec,
 		enabled:    enabled,
+		decision:   decision,
 		cached:     cached,
 		cacheKeyOK: keyOK,
 	}
@@ -189,6 +197,10 @@ func (r *MCPCapabilityRuntime) SetServerEnabled(name string, enabled bool) bool 
 	server, ok := r.servers[name]
 	if ok {
 		server.enabled = enabled
+		server.decision = config.MCPDecisionOff
+		if enabled {
+			server.decision = config.MCPDecisionOn
+		}
 		r.servers[name] = server
 	}
 	r.mu.Unlock()
@@ -1201,7 +1213,7 @@ func (t *UseCapabilityTool) lockAuthorizedRuntimeServer(ctx context.Context, ser
 	}
 	if !configured.enabled {
 		unlock()
-		return plugin.Spec{}, func() {}, mcpServerDisabledError(server)
+		return plugin.Spec{}, func() {}, mcpServerOffError(server, configured.decision)
 	}
 	spec := plugin.ResolveStoredAuthorization(ctx, cloneMCPSpec(configured.spec))
 	if !spec.ServerAuthorized() {

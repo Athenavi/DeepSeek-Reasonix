@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -26,11 +25,13 @@ type gitStatus struct {
 	Untracked int
 }
 
-func fetchGitStatus() tea.Cmd {
+// fetchGitStatus reads the status line through repo, the identity the session
+// resolved when it opened.
+func fetchGitStatus(repo gitcmd.Repo) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), gitStatusTimeout)
 		defer cancel()
-		status, err := loadGitStatus(ctx, "")
+		status, err := loadGitStatus(ctx, repo)
 		if err != nil {
 			return gitStatusMsg{}
 		}
@@ -38,21 +39,17 @@ func fetchGitStatus() tea.Cmd {
 	}
 }
 
-func loadGitStatus(ctx context.Context, cwd string) (gitStatus, error) {
-	return loadGitStatusWithRunner(ctx, cwd, runGit)
+func loadGitStatus(ctx context.Context, repo gitcmd.Repo) (gitStatus, error) {
+	return loadGitStatusWithRunner(ctx, repo, runGit)
 }
 
-func loadGitStatusWithRunner(ctx context.Context, cwd string, run func(context.Context, string, ...string) (string, error)) (gitStatus, error) {
-	root, err := run(ctx, cwd, "rev-parse", "--show-toplevel")
-	if err != nil {
-		return gitStatus{}, err
+func loadGitStatusWithRunner(ctx context.Context, repo gitcmd.Repo, run func(context.Context, gitcmd.Repo, ...string) (string, error)) (gitStatus, error) {
+	if !repo.Valid() {
+		return gitStatus{}, gitcmd.ErrNotRepository
 	}
-	root = strings.TrimSpace(root)
-	if root == "" {
-		return gitStatus{}, errors.New("empty git root")
-	}
+	root := repo.Top()
 
-	status := gitStatus{Repo: filepath.Base(root)}
+	status := gitStatus{Repo: filepath.Base(root.WorkTree)}
 	if branch, err := run(ctx, root, "symbolic-ref", "--quiet", "--short", "HEAD"); err == nil && strings.TrimSpace(branch) != "" {
 		status.Branch = strings.TrimSpace(branch)
 	} else if sha, err := run(ctx, root, "rev-parse", "--short", "HEAD"); err == nil && strings.TrimSpace(sha) != "" {
@@ -78,11 +75,8 @@ func loadGitStatusWithRunner(ctx context.Context, cwd string, run func(context.C
 	return status, nil
 }
 
-func runGit(ctx context.Context, cwd string, args ...string) (string, error) {
-	// cwd goes through gitcmd's dir parameter, not cmd.Dir, so the gitcmd
-	// baseline can resolve the repository's own config relative to it (the
-	// filter-driver neutralization reads <cwd>/.git/config).
-	cmd := gitcmd.Command(ctx, cwd, args...)
+func runGit(ctx context.Context, repo gitcmd.Repo, args ...string) (string, error) {
+	cmd := repo.Command(ctx, args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err

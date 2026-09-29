@@ -16,7 +16,7 @@ func TestInspectMergeUsesRecordedLinkedSource(t *testing.T) {
 	linked := filepath.Join(t.TempDir(), "source-linked")
 	gitTest(t, repo, "worktree", "add", "-b", "feature/source", linked, "HEAD")
 	managed := t.TempDir()
-	created, err := Create(context.Background(), linked, managed)
+	created, err := Create(context.Background(), opened(t, linked), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestMergeBackRequiresExplicitDirtyCommitAndFinalizesSeparately(t *testing.T
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestMergeBackRejectsTargetHeadDrift(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestMergeBackRejectsConfirmedWorktreeContentDrift(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestMergeBackPreservesStagingWhenContentChangesDuringAdd(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +167,7 @@ func TestMergeBackRejectsExtraCommitAfterAutoCommit(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestMergeBackStopsWhenSourceBranchChangesBeforePrepare(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestMergeBackReportsRecoveryRequiredWhenPreparedSourceDrifts(t *testing.T) 
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +241,7 @@ func TestMergeBackRechecksConflictAfterDirtyCommit(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +271,7 @@ func TestInspectMergeRejectsLegacyAndForgedMetadata(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +302,7 @@ func TestInspectMergeBlocksSourceBranchAndDirtyState(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,7 +327,7 @@ func TestFinalizeMergePreservesIgnoredContentAndSupportsRetry(t *testing.T) {
 	requireGit(t)
 	repo := initRepo(t)
 	managed := t.TempDir()
-	created, err := Create(context.Background(), repo, managed)
+	created, err := Create(context.Background(), opened(t, repo), managed)
 	if err != nil {
 		t.Fatal(err)
 	}

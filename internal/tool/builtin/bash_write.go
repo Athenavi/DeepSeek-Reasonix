@@ -179,7 +179,19 @@ var localFilePermissionDenied = regexp.MustCompile(`(?m)^(?:bash|zsh|sh|dash|fis
 var windowsChildProcessDenied = regexp.MustCompile(`\b(?:spawn(?:sync)?|exec(?:file|sync)?)\s+eperm\b`)
 
 func appendSandboxWriteHint(out string, err error, p bashParams, spec sandbox.Spec, preset, workDir string) string {
-	if !spec.Enforce() || strings.TrimSpace(preset) == string(permissionpreset.DangerFullAccess) || !looksLikeSandboxWriteDenial(out, err) {
+	if !spec.Enforce() || strings.TrimSpace(preset) == string(permissionpreset.DangerFullAccess) {
+		return out
+	}
+	// git reports some refused config writes and still exits 0, so the note
+	// rides on the protected path's identity, not on the exit status.
+	if named := gitMetadataNamedIn(out, spec, workDir); len(named) > 0 {
+		hint := gitMetadataDeniedHint(named)
+		if denialID := sandbox.IssueDenial(p.Command, preset); denialID != "" {
+			hint += " If the user asked for exactly this change, request danger-full-access for this exact retry with denial_id " + denialID + "."
+		}
+		return appendSessionDataHint(out, hint)
+	}
+	if !looksLikeSandboxWriteDenial(out, err) {
 		return out
 	}
 	hint := bashWriteDeniedHint()
@@ -195,6 +207,62 @@ func appendSandboxWriteHint(out string, err error, p bashParams, spec sandbox.Sp
 		hint += " If the command cannot be expressed with additional_write_dirs, request danger-full-access for this exact retry with denial_id " + denialID + "."
 	}
 	return appendSessionDataHint(out, hint)
+}
+
+// gitMetadataNamedIn returns the protected Git metadata paths a failed
+// command's output names, spelled as it names them. The paths are the host's
+// own identities; nothing here reads the wording around them.
+func gitMetadataNamedIn(output string, spec sandbox.Spec, workDir string) []string {
+	var named []string
+	for _, path := range sandbox.GitMetadataPaths(spec) {
+		for _, spelling := range gitMetadataSpellings(path, workDir) {
+			if containsPathToken(output, spelling) {
+				named = append(named, spelling)
+				break
+			}
+		}
+	}
+	return named
+}
+
+// containsPathToken reports whether path occurs in output as a whole path, not
+// as the tail or prefix of a longer one: `.git` inside `main/.git/objects` is
+// not the workspace's `.git`. A directory spelling ends in a separator.
+func containsPathToken(output, path string) bool {
+	dirSpelling := strings.HasSuffix(path, string(filepath.Separator))
+	for from := 0; ; {
+		i := strings.Index(output[from:], path)
+		if i < 0 {
+			return false
+		}
+		start, end := from+i, from+i+len(path)
+		if (start == 0 || !isPathByte(output[start-1])) && (dirSpelling || end == len(output) || !isPathByte(output[end])) {
+			return true
+		}
+		from = start + 1
+	}
+}
+
+func isPathByte(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.IndexByte("._-/\\~", c) >= 0
+}
+
+func gitMetadataSpellings(path, workDir string) []string {
+	out := []string{path}
+	if base, err := sandbox.ResolveAbsPath(workDir); err == nil {
+		if rel, err := filepath.Rel(base, path); err == nil && filepath.IsLocal(strings.TrimSuffix(rel, string(filepath.Separator))) {
+			if strings.HasSuffix(path, string(filepath.Separator)) {
+				rel += string(filepath.Separator)
+			}
+			out = append(out, rel)
+		}
+	}
+	return out
+}
+
+func gitMetadataDeniedHint(named []string) string {
+	return "[host] " + sandbox.GitMetadataDeniedCode + ": " + strings.Join(named, ", ") +
+		" is Git configuration or hooks that the host's own git reads, so the sandbox keeps it read-only; a write there did not happen even if the command exited 0. additional_write_dirs cannot grant it, and everything else under .git stays writable."
 }
 
 func gitWorktreeWriteDirs(workDir, output string, writeRoots []string) []string {

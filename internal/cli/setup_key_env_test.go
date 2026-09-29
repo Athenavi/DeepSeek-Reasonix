@@ -200,3 +200,23 @@ func TestSetupRefusesATypedNameTheEnvironmentSets(t *testing.T) {
 		})
 	}
 }
+
+func TestSetupRotatesAKeyUnderATypedNameInPlace(t *testing.T) {
+	typed := config.ProviderEntry{Name: "opencode", Kind: "openai", BaseURL: opencodeBaseURL, Model: "chat", APIKeyEnv: "CUSTOM_OPENCODE_AI_API_KEY"}
+	s, path := newKeyEnvTestSession(t, func(c *config.Config) { c.Providers = append(c.Providers, typed) })
+	if _, err := config.SetCredential("CUSTOM_OPENCODE_AI_API_KEY", "sk-old"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.setCredentialForProviders([]string{"opencode"}, "CUSTOM_OPENCODE_AI_API_KEY", "sk-new"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := commitProviderSetupSession(s, path); err != nil {
+		t.Fatal(err)
+	}
+	if got := savedKeyEnv(t, path, "opencode"); got != "CUSTOM_OPENCODE_AI_API_KEY" {
+		t.Fatalf("api_key_env = %q, want the typed name kept", got)
+	}
+	if res := config.ResolveCredentialForRootGlobalFirst(".", "CUSTOM_OPENCODE_AI_API_KEY"); res.Value != "sk-new" {
+		t.Fatalf("typed variable holds %q after rotation, want the new key", res.Value)
+	}
+}

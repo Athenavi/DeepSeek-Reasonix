@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -29,7 +28,7 @@ import (
 	"reasonix/internal/config"
 	"reasonix/internal/control"
 	"reasonix/internal/event"
-	"reasonix/internal/hook"
+	"reasonix/internal/gitcmd"
 	"reasonix/internal/i18n"
 	"reasonix/internal/memory"
 	"reasonix/internal/migration"
@@ -350,6 +349,10 @@ type chatTUI struct {
 	// toggle's non-persistent semantics.
 	mcp         *mcpManager
 	mcpDisabled map[string]bool
+	// mcpConnecting holds servers whose connect runs off the UI loop. It lives
+	// here, not on the manager, so closing and reopening /mcp cannot start a
+	// second handshake for the same server.
+	mcpConnecting map[string]bool
 
 	// clearConfirm is the destructive "/clear" confirmation overlay. It is separate
 	// from /new because /clear discards the current transcript instead of saving it.
@@ -534,61 +537,24 @@ type elapsedTickMsg struct{ generation uint64 }
 // formatted readout ("" when none/failed).
 type balanceMsg struct{ text string }
 
-// statuslineMsg carries the latest custom status-line output (one line, ""
-// when none/failed).
-type statuslineMsg struct{ out string }
-
 // gitStatusMsg carries the latest lightweight git readout for the built-in
 // status line. Empty means "not a git worktree" or "git unavailable".
 type gitStatusMsg struct{ status gitStatus }
-
-// runStatusline runs the user's custom status-line command off the event loop,
-// feeding it a small JSON context on stdin and returning its first stdout line.
-// A no-op (nil) when no command is configured. Tight timeout so a slow script
-// can't stall the UI; failures collapse to an empty line rather than an error.
-func (m chatTUI) runStatusline() tea.Cmd {
-	cmd := m.statuslineCmd
-	if cmd == "" {
-		return nil
-	}
-	used, window := m.ctrl.ContextSnapshot()
-	cwd, _ := os.Getwd()
-	payload, _ := json.Marshal(map[string]any{
-		"model":         m.label,
-		"contextUsed":   used,
-		"contextWindow": window,
-		"cwd":           cwd,
-	})
-	return func() tea.Msg { return statuslineMsg{out: runStatuslineCmd(cmd, string(payload))} }
-}
-
-const statuslineCommandTimeout = 2 * time.Second
-
-// runStatuslineCmd runs a status-line command with the JSON context on stdin and
-// returns its first stdout line (status lines are a single row). A tight timeout
-// keeps a slow script from stalling the UI; any failure collapses to "".
-func runStatuslineCmd(cmd, stdinPayload string) string {
-	return runStatuslineCmdWithTimeout(cmd, stdinPayload, statuslineCommandTimeout)
-}
-
-func runStatuslineCmdWithTimeout(cmd, stdinPayload string, timeout time.Duration) string {
-	res := hook.DefaultSpawner(context.Background(), hook.SpawnInput{
-		Command: cmd,
-		Stdin:   stdinPayload + "\n",
-		Timeout: timeout,
-	})
-	out := strings.TrimSpace(res.Stdout)
-	if i := strings.IndexByte(out, '\n'); i >= 0 {
-		out = strings.TrimSpace(out[:i])
-	}
-	return out
-}
 
 func (m chatTUI) refreshGitStatus() tea.Cmd {
 	if m.statuslineCmd != "" {
 		return nil
 	}
-	return fetchGitStatus()
+	return fetchGitStatus(sessionWorkspaceRepo(m.ctrl))
+}
+
+// sessionWorkspaceRepo is the git identity ctrl's session opened with; a
+// controller that carries none has no status line to read.
+func sessionWorkspaceRepo(ctrl control.SessionAPI) gitcmd.Repo {
+	if c, ok := ctrl.(interface{ WorkspaceRepo() gitcmd.Repo }); ok {
+		return c.WorkspaceRepo()
+	}
+	return gitcmd.Repo{}
 }
 
 // modelSwitchMsg carries the result of an async /model switch. A nil err means
@@ -1984,7 +1950,12 @@ func (m chatTUI) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case mcpExternalDoneMsg:
-		m.handleMCPExternalDone(msg)
+		if cmd := m.handleMCPExternalDone(msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+	case mcpConnectDoneMsg:
+		m.handleMCPConnectDone(msg)
 
 	case refsResolvedMsg:
 		for _, e := range msg.errs {
@@ -4645,6 +4616,9 @@ func (m *chatTUI) runMCPSubcommand(input string) {
 			m.notice("usage: /mcp connect <name>")
 			return
 		}
+		if m.mcpConnectBusy(args[2]) {
+			return
+		}
 		n, err := m.ctrl.ConnectConfiguredMCPServer(args[2])
 		if err != nil {
 			m.notice("mcp connect: " + err.Error())
@@ -4658,6 +4632,9 @@ func (m *chatTUI) runMCPSubcommand(input string) {
 			return
 		}
 		name := args[2]
+		if m.mcpConnectBusy(name) {
+			return
+		}
 		disconnected, err := m.ctrl.RemoveMCPServer(name)
 		if err != nil {
 			m.notice("mcp remove: " + err.Error())

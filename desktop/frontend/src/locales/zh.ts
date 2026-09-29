@@ -7,6 +7,7 @@ import type { DictKey } from "./en";
 export const zh: Record<DictKey, string> = {
   "error.unknown": "操作出现问题，请展开详情查看原始报错。",
   "error.connection": "无法连接服务，请检查网络、代理和服务地址。",
+  "error.transportProtocol": "HTTP/2 连接发生协议错误，请检查服务端或代理的兼容性，展开详情可查看错误信息。",
   "error.dns": "无法解析服务器地址，请检查地址和 DNS 设置。",
   "error.interrupted": "连接意外中断，请检查网络或服务状态后再试。",
   "error.timeout": "请求超时，请检查服务和网络连接后再试。",
@@ -3024,6 +3025,8 @@ export const zh: Record<DictKey, string> = {
   "settings.hooksPathUnavailable": "没有可用的项目设置文件",
   "settings.hooksGlobalHint": "保存为全局配置。重启 Reasonix 后加载新的 hooks。",
   "settings.hooksProjectHint": "保存在当前工作区。重启 Reasonix 后加载新的 hooks。",
+  "settings.hooksAwaitingApproval": "这些 hooks 随工作区而来，在你批准当前内容之前不会运行；之后有任何改动都需要重新批准。",
+  "settings.hooksApprove": "批准",
   "settings.hooksJsonTitle": "JSON 配置",
   "settings.hooksJsonHint": "直接编辑 settings.json 中的 {\"hooks\": ...}。也支持粘贴带 event 字段的 hook 数组；保存前会校验并格式化。",
   "settings.hooksJsonCopy": "复制 JSON",

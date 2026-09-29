@@ -33,7 +33,7 @@ func TestServeRecoveryEndpointsFailClosedAndExposeRuntime(t *testing.T) {
 	ctrl := control.New(control.Options{Sink: bc})
 	ctrl.SetGoal("ship remote parity")
 	api := &pendingPromptAPI{SessionAPI: ctrl}
-	srv := httptest.NewServer(New(api, bc, config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(New(api, bc, config.ServeConfig{})))
 	defer srv.Close()
 
 	resp, err := http.Get(srv.URL + "/pending-prompts")

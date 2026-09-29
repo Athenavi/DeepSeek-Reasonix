@@ -48,7 +48,7 @@ func (a *Agent) commitSummaryProjection(ctx context.Context, commit summaryProje
 		a.sess.compactionState.Projection.ProjectionVersion != commit.projectionVersion ||
 		a.sess.compactionState.Generation != commit.generation {
 		a.sess.compactionMu.Unlock()
-		return CompactionState{}, errCompressStaleContext
+		return CompactionState{}, summaryError(errCompressStaleContext)
 	}
 	prev := a.sess.compactionState
 	a.sess.compactionState = state
@@ -59,14 +59,14 @@ func (a *Agent) commitSummaryProjection(ctx context.Context, commit summaryProje
 		if accepted {
 			a.sess.checkpointState = "pending"
 			a.sess.compactionMu.Unlock()
-			return CompactionState{}, fmt.Errorf("persist projection: %w", err)
+			return CompactionState{}, &compactionPersistenceError{fmt.Errorf("persist projection: %w", err)}
 		}
 		a.sess.compactionState = prev
 		a.sess.compactionMu.Unlock()
 		if errors.Is(err, errCompressStaleContext) {
 			return CompactionState{}, err
 		}
-		return CompactionState{}, fmt.Errorf("persist projection: %w", err)
+		return CompactionState{}, &compactionPersistenceError{fmt.Errorf("persist projection: %w", err)}
 	}
 	a.sess.checkpointState = "applied"
 	if commit.activeTurn != 0 && commit.trigger != CompactionTriggerManual {

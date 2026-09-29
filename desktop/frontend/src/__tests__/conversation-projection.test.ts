@@ -25,7 +25,7 @@ const background = [{ id: "local-runtime" }] as unknown as BackgroundRuntimeView
 const view = projectConversation({ local, remote, tab, activeTabId: tab.id, backgroundRuntimes: background, connectingLabel: "connecting" });
 assert.equal(view.runtime, remote.transcript, "projection shares the canonical state and message arrays");
 assert.equal(view.context.items, remote.transcript.items);
-assert.equal(view.context.tabId, undefined, "remote context cannot fetch local telemetry");
+assert.equal(view.context.tabId, tab.id, "remote context reads the selected remote tab");
 assert.equal(view.composer.modelLabel, "remote-model");
 assert.equal(view.composer.cwd, "remote-cwd");
 assert.equal(view.composer.turnTokens, 7);

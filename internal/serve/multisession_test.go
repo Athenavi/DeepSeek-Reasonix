@@ -206,7 +206,7 @@ func TestBusyNewRejectsUntaggedLegacyController(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := control.New(control.Options{Runner: blockingRunner{}, Sink: bc, SessionDir: dir, SessionPath: path})
 	server := New(ctrl, bc, config.ServeConfig{})
-	httpServer := httptest.NewServer(server.Handler())
+	httpServer := httptest.NewServer(operatorHandler(server))
 	defer httpServer.Close()
 	defer ctrl.Close()
 	ctrl.Submit("keep running")
@@ -269,7 +269,7 @@ func TestEventsReplayUsesControllerCapturedWithPath(t *testing.T) {
 		<-promotionStarted
 	}
 
-	httpServer := httptest.NewServer(server.Handler())
+	httpServer := httptest.NewServer(operatorHandler(server))
 	defer httpServer.Close()
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, httpServer.URL+"/events", nil)
 	if err != nil {
@@ -329,7 +329,7 @@ func TestSlashNewRefreshesControllerTagAndForegroundRoute(t *testing.T) {
 	}
 	all, stop := bc.SubscribeAll()
 	defer stop()
-	httpServer := httptest.NewServer(server.Handler())
+	httpServer := httptest.NewServer(operatorHandler(server))
 	defer httpServer.Close()
 	resp, err := http.Post(httpServer.URL+"/submit", "application/json", strings.NewReader(`{"input":"/new"}`))
 	if err != nil {
@@ -492,7 +492,7 @@ func (c *balanceProbeController) RuntimeStateSnapshot() event.RuntimeStateSnapsh
 func TestStatusRuntimeQuerySkipsBalance(t *testing.T) {
 	bc := NewBroadcaster()
 	ctrl := &balanceProbeController{Controller: control.New(control.Options{Sink: bc})}
-	srv := httptest.NewServer(New(ctrl, bc, config.ServeConfig{}).Handler())
+	srv := httptest.NewServer(operatorHandler(New(ctrl, bc, config.ServeConfig{})))
 	defer srv.Close()
 
 	full, err := http.Get(srv.URL + "/status")
@@ -545,7 +545,7 @@ func TestBusyResumeDetachesAndReattachesRunningController(t *testing.T) {
 	server.buildControllerWithOptions = func(_ context.Context, _ string, opts boot.Options) (*control.Controller, error) {
 		return control.New(control.Options{Runner: blockingRunner{}, Sink: opts.Sink, SessionDir: opts.SessionDir, WorkspaceRoot: opts.WorkspaceRoot, Label: "test"}), nil
 	}
-	srv := httptest.NewServer(server.Handler())
+	srv := httptest.NewServer(operatorHandler(server))
 	defer srv.Close()
 	defer server.CloseBackground()
 
