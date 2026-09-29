@@ -39,6 +39,7 @@ export type HistoricalPreparationSurface = {
   operationId: string;
   status: SessionPreparationView["status"];
   errorCode?: string;
+  errorDetail?: string;
   retryable: boolean;
   revision?: number;
   isCurrent?: () => boolean;
@@ -59,7 +60,7 @@ export function reconcileHistoricalPreparation(expected: HistoricalPreparationSu
   if (!current || current.operationId !== expected.operationId || current.session !== expected.session
     || expected.isCurrent?.() === false || view.operationId !== expected.operationId
     || view.revision < (current.revision ?? 0) || view.status === "ready") return;
-  setHistoricalPreparation({ ...current, status: view.status, errorCode: view.errorCode,
+  setHistoricalPreparation({ ...current, status: view.status, errorCode: view.errorCode, errorDetail: view.errorDetail,
     retryable: view.retryable, revision: view.revision });
 }
 export type NavigationNotice = {

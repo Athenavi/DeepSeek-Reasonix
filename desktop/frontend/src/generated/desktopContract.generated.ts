@@ -3,7 +3,7 @@
 
 export const DESKTOP_PROTOCOL_VERSION = 11;
 
-export const DESKTOP_CONTRACT_DIGEST = "sha256:502efd6af4f2b5d07a27bbfbf126815ab2a03d75071de8ed9b744973e7cdcea8";
+export const DESKTOP_CONTRACT_DIGEST = "sha256:210f66b66e33ec4c371de07c74cfd69d22a831b23cbf6ef5dd44f2b156689241";
 
 export const DESKTOP_COMMANDS = [
   "AIRenameSession",
@@ -2595,6 +2595,7 @@ export interface HistoricalSessionView {
   format: string;
   status: string;
   errorCode?: string;
+  errorDetail?: string;
   session?: SessionRef | null;
   source?: SessionSourceRef | null;
 }
@@ -4394,6 +4395,7 @@ export interface SessionPreparationView {
   revision: number;
   target?: SessionRef | null;
   errorCode?: string;
+  errorDetail?: string;
   retryable: boolean;
 }
 

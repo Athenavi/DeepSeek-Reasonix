@@ -310,6 +310,7 @@ export function AppRuntimeView(props: AppRuntimeViewProps) {
           })} startupError={navigationCommands.manualCreation && navigationCommands.manualCreation.operation?.phase !== "ready" ? undefined : state.meta?.startupErr}
           historical={core.remoteSurfaceActive ? undefined : { tab: activeTab, navigate: session.desktopNavigation.enqueueNavigation,
             captureNavigation: () => { const intent = runtime.navigation.currentNavigationIntent(); return () => runtime.navigation.isNavigationIntentCurrent(intent); },
+            openRecoveryDetails: () => chromeCommands.openSidebarSettings("storage"),
           }} />
 
           <ChatPaneRegion
