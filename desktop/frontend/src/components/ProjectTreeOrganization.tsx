@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, lazy, Suspense, type DragEvent, type HTMLAttributes, type ReactNode } from "react";
-import { Archive, FolderMinus, Pencil } from "lucide-react";
+import { Archive, Clock, FolderMinus, Pencil } from "lucide-react";
 import { app } from "../lib/bridge";
 import { asArray } from "../lib/array";
 import type { Translator } from "../lib/i18n";
@@ -144,6 +144,7 @@ type TopicRowDragProps = Pick<HTMLAttributes<HTMLDivElement>, "draggable" | "onD
 
 export interface ProjectTreeOrganizationController {
   orderFor?(folder: ProjectNode): readonly string[];
+  resetOrderMenuItems(folder: ProjectNode, t: Translator, closeMenu: () => void): ContextMenuItem[];
   topicRow(node: ProjectNode, disabled: boolean): { className: string; props: TopicRowDragProps };
   topicMenuItems(node: ProjectNode, t: Translator): ContextMenuItem[];
   createGroup(folder: ProjectNode, title: string): void;
@@ -348,6 +349,13 @@ export function useProjectTreeOrganization({
 
   return {
     orderFor(folder) { return ordersByKey[projectTreeOrganizationKey(folder)] ?? []; },
+    resetOrderMenuItems(folder, t, closeMenu) {
+      const key = projectTreeOrganizationKey(folder);
+      return (ordersByKey[key]?.length ?? 0) > 0 ? [{
+        key: "reset-manual-order", icon: <Clock size={13} />, label: t("projectTree.resetManualOrder"),
+        onSelect: () => { closeMenu(); mutateGroups(key, (groups) => groups, { kind: "reset-order" }); },
+      }] : [];
+    },
     topicRow,
     topicMenuItems(node, t) {
       if (!(groupsRef.current[projectTreeOrganizationKey(node)] ?? []).some((group) => projectTreeGroupContainsNode(group, node))) return [];

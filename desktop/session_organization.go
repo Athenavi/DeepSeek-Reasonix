@@ -478,6 +478,9 @@ func (a *App) replaceSessionOrganizationGroups(ctx context.Context, scope, root 
 
 func applyOrganizationMutation(o *workspacestate.Organization, mutation SessionOrganizationMutation, key, anchor string) error {
 	switch mutation.Kind {
+	case "reset-order":
+		// Keep the recorded order and groups; time sorting ignores ranks while disabled.
+		o.ManualOrderEnabled = false
 	case "move":
 		if key == anchor {
 			return nil
