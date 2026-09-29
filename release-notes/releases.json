@@ -2,6 +2,264 @@
   "schemaVersion": 1,
   "releases": [
     {
+      "version": "1.39.5",
+      "date": "2026-09-29",
+      "channel": "stable",
+      "targetingVersion": 1,
+      "title": {
+        "en": "Reasonix 1.39.5",
+        "zh": "Reasonix 1.39.5"
+      },
+      "summary": {
+        "en": "Security hardening for project configuration and the sandbox, compaction that no longer waits indefinitely, and desktop fixes.",
+        "zh": "项目配置与沙盒的安全加固、上下文整理不再无限等待，以及若干桌面端修复。"
+      },
+      "surfaces": [
+        "desktop",
+        "cli"
+      ],
+      "guides": [],
+      "highlights": [
+        {
+          "kind": "security",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Project configuration can only narrow your settings",
+            "zh": "项目配置只能收紧你的设置"
+          },
+          "body": {
+            "en": "A repository's reasonix.toml and .reasonix/settings.json can no longer loosen the sandbox, permissions or approval settings; a project may only make them stricter. Programs a project declares (hooks, language servers, providers, the shell, ripgrep and browser paths) wait for your approval before first use, and a changed declaration or file asks again. \"Always allow\" answers given in a project are kept in your Reasonix home rather than in the repository.",
+            "zh": "仓库里的 reasonix.toml 和 .reasonix/settings.json 不能再放宽沙盒、权限和审批设置，只能让它们更严格。项目声明的程序（钩子、语言服务器、模型服务商、shell、ripgrep 和浏览器路径）首次使用前需要你批准，声明或相关文件变化后会再次询问。在项目里选择的「总是允许」改为保存在你的 Reasonix 主目录，而不是写进仓库。"
+          },
+          "refs": [
+            11209
+          ]
+        },
+        {
+          "kind": "fixed",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Compaction has a time limit and keeps your context on failure",
+            "zh": "上下文整理有时间上限，失败时保留原有上下文"
+          },
+          "body": {
+            "en": "Compacting a near-full conversation could wait indefinitely because server heartbeats kept the request alive. Each compaction now has one five-minute deadline, and a failed summary keeps the last committed context instead of falling back to a lossy truncation.",
+            "zh": "接近上限的对话在整理时可能无限等待，因为服务端心跳一直让请求保持活跃。现在每次整理有统一的五分钟上限；摘要失败时保留最后一次确认的上下文，不再退回有损截断。"
+          },
+          "refs": [
+            11171
+          ]
+        }
+      ],
+      "changes": {
+        "new": [],
+        "improved": [
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Permission rules for unknown tools are rejected when saved",
+              "zh": "保存权限规则时拒绝未知工具名"
+            },
+            "body": {
+              "en": "The desktop settings no longer save a rule such as deny = [\"rm\"] that names no registered tool and would never match. It suggests the Bash(...) form instead; MCP tool names are accepted while their server is disconnected.",
+              "zh": "桌面设置不再保存像 deny = [\"rm\"] 这样不对应任何已注册工具、永远不会生效的规则，并给出应写成的 Bash(...) 形式；MCP 服务暂时断开时，它的工具名仍可保存。"
+            },
+            "refs": [
+              11185
+            ]
+          },
+          {
+            "targets": [
+              "desktop",
+              "cli"
+            ],
+            "title": {
+              "en": "Provider failure details survive cleanup and restart",
+              "zh": "模型请求失败的诊断信息在收尾和重启后保留"
+            },
+            "body": {
+              "en": "A failed model request keeps its final status and failure class through cleanup, and reopening the session still shows it. Model input and retry behaviour are unchanged.",
+              "zh": "模型请求失败后，最终状态与失败分类在收尾时不再丢失，重新打开会话后仍能看到。发给模型的内容和重试策略不变。"
+            },
+            "refs": [
+              11152
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "The title-bar logo follows the theme",
+              "zh": "标题栏图标跟随主题配色"
+            },
+            "body": {
+              "en": "The title-bar mark now uses the theme's accent colour, so it stays visible on dark themes.",
+              "zh": "标题栏图标改用主题强调色，在深色主题下也清晰可见。"
+            },
+            "refs": [
+              11188
+            ]
+          }
+        ],
+        "fixed": [
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Two projects with similar paths no longer share sessions",
+              "zh": "路径相近的两个项目不再共用会话"
+            },
+            "body": {
+              "en": "Workspace roots such as front-end/app and front/end-app mapped to the same project folder, so a session saved in one could appear in the other. A newly added project that collides now gets its own folder; existing projects keep theirs.",
+              "zh": "像 front-end/app 与 front/end-app 这样的工作区会映射到同一个项目目录，一个项目里保存的会话可能出现在另一个项目中。现在新添加的项目若发生冲突会使用独立目录，已有项目保持不变。"
+            },
+            "refs": [
+              11190
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Archiving an old conversation archives all its versions",
+              "zh": "归档旧会话时一并归档它的所有版本"
+            },
+            "body": {
+              "en": "Archiving a conversation from an older version left its other versions in the sidebar, so it looked like the row kept coming back. All versions are now archived together.",
+              "zh": "归档旧版本留下的会话时，它的其他版本仍留在侧边栏，看起来像是归档后又出现。现在会一并归档所有版本。"
+            },
+            "refs": [
+              11187
+            ]
+          },
+          {
+            "targets": [
+              "desktop"
+            ],
+            "title": {
+              "en": "Updating an old Linux portable install restores the previous release on failure",
+              "zh": "旧版 Linux 便携安装升级失败时恢复原版本"
+            },
+            "body": {
+              "en": "Updaters from 1.18 to 1.19.2 on the Linux portable install could unpack an incomplete update. The migrator now refuses it and restores the previous release instead of leaving a broken install.",
+              "zh": "Linux 便携版 1.18 至 1.19.2 的更新程序可能只解出部分文件。现在迁移程序会拒绝这种不完整的更新并恢复原版本，不再留下无法启动的安装。"
+            },
+            "refs": [
+              11182
+            ]
+          }
+        ]
+      },
+      "upgrade": [
+        {
+          "level": "warning",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Programs a project declares need approval once",
+            "zh": "项目声明的程序需要批准一次"
+          },
+          "body": {
+            "en": "Hooks, language servers, providers, tools.shell.path, tools.search.rg_path and [browser] settings from a project's reasonix.toml or .reasonix/settings.json stay off until you approve them: run reasonix trust in the project (reasonix trust --yes to approve), or approve hooks in the desktop hooks settings. Model settings that named only an unapproved project provider fall back to your own.",
+            "zh": "项目 reasonix.toml 或 .reasonix/settings.json 里声明的钩子、语言服务器、模型服务商、tools.shell.path、tools.search.rg_path 和 [browser] 设置，在你批准前不会生效：在项目目录运行 reasonix trust 查看（reasonix trust --yes 批准），或在桌面端的钩子设置里批准。只指向未批准项目服务商的模型设置会回落到你自己的设置。"
+          }
+        },
+        {
+          "level": "info",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Approvals belong to one folder",
+            "zh": "批准按文件夹分别记录"
+          },
+          "body": {
+            "en": "Each worktree and each other folder of the same repository needs its own approval.",
+            "zh": "同一仓库的每个工作树、每个其他文件夹都需要分别批准。"
+          }
+        },
+        {
+          "level": "warning",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Program paths inside the workspace are no longer accepted",
+            "zh": "不再接受位于工作区内的程序路径"
+          },
+          "body": {
+            "en": "tools.shell.path, tools.search.rg_path and browser.chrome_path may not point into the workspace, a temporary directory, an allow_write directory or a toolchain cache. Point them at an installed program instead.",
+            "zh": "tools.shell.path、tools.search.rg_path 和 browser.chrome_path 不能再指向工作区、临时目录、allow_write 目录或工具链缓存里的程序，请改为指向已安装的程序。"
+          }
+        },
+        {
+          "level": "info",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "Sandbox, permission and proxy settings are read from your own config",
+            "zh": "沙盒、权限和代理设置只取你自己的配置"
+          },
+          "body": {
+            "en": "A project can only make [sandbox] and [permissions] stricter; permissions.mode, allow, allow_dynamic_bash, [network] proxy settings and the default tool approval mode come from your user config. Settings a project can no longer apply are listed as load warnings.",
+            "zh": "项目只能让 [sandbox] 和 [permissions] 更严格；permissions.mode、allow、allow_dynamic_bash、[network] 代理设置和默认工具审批模式都取自你的用户配置。项目里不再生效的设置会在加载时以警告列出。"
+          }
+        },
+        {
+          "level": "warning",
+          "targets": [
+            "desktop",
+            "cli"
+          ],
+          "title": {
+            "en": "The bot reads only your own config",
+            "zh": "机器人只读取你自己的配置"
+          },
+          "body": {
+            "en": "The [bot] section of a project's reasonix.toml is no longer read, and the desktop no longer copies a project's reasonix.toml into your config. Move bot settings into your user config.",
+            "zh": "不再读取项目 reasonix.toml 里的 [bot] 段，桌面端也不再把项目的 reasonix.toml 合并进你的配置。请把机器人设置移到用户配置中。"
+          }
+        }
+      ],
+      "risks": [],
+      "contributors": [
+        "esengine",
+        "KHG420",
+        "SivanCola"
+      ],
+      "links": {
+        "github": "https://github.com/esengine/DeepSeek-Reasonix/releases/tag/desktop-v1.39.5",
+        "compare": "https://github.com/esengine/DeepSeek-Reasonix/compare/desktop-v1.39.4...desktop-v1.39.5",
+        "download": "https://reasonix.io/?download=desktop&channel=stable#start"
+      },
+      "releaseId": "1.39.5",
+      "baseVersion": "1.39.5",
+      "status": "reviewed",
+      "previousRelease": "1.39.4",
+      "builds": {
+        "cli": "v1.39.5",
+        "desktop": "v1.39.5",
+        "npm": "1.39.5"
+      }
+    },
+    {
       "version": "1.39.4",
       "date": "2026-09-28",
       "channel": "stable",
