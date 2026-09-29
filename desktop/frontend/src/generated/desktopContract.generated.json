@@ -40676,6 +40676,13 @@
           "type": {
             "kind": "string"
           }
+        },
+        {
+          "name": "sortMode",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
         }
       ]
     },

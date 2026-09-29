@@ -3,7 +3,7 @@
 
 export const DESKTOP_PROTOCOL_VERSION = 11;
 
-export const DESKTOP_CONTRACT_DIGEST = "sha256:b4fd48e18f5b4e766fb0da34f9d382961a0f9e07ee8385ac7b387babf63fa6e0";
+export const DESKTOP_CONTRACT_DIGEST = "sha256:502efd6af4f2b5d07a27bbfbf126815ab2a03d75071de8ed9b744973e7cdcea8";
 
 export const DESKTOP_COMMANDS = [
   "AIRenameSession",
@@ -4370,6 +4370,7 @@ export interface SessionOrganizationMutation {
   position?: string;
   groupId?: string;
   title?: string;
+  sortMode?: string;
 }
 
 export interface SessionOrganizationSnapshot {

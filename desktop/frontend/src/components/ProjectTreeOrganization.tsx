@@ -161,15 +161,20 @@ export function useProjectTreeOrganization({
   refresh,
   onTopicsChanged,
   organizationRevision = 0,
+  sortMode,
   bindings = app,
 }: {
   tree: ProjectNode[];
   refresh: ProjectTreeRefresh;
   onTopicsChanged?: () => Promise<void> | void;
   organizationRevision?: number;
+  // The activity order on screen; a first manual move starts from it.
+  sortMode?: string;
   bindings?: ProjectTreeOrganizationBindings;
 }): ProjectTreeOrganizationController {
   const { showToast } = useToast();
+  const sortModeRef = useRef(sortMode);
+  sortModeRef.current = sortMode;
   const [ordersByKey, setOrdersByKey] = useState<Record<string, string[]>>({});
   const [dragTopicID, setDragTopicID] = useState<string | null>(null);
   const [dropTopic, setDropTopic] = useState<{ topicID: string; position: ProjectDropPosition } | null>(null);
@@ -318,7 +323,7 @@ export function useProjectTreeOrganization({
           mutateGroups(key, (groups) => moveNodeToGroup(groups, dragged, targetGroup.id), { kind: "set-group", target: projectNodeSelector(dragged), groupId: targetGroup.id });
         } else if (bindings.UpdateSessionOrganization && dragged) {
           void mutateSessionOrganization(bindings, { scope: context.scope, workspaceRoot: context.root, hostId: splitOrganizationKey(key).hostId },
-            { kind: "move", target: projectNodeSelector(dragged), anchor: projectNodeSelector(node), position })
+            { kind: "move", target: projectNodeSelector(dragged), anchor: projectNodeSelector(node), position, sortMode: sortModeRef.current })
             .then(saved => { setOrdersByKey(current => ({ ...current, [key]: saved.order })); return refresh({ reloadAllTopics: true }); })
             .then(() => onTopicsChanged?.()).catch(error => { showToast(String(error), "error"); loadGroups(key, true); return refresh({ reloadAllTopics: true }); });
         } else {
