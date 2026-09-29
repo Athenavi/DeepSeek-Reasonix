@@ -52,10 +52,9 @@ preserves the objective, while a replacement must be non-empty. `blocked` still
 requires a non-empty reason. Exact revision, host authority, and lifecycle checks
 still apply.
 
-The action-specific field compatibility update changes the static tool schema
-and description once on upgrade. Tool ordering and serialization remain
-deterministic across turns; the Bash and PowerShell cache-contract fixtures
-record the new prefix, without changing system prompts or compaction behavior.
+Successful results identify ignored non-null text fields and explicitly supplied
+unused round limits in their instruction. The returned goal is the effective
+state; accepting a lifecycle action does not apply edits carried in other fields.
 
 ## Schema Snapshot
 

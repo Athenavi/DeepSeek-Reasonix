@@ -14,6 +14,15 @@ func init() { tool.RegisterBuiltin(updateGoal{}) }
 
 type updateGoal struct{}
 
+type updateGoalInput struct {
+	GoalID        string             `json:"goal_id"`
+	Revision      uint64             `json:"revision"`
+	Action        tool.GoalAction    `json:"action"`
+	Objective     *string            `json:"objective"`
+	Limit         optionalRoundLimit `json:"max_goal_rounds"`
+	BlockedReason *string            `json:"blocked_reason"`
+}
+
 func (updateGoal) Name() string { return "update_goal" }
 func (updateGoal) Description() string {
 	return "Update the exact current goal revision. edit, pause, and resume require current direct-human authority; complete and blocked are also allowed during the exact autonomous goal round. There is no continue action: leaving an active goal unchanged continues it automatically. Only edit consumes objective/max_goal_rounds; only blocked consumes blocked_reason. Omit unused fields; supplied unused fields are ignored."
@@ -30,14 +39,7 @@ func (updateGoal) Execute(ctx context.Context, args json.RawMessage) (string, er
 	if strings.Contains(string(args), `"status"`) && !strings.Contains(string(args), `"action"`) {
 		return "", fmt.Errorf("legacy update_goal protocol is unsupported; call get_goal, then use goal_id, revision, and action; leaving an active goal unchanged continues automatically")
 	}
-	var input struct {
-		GoalID        string             `json:"goal_id"`
-		Revision      uint64             `json:"revision"`
-		Action        tool.GoalAction    `json:"action"`
-		Objective     *string            `json:"objective"`
-		Limit         optionalRoundLimit `json:"max_goal_rounds"`
-		BlockedReason *string            `json:"blocked_reason"`
-	}
+	var input updateGoalInput
 	if err := decodeGoalArgs(args, &input, "update_goal"); err != nil {
 		return "", err
 	}
@@ -77,7 +79,6 @@ func (updateGoal) Execute(ctx context.Context, args json.RawMessage) (string, er
 		}
 		request.BlockedReason = &goaldomain.BlockReason{Code: "model-blocked", Message: message}
 	case tool.GoalActionPause, tool.GoalActionResume, tool.GoalActionComplete:
-		// Lifecycle-only actions carry the exact reference and action above.
 	default:
 		return "", fmt.Errorf("action must be one of edit|pause|resume|complete|blocked")
 	}
@@ -93,5 +94,25 @@ func (updateGoal) Execute(ctx context.Context, args json.RawMessage) (string, er
 	if view.Phase == goaldomain.PhaseComplete || view.Phase == goaldomain.PhaseBlocked {
 		instruction = "Finish the current turn with an accurate final summary for the user; no further automatic goal round will be admitted."
 	}
+	if ignored := input.ignoredFields(); len(ignored) > 0 {
+		notice := fmt.Sprintf("Fields not applied: %s. Action %q ignores these fields; the returned goal contains the effective state.", strings.Join(ignored, ", "), input.Action)
+		instruction = strings.TrimSpace(instruction + " " + notice)
+	}
 	return goalToolResultWithInstruction(&view, instruction)
+}
+
+func (p updateGoalInput) ignoredFields() []string {
+	var fields []string
+	if p.Action != tool.GoalActionEdit {
+		if p.Objective != nil {
+			fields = append(fields, "objective")
+		}
+		if p.Limit.Present {
+			fields = append(fields, "max_goal_rounds")
+		}
+	}
+	if p.Action != tool.GoalActionBlocked && p.BlockedReason != nil {
+		fields = append(fields, "blocked_reason")
+	}
+	return fields
 }

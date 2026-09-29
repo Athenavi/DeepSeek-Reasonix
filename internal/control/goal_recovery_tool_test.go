@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -56,7 +57,10 @@ func (r *restoredGoalRunner) Run(ctx context.Context, _ string) error {
 		if validation.CompileErr != nil || len(validation.Violations) != 0 {
 			return errors.New("resume arguments failed host validation")
 		}
-		_, err = resumeTool.Execute(ctx, args)
+		result, err := resumeTool.Execute(ctx, args)
+		if err == nil && !strings.Contains(result, "Fields not applied: objective, max_goal_rounds, blocked_reason.") {
+			return errors.New("resume result did not disclose ignored fields")
+		}
 		return err
 	case 2:
 		return nil
