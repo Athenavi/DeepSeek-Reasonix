@@ -235,6 +235,9 @@ func (b bash) ExecuteDetailed(ctx context.Context, args json.RawMessage) (tool.D
 	if res, err, used := b.tryPersistent(ctx, p, sh, prepared, persistEnv(cmdEnv), start, ex); used {
 		return res, err
 	}
+	if err := checkCommandLine(argv); err != nil {
+		return bashPreflightFailure(ex, start, err)
+	}
 
 	if p.RunInBackground {
 		return b.startBackground(ctx, p, sh, argv, wrapped, cmdEnv, lease, &releaseLease, start, ex)
