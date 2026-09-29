@@ -382,7 +382,6 @@ func RenderTOMLForScope(c *Config, scope RenderScope) string {
 			if p.NoProxy {
 				b.WriteString("no_proxy    = true   # reach this base_url directly, never via the proxy\n")
 			}
-			b.WriteString(providerHTTPCompatibilityTOML(p))
 			b.WriteString("\n")
 		}
 	}
@@ -1042,7 +1041,6 @@ func RenderTOMLProjectDelta(c *Config) string {
 			if p.NoProxy {
 				b.WriteString("no_proxy    = true\n")
 			}
-			b.WriteString(providerHTTPCompatibilityTOML(p))
 			b.WriteString("\n")
 		}
 	}

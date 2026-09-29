@@ -72,10 +72,9 @@ func (e *ProviderEntry) FetchModelCatalogWithProxy(ctx context.Context, proxy ne
 	authMode := modelFetchAuthMode(e)
 	for _, u := range candidates {
 		models, err := openai.FetchModelCatalogWithOptions(ctx, u, key, openai.FetchModelsOptions{
-			HTTP1Only: e.HTTP1Only,
-			Headers:   e.Headers,
-			AuthMode:  authMode,
-			Proxy:     proxy,
+			Headers:  e.Headers,
+			AuthMode: authMode,
+			Proxy:    proxy,
 		})
 		if err == nil {
 			allowed := provider.FilterOpenCodeGoRequestModels(e.Kind, e.BaseURL, e.RequestURL, e.ChatURL, modelInfoIDs(models))
