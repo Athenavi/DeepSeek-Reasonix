@@ -42,6 +42,21 @@ for old session replay but are omitted from new provider schemas.
 | `web_fetch` | true | Fetch a URL over HTTPS/HTTP and return its text content. HTML pages are reduced to readable text; JSON / plain text / markdown bodies come back verbatim. Use to read documentation pages, API responses, or source files hosted somewhere the local filesystem can't reach. |
 | `write_file` | false | Create or replace a text file. A missing target is created without overwriting a concurrent creator. Replacing an existing target requires a current host observation from read_file or a prior successful structured mutation. |
 
+`update_goal` uses `action` to select its mutation fields: only `edit` consumes
+`objective` and `max_goal_rounds`, and only `blocked` consumes `blocked_reason`.
+Omit unused fields; schema-valid echoed values and placeholders in unused fields
+are ignored, including empty or null text fields. `pause`, `resume`, and `complete`
+never edit the objective or round limit. For `edit`, omitting `max_goal_rounds`
+preserves the limit while null removes it; omitting `objective` or passing null
+preserves the objective, while a replacement must be non-empty. `blocked` still
+requires a non-empty reason. Exact revision, host authority, and lifecycle checks
+still apply.
+
+The action-specific field compatibility update changes the static tool schema
+and description once on upgrade. Tool ordering and serialization remain
+deterministic across turns; the Bash and PowerShell cache-contract fixtures
+record the new prefix, without changing system prompts or compaction behavior.
+
 ## Schema Snapshot
 
 The exact canonical schemas are intentionally tested in code rather than copied by hand here. Run:
