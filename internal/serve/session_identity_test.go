@@ -133,7 +133,7 @@ func newExclusiveSessionServe(t *testing.T) (*Server, *control.Controller, *sess
 
 func TestExclusiveSessionPermissionPresetDoesNotFollowTheForegroundController(t *testing.T) {
 	srv, ctrl, service, first := newExclusiveSessionServe(t)
-	httpServer := httptest.NewServer(srv.Handler())
+	httpServer := httptest.NewServer(operatorHandler(srv))
 	defer httpServer.Close()
 	target, err := service.Create(t.Context(), session.CreateOptions{SessionID: "target"})
 	if err != nil {
