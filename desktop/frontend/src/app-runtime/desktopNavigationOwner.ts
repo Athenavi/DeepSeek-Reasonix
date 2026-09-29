@@ -149,6 +149,8 @@ export async function executeDesktopNavigation(input: DesktopNavigationCapture, 
         checkpoint();
         if (connection.sessionSource === "auto") await ports.openChannelSession(target.value, tab.id, seq);
         else await ports.resumeSession(target.value, tab.id, seq);
+      } else if (target.kind === "bot-session") {
+        tab = await openTopic(connection.scope, connection.workspaceRoot, "", `bot-session:local:${target.value}`);
       } else tab = await openTopic(connection.scope, connection.workspaceRoot, target.value);
       checkpoint(); ports.seedTab(tab);
       await refresh(); checkpoint(); ports.reveal(); ports.projectChanged(); return;
