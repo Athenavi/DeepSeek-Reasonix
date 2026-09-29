@@ -56,7 +56,7 @@ func (a *App) archiveHistoricalSource(selector SessionSelector) (SessionMutation
 			slog.Warn("desktop: sibling archive skipped", "source_key", id, "err", err)
 			continue
 		}
-		if historicalSourceRetired(state, siblingID) {
+		if historicalSourceMapped(state, siblingID) {
 			continue
 		}
 		siblingResult, err := a.archiveHistoricalSourceWithOperation(ctx, siblingID, siblingSource,
@@ -117,16 +117,12 @@ func recoveredLegacySiblings(source historicalSource) []string {
 	return siblings
 }
 
-// historicalSourceRetired reports a source whose version is already archived or
-// removed. Archiving it again can only compare the whole transcript's
-// fingerprint, which any other head's write moves, and materialize a copy.
-func historicalSourceRetired(state workspacestate.State, id string) bool {
-	mapping, ok, err := state.ResolveSource(id)
-	if err != nil || !ok {
-		return false
-	}
-	lifecycle := state.SessionStates[mapping.SessionID].Lifecycle
-	return lifecycle == workspacestate.Archived || lifecycle == workspacestate.Deleted
+// A sibling with a durable mapping already has its own lifecycle. Archiving a
+// different version must not retire an active session or copy an old version
+// again after another head changes the shared legacy transcript.
+func historicalSourceMapped(state workspacestate.State, id string) bool {
+	_, mapped, err := state.ResolveSource(id)
+	return err == nil && mapped
 }
 
 // headStartsConversation reports a head the user split off under a name. A

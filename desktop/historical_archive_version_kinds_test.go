@@ -8,6 +8,7 @@ import (
 	"reasonix/desktop/internal/workspacestate"
 	"reasonix/internal/agent"
 	"reasonix/internal/provider"
+	"reasonix/internal/session"
 )
 
 func forkLegacyVersion(t *testing.T, legacy *agent.Session, path, kind, name, answer string) string {
@@ -206,5 +207,71 @@ func TestArchivingLegacyConversationDoesNotRematerializeArchivedVersions(t *test
 		if perHead[head] != 1 {
 			t.Fatalf("version %s has %d mappings; want 1 (%v)", head, perHead[head], perHead)
 		}
+	}
+}
+
+func TestArchivingLegacyVersionKeepsAnotherOpenVersionActive(t *testing.T) {
+	isolateDesktopUserDirs(t)
+	path, legacy, mainHead := migrationSingleDAGFixture(t)
+	legacy.Add(provider.Message{ID: "answer", Role: provider.RoleAssistant, Content: "first answer"})
+	if err := legacy.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	otherHead := forkLegacyVersion(t, legacy, path, agent.HeadKindRewind, "", "second answer")
+	app, root, _ := legacyVersionApp(t, path)
+
+	prepared, err := app.PrepareSession(SessionSelector{Source: &SessionSourceRef{HostID: localDesktopHostID, Path: path, HeadID: mainHead}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.historicalImports.mu.Lock()
+	call := app.historicalImports.operations[prepared.OperationID]
+	app.historicalImports.mu.Unlock()
+	imported, err := waitHistoricalImport(call)
+	if err != nil {
+		t.Fatal(err)
+	}
+	active := session.SessionRef{HostID: localDesktopHostID, SessionID: imported.Session.SessionID}
+	if _, err := app.OpenSession(active); err != nil {
+		t.Fatal(err)
+	}
+	legacy.Add(provider.Message{Role: provider.RoleUser, Content: "the other legacy version continued"})
+	if err := legacy.Save(path); err != nil {
+		t.Fatal(err)
+	}
+	sourceBefore, err := desktopSourceFingerprint(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := countSessionDirs(t, root)
+
+	result, err := app.ArchiveSessionTarget(SessionSelector{Source: &SessionSourceRef{HostID: localDesktopHostID, Path: path, HeadID: otherHead}})
+	if err != nil || !result.Committed {
+		t.Fatalf("archive other version = %+v, %v", result, err)
+	}
+	state, err := app.workspaceRegistry().Load(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := state.SessionStates[active.SessionID].Lifecycle; got != workspacestate.Active {
+		t.Fatalf("open version lifecycle = %q, want active", got)
+	}
+	mainMappings := 0
+	for _, mapping := range state.SourceMappings {
+		if mapping.HeadID == mainHead {
+			mainMappings++
+			if mapping.SessionID != active.SessionID {
+				t.Fatalf("open version remapped from %s to %s", active.SessionID, mapping.SessionID)
+			}
+		}
+	}
+	if mainMappings != 1 {
+		t.Fatalf("open version has %d mappings, want one", mainMappings)
+	}
+	if got := countSessionDirs(t, root); got != before+1 {
+		t.Fatalf("archive wrote %d session directories, want one for the other version", got-before)
+	}
+	if sourceAfter, err := desktopSourceFingerprint(path); err != nil || sourceAfter != sourceBefore {
+		t.Fatalf("archive changed the legacy source: before=%s after=%s err=%v", sourceBefore, sourceAfter, err)
 	}
 }
