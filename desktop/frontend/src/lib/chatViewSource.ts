@@ -36,7 +36,7 @@ const sameReferences = (a: readonly unknown[] = [], b: readonly unknown[] = []) 
   a.length === b.length && a.every((item, index) => item === b[index]);
 const shallowSame = (a: object, b: object) => Object.keys(a).length === Object.keys(b).length
   && Object.entries(a).every(([key, value]) => value === (b as Record<string, unknown>)[key]);
-const foldViews = new Map<string, Set<string>>();
+const foldViews = new Map<string, Map<string, boolean>>();
 const emptyChildren: readonly Extract<ChatNode, { kind: "tool" }>[] = [];
 function proxyAuditCall(item: Item): string | undefined {
   if (item.kind !== "notice" || item.code !== "capability_proxy_audit") return undefined;
@@ -109,11 +109,11 @@ export class ChatSource implements ChatViewSource {
   private epoch = 0;
   private input?: ChatInput;
   private status: ChatStatus = { running: false, hydrating: true, hasOlder: false, loadingOlder: false };
-  private opened = new Set<string>();
+  private choices = new Map<string, boolean>();
   private displayKeyBySubmission = new Map<string, string>();
   private displayMessageBySubmission = new Map<string, string>();
   private displayKeyByMessage = new Map<string, string>();
-  constructor(readonly sessionKey: string) { this.opened = new Set(foldViews.get(sessionKey)); }
+  constructor(readonly sessionKey: string) { this.choices = new Map(foldViews.get(sessionKey)); }
   getOrderSnapshot = () => this.order;
   getNodeSnapshot = (key: string) => this.nodes.get(key);
   getStatusSnapshot = () => this.status;
@@ -207,11 +207,13 @@ export class ChatSource implements ChatViewSource {
       const hasProcess = current.items.some(item => item.kind === "tool" || item.kind === "phase" ||
         item.kind === "assistant" && (item !== answer && item.text.trim() || item.reasoning.trim()));
       const hasTrailingWork = current.items.slice(answerIndex + 1).some(item => item.kind === "tool" || item.kind === "phase" || item.kind === "assistant");
-      const foldable = Boolean(hasProcess && current.user && answer && !hasTrailingWork && !active && !failed && !current.user.failed);
+      // Every ended turn can fold by hand; only a settled one starts folded.
+      const settled = Boolean(answer && !hasTrailingWork && !failed && !current.user?.failed);
+      const foldable = Boolean(hasProcess && current.user && !active);
       const allCalls = current.items.filter((item): item is Extract<Item, { kind: "tool" }> => item.kind === "tool");
       const calls = allCalls.filter(item => !item.parentId);
       const subagentCount = calls.filter(item => ["task", "read_only_task", "parallel_tasks", "fleet", "subagent"].includes(item.name)).length;
-      add({ kind: "process", key: processKey, turnKey, members: stableMembers, foldable, collapsed: foldable && !this.opened.has(turnKey),
+      add({ kind: "process", key: processKey, turnKey, members: stableMembers, foldable, collapsed: foldable && !(this.choices.get(turnKey) ?? !settled),
         toolCallCount: calls.length - subagentCount, subagentCount,
         messageCount: current.items.filter(item => item.kind === "assistant" && item !== answer && item.text.trim()).length,
         failureCount: calls.filter(item => item.status === "error" || item.error).length });
@@ -264,7 +266,7 @@ export class ChatSource implements ChatViewSource {
         this.children.set(key, next); this.dirty.add(`${key}:children`);
       }
     }
-    for (const key of this.opened) if (!groupKeys.has(key)) this.opened.delete(key);
+    for (const key of this.choices.keys()) if (!groupKeys.has(key)) this.choices.delete(key);
     if (!sameKeys(this.order, order)) { this.order = order; this.orderDirty = true; }
     recordFrontendDiagnostic("transcript", "presentation", this.presentationStats());
   }
@@ -308,10 +310,12 @@ export class ChatSource implements ChatViewSource {
   toggleProcess(turnKey: string) {
     const node = this.nodes.get(`${turnKey}:process`);
     if (node?.kind !== "process") return;
-    if (node.collapsed) this.opened.add(turnKey); else this.opened.delete(turnKey);
-    foldViews.delete(this.sessionKey); foldViews.set(this.sessionKey, new Set(this.opened));
+    if (!node.foldable) return;
+    const open = node.collapsed;
+    this.choices.set(turnKey, open);
+    foldViews.delete(this.sessionKey); foldViews.set(this.sessionKey, new Map(this.choices));
     if (foldViews.size > 100) foldViews.delete(foldViews.keys().next().value!);
-    this.put({ ...node, collapsed: node.foldable && !this.opened.has(turnKey) });
+    this.put({ ...node, collapsed: !open });
     this.flush();
   }
   toolChildren(id: string) { return this.children.get(id) ?? emptyChildren; }
