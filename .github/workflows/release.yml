@@ -333,10 +333,10 @@ jobs:
         if: ${{ steps.publication.outputs.decision == 'publish' && inputs.candidate_artifact_name == '' }}
         with:
           version: '~> v2'
-          args: release --clean
+          args: release --clean${{ vars.CLI_PUBLISH_FROZEN == 'true' && ' --skip=homebrew' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_TOKEN: ${{ needs.resolve.outputs.channel == 'stable' && secrets.HOMEBREW_TAP_TOKEN || '' }}
+          HOMEBREW_TAP_TOKEN: ${{ needs.resolve.outputs.channel == 'stable' && vars.CLI_PUBLISH_FROZEN != 'true' && secrets.HOMEBREW_TAP_TOKEN || '' }}
           # workflow_dispatch recovery runs have a branch-shaped GITHUB_REF even
           # though checkout is on the release tag. Pin GoReleaser explicitly, and
           # avoid ambiguity from the three release tags sharing one commit.
@@ -359,7 +359,7 @@ jobs:
             --title "Reasonix CLI $TAG" --notes-file /tmp/release-notes.md --latest=false
 
       - name: Publish prepared Homebrew cask
-        if: ${{ inputs.candidate_artifact_name != '' && needs.resolve.outputs.channel == 'stable' }}
+        if: ${{ inputs.candidate_artifact_name != '' && needs.resolve.outputs.channel == 'stable' && vars.CLI_PUBLISH_FROZEN != 'true' }}
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: node release-control/scripts/publish-homebrew-cask.mjs "$RUNNER_TEMP/release-candidate/cli/reasonix.rb"
@@ -375,6 +375,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.resolve.outputs.tag }}
           NOTES_TAG: ${{ needs.resolve.outputs.notes_version }}
+          CLI_PUBLISH_FROZEN: ${{ vars.CLI_PUBLISH_FROZEN == 'true' }}
           HAS_R2: ${{ secrets.R2_ACCESS_KEY_ID != '' && secrets.R2_SECRET_ACCESS_KEY != '' && secrets.R2_ACCOUNT_ID != '' && secrets.R2_BUCKET != '' }}
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -475,6 +476,11 @@ jobs:
 
           if [ -z "$channel" ]; then
             echo "internal CLI release $TAG; Stable and Preview pointers remain unchanged"
+            exit 0
+          fi
+
+          if [ "${CLI_PUBLISH_FROZEN:-}" = "true" ]; then
+            echo "CLI publication is frozen; the $channel pointer stays where it is and $TAG keeps only its immutable record"
             exit 0
           fi
 
@@ -612,6 +618,7 @@ jobs:
       - name: Check npm latest dist-tag freshness
         env:
           TAG: ${{ needs.resolve.outputs.tag }}
+          CLI_PUBLISH_FROZEN: ${{ vars.CLI_PUBLISH_FROZEN == 'true' }}
         run: |
           set -euo pipefail
           case "$TAG" in
@@ -624,6 +631,10 @@ jobs:
           if ! git ls-remote --exit-code origin "refs/tags/npm-v$version" >/dev/null; then
             echo "::error::the npm-v$version tag was never pushed — the npm channel is being left behind and 'npm update -g' users will be downgraded to the old 'latest'. Push it: git tag npm-v$version ${TAG} && git push origin npm-v$version (or 'npm dist-tag add reasonix@$version latest' for an already-published version)."
             exit 1
+          fi
+          if [ "${CLI_PUBLISH_FROZEN:-}" = "true" ]; then
+            echo "CLI publication is frozen; npm latest belongs to another line, only the npm-v$version tag is required"
+            exit 0
           fi
           for attempt in 1 2 3 4 5 6; do
             got="$(npm view reasonix dist-tags.latest 2>/dev/null || true)"
