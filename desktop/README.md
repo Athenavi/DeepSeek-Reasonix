@@ -193,8 +193,8 @@ not depend on homepage badge semantics. Self-update behavior by platform:
 
 ### Code signing — first launch
 
-- **Windows** — stable builds carry an Authenticode signature (SignPath, approved
-  per release; `release-desktop.yml` verifies every payload binary through
+- **Windows** — stable builds carry an Authenticode signature (Certum certificate;
+  `release-desktop.yml` verifies every payload binary through
   `scripts/verify-windows-authenticode.ps1` and fails the release otherwise). A
   brand-new version can still show SmartScreen until the signature accumulates
   reputation: *More info → Run anyway*.
